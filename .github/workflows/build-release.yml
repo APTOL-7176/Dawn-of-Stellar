@@ -13,6 +13,7 @@ permissions:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
@@ -53,13 +54,19 @@ jobs:
       if: matrix.os == 'windows-latest'
       shell: bash
       run: |
-        pyinstaller ${{ matrix.build_options }} --add-data "sounds;sounds" main.py
+        echo "🎵 사운드 파일 크기 확인..."
+        du -sh sounds/ || echo "sounds 폴더 없음"
+        echo "⚡ PyInstaller 빌드 시작 (사운드 포함)..."
+        pyinstaller ${{ matrix.build_options }} --add-data "sounds;sounds" --distpath dist --workpath build main.py
 
     - name: Build with PyInstaller (Linux/Mac)
       if: matrix.os != 'windows-latest'
       shell: bash
       run: |
-        pyinstaller ${{ matrix.build_options }} --add-data "sounds:sounds" main.py
+        echo "🎵 사운드 파일 크기 확인..."
+        du -sh sounds/ || echo "sounds 폴더 없음"
+        echo "⚡ PyInstaller 빌드 시작 (사운드 포함)..."
+        pyinstaller ${{ matrix.build_options }} --add-data "sounds:sounds" --distpath dist --workpath build main.py
 
     - name: Prepare release files
       shell: bash
@@ -72,7 +79,9 @@ jobs:
         fi
         cp README.md release_package/
         cp requirements.txt release_package/
-        cp SOUND_FIX_GUIDE.md release_package/
+        if [ -f "SOUND_FIX_GUIDE.md" ]; then
+          cp SOUND_FIX_GUIDE.md release_package/
+        fi
         if [ "${{ matrix.os }}" == "windows-latest" ]; then
           cp "파이썬_설치.bat" release_package/ 2>/dev/null || true
           cp "게임시작_간편.bat" release_package/ 2>/dev/null || true
@@ -87,7 +96,11 @@ jobs:
         fi
         echo "" >> release_package/실행방법.txt
         echo "🎵 사운드: FFVII 스타일 BGM/SFX 내장!" >> release_package/실행방법.txt
-        echo "📋 문제 해결: SOUND_FIX_GUIDE.md 참조" >> release_package/실행방법.txt
+        if [ -f "SOUND_FIX_GUIDE.md" ]; then
+          echo "📋 문제 해결: SOUND_FIX_GUIDE.md 참조" >> release_package/실행방법.txt
+        else
+          echo "📋 문제 해결: GitHub Issues에서 도움 요청" >> release_package/실행방법.txt
+        fi
 
     - name: Create ZIP archive (Windows)
       if: matrix.os == 'windows-latest'
