@@ -27,6 +27,9 @@ venv/
 ENV/
 env/
 
+# Portable Python (too large for git)
+python/
+
 # IDE/Editor
 .vscode/
 .idea/
