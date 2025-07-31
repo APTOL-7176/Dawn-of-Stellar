@@ -49,9 +49,9 @@ __pycache__/
 *.log
 *.tmp
 
-# Audio files (too large for git)
-game/audio/
-sounds/
+# Audio files (too large for git) - COMMENTED OUT TO INCLUDE SOUNDS
+# game/audio/
+# sounds/
 
 # Test files and development scripts
 test_*.py
