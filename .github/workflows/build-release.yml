@@ -84,15 +84,19 @@ jobs:
           echo "📋 문제 해결: GitHub Issues에서 도움 요청" >> release_package/실행방법.txt
         fi
 
-    - name: Create ZIP archive
+    - name: Create ZIP archive (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: powershell
+      run: |
+        cd release_package
+        Compress-Archive -Path * -DestinationPath ..\${{ matrix.artifact_name }}.zip
+
+    - name: Create ZIP archive (Linux/Mac)
+      if: matrix.os != 'windows-latest'
       shell: bash
       run: |
         cd release_package
-        if [ "${{ matrix.os }}" == "windows-latest" ]; then
-          powershell Compress-Archive -Path * -DestinationPath ../${{ matrix.artifact_name }}.zip
-        else
-          zip -r ../${{ matrix.artifact_name }}.zip *
-        fi
+        zip -r ../${{ matrix.artifact_name }}.zip *
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
