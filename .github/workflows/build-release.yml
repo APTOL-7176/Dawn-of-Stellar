@@ -49,10 +49,17 @@ jobs:
         mkdir -p sounds/bgm sounds/sfx
       shell: bash
 
-    - name: Build with PyInstaller
-      run: |
-        pyinstaller ${{ matrix.build_options }} main.py
+    - name: Build with PyInstaller (Windows)
+      if: matrix.os == 'windows-latest'
       shell: bash
+      run: |
+        pyinstaller ${{ matrix.build_options }} --add-data "sounds;sounds" main.py
+
+    - name: Build with PyInstaller (Linux/Mac)
+      if: matrix.os != 'windows-latest'
+      shell: bash
+      run: |
+        pyinstaller ${{ matrix.build_options }} --add-data "sounds:sounds" main.py
 
     - name: Prepare release files
       shell: bash
@@ -65,9 +72,7 @@ jobs:
         fi
         cp README.md release_package/
         cp requirements.txt release_package/
-        if [ -f "SOUND_FIX_GUIDE.md" ]; then
-          cp SOUND_FIX_GUIDE.md release_package/
-        fi
+        cp SOUND_FIX_GUIDE.md release_package/
         if [ "${{ matrix.os }}" == "windows-latest" ]; then
           cp "파이썬_설치.bat" release_package/ 2>/dev/null || true
           cp "게임시작_간편.bat" release_package/ 2>/dev/null || true
@@ -81,12 +86,8 @@ jobs:
           echo "Linux/Mac: 터미널에서 ./Dawn-of-Stellar 실행" >> release_package/실행방법.txt
         fi
         echo "" >> release_package/실행방법.txt
-        echo "🎵 사운드: 사운드 파일 없어도 정상 작동합니다!" >> release_package/실행방법.txt
-        if [ -f "SOUND_FIX_GUIDE.md" ]; then
-          echo "📋 문제 해결: SOUND_FIX_GUIDE.md 참조" >> release_package/실행방법.txt
-        else
-          echo "📋 문제 해결: GitHub Issues에서 도움 요청" >> release_package/실행방법.txt
-        fi
+        echo "🎵 사운드: FFVII 스타일 BGM/SFX 내장!" >> release_package/실행방법.txt
+        echo "📋 문제 해결: SOUND_FIX_GUIDE.md 참조" >> release_package/실행방법.txt
 
     - name: Create ZIP archive (Windows)
       if: matrix.os == 'windows-latest'
@@ -139,20 +140,21 @@ jobs:
           
           ### ✅ 특징
           - **Python 설치 불필요** - 실행 파일에 모든 것이 포함되어 있습니다!
-          - **🎵 사운드 시스템 완전 개선** - 사운드 파일 없어도 정상 작동합니다
+          - **🎵 FFVII 사운드 시스템 내장** - 90개 BGM + 724개 SFX 완전 포함!
           - **안전한 오디오 처리** - pygame 오류 시에도 게임이 계속됩니다
           - **콘솔 출력 지원** - 오류 발생 시 메시지를 확인할 수 있습니다
           
           ### 🎵 사운드 시스템 개선사항
-          - FFVII 스타일 BGM/SFX 지원 (814개 사운드 파일)
-          - 사운드 파일 자동 탐지 및 안전한 경로 처리
-          - 사운드 없어도 게임 정상 진행 (DummyAudioManager)
-          - 실행 파일 크래시 문제 완전 해결
+          - **FFVII 원작 사운드** - 모든 BGM과 SFX 파일 내장
+          - **층별 다른 BGM** - 진행도에 따른 배경음악 변화
+          - **전투/이벤트 효과음** - 액션마다 생생한 사운드
+          - **자동 경로 탐지** - 실행 파일 위치에 관계없이 정상 작동
           
           ### 🔧 문제 해결
           - 실행 시 오류가 발생하면 콘솔 창의 오류 메시지를 확인해주세요
           - Windows Defender에서 차단될 수 있습니다 (신뢰할 수 있는 소프트웨어입니다)
-          - 문제가 있으면 GitHub Issues에서 도움을 요청해주세요
+          - 사운드 문제는 SOUND_FIX_GUIDE.md를 참조해주세요
+          - 기타 문제는 GitHub Issues에서 도움을 요청해주세요
         draft: false
         prerelease: false
         token: ${{ secrets.GITHUB_TOKEN }}
