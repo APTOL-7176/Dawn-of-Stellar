@@ -227,22 +227,44 @@ S - 아래로 이동   D - 오른쪽 이동
 - 시야 제한 시스템으로 긴장감 증대
 - 균형잡힌 적 배치와 아이템 드롭
 
-## 💾 독립 실행형 배포 (예정)
+## 💾 독립 실행형 배포
 
 ### 🐍 Python 미설치 환경에서도 실행 가능!
 
-Python이 설치되지 않은 컴퓨터에서도 게임을 즐길 수 있도록 **두 가지 배포 방식**을 제공할 예정입니다.
+Python이 설치되지 않은 컴퓨터에서도 게임을 즐길 수 있도록 **GitHub Actions 자동 빌드**를 통해 실행파일을 제공합니다.
 
-#### 📦 방법 1: PyInstaller 단일 실행 파일
+#### 📦 자동 빌드 시스템
 **배포 방법:**
-- **PyInstaller**: Python 런타임과 모든 의존성을 포함한 단일 실행 파일 생성
-- **내장 라이브러리**: numpy, colorama, keyboard 등 모든 필요 라이브러리 번들링
-- **크로스 플랫폼**: Windows, macOS, Linux 각각의 실행 파일 제공
+- **GitHub Actions**: 태그 생성 시 자동으로 3개 플랫폼용 실행파일 생성
+- **PyInstaller**: Python 런타임과 모든 의존성을 포함한 단일 실행 파일
+- **크로스 플랫폼**: Windows, Linux, macOS 동시 지원
 
 **사용자 이점:**
 - ✅ **Python 설치 완전히 불필요** - 런타임 내장으로 즉시 실행
-- ✅ 라이브러리 설치 과정 생략
-- ✅ 다운로드 후 바로 게임 시작
+- ✅ **GitHub Releases에서 다운로드** - 간편한 배포
+- ✅ **콘솔 출력 지원** - 오류 발생 시 디버깅 가능
+- ✅ **BGM 없이도 정상 작동** - 사운드 파일 불필요
+
+#### 📥 다운로드 방법
+1. **[GitHub Releases 페이지](https://github.com/APTOL-7176/Dawn-of-Stellar/releases)** 방문
+2. 최신 릴리즈에서 운영체제에 맞는 ZIP 파일 다운로드:
+   - **Windows**: `Dawn-of-Stellar-Windows.zip`
+   - **Linux**: `Dawn-of-Stellar-Linux.zip`
+   - **macOS**: `Dawn-of-Stellar-macOS.zip`
+3. ZIP 파일 압축 해제
+4. 실행파일 더블클릭으로 게임 시작!
+
+#### 🛠️ 개발자용: 릴리즈 생성 방법
+```bash
+# 새 버전 태그 생성 및 푸시
+git tag v1.0.0
+git push origin v1.0.0
+
+# GitHub Actions가 자동으로:
+# 1. 3개 플랫폼용 실행파일 빌드
+# 2. GitHub Releases에 자동 업로드
+# 3. 릴리즈 노트 자동 생성
+```
 - ✅ 파일 크기 최적화 (약 20-30MB)
 
 #### 🎒 방법 2: 포터블 파이썬 패키지
