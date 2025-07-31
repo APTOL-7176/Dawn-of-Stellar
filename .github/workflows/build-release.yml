@@ -61,7 +61,14 @@ jobs:
         fi
         cp README.md release_package/
         cp requirements.txt release_package/
-        cp SOUND_FIX_GUIDE.md release_package/
+        if [ -f "SOUND_FIX_GUIDE.md" ]; then
+          cp SOUND_FIX_GUIDE.md release_package/
+        fi
+        if [ "${{ matrix.os }}" == "windows-latest" ]; then
+          cp "파이썬_설치.bat" release_package/ 2>/dev/null || true
+          cp "게임시작_간편.bat" release_package/ 2>/dev/null || true
+          cp "문제해결.bat" release_package/ 2>/dev/null || true
+        fi
         echo "# Dawn Of Stellar - 실행 가이드" > release_package/실행방법.txt
         echo "" >> release_package/실행방법.txt
         if [ "${{ matrix.os }}" == "windows-latest" ]; then
@@ -71,7 +78,11 @@ jobs:
         fi
         echo "" >> release_package/실행방법.txt
         echo "🎵 사운드: 사운드 파일 없어도 정상 작동합니다!" >> release_package/실행방법.txt
-        echo "📋 문제 해결: SOUND_FIX_GUIDE.md 참조" >> release_package/실행방법.txt
+        if [ -f "SOUND_FIX_GUIDE.md" ]; then
+          echo "📋 문제 해결: SOUND_FIX_GUIDE.md 참조" >> release_package/실행방법.txt
+        else
+          echo "📋 문제 해결: GitHub Issues에서 도움 요청" >> release_package/실행방법.txt
+        fi
 
     - name: Create ZIP archive
       shell: bash
@@ -133,7 +144,7 @@ jobs:
           ### 🔧 문제 해결
           - 실행 시 오류가 발생하면 콘솔 창의 오류 메시지를 확인해주세요
           - Windows Defender에서 차단될 수 있습니다 (신뢰할 수 있는 소프트웨어입니다)
-          - 자세한 사운드 문제 해결: SOUND_FIX_GUIDE.md 참조
+          - 문제가 있으면 GitHub Issues에서 도움을 요청해주세요
         draft: false
         prerelease: false
       env:
