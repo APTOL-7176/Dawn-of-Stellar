@@ -1,0 +1,99 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Game specific files to ignore
+saves/
+auto_saves/
+__pycache__/
+*.log
+*.tmp
+
+# Audio files (too large for git)
+game/audio/
+sounds/
+
+# Test files and development scripts
+test_*.py
+*_test.py
+demo_*.py
+simple_test.py
+combat_log_test.py
+complete_*.py
+system_test*.py
+fix_*.py
+trait_methods.py
+launcher_old.py
+launcher_simple.py
+
+# Reports and documentation (development only)
+*_REPORT.md
+*_GUIDE.md
+BGM_Guide.md
+BRAVE_SYSTEM_REPORT.md
+GAME_EXPANSION_PLAN.md
+GAME_LAUNCHER_GUIDE.md
+PROJECT_CLEANUP_REPORT.md
+RECIPE_WIKI*.md
+SYSTEM_COMPLETION_REPORT.md
+TODO_ROADMAP.md
+AI_SYSTEM_COMPLETE.txt
+
+# Archive and backup files
+archive/
+*.backup
+*.py.backup
+
+# Progress and save files
+combat_log.json
+game_settings.json
+meta_progress.json
+permanent_progress.json
+test_output.txt
+
+# Batch files are now INCLUDED (commented out)
+# *.bat
+
+# Exclude specific development batch files
+개발모드.bat
+일반모드.bat
+
+# Cache files
+.github/
