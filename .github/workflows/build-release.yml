@@ -40,7 +40,7 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller
 
-    - name: Create sounds directory (fix BGM issue)
+    - name: Create sounds directory (for audio system)
       run: |
         mkdir -p sounds/bgm sounds/sfx
       shell: bash
@@ -61,6 +61,7 @@ jobs:
         fi
         cp README.md release_package/
         cp requirements.txt release_package/
+        cp SOUND_FIX_GUIDE.md release_package/
         echo "# Dawn Of Stellar - 실행 가이드" > release_package/실행방법.txt
         echo "" >> release_package/실행방법.txt
         if [ "${{ matrix.os }}" == "windows-latest" ]; then
@@ -68,6 +69,9 @@ jobs:
         else
           echo "Linux/Mac: 터미널에서 ./Dawn-of-Stellar 실행" >> release_package/실행방법.txt
         fi
+        echo "" >> release_package/실행방법.txt
+        echo "🎵 사운드: 사운드 파일 없어도 정상 작동합니다!" >> release_package/실행방법.txt
+        echo "📋 문제 해결: SOUND_FIX_GUIDE.md 참조" >> release_package/실행방법.txt
 
     - name: Create ZIP archive
       shell: bash
@@ -75,117 +79,6 @@ jobs:
         cd release_package
         if [ "${{ matrix.os }}" == "windows-latest" ]; then
           powershell Compress-Archive -Path * -DestinationPath ../${{ matrix.artifact_name }}.zip
-        else
-          zip -r ../${{ matrix.artifact_name }}.zip *
-        fi
-
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: ${{ matrix.artifact_name }}
-        path: ${{ matrix.artifact_name }}.zip
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-
-    steps:
-    - name: Download all artifacts
-      uses: actions/download-artifact@v3
-
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: |
-          Dawn-of-Stellar-Windows/Dawn-of-Stellar-Windows.zip
-          Dawn-of-Stellar-Linux/Dawn-of-Stellar-Linux.zip
-          Dawn-of-Stellar-macOS/Dawn-of-Stellar-macOS.zip
-        body: |
-          ## 🎮 Dawn Of Stellar - 새 버전 출시!
-          
-          ### 📥 다운로드 방법
-          1. 아래에서 운영체체에 맞는 파일 다운로드
-          2. ZIP 파일 압축 해제
-          3. 실행 파일 더블클릭으로 게임 시작!
-          
-          ### 💻 지원 플랫폼
-          - **Windows**: Dawn-of-Stellar-Windows.zip
-          - **Linux**: Dawn-of-Stellar-Linux.zip  
-          - **macOS**: Dawn-of-Stellar-macOS.zip
-          
-          ### ✅ 특징
-          - **Python 설치 불필요** - 실행 파일에 모든 것이 포함되어 있습니다!
-          - **BGM 없이 실행** - 사운드 파일 없어도 정상 작동합니다
-          - **콘솔 출력 지원** - 오류 발생 시 메시지를 확인할 수 있습니다
-          
-          ### 🐛 문제 해결
-          - 실행 시 오류가 발생하면 콘솔 창의 오류 메시지를 확인해주세요
-          - Windows Defender에서 차단될 수 있습니다 (신뢰할 수 있는 소프트웨어입니다)
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
-        include:
-          - os: windows-latest
-            executable_name: Dawn-of-Stellar.exe
-            artifact_name: Dawn-of-Stellar-Windows
-          - os: ubuntu-latest
-            executable_name: Dawn-of-Stellar
-            artifact_name: Dawn-of-Stellar-Linux
-          - os: macos-latest
-            executable_name: Dawn-of-Stellar
-            artifact_name: Dawn-of-Stellar-macOS
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Python 3.11
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pyinstaller
-
-    - name: Build with PyInstaller (Windows)
-      if: matrix.os == 'windows-latest'
-      run: |
-        pyinstaller --onefile --noconsole --name="Dawn-of-Stellar" --icon=assets/icon.ico main.py
-      continue-on-error: true
-
-    - name: Build with PyInstaller (Linux/macOS)
-      if: matrix.os != 'windows-latest'
-      run: |
-        pyinstaller --onefile --name="Dawn-of-Stellar" main.py
-
-    - name: Prepare release files
-      shell: bash
-      run: |
-        mkdir release
-        if [ "${{ matrix.os }}" == "windows-latest" ]; then
-          cp dist/Dawn-of-Stellar.exe release/
-          cp README.md release/
-          cp requirements.txt release/
-        else
-          cp dist/Dawn-of-Stellar release/
-          cp README.md release/
-          cp requirements.txt release/
-        fi
-
-    - name: Create ZIP archive
-      shell: bash
-      run: |
-        cd release
-        if [ "${{ matrix.os }}" == "windows-latest" ]; then
-          7z a ../${{ matrix.artifact_name }}.zip *
         else
           zip -r ../${{ matrix.artifact_name }}.zip *
         fi
@@ -225,7 +118,22 @@ jobs:
           - **Linux**: Dawn-of-Stellar-Linux.zip  
           - **macOS**: Dawn-of-Stellar-macOS.zip
           
-          > ✅ **Python 설치 불필요** - 실행 파일에 모든 것이 포함되어 있습니다!
+          ### ✅ 특징
+          - **Python 설치 불필요** - 실행 파일에 모든 것이 포함되어 있습니다!
+          - **🎵 사운드 시스템 완전 개선** - 사운드 파일 없어도 정상 작동합니다
+          - **안전한 오디오 처리** - pygame 오류 시에도 게임이 계속됩니다
+          - **콘솔 출력 지원** - 오류 발생 시 메시지를 확인할 수 있습니다
+          
+          ### 🎵 사운드 시스템 개선사항
+          - FFVII 스타일 BGM/SFX 지원 (814개 사운드 파일)
+          - 사운드 파일 자동 탐지 및 안전한 경로 처리
+          - 사운드 없어도 게임 정상 진행 (DummyAudioManager)
+          - 실행 파일 크래시 문제 완전 해결
+          
+          ### � 문제 해결
+          - 실행 시 오류가 발생하면 콘솔 창의 오류 메시지를 확인해주세요
+          - Windows Defender에서 차단될 수 있습니다 (신뢰할 수 있는 소프트웨어입니다)
+          - 자세한 사운드 문제 해결: SOUND_FIX_GUIDE.md 참조
         draft: false
         prerelease: false
       env:

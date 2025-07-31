@@ -274,15 +274,29 @@ class DawnOfStellarGame:
         
         # 🚀 신규 통합 시스템들
         self.skill_manager = get_skill_manager() if callable(get_skill_manager) else None
-        self.audio_system = get_unified_audio_system(debug_mode=True) if callable(get_unified_audio_system) else None
+        
+        # 🎵 안전한 오디오 시스템 초기화
+        try:
+            print("🎵 오디오 시스템을 초기화하는 중...")
+            self.audio_system = get_unified_audio_system(debug_mode=True) if callable(get_unified_audio_system) else None
+            self.sound_manager = self.audio_system  # 통합된 오디오 시스템 사용
+            
+            if self.sound_manager and hasattr(self.sound_manager, 'mixer_available') and self.sound_manager.mixer_available:
+                print("✅ 오디오 시스템 초기화 성공!")
+            else:
+                print("🔇 오디오 시스템을 사용할 수 없습니다. 사운드 없이 게임을 진행합니다.")
+                
+        except Exception as e:
+            print(f"⚠️ 사운드 시스템 초기화 실패: {e}")
+            print("🔇 사운드 없이 게임을 계속합니다.")
+            self.audio_system = None
+            self.sound_manager = None
+        
         self.enemy_manager = get_enemy_manager() if callable(get_enemy_manager) else None
         self.save_manager = get_save_manager() if callable(get_save_manager) else None
         self.auto_save_manager = get_auto_save_manager() if callable(get_auto_save_manager) else None
         self.ui_manager = get_ui_manager() if callable(get_ui_manager) else None
         self.tutorial_manager = get_tutorial_manager() if callable(get_tutorial_manager) else None
-        
-        # 🎵 통합 사운드 시스템 (모든 사운드 기능 통합)
-        self.sound_manager = self.audio_system  # 통합된 오디오 시스템 사용
         
         # 🎯 적응형 밸런스 시스템 초기화
         try:
@@ -315,28 +329,52 @@ class DawnOfStellarGame:
         print(f"{bright_yellow('✨ 28명 캐릭터, 165+ 상태효과, 100+ 적, 통합 사운드 시스템, 튜토리얼 시스템 활성화! ✨')}")
         
         # 🎵 시작 BGM 재생 (통합 사운드 시스템 사용)
-        if self.sound_manager:
-            self.sound_manager.set_floor_bgm(1)
+        if self.sound_manager and hasattr(self.sound_manager, 'mixer_available') and self.sound_manager.mixer_available:
+            try:
+                self.sound_manager.set_floor_bgm(1)
+                print("🎵 시작 BGM 재생 중...")
+            except Exception as e:
+                print(f"⚠️ BGM 재생 실패: {e}")
+        else:
+            print("🔇 사운드 매니저를 사용할 수 없습니다.")
         
         self.encounter_rate_increase = 0.01  # 걸음당 1% 증가로 원복
+    
+    def safe_play_bgm(self, bgm_name_or_type, **kwargs):
+        """안전한 BGM 재생 헬퍼"""
+        if self.sound_manager and hasattr(self.sound_manager, 'mixer_available') and self.sound_manager.mixer_available:
+            try:
+                self.sound_manager.play_bgm(bgm_name_or_type, **kwargs)
+            except Exception as e:
+                print(f"⚠️ BGM 재생 실패: {e}")
+    
+    def safe_play_sfx(self, sfx_name_or_type, **kwargs):
+        """안전한 SFX 재생 헬퍼"""
+        if self.sound_manager and hasattr(self.sound_manager, 'mixer_available') and self.sound_manager.mixer_available:
+            try:
+                self.sound_manager.play_sfx(sfx_name_or_type, **kwargs)
+            except Exception as e:
+                print(f"⚠️ SFX 재생 실패: {e}")
+    
+    def safe_set_floor_bgm(self, floor: int):
+        """안전한 층별 BGM 설정 헬퍼"""
+        if self.sound_manager and hasattr(self.sound_manager, 'set_floor_bgm'):
+            try:
+                self.sound_manager.set_floor_bgm(floor)
+            except Exception as e:
+                print(f"⚠️ 층별 BGM 설정 실패: {e}")
         
     def initialize_game(self):
         """게임 초기화"""
         # 🎵 메인 메뉴 BGM 재생
         print("🎵 메인 테마 재생 중...")
-        if self.audio_system:
-            self.audio_system.play_bgm("Main theme of FFVII", loop=True)
-        elif self.ffvii_sound:
-            self.ffvii_sound.play_bgm("Main theme of FFVII", loop=True)
+        self.safe_play_bgm("Main theme of FFVII", loop=True)
         
         self.display.show_title()
         
         # 🎵 캐릭터 선택 BGM으로 변경
         print("🎵 캐릭터 선택 음악으로 변경...")
-        if self.audio_system:
-            self.audio_system.play_bgm("prelude", loop=True)
-        elif self.ffvii_sound:
-            self.ffvii_sound.play_bgm("prelude", loop=True)
+        self.safe_play_bgm("prelude", loop=True)
         
         self.show_character_selection()
         self.apply_permanent_bonuses()  # 영구 성장 보너스 적용
@@ -344,7 +382,7 @@ class DawnOfStellarGame:
         
         # 🎵 게임 시작 BGM 재생
         print("🎵 던전 테마로 변경...")
-        self.sound_manager.play_bgm("dungeon_theme", loop=True)
+        self.safe_play_bgm("dungeon_theme", loop=True)
         print("✅ 게임 초기화 완료!")
         time.sleep(1)
         
@@ -582,8 +620,7 @@ class DawnOfStellarGame:
     def create_auto_party_legacy(self):
         """자동 파티 생성 (기존 시스템)"""
         # 🎵 파티 생성 화면 BGM 재생 (평화로운 테마)
-        if hasattr(self, 'sound_manager') and self.sound_manager:
-            self.sound_manager.play_bgm("peaceful", loop=True)
+        self.safe_play_bgm("peaceful", loop=True)
         
         print(f"\n{bright_cyan('🤖 자동 파티 생성 시스템', True)}")
         print("="*60)
@@ -624,8 +661,7 @@ class DawnOfStellarGame:
         print(f"\n{bright_green('파티 생성 완료! 🎉')}")
         
         # 🎵 파티 생성 완료 BGM 재생 (캐릭터 선택 테마)
-        if hasattr(self, 'sound_manager') and self.sound_manager:
-            self.sound_manager.play_bgm("character_select", loop=True)
+        self.safe_play_bgm("character_select", loop=True)
         
         self.keyboard.wait_for_key("🚀 아무 키나 눌러 모험을 시작하세요...")
         
@@ -678,23 +714,20 @@ class DawnOfStellarGame:
         
         # 🎵 층수에 맞는 BGM 재생 (던전 테마)
         print("🎵 게임 BGM을 시작합니다...")
-        if hasattr(self, 'sound_manager') and self.sound_manager:
-            try:
-                # 현재 층수에 따른 BGM 선택
-                current_floor = getattr(self.world, 'current_level', 1)
-                if current_floor <= 10:
-                    bgm_name = "dungeon"  # 초반 던전
-                elif current_floor <= 20:
-                    bgm_name = "dungeon_deep"  # 깊은 던전
-                else:
-                    bgm_name = "mysterious"  # 신비로운 던전
-                
-                self.sound_manager.play_bgm(bgm_name, loop=True)
-                print(f"✅ BGM 재생 중: {bgm_name}")
-            except Exception as e:
-                print(f"⚠️ BGM 재생 실패: {e}")
-        else:
-            print("⚠️ 사운드 매니저를 찾을 수 없습니다.")
+        try:
+            # 현재 층수에 따른 BGM 선택
+            current_floor = getattr(self.world, 'current_level', 1)
+            if current_floor <= 10:
+                bgm_name = "dungeon"  # 초반 던전
+            elif current_floor <= 20:
+                bgm_name = "dungeon_deep"  # 깊은 던전
+            else:
+                bgm_name = "mysterious"  # 신비로운 던전
+            
+            self.safe_play_bgm(bgm_name, loop=True)
+            print(f"✅ BGM 재생 중: {bgm_name}")
+        except Exception as e:
+            print(f"⚠️ BGM 재생 실패: {e}")
         
         print("✅ 게임 초기화 완료!")
         
@@ -985,7 +1018,7 @@ class DawnOfStellarGame:
             if action:  # 빈 문자열이 아닌 경우만 메시지 출력
                 print(f"잘못된 선택입니다: '{action}'")
                 print("도움말을 보려면 'H'를 누르세요.")
-                self.sound_manager.play_sfx("menu_error")
+                self.safe_play_sfx("menu_error")
     
     def show_cooking_menu(self):
         """요리 메뉴 표시"""
@@ -1011,7 +1044,7 @@ class DawnOfStellarGame:
                     
                 # 식재료 획득 효과음
                 try:
-                    self.sound_manager.play_sfx("item_pickup")
+                    self.safe_play_sfx("item_pickup")
                 except:
                     pass
     
@@ -1086,11 +1119,11 @@ class DawnOfStellarGame:
                         # 아이템 희귀도별 효과음
                         rarity = getattr(result, 'rarity', None)
                         if rarity and rarity.name in ["유니크", "레전더리"]:
-                            self.sound_manager.play_sfx("winning_prize")  # 특별한 아이템
+                            self.safe_play_sfx("winning_prize")  # 특별한 아이템
                         elif rarity and rarity.name in ["레어", "에픽"]:
-                            self.sound_manager.play_sfx("treasure_open")  # 좋은 아이템
+                            self.safe_play_sfx("treasure_open")  # 좋은 아이템
                         else:
-                            self.sound_manager.play_sfx("item_pickup")  # 일반 아이템
+                            self.safe_play_sfx("item_pickup")  # 일반 아이템
                         self.items_collected += 1
                         
                         # 아이템 획득 메시지를 천천히 보여주기
@@ -1098,7 +1131,7 @@ class DawnOfStellarGame:
                     else:
                         print(f"⚠️ {target_member.name}의 인벤토리가 가득 찼습니다!")
                         # 인벤토리 가득함 효과음
-                        self.sound_manager.play_sfx("menu_error")
+                        self.safe_play_sfx("menu_error")
                         self.keyboard.wait_for_key("🔑 아무 키나 눌러 계속...")
                 pass
             else:
