@@ -17,7 +17,74 @@ class FieldCookingInterface:
         self.cooking_system = cooking_system
     
     def show_cooking_menu(self):
-        """요리 메뉴 표시"""
+        """요리 메뉴 표시 - 커서 방식"""
+        try:
+            from .cursor_menu_system import create_simple_menu
+            
+            while True:
+                print(f"\n{CYAN}{'='*80}{RESET}")
+                print(f"{WHITE}{BOLD}🍳 야외 요리 & 채집 시스템{RESET}")
+                print(f"{CYAN}{'='*80}{RESET}")
+                
+                # 파티의 실제 총 무게한계 계산
+                total_weight = self.cooking_system.get_total_inventory_weight()
+                max_weight = self._get_party_max_weight()
+                
+                weight_ratio = total_weight / max_weight if max_weight > 0 else 0
+                if weight_ratio >= 0.8:
+                    weight_color = RED
+                elif weight_ratio >= 0.6:
+                    weight_color = YELLOW
+                else:
+                    weight_color = GREEN
+                    
+                print(f"{WHITE}현재 인벤토리 무게: {weight_color}{total_weight:.1f}kg / {max_weight:.1f}kg{RESET}")
+                print(f"{WHITE}요리 레벨: {GREEN}{self.cooking_system.cooking_level}{RESET} "
+                      f"(경험치: {self.cooking_system.cooking_experience}/{self.cooking_system.cooking_level * 100}){RESET}")
+                
+                # 상시 도전 모드 - 재료 개수만 표시
+                total_ingredients = sum(self.cooking_system.ingredients_inventory.values())
+                print(f"\n{CYAN}📦 보유 재료: 총 {total_ingredients}개 (내용물 미확인){RESET}")
+                
+                # 커서 메뉴 옵션 생성
+                options = [
+                    "🍳 요리 제작하기 (감각에 의존)",
+                    "🍽️ 완성된 요리 보기",
+                    "🍴 요리 먹기",
+                    "✨ 활성 요리 효과 보기",
+                    "🌿 채집 장소 가기"
+                ]
+                
+                descriptions = [
+                    "재료를 사용해서 새로운 요리를 만듭니다",
+                    "완성된 요리 목록을 확인합니다",
+                    "완성된 요리를 섭취하여 버프를 받습니다",
+                    "현재 활성화된 요리 효과들을 확인합니다",
+                    "채집 장소로 이동하여 재료를 수집합니다"
+                ]
+                
+                menu = create_simple_menu("요리 & 채집 메뉴", options, descriptions)
+                result = menu.run()
+                
+                if result is None:  # 취소 (Q키)
+                    break
+                elif result == 0:
+                    self._show_challenge_cooking()  # 상시 도전 모드
+                elif result == 1:
+                    self.cooking_system.show_cooked_food_inventory()
+                elif result == 2:
+                    self._show_food_consumption()
+                elif result == 3:
+                    self.cooking_system.show_active_buffs()
+                elif result == 4:
+                    self._show_gathering_menu()
+                    
+        except ImportError:
+            # 폴백: 기존 방식
+            self._show_cooking_menu_fallback()
+    
+    def _show_cooking_menu_fallback(self):
+        """요리 메뉴 폴백 (기존 방식)"""
         while True:
             print(f"\n{CYAN}{'='*80}{RESET}")
             print(f"{WHITE}{BOLD}🍳 야외 요리 & 채집 시스템{RESET}")
@@ -107,7 +174,64 @@ class FieldCookingInterface:
         return self.cooking_system.get_max_inventory_weight()
     
     def _show_gathering_menu(self):
-        """채집 장소 메뉴"""
+        """채집 장소 메뉴 - 커서 방식"""
+        try:
+            from .cursor_menu_system import create_simple_menu
+            
+            print(f"\n{CYAN}{'='*80}{RESET}")
+            print(f"{WHITE}{BOLD}🌍 채집 장소 선택{RESET}")
+            print(f"{CYAN}{'='*80}{RESET}")
+            
+            # 채집 상태 정보 표시
+            try:
+                from game.gathering_limiter import get_gathering_status
+                status = get_gathering_status()
+                
+                cooldown_remaining = status['cooldown_remaining_steps']
+                if cooldown_remaining > 0:
+                    print(f"{RED}⏰ 채집 쿨다운: {cooldown_remaining}걸음 더 이동 필요{RESET}")
+                    from .input_utils import KeyboardInput
+                    KeyboardInput().wait_for_key("아무 키나 눌러 계속...")
+                    return
+                else:
+                    print(f"{GREEN}✅ 채집 가능{RESET}")
+                print()
+            except ImportError:
+                pass
+            
+            locations = list(GATHERING_LOCATIONS.items())
+            
+            # 커서 메뉴 옵션 생성
+            options = []
+            descriptions = []
+            
+            for location_name, location_data in locations:
+                options.append(f"{location_data['icon']} {location_name}")
+                
+                common_items = ", ".join(location_data['common'][:3])
+                uncommon_items = ", ".join(location_data['uncommon'][:2]) 
+                rare_items = ", ".join(location_data['rare'])
+                
+                desc = f"{location_data['description']}\n"
+                desc += f"일반: {common_items}... | 희귀: {uncommon_items}... | 전설: {rare_items}..."
+                descriptions.append(desc)
+            
+            menu = create_simple_menu("채집 장소 선택", options, descriptions)
+            result = menu.run()
+            
+            if result is None:  # 취소 (Q키)
+                return
+            
+            if 0 <= result < len(locations):
+                location_name = locations[result][0]
+                self._start_gathering(location_name)
+                
+        except ImportError:
+            # 폴백: 기존 방식
+            self._show_gathering_menu_fallback()
+    
+    def _show_gathering_menu_fallback(self):
+        """채집 장소 메뉴 폴백 (기존 방식)"""
         print(f"\n{CYAN}{'='*80}{RESET}")
         print(f"{WHITE}{BOLD}🌍 채집 장소 선택{RESET}")
         print(f"{CYAN}{'='*80}{RESET}")
@@ -198,6 +322,9 @@ class FieldCookingInterface:
             print(f"\n{CYAN}총 {len(gathered_ingredients)}개의 재료를 채집했습니다!{RESET}")
         else:
             print(f"{YELLOW}아무것도 찾지 못했습니다... 다음에 다시 시도해보세요.{RESET}")
+        
+        # 채집 결과를 보여준 후 사용자 입력 대기
+        input(f"\n{CYAN}아무 키나 눌러 돌아가기...{RESET}")
     
     def _show_cooking_recipes(self):
         """요리 제작 메뉴"""

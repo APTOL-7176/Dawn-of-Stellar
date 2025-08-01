@@ -224,7 +224,15 @@ class Enemy(Character):
     def _determine_level(self, floor: int) -> int:
         """층수에 따른 레벨 결정"""
         base_level = floor
-        level_variance = random.randint(-2, 3)  # -2~+3 레벨 변동
+        
+        # 초기 층에서는 레벨 변동을 거의 없앰
+        if floor <= 4:
+            level_variance = 0  # 1-4층: 변동 없음 (정확히 층수 = 레벨)
+        elif floor <= 10:
+            level_variance = random.randint(-1, 1)  # 5-10층: -1~+1 변동만
+        else:
+            level_variance = random.randint(-2, 3)  # 11층+: -2~+3 변동
+            
         final_level = max(1, base_level + level_variance)
         
         # 등급별 레벨 보너스
@@ -263,7 +271,12 @@ class Enemy(Character):
         """적 전용 스탯 설정 (적응형 밸런스 적용)"""
         base_stats = self._get_base_stats_by_type()
         
-        # 합리적 난이도 증가 (배율들이 곱셈으로 너무 강해지지 않게 조정)
+        # 난이도별 multiplier 적용
+        from config import game_config
+        enemy_hp_multiplier = game_config.get_difficulty_setting('enemy_hp_multiplier')
+        enemy_damage_multiplier = game_config.get_difficulty_setting('enemy_damage_multiplier')
+        
+        # 합리적 난이도 증가
         if self.floor <= 5:
             floor_multiplier = 1.0 + (self.floor - 1) * 0.2  # 1-5층: 20% 증가 (1.0~1.8)
         elif self.floor <= 10:
@@ -271,11 +284,11 @@ class Enemy(Character):
         elif self.floor <= 20:
             floor_multiplier = 2.55 + (self.floor - 11) * 0.1  # 11-20층: 10% 증가 (2.55~3.45)
         elif self.floor <= 30:
-            floor_multiplier = 3.45 + (self.floor - 21) * 0.08  # 21-30층: 8% 증가 (3.45~4.25)
+            floor_multiplier = 3.45 + (self.floor - 21) * 0.08  # 21-30층: 8% 증가 (3.45~4.17)
         elif self.floor <= 50:
-            floor_multiplier = 4.25 + (self.floor - 31) * 0.05  # 31-50층: 5% 증가 (4.25~5.2)
+            floor_multiplier = 4.17 + (self.floor - 31) * 0.05  # 31-50층: 5% 증가 (4.17~5.12)
         else:
-            floor_multiplier = 5.2 + (self.floor - 51) * 0.03  # 51층+: 3% 증가
+            floor_multiplier = 5.12 + (self.floor - 51) * 0.03  # 51층+: 3% 증가
         
         # 적응형 밸런스 시스템 적용
         try:
@@ -298,16 +311,16 @@ class Enemy(Character):
                 continue
             
             # 스탯별 성장률 조정 (플레이어 성장 패턴과 유사하게)
-            # 플레이어 추가 강화 요소 고려: 장비(+30-80%), 패시브(+20-50%), 버프(+15-30%)
-            if stat_name == "max_hp":
-                # HP는 가장 많이 성장 (플레이어와 유사)
+            # 난이도별 적 스탯 배율 적용
+            if stat_name in ["max_hp"]:
+                # HP는 가장 많이 성장 (플레이어와 유사) + 난이도 배율
                 # 플레이어 HP 강화 요소: 장비 +50%, 패시브 +30% 고려
-                stat_floor_multiplier = floor_multiplier * 1.4  # 40% 추가 성장 (1.2→1.4)
+                stat_floor_multiplier = floor_multiplier * 1.4 * enemy_hp_multiplier  # 40% 추가 성장 (1.2→1.4) + 난이도
                 stat_level_multiplier = 1 + (self.level - 1) * 0.15  # 레벨당 15% (12%→15%)
             elif stat_name in ["attack", "magic_power"]:
-                # 공격력은 중간 성장
+                # 공격력은 중간 성장 + 난이도 배율
                 # 플레이어 공격력 강화: 무기 +80%, 패시브 +50%, 버프 +30% 고려
-                stat_floor_multiplier = floor_multiplier * 1.3  # 30% 추가 성장 (1.0→1.3)
+                stat_floor_multiplier = floor_multiplier * 1.3 * enemy_damage_multiplier  # 30% 추가 성장 (1.0→1.3) + 난이도
                 stat_level_multiplier = 1 + (self.level - 1) * 0.12  # 레벨당 12% (8%→12%)
             elif stat_name in ["defense", "magic_defense"]:
                 # 방어력은 중간 성장
@@ -332,7 +345,7 @@ class Enemy(Character):
             # 스탯별 배율 적용
             adjusted_value = base_value * stat_floor_multiplier * rank_multiplier * stat_level_multiplier
             
-            # 적응형 배율 적용 (HP, 물리공격력, 마법공격력에 적용)
+            # 적응형 배율 적용 (HP, 물리공격력, 마법공격력에 적용) - 난이도는 이미 적용됨
             if stat_name in ["max_hp"]:
                 final_value = int(adjusted_value * adaptive_hp_multiplier)
             elif stat_name in ["attack"]:
@@ -386,17 +399,28 @@ class Enemy(Character):
         
         # Brave 시스템 (적용되지 않을 수도 있지만 호환성을 위해)
         try:
-            # 기본값 설정 (이미 위에서 계산됨)
+            # BRV 값이 이미 계산되어 설정되었는지 확인
             if not hasattr(self, 'current_brv'):
-                self.current_brv = base_stats.get("init_brv", 500)
+                # BRV가 계산되지 않은 경우에만 기본값 적용
+                init_brv = base_stats.get("init_brv", 500)
+                # 층수와 레벨에 맞게 초기 BRV 조정
+                brv_floor_multiplier = floor_multiplier * 1.1
+                brv_level_multiplier = 1 + (self.level - 1) * 0.06
+                self.current_brv = int(init_brv * brv_floor_multiplier * rank_multiplier * brv_level_multiplier)
             if not hasattr(self, 'max_brv'):
-                self.max_brv = base_stats.get("max_brv", 2500)
+                # max_brv가 계산되지 않은 경우에만 기본값 적용
+                max_brv = base_stats.get("max_brv", 2500)
+                # 층수와 레벨에 맞게 최대 BRV 조정
+                brv_floor_multiplier = floor_multiplier * 1.1
+                brv_level_multiplier = 1 + (self.level - 1) * 0.06
+                self.max_brv = int(max_brv * brv_floor_multiplier * rank_multiplier * brv_level_multiplier)
             
             # 추가 BRV 관련 속성들 (플레이어와 호환)
             self.int_brv = self.current_brv  # 초기 BRV = 현재 BRV
             self.initial_brave = self.current_brv  # 호환성을 위한 별칭
             self.max_brave = self.max_brv  # 호환성을 위한 별칭
             self.current_brave = self.current_brv  # 호환성을 위한 별칭
+            self.brave_points = self.current_brv  # brave_combat.py와 호환
             self.is_broken = False  # Break 상태
             self.brv_regen = max(1, self.speed // 15)  # BRV 자동 회복량 (적은 양)
             self.brave_bonus_rate = 1.0  # BRV 획득 배율
@@ -409,9 +433,9 @@ class Enemy(Character):
         stats_table = {
             # 일반 몬스터 (1-10층) - 1층부터 위협적이게 조정
             EnemyType.GOBLIN: {
-                "max_hp": 140, "max_mp": 45, "attack": 35, "defense": 25,
-                "magic_power": 22, "magic_defense": 20, "speed": 35,
-                "init_brv": 580, "max_brv": 1200, "element": ElementType.NEUTRAL
+                "max_hp": 140, "max_mp": 35, "attack": 30, "defense": 20,
+                "magic_power": 18, "magic_defense": 15, "speed": 30,
+                "init_brv": 400, "max_brv": 800, "element": ElementType.NEUTRAL
             },
             EnemyType.ORC: {
                 "max_hp": 180, "max_mp": 55, "attack": 42, "defense": 32,
@@ -426,7 +450,7 @@ class Enemy(Character):
             EnemyType.ZOMBIE: {
                 "max_hp": 200, "max_mp": 35, "attack": 38, "defense": 28,
                 "magic_power": 16, "magic_defense": 24, "speed": 15,
-                "init_brv": 680, "max_brv": 1200, "element": ElementType.DARK  # 언데드
+                "init_brv": 680, "max_brv": 1350, "element": ElementType.DARK  # 언데드
             },
             EnemyType.SPIDER: {
                 "max_hp": 120, "max_mp": 50, "attack": 36, "defense": 22,
@@ -441,7 +465,7 @@ class Enemy(Character):
             EnemyType.BAT: {
                 "max_hp": 110, "max_mp": 55, "attack": 32, "defense": 18,
                 "magic_power": 22, "magic_defense": 20, "speed": 55,
-                "init_brv": 520, "max_brv": 960, "element": ElementType.DARK  # 어둠 속성
+                "init_brv": 520, "max_brv": 980, "element": ElementType.DARK  # 어둠 속성
             },
             EnemyType.WOLF: {
                 "max_hp": 160, "max_mp": 50, "attack": 40, "defense": 26,
@@ -451,7 +475,7 @@ class Enemy(Character):
             EnemyType.SLIME: {
                 "max_hp": 170, "max_mp": 60, "attack": 28, "defense": 36,
                 "magic_power": 32, "magic_defense": 32, "speed": 20,
-                "init_brv": 580, "max_brv": 1200, "element": ElementType.POISON  # 독성 슬라임
+                "init_brv": 580, "max_brv": 1180, "element": ElementType.POISON  # 독성 슬라임
             },
             EnemyType.IMP: {
                 "max_hp": 135, "max_mp": 75, "attack": 34, "defense": 24,
@@ -1076,6 +1100,24 @@ class Enemy(Character):
             drops.extend(random.sample(specific_drops, min(len(specific_drops), 2)))
         
         return drops
+    
+    def get_enemy_skill_power(self, base_power: float) -> float:
+        """적 스킬 위력에 배수 적용"""
+        try:
+            # NewSkillSystem에서 적 스킬 배수 가져오기
+            from .new_skill_system import skill_system
+            return base_power * skill_system.enemy_skill_power_multiplier
+        except ImportError:
+            # 폴백: 1.3배 고정 배수
+            return base_power * 1.3
+    
+    def get_modified_skill(self, skill: Dict) -> Dict:
+        """적 스킬에 배수를 적용하여 반환"""
+        modified_skill = skill.copy()
+        if 'power' in modified_skill:
+            original_power = modified_skill['power']
+            modified_skill['power'] = self.get_enemy_skill_power(original_power)
+        return modified_skill
     
     def _get_enemy_skills(self) -> List[Dict]:
         """적 전용 스킬 (모든 적 타입에 스킬 추가)"""

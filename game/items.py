@@ -1,8 +1,9 @@
 """
 아이템 시스템 (스테이지별 드롭률 포함)
+내구도 시스템과 특수 효과 통합
 """
 
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 from enum import Enum
 import random
 
@@ -23,6 +24,38 @@ class ItemRarity(Enum):
     RARE = "희귀"
     EPIC = "영웅"
     LEGENDARY = "전설"
+
+
+class ElementalAffinity(Enum):
+    """원소 친화도"""
+    NEUTRAL = "무속성"
+    FIRE = "화염"
+    ICE = "냉기"
+    LIGHTNING = "번개"
+    EARTH = "대지"
+    WIND = "바람"
+    WATER = "물"
+    LIGHT = "빛"
+    DARK = "어둠"
+    POISON = "독"
+
+
+class ItemEffect:
+    """아이템 효과 클래스"""
+    def __init__(self, name: str, description: str, effect_type: str, 
+                 effect_value: Any, condition: str = "always", boss_immune: bool = False):
+        self.name = name
+        self.description = description
+        self.effect_type = effect_type  # stat_boost, combat_effect, special_ability 등
+        self.effect_value = effect_value
+        self.condition = condition  # always, combat, low_hp, high_brave 등
+        self.boss_immune = boss_immune  # 보스에게 면역인 효과
+        
+    def can_apply_to_target(self, target) -> bool:
+        """대상에게 효과 적용 가능한지 확인 (보스 면역 체크)"""
+        if self.boss_immune and hasattr(target, 'is_boss') and target.is_boss:
+            return False
+        return True
 
 
 class DropRateManager:
@@ -112,7 +145,7 @@ class DropRateManager:
 
 class Item:
     """
-    아이템 클래스
+    아이템 클래스 - 내구도 시스템 통합
     
     주요 속성 설명:
     - vision_range: 무기/장비의 가시거리 증가 효과 (매우 중요!)
@@ -122,12 +155,15 @@ class Item:
         * +3: 기본 가시거리에서 3칸 추가 (예언자의 수정구)
         * +4+: 매우 넓은 가시거리 (드래곤의 눈, 신의 시야)
         * 파티 전체의 vision_range 효과가 누적되어 최종 시야 결정
-    - min_level: 아이템 사용을 위한 최소 레벨 제한
-    - rarity: 희귀도 (Common, Uncommon, Rare, Epic, Legendary)
+    - max_durability: 최대 내구도
+    - current_durability: 현재 내구도
+    - is_broken: 파괴 상태 여부
     """
     
     def __init__(self, name: str, item_type: ItemType, rarity: ItemRarity, 
-                 description: str, value: int = 0, weight: float = 1.0, min_level: int = 1):
+                 description: str, value: int = 0, weight: float = 1.0, min_level: int = 1,
+                 max_durability: int = None, special_effects: List[ItemEffect] = None,
+                 elemental_affinity: ElementalAffinity = ElementalAffinity.NEUTRAL):
         self.name = name
         self.item_type = item_type
         self.rarity = rarity
@@ -136,13 +172,169 @@ class Item:
         self.weight = weight  # 무게
         self.min_level = min_level  # 최소 레벨 제한
         self.stats = {}  # 능력치 보너스 (vision_range 포함)
-        self.effects = []  # 특수 효과
+        self.effects = []  # 특수 효과 (구버전 호환)
+        self.special_effects = special_effects or []  # 새로운 특수 효과 시스템
+        self.elemental_affinity = elemental_affinity  # 원소 친화도
         self.elemental_resistances = {}  # 원소 저항 (ElementType: float)
         self.elemental_weaknesses = {}   # 원소 약점 (ElementType: float)
         self.special_properties = []     # 특수 속성들
         self.stage_scaling = self._calculate_stage_scaling()  # 스테이지별 스케일링
         self.field_usable = False  # 필드에서 사용 가능 여부
         self.combat_usable = True  # 전투에서 사용 가능 여부 (기본값 True)
+        
+        # 내구도 시스템
+        self.max_durability = max_durability or self._get_default_durability()
+        self.current_durability = self.max_durability
+        self.repair_cost_multiplier = self._get_repair_cost_multiplier()
+        self.upgrade_level = 0  # 강화 수준
+        self.is_broken = False  # 파괴 상태
+        self.protection_turns = 0  # 보호 효과 남은 턴 수
+        
+    def _get_default_durability(self) -> int:
+        """희귀도별 기본 내구도 반환"""
+        # 소모품은 내구도가 없음
+        if self.item_type == ItemType.CONSUMABLE or self.item_type == ItemType.MATERIAL:
+            return 0
+            
+        # 희귀도별 기본 내구도 설정
+        rarity_durability = {
+            ItemRarity.COMMON: 80,
+            ItemRarity.UNCOMMON: 100,
+            ItemRarity.RARE: 120,
+            ItemRarity.EPIC: 150,
+            ItemRarity.LEGENDARY: 200
+        }
+        
+        return rarity_durability.get(self.rarity, 100)
+    
+    def _get_repair_cost_multiplier(self) -> float:
+        """희귀도별 수리 비용 배수 반환"""
+        rarity_multiplier = {
+            ItemRarity.COMMON: 1.0,
+            ItemRarity.UNCOMMON: 1.2,
+            ItemRarity.RARE: 1.5,
+            ItemRarity.EPIC: 2.0,
+            ItemRarity.LEGENDARY: 3.0
+        }
+        
+        return rarity_multiplier.get(self.rarity, 1.0)
+    
+    def get_durability_percentage(self) -> float:
+        """내구도 퍼센트 반환"""
+        if self.max_durability == 0:
+            return 100.0  # 소모품은 항상 100%
+        return (self.current_durability / self.max_durability) * 100
+    
+    def get_durability_status(self) -> str:
+        """내구도 상태 문자열"""
+        if self.max_durability == 0:
+            return ""  # 소모품은 내구도 표시 안함
+            
+        percentage = self.get_durability_percentage()
+        if percentage >= 80:
+            return "🟢"
+        elif percentage >= 50:
+            return "🟡"
+        elif percentage >= 20:
+            return "🟠"
+        elif percentage > 0:
+            return "🔴"
+        else:
+            return "💥"
+    
+    def damage_durability(self, amount: int = 1) -> bool:
+        """내구도 감소 - 파괴 여부 반환"""
+        if self.max_durability == 0 or self.is_broken:
+            return False
+        
+        # 보호 효과가 있으면 내구도 감소 방지
+        if self.protection_turns > 0:
+            self.protection_turns = max(0, self.protection_turns - 1)
+            return False
+        
+        self.current_durability = max(0, self.current_durability - amount)
+        
+        if self.current_durability <= 0:
+            self.is_broken = True
+            return True
+        
+        return False
+    
+    def repair(self, amount: int = None) -> int:
+        """수리 - 수리 비용 반환"""
+        if self.max_durability == 0:
+            return 0  # 소모품은 수리 불가
+            
+        if amount is None:
+            amount = self.max_durability - self.current_durability
+        
+        actual_repair = min(amount, self.max_durability - self.current_durability)
+        self.current_durability += actual_repair
+        
+        if self.current_durability >= self.max_durability:
+            self.is_broken = False
+        
+        # 수리 비용 계산
+        base_cost = actual_repair * self.repair_cost_multiplier
+        total_cost = int(base_cost * (1.0 + self.upgrade_level * 0.2))  # 강화 수준에 따라 비용 증가
+        
+        return total_cost
+    
+    def get_effective_stats(self) -> Dict[str, int]:
+        """내구도에 따른 실제 능력치 반환"""
+        if self.max_durability == 0:
+            return self.stats.copy()  # 소모품은 내구도 영향 없음
+            
+        if self.is_broken:
+            return {stat: 0 for stat in self.stats if isinstance(self.stats[stat], (int, float))}
+        
+        # 내구도가 낮을수록 능력치 감소
+        durability_factor = self.get_durability_percentage() / 100
+        
+        # 내구도 50% 이하부터 능력치 감소 시작
+        if durability_factor < 0.5:
+            effectiveness = 0.3 + (durability_factor * 1.4)  # 30%~100% 범위
+        else:
+            effectiveness = 1.0
+        
+        effective_stats = {}
+        for stat, value in self.stats.items():
+            if isinstance(value, (int, float)):
+                effective_stats[stat] = int(value * effectiveness)
+            else:
+                effective_stats[stat] = value  # 숫자가 아닌 값은 그대로
+                
+        return effective_stats
+    
+    def get_display_name(self) -> str:
+        """표시용 이름 (등급, 강화, 내구도 포함)"""
+        rarity_colors = {
+            ItemRarity.COMMON: "⚪",
+            ItemRarity.UNCOMMON: "🟢",
+            ItemRarity.RARE: "🔵",
+            ItemRarity.EPIC: "🟣",
+            ItemRarity.LEGENDARY: "🟠"
+        }
+        
+        element_icons = {
+            ElementalAffinity.FIRE: "🔥",
+            ElementalAffinity.ICE: "❄️",
+            ElementalAffinity.LIGHTNING: "⚡",
+            ElementalAffinity.EARTH: "🌍",
+            ElementalAffinity.WIND: "💨",
+            ElementalAffinity.WATER: "💧",
+            ElementalAffinity.LIGHT: "✨",
+            ElementalAffinity.DARK: "🌑",
+            ElementalAffinity.POISON: "☠️",
+            ElementalAffinity.NEUTRAL: ""
+        }
+        
+        color = rarity_colors.get(self.rarity, "⚪")
+        element = element_icons.get(self.elemental_affinity, "")
+        upgrade_text = f"+{self.upgrade_level}" if self.upgrade_level > 0 else ""
+        durability_icon = self.get_durability_status()
+        
+        return f"{color}{element}{self.name}{upgrade_text}{durability_icon}"
         
     def _calculate_stage_scaling(self) -> Dict[str, float]:
         """희귀도별 스테이지 스케일링 계수"""
@@ -1806,6 +1998,127 @@ class ItemDatabase:
         platinum_ring.value = 800
         items.append(platinum_ring)
         
+        # === 내구도 시스템이 적용된 강력한 장비들 (mega_equipment에서 이전) ===
+        
+        # 🗡️ 특수 검류 - 내구도 시스템과 특수 효과 완전 연동
+        flame_sword = Item("화염의 검", ItemType.WEAPON, ItemRarity.RARE,
+                          "불꽃이 깃든 마법검", 500, 2.5, 10, 120,
+                          [ItemEffect("화염 부여", "공격 시 15% 확률로 화상", "burn_chance", 0.15),
+                           ItemEffect("열정", "HP 50% 이하시 공격력 +30%", "passion", 1.3)],
+                          ElementalAffinity.FIRE)
+        flame_sword.stats = {"physical_attack": 25, "magic_attack": 10}
+        items.append(flame_sword)
+        
+        frost_blade = Item("빙결의 검", ItemType.WEAPON, ItemRarity.RARE,
+                          "차가운 기운이 도는 얼음 검", 480, 2.3, 10, 120,
+                          [ItemEffect("한기", "공격 시 20% 확률로 속도 감소", "chill_strike", 0.2),
+                           ItemEffect("절대영도", "크리티컬 시 적 1턴 행동불가 (보스 면역)", "absolute_zero", True, "always", True)],
+                          ElementalAffinity.ICE)
+        frost_blade.stats = {"physical_attack": 23, "magic_defense": 8}
+        items.append(frost_blade)
+        
+        storm_blade = Item("번개의 검", ItemType.WEAPON, ItemRarity.RARE,
+                          "전기가 흐르는 마법검", 520, 2.4, 12, 125,
+                          [ItemEffect("전기 충격", "30% 확률로 마비 부여", "paralysis_chance", 0.3),
+                           ItemEffect("연쇄 번개", "크리티컬 시 인근 적에게 연쇄 피해", "chain_lightning", True)],
+                          ElementalAffinity.LIGHTNING)
+        storm_blade.stats = {"physical_attack": 22, "speed": 8}
+        items.append(storm_blade)
+        
+        earth_breaker = Item("대지의 검", ItemType.WEAPON, ItemRarity.RARE,
+                            "대지의 힘이 깃든 거대한 검", 550, 3.5, 11, 140,
+                            [ItemEffect("지진", "공격 시 25% 확률로 모든 적 기절 (보스 면역)", "earthquake", 0.25, "always", True),
+                             ItemEffect("견고함", "받는 피해 -15%", "earth_shield", 0.85)],
+                            ElementalAffinity.EARTH)
+        earth_breaker.stats = {"physical_attack": 28, "physical_defense": 12}
+        items.append(earth_breaker)
+        
+        wind_cutter = Item("바람의 검", ItemType.WEAPON, ItemRarity.RARE,
+                          "바람처럼 빠른 검", 450, 1.8, 9, 110,
+                          [ItemEffect("바람 베기", "회피 불가능한 공격", "wind_slash", True),
+                           ItemEffect("순풍", "매 턴 속도 +2", "tailwind", 2)],
+                          ElementalAffinity.WIND)
+        wind_cutter.stats = {"physical_attack": 20, "speed": 15}
+        items.append(wind_cutter)
+        
+        # ⚔️ 전설급 무기들
+        dragon_slayer = Item("드래곤 슬레이어", ItemType.WEAPON, ItemRarity.LEGENDARY,
+                            "용을 잡기 위해 만들어진 전설의 검", 2000, 4.0, 20, 250,
+                            [ItemEffect("용 특효", "드래곤족에게 3배 피해", "dragon_bane", 3.0),
+                             ItemEffect("용의 심장", "크리티컬 시 브레이브 +10", "dragon_heart", 10),
+                             ItemEffect("용린 갑옷", "물리 피해 -25%", "dragon_scale", 0.75)],
+                            ElementalAffinity.FIRE)
+        dragon_slayer.stats = {"physical_attack": 45, "magic_attack": 20, "brave": 15}
+        items.append(dragon_slayer)
+        
+        void_blade = Item("공허의 검", ItemType.WEAPON, ItemRarity.LEGENDARY,
+                         "모든 것을 무로 돌리는 검", 2200, 3.0, 22, 300,
+                         [ItemEffect("공허 베기", "방어력 무시 피해", "void_cut", True),
+                          ItemEffect("무효화", "50% 확률로 적의 스킬 무효화", "nullify", 0.5),
+                          ItemEffect("존재 소거", "치명타 시 적 즉사 (보스 면역)", "existence_erase", True, "critical", True)],
+                         ElementalAffinity.DARK)
+        void_blade.stats = {"physical_attack": 40, "magic_attack": 25, "speed": 10}
+        items.append(void_blade)
+        
+        # 🛡️ 강력한 방어구들
+        dragon_mail = Item("드래곤 메일", ItemType.ARMOR, ItemRarity.EPIC,
+                          "용의 비늘로 만든 갑옷", 1200, 8.0, 15, 180,
+                          [ItemEffect("용의 보호", "화염 피해 -50%", "fire_resistance", 0.5),
+                           ItemEffect("위압", "적 명중률 -20%", "intimidation", 0.8)],
+                          ElementalAffinity.FIRE)
+        dragon_mail.stats = {"physical_defense": 25, "magic_defense": 15, "hp": 50}
+        items.append(dragon_mail)
+        
+        phoenix_robe = Item("불사조 로브", ItemType.ARMOR, ItemRarity.LEGENDARY,
+                           "불사조의 깃털로 만든 마법 로브", 1800, 3.0, 18, 200,
+                           [ItemEffect("부활", "사망 시 50% HP로 부활 (1회)", "phoenix_revival", 0.5),
+                            ItemEffect("재생의 불꽃", "매 턴 HP 5% 회복", "flame_regeneration", 0.05),
+                            ItemEffect("화염 면역", "화염 피해 완전 무효", "fire_immunity", True)],
+                           ElementalAffinity.FIRE)
+        phoenix_robe.stats = {"magic_defense": 30, "hp": 80, "mp": 40}
+        items.append(phoenix_robe)
+        
+        # 🔮 신비한 장신구들
+        time_ring = Item("시간의 반지", ItemType.ACCESSORY, ItemRarity.LEGENDARY,
+                        "시간을 조작하는 신비한 반지", 3000, 0.1, 25, 100,
+                        [ItemEffect("시간 정지", "5% 확률로 적 행동 스킵", "time_stop", 0.05),
+                         ItemEffect("가속", "매 턴 시작 시 추가 행동", "haste", True)],
+                        ElementalAffinity.NEUTRAL)
+        time_ring.stats = {"speed": 20, "luck": 10}
+        items.append(time_ring)
+        
+        soul_amulet = Item("영혼의 목걸이", ItemType.ACCESSORY, ItemRarity.EPIC,
+                          "영혼의 힘을 담은 목걸이", 800, 0.3, 12, 120,
+                          [ItemEffect("영혼 흡수", "적 처치 시 MP 전체 회복", "soul_drain", True),
+                           ItemEffect("정신력", "정신 상태이상 면역", "mental_immunity", True)],
+                          ElementalAffinity.DARK)
+        soul_amulet.stats = {"mp": 30, "magic_attack": 10}
+        items.append(soul_amulet)
+        
+        # 🌟 시야 확장 장비들 (중요!)
+        eagle_eye = Item("독수리의 눈", ItemType.ACCESSORY, ItemRarity.RARE,
+                        "독수리의 예리한 시야를 가진 보석", 600, 0.2, 8, 80,
+                        [ItemEffect("정밀 조준", "크리티컬 확률 +15%", "precision", 15)],
+                        ElementalAffinity.NEUTRAL)
+        eagle_eye.stats = {"vision_range": 2, "dexterity": 8}
+        items.append(eagle_eye)
+        
+        oracle_crystal = Item("예언자의 수정구", ItemType.ACCESSORY, ItemRarity.EPIC,
+                             "미래를 보는 마법 수정구", 1500, 0.5, 15, 150,
+                             [ItemEffect("예지력", "회피율 +25%", "foresight", 25),
+                              ItemEffect("위험 감지", "함정 탐지 확률 +50%", "danger_sense", 0.5)],
+                             ElementalAffinity.LIGHT)
+        oracle_crystal.stats = {"vision_range": 3, "wisdom": 15, "luck": 10}
+        items.append(oracle_crystal)
+        
+        gods_sight = Item("신의 시야", ItemType.ACCESSORY, ItemRarity.LEGENDARY,
+                         "신의 전지적 시야를 가진 유물", 5000, 0.1, 30, 300,
+                         [ItemEffect("전지", "맵 전체 공개", "omniscience", True),
+                          ItemEffect("신성", "모든 능력치 +20%", "divine_blessing", 1.2)],
+                         ElementalAffinity.LIGHT)
+        gods_sight.stats = {"vision_range": 10, "all_stats": 20}
+        items.append(gods_sight)
+        
         power_ring = Item("힘의 반지", ItemType.ACCESSORY, ItemRarity.RARE,
                          "착용자의 힘을 증가시키는 반지")
         power_ring.stats = {"physical_attack": 8}
@@ -2520,3 +2833,16 @@ class Inventory:
             return False, f"무게 제한 초과 ({total_weight:.1f}/{self.max_weight:.1f})"
         
         return True, "추가 가능"
+
+
+# durability_system.py의 기능을 사용하므로 여기서는 import만
+try:
+    from game.durability_system import DurabilitySystem, GoldBalanceSystem, get_durability_system, get_gold_balance_system
+except ImportError:
+    try:
+        from durability_system import DurabilitySystem, GoldBalanceSystem, get_durability_system, get_gold_balance_system
+    except ImportError:
+        # 폴백: 기본 시스템
+        print("⚠️ durability_system.py를 불러올 수 없습니다. 기본 시스템을 사용합니다.")
+        DurabilitySystem = None
+        GoldBalanceSystem = None

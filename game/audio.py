@@ -13,7 +13,7 @@ class UnifiedAudioSystem:
         self.debug_mode = debug_mode
         self.current_bgm = None
         self.bgm_volume = 0.6
-        self.sfx_volume = 0.8
+        self.sfx_volume = 0.8  # 원래대로 복구
         self.master_volume = 0.7
         
         # 사운드 저장소

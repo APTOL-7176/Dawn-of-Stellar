@@ -11,6 +11,12 @@ import random
 from typing import Dict, List, Optional, Tuple
 from enum import Enum
 
+# 아이템 시스템에서 소모품 데이터베이스 임포트
+try:
+    from .item_system import get_consumable_database, ItemRarity as ConsumableRarity, Consumable
+except ImportError:
+    from item_system import get_consumable_database, ItemRarity as ConsumableRarity, Consumable
+
 class ItemRarity(Enum):
     """아이템 희귀도"""
     COMMON = "일반"
@@ -241,18 +247,18 @@ class BalancedMerchant:
             ]
         }
     
-    def generate_stock(self, current_floor: int, stock_size: int = 8) -> List[MerchantItem]:
+    def generate_stock(self, current_floor: int, stock_size: int = 12) -> List[MerchantItem]:
         """현재 층에 맞는 재고 생성"""
         self.inventory.clear()
         
         # 층별 희귀도 확률 조정
         rarity_chances = self._get_rarity_chances(current_floor)
         
-        # 카테고리별 재고 생성
-        weapons = self._select_items_by_rarity(ItemType.WEAPON, current_floor, 2, rarity_chances)
-        armors = self._select_items_by_rarity(ItemType.ARMOR, current_floor, 2, rarity_chances)
+        # 카테고리별 재고 생성 (재고량 증가)
+        weapons = self._select_items_by_rarity(ItemType.WEAPON, current_floor, 3, rarity_chances)
+        armors = self._select_items_by_rarity(ItemType.ARMOR, current_floor, 3, rarity_chances)
         accessories = self._select_items_by_rarity(ItemType.ACCESSORY, current_floor, 2, rarity_chances)
-        consumables = self._select_items_by_rarity(ItemType.CONSUMABLE, current_floor, 2, rarity_chances)
+        consumables = self._select_items_by_rarity(ItemType.CONSUMABLE, current_floor, 4, rarity_chances)
         
         self.inventory.extend(weapons + armors + accessories + consumables)
         
@@ -321,6 +327,10 @@ class BalancedMerchant:
     def _select_items_by_rarity(self, item_type: ItemType, floor: int, count: int, 
                                rarity_chances: Dict[ItemRarity, float]) -> List[MerchantItem]:
         """희귀도에 따른 아이템 선택"""
+        # 소모품의 경우 별도 처리
+        if item_type == ItemType.CONSUMABLE:
+            return self._select_consumables(floor, count, rarity_chances)
+        
         available_items = [item for item in self.item_pool[item_type] 
                           if item.min_floor <= floor]
         
@@ -446,6 +456,217 @@ class BalancedMerchant:
             "message": f"{item_name}을(를) {actual_price} 골드에 판매했습니다!",
             "gold_gained": actual_price
         }
+    
+    def _select_consumables(self, floor: int, count: int, rarity_chances: Dict[ItemRarity, float]) -> List[MerchantItem]:
+        """소모품 선택"""
+        try:
+            consumable_db = get_consumable_database()
+            available_consumables = list(consumable_db.consumables.values())
+            
+            selected = []
+            for _ in range(count):
+                # 희귀도 결정
+                rand = random.random()
+                cumulative = 0
+                selected_rarity = ItemRarity.COMMON
+                
+                for rarity, chance in rarity_chances.items():
+                    cumulative += chance
+                    if rand <= cumulative:
+                        selected_rarity = rarity
+                        break
+                
+                # ConsumableRarity로 변환
+                consumable_rarity = self._convert_merchant_rarity(selected_rarity)
+                
+                # 해당 희귀도의 소모품 중 랜덤 선택
+                rarity_consumables = [c for c in available_consumables if c.rarity == consumable_rarity]
+                if rarity_consumables:
+                    consumable = random.choice(rarity_consumables)
+                    
+                    # 가격 계산
+                    base_price = self._calculate_consumable_price(consumable)
+                    
+                    # MerchantItem으로 변환
+                    merchant_item = MerchantItem(
+                        name=consumable.name,
+                        item_type=ItemType.CONSUMABLE,
+                        rarity=selected_rarity,
+                        base_price=base_price,
+                        description=consumable.description or f"{consumable.effect_type} 효과",
+                        min_floor=1,
+                        effects={"effect_type": consumable.effect_type, "effect_value": consumable.effect_value},
+                        stock=random.randint(1, 3)
+                    )
+                    
+                    selected.append(merchant_item)
+            
+            return selected
+        except Exception as e:
+            print(f"소모품 선택 중 오류 발생: {e}")
+            return []
+    
+    def _convert_merchant_rarity(self, merchant_rarity: ItemRarity) -> ConsumableRarity:
+        """상인 아이템 희귀도를 소모품 희귀도로 변환"""
+        conversion = {
+            ItemRarity.COMMON: ConsumableRarity.COMMON,
+            ItemRarity.UNCOMMON: ConsumableRarity.RARE,
+            ItemRarity.RARE: ConsumableRarity.RARE,
+            ItemRarity.EPIC: ConsumableRarity.EPIC,
+            ItemRarity.LEGENDARY: ConsumableRarity.LEGENDARY,
+            ItemRarity.MYTHIC: ConsumableRarity.MYTHIC
+        }
+        return conversion.get(merchant_rarity, ConsumableRarity.COMMON)
+    
+    def _calculate_consumable_price(self, consumable: Consumable) -> int:
+        """소모품 기본 가격 계산"""
+        base_prices = {
+            ConsumableRarity.COMMON: 15,
+            ConsumableRarity.RARE: 40,
+            ConsumableRarity.EPIC: 100,
+            ConsumableRarity.LEGENDARY: 250,
+            ConsumableRarity.MYTHIC: 600
+        }
+        
+        base_price = base_prices.get(consumable.rarity, 20)
+        
+        # 효과 값에 따른 가격 조정
+        if consumable.effect_value > 100:
+            base_price = int(base_price * 1.5)
+        elif consumable.effect_value > 50:
+            base_price = int(base_price * 1.2)
+        
+        # 전체 대상 아이템은 비싸게
+        if "all" in consumable.target_type:
+            base_price = int(base_price * 1.5)
+        
+        return base_price
+    
+    def offer_repair_service(self, party_manager) -> bool:
+        """장비 수리 서비스 제공"""
+        print(f"\n{self.name}: '장비 수리도 해드립니다! 골드만 있으면요!'")
+        
+        # 수리 가능한 장비 찾기
+        repairable_items = []
+        for member in party_manager.get_alive_members():
+            if hasattr(member, 'equipment') and member.equipment:
+                for slot, equipment in member.equipment.items():
+                    if equipment and hasattr(equipment, 'current_durability'):
+                        if equipment.current_durability < equipment.max_durability:
+                            repair_needed = equipment.max_durability - equipment.current_durability
+                            repair_cost = self._calculate_repair_cost(equipment, repair_needed)
+                            repairable_items.append((member, slot, equipment, repair_cost))
+        
+        if not repairable_items:
+            print(f"{self.name}: '모든 장비가 완벽한 상태네요! 수리할 게 없습니다.'")
+            return False
+        
+        print(f"\n🔧 수리 서비스 메뉴:")
+        print("="*60)
+        
+        # 수리 옵션 표시
+        for i, (member, slot, equipment, cost) in enumerate(repairable_items, 1):
+            durability_percent = int((equipment.current_durability / equipment.max_durability) * 100)
+            print(f"{i}. {member.name}의 {equipment.name}")
+            print(f"   내구도: {equipment.current_durability}/{equipment.max_durability} ({durability_percent}%)")
+            print(f"   수리비: {cost} 골드")
+        
+        print(f"\n{len(repairable_items) + 1}. 모든 장비 일괄 수리")
+        total_cost = sum(cost for _, _, _, cost in repairable_items)
+        
+        # 성격에 따른 할인
+        if self.personality == "generous":
+            total_cost = int(total_cost * 0.8)
+            print(f"   총 비용: {total_cost} 골드 (친절 할인 20%)")
+        elif self.personality == "stingy":
+            total_cost = int(total_cost * 1.2)
+            print(f"   총 비용: {total_cost} 골드 (바가지 요금 +20%)")
+        else:
+            print(f"   총 비용: {total_cost} 골드")
+        
+        print(f"\n0. 나가기")
+        
+        try:
+            choice = int(input(f"\n선택하세요: "))
+            
+            if choice == 0:
+                return False
+            elif 1 <= choice <= len(repairable_items):
+                # 개별 장비 수리
+                member, slot, equipment, cost = repairable_items[choice - 1]
+                
+                # 성격에 따른 가격 조정
+                if self.personality == "generous":
+                    cost = int(cost * 0.8)
+                elif self.personality == "stingy":
+                    cost = int(cost * 1.2)
+                
+                if party_manager.gold < cost:
+                    print(f"{self.name}: '골드가 부족하시네요. {cost} 골드가 필요합니다.'")
+                    return False
+                
+                # 수리 실행
+                party_manager.gold -= cost
+                equipment.current_durability = equipment.max_durability
+                equipment.is_broken = False
+                
+                print(f"✨ {equipment.name}이(가) 완전히 수리되었습니다!")
+                print(f"💰 {cost} 골드를 지불했습니다. (잔액: {party_manager.gold}G)")
+                return True
+                
+            elif choice == len(repairable_items) + 1:
+                # 일괄 수리
+                if party_manager.gold < total_cost:
+                    print(f"{self.name}: '골드가 부족하시네요. {total_cost} 골드가 필요합니다.'")
+                    return False
+                
+                # 모든 장비 수리
+                party_manager.gold -= total_cost
+                repaired_count = 0
+                
+                for member, slot, equipment, _ in repairable_items:
+                    equipment.current_durability = equipment.max_durability
+                    equipment.is_broken = False
+                    repaired_count += 1
+                
+                print(f"✨ 모든 장비가 완전히 수리되었습니다! ({repaired_count}개)")
+                print(f"💰 {total_cost} 골드를 지불했습니다. (잔액: {party_manager.gold}G)")
+                return True
+            else:
+                print("잘못된 선택입니다.")
+                return False
+                
+        except (ValueError, KeyboardInterrupt):
+            print("취소되었습니다.")
+            return False
+    
+    def _calculate_repair_cost(self, equipment, repair_amount: int) -> int:
+        """수리 비용 계산"""
+        # 기본 수리비: 수리량 * 2
+        base_cost = repair_amount * 2
+        
+        # 장비 등급에 따른 수리비 배율
+        rarity_multipliers = {
+            "일반": 1.0,
+            "고급": 1.5,
+            "희귀": 2.0,
+            "영웅": 3.0,
+            "전설": 5.0,
+            "신화": 8.0
+        }
+        
+        if hasattr(equipment, 'rarity'):
+            if hasattr(equipment.rarity, 'value'):
+                multiplier = rarity_multipliers.get(equipment.rarity.value, 1.0)
+            else:
+                multiplier = rarity_multipliers.get(str(equipment.rarity), 1.0)
+        else:
+            multiplier = 1.0
+        
+        final_cost = int(base_cost * multiplier)
+        
+        # 최소 수리비
+        return max(final_cost, 5)
     
     def restock(self, current_floor: int):
         """재고 보충"""

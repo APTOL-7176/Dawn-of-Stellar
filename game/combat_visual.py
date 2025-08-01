@@ -300,8 +300,11 @@ class CombatVisualizer:
             # 현재 적 표시
             current_marker = f" ⚡ " if enemy == current_char else "   "
             
-            # 첫 번째 줄: 이름과 HP/BRV
-            name_line = f"{current_marker}{name_color}{enemy.name[:20]:20}{Color.RESET}"
+            # 레벨 표시 추가
+            level_display = f"Lv.{getattr(enemy, 'level', 1):2}"
+            
+            # 첫 번째 줄: 이름, 레벨과 HP/BRV
+            name_line = f"{current_marker}{name_color}{enemy.name[:15]:15}{Color.RESET} {Color.BRIGHT_WHITE}{level_display}{Color.RESET}"
             stats_line = f"HP:{hp_color}{enemy.current_hp:3}/{enemy.max_hp:3}{Color.RESET} BRV:{Color.YELLOW}{enemy.brave_points:4}{Color.RESET}"
             
             # 두 번째 줄: ATB 게이지 (퍼센트/READY를 오른쪽으로)
@@ -410,6 +413,12 @@ class CombatVisualizer:
         effect = "✨" if is_positive else "💀"
         
         print(f"  {color}{sprite} {character.name} {effect} {status_name}{Color.RESET}")
+    
+    def show_miss_effect(self, attacker, target):
+        """회피 효과 표시 - 중복 메시지 방지를 위해 비주얼 효과만"""
+        # brave_combat.py에서 이미 회피 메시지를 출력하므로 여기서는 생략
+        # 필요시 추가 비주얼 효과만 처리
+        time.sleep(0.3)
     
     def clear_screen(self):
         """화면 지우기"""

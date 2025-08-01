@@ -13,7 +13,7 @@ echo.
 REM Python 설치 확인
 echo 📋 1. Python 설치 상태 확인...
 python --version >nul 2>&1
-if %errorlevel__ == 0 (
+if %errorlevel% == 0 (
     for /f "tokens=2" %%i in ('python --version 2^>^&1') do echo ✅ Python %%i 설치됨
 ) else (
     echo ❌ Python이 설치되지 않음 또는 PATH에 등록되지 않음
@@ -57,10 +57,10 @@ REM 의존성 패키지 확인
 echo.
 echo 📋 4. 의존성 패키지 확인...
 if exist ".venv" (
-    call .venv\Scripts\activate.bat >nul 2>&1
+    call ".venv\Scripts\activate.bat" >nul 2>&1
     
     python -c "import pygame" >nul 2>&1
-    if %errorlevel__ == 0 (
+    if %errorlevel% == 0 (
         echo ✅ pygame 설치됨
     ) else (
         echo ❌ pygame 설치되지 않음
@@ -68,7 +68,7 @@ if exist ".venv" (
     )
     
     python -c "import numpy" >nul 2>&1
-    if %errorlevel__ == 0 (
+    if %errorlevel% == 0 (
         echo ✅ numpy 설치됨
     ) else (
         echo ❌ numpy 설치되지 않음
@@ -76,14 +76,14 @@ if exist ".venv" (
     )
     
     python -c "import colorama" >nul 2>&1
-    if %errorlevel__ == 0 (
+    if %errorlevel% == 0 (
         echo ✅ colorama 설치됨
     ) else (
         echo ⚠️  colorama 설치되지 않음 (선택사항)
     )
     
     python -c "import keyboard" >nul 2>&1
-    if %errorlevel__ == 0 (
+    if %errorlevel% == 0 (
         echo ✅ keyboard 설치됨
     ) else (
         echo ⚠️  keyboard 설치되지 않음 (선택사항)
@@ -165,7 +165,7 @@ echo.
 echo 🔄 가상환경을 다시 생성합니다...
 if exist ".venv" rmdir /s /q ".venv"
 python -m venv .venv
-call .venv\Scripts\activate.bat
+call ".venv\Scripts\activate.bat"
 python -m pip install --upgrade pip
 if exist "requirements.txt" (
     python -m pip install -r requirements.txt
@@ -178,7 +178,7 @@ goto END
 :REINSTALL_PACKAGES
 echo.
 echo 📦 패키지를 다시 설치합니다...
-call .venv\Scripts\activate.bat
+call ".venv\Scripts\activate.bat"
 python -m pip uninstall -y pygame numpy colorama keyboard
 python -m pip install pygame numpy colorama keyboard
 echo ✅ 패키지 재설치 완료
@@ -195,7 +195,7 @@ goto END
 :FORCE_RUN
 echo.
 echo 🎮 게임 강제 실행을 시도합니다...
-call .venv\Scripts\activate.bat
+call ".venv\Scripts\activate.bat"
 python main.py
 goto END
 

@@ -72,7 +72,15 @@ class Room:
 class GameWorld:
     """게임 월드 관리 클래스"""
     
-    def __init__(self, width: int = 80, height: int = 25, party_manager=None):
+    def __init__(self, width: int = None, height: int = None, party_manager=None):
+        # 설정에서 맵 크기 가져오기
+        if width is None or height is None:
+            try:
+                from config import game_config
+                width, height = game_config.get_map_dimensions()
+            except ImportError:
+                width, height = 35, 35  # 기본값 (정사각형)
+        
         self.width = width
         self.height = height
         self.party_manager = party_manager  # 파티 매니저 참조 추가
@@ -85,6 +93,34 @@ class GameWorld:
         self.items_positions: List[Tuple[int, int]] = []
         self.floor_items: Dict[Tuple[int, int], Item] = {}  # 위치별 아이템 매핑
         self.floor_enemies: Dict[Tuple[int, int], Dict] = {}  # 위치별 적 정보 매핑 (레벨 등)
+        
+        # 이동거리 추적 시스템
+        self.total_movement_distance = 0  # 총 이동거리 (게임 전체)
+        self.current_run_movement = 0     # 현재 런에서의 이동거리
+        self.actions_taken = 0            # 총 액션 수 (AFK 방지)
+        self.combat_count = 0             # 전투 횟수
+        
+        # 성과 기반 보상 시스템
+        self.performance_metrics = {
+            'floors_cleared': 0,           # 클리어한 층수
+            'enemies_defeated': 0,         # 처치한 적 수
+            'items_collected': 0,          # 수집한 아이템 수
+            'perfect_floors': 0,           # 모든 적을 처치한 층수
+            'exploration_rate': 0.0,       # 탐험률 (0.0 ~ 1.0)
+            'combat_efficiency': 0.0,      # 전투 효율성
+            'survival_time': 0,            # 생존 시간 (초)
+            'no_damage_combats': 0,        # 무피해 전투 횟수
+            'critical_hits': 0,            # 크리티컬 히트 횟수
+            'skills_used': 0,              # 사용한 스킬 수
+        }
+        
+        # 현재 층 통계
+        self.current_floor_stats = {
+            'enemies_on_floor': 0,         # 현재 층의 총 적 수
+            'enemies_defeated_on_floor': 0, # 현재 층에서 처치한 적 수
+            'tiles_explored': set(),       # 탐험한 타일들
+            'total_tiles': 0,              # 총 바닥 타일 수
+        }
         
         self.initialize_world()
         
@@ -132,6 +168,9 @@ class GameWorld:
         
         # 계단 배치 (다음 층으로 가는 계단)
         self.place_stairs()
+        
+        # 성과 추적을 위한 통계 계산
+        self._calculate_floor_stats()
         
         # 시야 업데이트
         self.update_visibility()
@@ -191,9 +230,25 @@ class GameWorld:
                 self.tiles[y][x].type = TileType.FLOOR
                 
     def place_enemies(self):
-        """적 배치 - 플레이어 스폰 지점 근처 안전 반지름 적용"""
-        num_enemies = random.randint(3, 8)
+        """적 배치 - 맵 크기와 난이도에 따른 적 수 조정"""
+        # 맵 크기에 따른 기본 적 수 계산
+        map_area = self.width * self.height
+        base_enemies = max(3, map_area // 120)  # 맵 크기 비례 (120 타일당 1마리)
+        
+        # 난이도별 적 수 조정
+        from config import game_config
+        enemy_spawn_rate = game_config.get_difficulty_setting('enemy_spawn_rate')
+        num_enemies = int(base_enemies * enemy_spawn_rate)
+        
+        # 맵 크기별 추가 보정 (큰 맵일수록 더 많은 적)
+        if self.width >= 60:  # 큰 맵
+            num_enemies = int(num_enemies * 1.5)
+        elif self.width >= 45:  # 중간 맵
+            num_enemies = int(num_enemies * 1.2)
+        
         safe_radius = 7  # 플레이어 스폰 지점 반지름 7블록 내 적 생성 금지
+        
+        print(f"🎯 맵 크기 {self.width}x{self.height}에 적 {num_enemies}마리 배치 시도")
         
         for _ in range(num_enemies):
             # 빈 바닥 타일에 적 배치
@@ -320,41 +375,80 @@ class GameWorld:
             print(f"다음 층으로 가는 계단이 ({stair_x}, {stair_y})에 배치되었습니다.")
                 
     def can_move(self, dx: int, dy: int) -> bool:
-        """이동 가능한지 확인"""
-        new_x = self.player_pos[0] + dx
-        new_y = self.player_pos[1] + dy
-        
-        return self.is_valid_pos(new_x, new_y) and self.tiles[new_y][new_x].is_walkable()
+        """이동 가능한지 확인 - 개선된 오류 처리"""
+        try:
+            new_x = self.player_pos[0] + dx
+            new_y = self.player_pos[1] + dy
+            
+            # 경계 확인
+            if not self.is_valid_pos(new_x, new_y):
+                return False
+                
+            # 타일 확인
+            if new_y >= len(self.tiles) or new_x >= len(self.tiles[new_y]):
+                return False
+                
+            tile = self.tiles[new_y][new_x]
+            return tile.is_walkable()
+            
+        except Exception as e:
+            print(f"can_move 오류: {e}")
+            return False
         
     def move_player(self, dx: int, dy: int):
-        """플레이어 이동"""
-        new_x = self.player_pos[0] + dx
-        new_y = self.player_pos[1] + dy
-        
-        if self.can_move(dx, dy):
-            # 이동하려는 위치에 적이 있는지 먼저 확인
-            if (new_x, new_y) in self.enemies_positions:
-                # 적과 충돌 - 전투 시작
-                return "combat"
+        """플레이어 이동 - 개선된 아이템 처리"""
+        try:
+            new_x = self.player_pos[0] + dx
+            new_y = self.player_pos[1] + dy
             
-            self.player_pos = (new_x, new_y)
-            self.update_visibility()
-            
-            # 아이템 획득 체크
-            if (new_x, new_y) in self.items_positions:
-                item = self.floor_items.get((new_x, new_y))
-                if item:
-                    self.items_positions.remove((new_x, new_y))
-                    del self.floor_items[(new_x, new_y)]
-                    self.tiles[new_y][new_x].has_item = False
-                    print(f"{item.get_colored_name()}을(를) 발견했습니다!")
-                    return item  # 아이템 반환하여 인벤토리에 추가할 수 있도록
-            
-            # 계단 체크 (다음 층으로 이동)
-            if self.tiles[new_y][new_x].type == TileType.STAIRS_DOWN:
-                return "next_floor"
+            if self.can_move(dx, dy):
+                # 이동하려는 위치에 적이 있는지 먼저 확인
+                if (new_x, new_y) in self.enemies_positions:
+                    # 적과 충돌 - 전투 시작
+                    return "combat"
                 
-        return None
+                # 플레이어 위치 업데이트 및 이동거리 추적
+                self.player_pos = (new_x, new_y)
+                
+                # 이동거리 추가 (맨하탄 거리)
+                movement_distance = abs(dx) + abs(dy)
+                self.total_movement_distance += movement_distance
+                self.current_run_movement += movement_distance
+                self.actions_taken += 1  # 액션 수 증가
+                
+                # 탐험 추적
+                self.track_exploration(new_x, new_y)
+                
+                self.update_visibility()
+                
+                # 아이템 획득 체크
+                if (new_x, new_y) in self.items_positions:
+                    item = self.floor_items.get((new_x, new_y))
+                    if item:
+                        # 아이템 제거
+                        self.items_positions.remove((new_x, new_y))
+                        del self.floor_items[(new_x, new_y)]
+                        self.tiles[new_y][new_x].has_item = False
+                        
+                        # 아이템 수집 추적
+                        self.track_item_collection()
+                        
+                        return item  # 아이템 반환
+                
+                # 계단 체크 (다음 층으로 이동)
+                if self.tiles[new_y][new_x].type == TileType.STAIRS_DOWN:
+                    # 층 완료 시 통계 계산
+                    self.track_floor_completion()
+                    return "next_floor"
+                    
+                # 일반 이동 성공
+                return "moved"
+                
+            return None  # 이동 실패
+            
+        except Exception as e:
+            print(f"move_player 오류: {e}")
+            return None
                 
     def is_valid_pos(self, x: int, y: int) -> bool:
         """유효한 위치인지 확인"""
@@ -675,3 +769,123 @@ class GameWorld:
         if (x, y) in self.enemies_positions:
             return False
         return True
+        
+    def track_enemy_defeat(self, enemy_pos: Tuple[int, int]):
+        """적 처치 추적"""
+        self.performance_metrics['enemies_defeated'] += 1
+        self.current_floor_stats['enemies_defeated_on_floor'] += 1
+        self.combat_count += 1
+        
+    def track_item_collection(self):
+        """아이템 수집 추적"""
+        self.performance_metrics['items_collected'] += 1
+        
+    def track_exploration(self, x: int, y: int):
+        """탐험 추적"""
+        if self.is_valid_pos(x, y) and self.tiles[y][x].type == TileType.FLOOR:
+            self.current_floor_stats['tiles_explored'].add((x, y))
+            
+    def track_floor_completion(self):
+        """층 완료 추적"""
+        self.performance_metrics['floors_cleared'] += 1
+        
+        # 완벽한 층 체크 (모든 적 처치)
+        if (self.current_floor_stats['enemies_defeated_on_floor'] >= 
+            self.current_floor_stats['enemies_on_floor']):
+            self.performance_metrics['perfect_floors'] += 1
+            
+        # 탐험률 계산
+        if self.current_floor_stats['total_tiles'] > 0:
+            exploration_rate = (len(self.current_floor_stats['tiles_explored']) / 
+                              self.current_floor_stats['total_tiles'])
+            self.performance_metrics['exploration_rate'] = exploration_rate
+            
+        # 다음 층을 위한 통계 초기화
+        self.current_floor_stats['enemies_defeated_on_floor'] = 0
+        self.current_floor_stats['tiles_explored'] = set()
+        
+    def calculate_performance_score(self) -> int:
+        """성과 점수 계산 (AFK 방지 포함)"""
+        metrics = self.performance_metrics
+        
+        # 기본 점수 계산
+        base_score = (
+            metrics['floors_cleared'] * 100 +         # 층당 100점
+            metrics['enemies_defeated'] * 10 +        # 적당 10점
+            metrics['items_collected'] * 5 +          # 아이템당 5점
+            metrics['perfect_floors'] * 50 +          # 완벽한 층당 50점 보너스
+            int(metrics['exploration_rate'] * 100) +  # 탐험률 보너스
+            metrics['no_damage_combats'] * 20 +       # 무피해 전투당 20점
+            metrics['critical_hits'] * 2 +            # 크리티컬당 2점
+            metrics['skills_used'] * 3                # 스킬 사용당 3점
+        )
+        
+        # AFK 방지: 액션 대비 성과 비율 체크
+        if self.actions_taken > 0:
+            efficiency_ratio = base_score / self.actions_taken
+            if efficiency_ratio < 0.5:  # 너무 비효율적인 플레이
+                base_score = int(base_score * 0.7)  # 30% 감소
+            elif efficiency_ratio > 2.0:  # 매우 효율적인 플레이
+                base_score = int(base_score * 1.2)  # 20% 보너스
+                
+        return max(0, base_score)
+        
+    def get_star_fragment_reward(self) -> int:
+        """별조각 보상 계산 (성과 기반)"""
+        performance_score = self.calculate_performance_score()
+        metrics = self.performance_metrics
+        
+        # 기본 보상 (성과 점수 기반)
+        base_reward = performance_score // 10  # 10점당 1개
+        
+        # 특별 보너스
+        bonus_reward = 0
+        
+        # 층수 보너스 (층당 5개)
+        bonus_reward += metrics['floors_cleared'] * 5
+        
+        # 완벽한 층 보너스 (완벽한 층당 추가 10개)
+        bonus_reward += metrics['perfect_floors'] * 10
+        
+        # 탐험 보너스 (90% 이상 탐험시 보너스)
+        if metrics['exploration_rate'] >= 0.9:
+            bonus_reward += metrics['floors_cleared'] * 5
+            
+        # 효율성 보너스 (무피해 전투가 많으면)
+        if metrics['no_damage_combats'] >= 5:
+            bonus_reward += 20
+            
+        # 연속 성공 보너스 (층수가 높아질수록)
+        if metrics['floors_cleared'] >= 10:
+            bonus_reward += 30
+        elif metrics['floors_cleared'] >= 5:
+            bonus_reward += 15
+            
+        total_reward = base_reward + bonus_reward
+        
+        # 난이도별 별조각 배율 적용
+        try:
+            from config import game_config
+            difficulty_multiplier = game_config.get_difficulty_setting('star_fragment_multiplier')
+            total_reward = int(total_reward * difficulty_multiplier)
+        except:
+            pass  # 설정 로드 실패시 기본값 유지
+        
+        # 최소 보상 보장 (어려움 보정)
+        min_reward = metrics['floors_cleared'] * 3  # 층당 최소 3개
+        
+        return max(min_reward, total_reward)
+        
+    def _calculate_floor_stats(self):
+        """현재 층의 통계 계산"""
+        # 총 바닥 타일 수 계산
+        total_floor_tiles = 0
+        for row in self.tiles:
+            for tile in row:
+                if tile.type == TileType.FLOOR:
+                    total_floor_tiles += 1
+                    
+        self.current_floor_stats['total_tiles'] = total_floor_tiles
+        self.current_floor_stats['enemies_on_floor'] = len(self.enemies_positions)
+        
+        print(f"층 {self.current_level} 통계: 바닥 타일 {total_floor_tiles}개, 적 {len(self.enemies_positions)}마리")

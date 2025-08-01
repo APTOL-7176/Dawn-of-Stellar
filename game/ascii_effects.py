@@ -179,23 +179,10 @@ ascii_visual = ASCIIVisualEffects()
 combat_animator = CombatTextAnimator()
 
 def play_ascii_sound(effect_name: str):
-    """ASCII 효과음 재생"""
-    sound_map = {
-        "brave_attack": ascii_sound.play_brave_attack_sound,
-        "hp_attack": ascii_sound.play_hp_attack_sound,
-        "break": ascii_sound.play_break_sound,
-        "critical": ascii_sound.play_critical_sound,
-        "heal": ascii_sound.play_heal_sound,
-        "menu": ascii_sound.play_menu_sound,
-        "level_up": ascii_sound.play_level_up_sound,
-        "item_get": ascii_sound.play_item_get_sound,
-        "magic": ascii_sound.play_magic_sound,
-    }
-    
-    if effect_name in sound_map:
-        sound_map[effect_name]()
-    else:
-        print(f"♪ {effect_name}")
+    """ASCII 효과음 재생 - 중복 방지를 위해 비활성화"""
+    # 중복 효과음 방지를 위해 완전히 비활성화
+    # audio.py의 AudioManager만 사용
+    pass
 
 
 def enhanced_battle_effect(effect_type: str, **kwargs):

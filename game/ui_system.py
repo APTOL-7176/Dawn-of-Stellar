@@ -1,12 +1,36 @@
 #!/usr/bin/env python3
 """
-UI 시스템 개선 - 깔끔한 인터페이스, 타원형 시야 개선
+UI 시스템 개선 - 깔끔한 인터페이스, Windows 호환
 """
 
-import curses
 import math
+import os
 from typing import Tuple, List, Dict, Optional
 from enum import Enum
+
+# Windows용 curses 대안
+try:
+    import curses
+    CURSES_AVAILABLE = True
+except ImportError:
+    # Windows에서 curses가 없을 경우 더미 모듈
+    class DummyCurses:
+        def initscr(self): return None
+        def endwin(self): pass
+        def cbreak(self): pass
+        def noecho(self): pass
+        def curs_set(self, visibility): pass
+        def newwin(self, *args): return DummyWindow()
+        
+    class DummyWindow:
+        def addstr(self, *args): pass
+        def refresh(self): pass
+        def clear(self): pass
+        def move(self, *args): pass
+        def getmaxyx(self): return (24, 80)
+        
+    curses = DummyCurses()
+    CURSES_AVAILABLE = False
 
 class UIColor(Enum):
     """UI 색상"""
@@ -38,22 +62,28 @@ class UIManager:
         self.vision_radius = 8
         self.fov_map = {}
         
-    def initialize(self, stdscr):
+    def initialize(self, stdscr=None):
         """UI 초기화"""
-        self.stdscr = stdscr
-        self.screen_height, self.screen_width = stdscr.getmaxyx()
-        
-        # 커서 숨기기
-        curses.curs_set(0)
-        
-        # 색상 초기화
-        if curses.has_colors():
-            curses.start_color()
-            curses.use_default_colors()
+        if not CURSES_AVAILABLE:
+            self.screen_height = 24
+            self.screen_width = 80
+            return
             
-            curses.init_pair(UIColor.WHITE.value, curses.COLOR_WHITE, -1)
-            curses.init_pair(UIColor.RED.value, curses.COLOR_RED, -1)
-            curses.init_pair(UIColor.GREEN.value, curses.COLOR_GREEN, -1)
+        self.stdscr = stdscr
+        if stdscr:
+            self.screen_height, self.screen_width = stdscr.getmaxyx()
+            
+            # 커서 숨기기
+            curses.curs_set(0)
+            
+            # 색상 초기화
+            if curses.has_colors():
+                curses.start_color()
+                curses.use_default_colors()
+                
+                curses.init_pair(UIColor.WHITE.value, curses.COLOR_WHITE, -1)
+                curses.init_pair(UIColor.RED.value, curses.COLOR_RED, -1)
+                curses.init_pair(UIColor.GREEN.value, curses.COLOR_GREEN, -1)
             curses.init_pair(UIColor.BLUE.value, curses.COLOR_BLUE, -1)
             curses.init_pair(UIColor.YELLOW.value, curses.COLOR_YELLOW, -1)
             curses.init_pair(UIColor.MAGENTA.value, curses.COLOR_MAGENTA, -1)
@@ -96,46 +126,51 @@ class UIManager:
     
     def clear_screen(self):
         """화면 지우기"""
-        if self.stdscr:
+        if CURSES_AVAILABLE and self.stdscr:
             self.stdscr.clear()
+        else:
+            os.system('cls' if os.name == 'nt' else 'clear')
     
     def refresh_screen(self):
         """화면 새로고침"""
-        if self.stdscr:
+        if CURSES_AVAILABLE and self.stdscr:
             self.stdscr.refresh()
     
     def draw_border(self, area: Dict, title: str = ""):
         """테두리 그리기"""
-        if not self.stdscr:
+        if not CURSES_AVAILABLE or not self.stdscr:
             return
         
         x, y = area["x"], area["y"]
         width, height = area["width"], area["height"]
         
-        # 상하단
-        for i in range(width):
-            self.stdscr.addch(y, x + i, "─")
-            self.stdscr.addch(y + height - 1, x + i, "─")
-        
-        # 좌우단
-        for i in range(height):
-            self.stdscr.addch(y + i, x, "│")
-            self.stdscr.addch(y + i, x + width - 1, "│")
-        
-        # 모서리
-        self.stdscr.addch(y, x, "┌")
-        self.stdscr.addch(y, x + width - 1, "┐")
-        self.stdscr.addch(y + height - 1, x, "└")
-        self.stdscr.addch(y + height - 1, x + width - 1, "┘")
-        
-        # 제목
-        if title:
-            title_x = x + (width - len(title)) // 2
-            self.stdscr.addstr(y, title_x, f"[ {title} ]")
+        try:
+            # 상하단
+            for i in range(width):
+                self.stdscr.addch(y, x + i, "─")
+                self.stdscr.addch(y + height - 1, x + i, "─")
+            
+            # 좌우단
+            for i in range(height):
+                self.stdscr.addch(y + i, x, "│")
+                self.stdscr.addch(y + i, x + width - 1, "│")
+            
+            # 모서리
+            self.stdscr.addch(y, x, "┌")
+            self.stdscr.addch(y, x + width - 1, "┐")
+            self.stdscr.addch(y + height - 1, x, "└")
+            self.stdscr.addch(y + height - 1, x + width - 1, "┘")
+            
+            # 제목
+            if title:
+                title_x = x + (width - len(title)) // 2
+                self.stdscr.addstr(y, title_x, f"[ {title} ]")
+        except:
+            pass
     
     def draw_text(self, x: int, y: int, text: str, color: UIColor = UIColor.WHITE):
         """텍스트 그리기"""
-        if not self.stdscr:
+        if not CURSES_AVAILABLE or not self.stdscr:
             return
         
         try:
@@ -143,7 +178,7 @@ class UIManager:
                 self.stdscr.addstr(y, x, text, curses.color_pair(color.value))
             else:
                 self.stdscr.addstr(y, x, text)
-        except curses.error:
+        except:
             pass  # 화면 밖으로 나간 경우 무시
     
     def draw_centered_text(self, y: int, text: str, color: UIColor = UIColor.WHITE):

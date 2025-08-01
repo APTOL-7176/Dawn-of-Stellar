@@ -75,7 +75,7 @@ class TutorialManager:
                 "  • 상대방의 Brave가 0이 되면 Break 상태",
                 "  • Break 상태에서는 받는 HP 데미지가 증가!",
                 "",
-                "⚠️ 중요: HP 공격 시 최소 500 Brave가 있어야 효과적입니다!"
+                "⚠️ 중요: HP 공격 시 최소 300 Brave가 있어야 효과적입니다!"
             ],
             category="basic",
             importance=1
@@ -90,7 +90,7 @@ class TutorialManager:
                 "",
                 "🎯 전투 중 선택 가능한 행동:",
                 "  1. Brave 공격: 상대방 Brave 깎기 + 자신 Brave 증가",
-                "  2. HP 공격: Brave 포인트로 실제 데미지 (최소 500 Brave 필요)",
+                "  2. HP 공격: Brave 포인트로 실제 데미지 (최소 300 Brave 필요)",
                 "  3. 스킬 사용: 캐릭터별 고유 스킬",
                 "  4. 아이템 사용: 치유나 버프 아이템",
                 "  5. 방어: 데미지 감소 + 약간의 Brave 회복",
@@ -462,6 +462,13 @@ class TutorialManager:
             print(line)
         print(f"{'─'*50}")
         
+        # 키 입력 대기 추가
+        try:
+            from .input_utils import wait_for_any_key
+            wait_for_any_key("\n계속하려면 아무 키나 누르세요...")
+        except ImportError:
+            input("\n계속하려면 Enter를 누르세요...")
+        
     def show_quick_help(self):
         """빠른 도움말"""
         print(f"\n{'='*60}")
@@ -491,6 +498,13 @@ class TutorialManager:
         print("인벤토리: I | 도움말: H | 저장: SAVE | 불러오기: LOAD")
         print(f"{'='*60}")
         
+        # 키 입력 대기 추가
+        try:
+            from .input_utils import wait_for_any_key
+            wait_for_any_key("\n계속하려면 아무 키나 누르세요...")
+        except ImportError:
+            input("\n계속하려면 Enter를 누르세요...")
+        
     def show_combat_help(self):
         """전투 중 도움말"""
         print(f"\n{'─'*50}")
@@ -502,8 +516,73 @@ class TutorialManager:
         print("5️⃣ 방어 - 데미지 감소 + Brave 회복")
         print(f"{'─'*50}")
         
+        # 키 입력 대기 추가
+        try:
+            from .input_utils import wait_for_any_key
+            wait_for_any_key("\n계속하려면 아무 키나 누르세요...")
+        except ImportError:
+            input("\n계속하려면 Enter를 누르세요...")
+        
     def show_tutorial_menu(self):
-        """튜토리얼 메뉴"""
+        """튜토리얼 메뉴 - 커서 네비게이션"""
+        try:
+            from .cursor_menu_system import CursorMenu
+            from .input_utils import KeyboardInput
+            from .color_text import bright_cyan, bright_yellow, bright_green
+            
+            keyboard = KeyboardInput()
+            
+            while True:
+                # 메뉴 옵션
+                options = [
+                    "📖 전체 튜토리얼 보기",
+                    "⭐ 필수 내용만 보기", 
+                    "🎯 고급 팁만 보기",
+                    "🔍 특정 주제 선택",
+                    "⚡ 빠른 도움말"
+                ]
+                
+                descriptions = [
+                    "모든 튜토리얼을 순서대로 봅니다",
+                    "필수 내용만 빠르게 봅니다",
+                    "고급 팁과 전략을 봅니다",
+                    "원하는 주제를 선택해서 봅니다",
+                    "핵심 조작법만 빠르게 확인합니다"
+                ]
+                
+                # 커서 메뉴 생성
+                menu = CursorMenu(
+                    "📚 튜토리얼 메뉴",
+                    options, descriptions, cancellable=True
+                )
+                
+                # 메뉴 실행
+                result = menu.run()
+                
+                if result is None:  # 취소
+                    break
+                elif result == 0:  # 전체 튜토리얼
+                    for i, tutorial in enumerate(self.tutorials):
+                        self.show_tutorial_step(tutorial, i + 1, len(self.tutorials))
+                elif result == 1:  # 필수 내용만
+                    essential = self.filter_tutorials_by_importance(1)
+                    for i, tutorial in enumerate(essential):
+                        self.show_tutorial_step(tutorial, i + 1, len(essential))
+                elif result == 2:  # 고급 팁만
+                    advanced = [t for t in self.tutorials if t.category == "advanced"]
+                    for i, tutorial in enumerate(advanced):
+                        self.show_tutorial_step(tutorial, i + 1, len(advanced))
+                elif result == 3:  # 특정 주제 선택
+                    self.show_topic_selection()
+                elif result == 4:  # 빠른 도움말
+                    self.show_quick_help()
+                    
+        except ImportError:
+            # 커서 시스템이 없으면 기존 방식 사용
+            self._show_tutorial_menu_legacy()
+    
+    def _show_tutorial_menu_legacy(self):
+        """기존 튜토리얼 메뉴 (fallback)"""
         while True:
             print("\n" + "="*60)
             print("📚 튜토리얼 메뉴")

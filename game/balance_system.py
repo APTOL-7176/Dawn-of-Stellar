@@ -411,134 +411,148 @@ class EquipmentBalance:
 class FieldSkillBalance:
     """필드 스킬 밸런스 (걸음 수 기준 쿨다운)"""
     
-    # 캐릭터 클래스별 사용 가능한 필드 스킬
+    # 캐릭터 클래스별 사용 가능한 필드 스킬 - 실제 게임 직업에 맞게 수정
     CLASS_FIELD_SKILLS = {
-        "무당": ["정령 치유", "환경 정화", "영혼 분석", "자연 은신"],
-        "용기사": ["용의 숨결", "위압", "집단 보호", "마법 이동"], 
-        "사무라이": ["일섬", "명상", "자물쇠 해제", "집중"],
-        "네크로맨서": ["언데드 소환", "영혼 탐지", "생명력 흡수", "저주"]
+        "전사": ["보물 탐지", "야외 치료", "집단 축복", "장비 수리"],
+        "아크메이지": ["마법 이동", "환경 정화", "보물 탐지", "내구도 강화", "완벽 수리", "장비 보호"],
+        "궁수": ["보물 탐지", "던전 분석", "집단 은신"],
+        "도적": ["자물쇠 해제", "보물 탐지", "집단 은신"],
+        "성기사": ["야외 치료", "환경 정화", "집단 축복", "내구도 강화", "장비 보호"],
+        "암흑기사": ["환경 정화", "던전 분석", "마법 이동"],
+        "몽크": ["야외 치료", "집단 축복", "던전 분석"],
+        "바드": ["집단 축복", "환경 정화", "보물 탐지"],
+        "네크로맨서": ["환경 정화", "던전 분석", "마법 이동"],
+        "용기사": ["집단 축복", "마법 이동", "야외 치료"],
+        "검성": ["자물쇠 해제", "던전 분석", "집단 축복", "내구도 분석"],
+        "정령술사": ["환경 정화", "마법 이동", "야외 치료", "내구도 강화", "장비 보호"],
+        "암살자": ["집단 은신", "자물쇠 해제", "보물 탐지"],
+        "기계공학자": ["자물쇠 해제", "던전 분석", "보물 탐지", "장비 수리", "내구도 강화", "완벽 수리", "내구도 분석"],
+        "무당": ["환경 정화", "야외 치료", "집단 축복", "내구도 강화", "장비 보호"],
+        "해적": ["보물 탐지", "자물쇠 해제", "집단 은신"],
+        "사무라이": ["자물쇠 해제", "던전 분석", "집단 축복"],
+        "드루이드": ["야외 치료", "환경 정화", "보물 탐지", "장비 수리", "장비 보호"],
+        "철학자": ["던전 분석", "환경 정화", "집단 축복", "장비 수리", "내구도 분석"],
+        "시간술사": ["마법 이동", "던전 분석", "환경 정화", "완벽 수리", "내구도 분석"],
+        "연금술사": ["환경 정화", "야외 치료", "보물 탐지", "장비 수리", "내구도 강화", "완벽 수리", "내구도 분석"],
+        "검투사": ["야외 치료", "집단 축복", "보물 탐지"],
+        "기사": ["집단 축복", "야외 치료", "던전 분석"],
+        "신관": ["야외 치료", "환경 정화", "집단 축복"],
+        "마검사": ["마법 이동", "집단 축복", "보물 탐지", "내구도 강화", "장비 보호"],
+        "차원술사": ["마법 이동", "던전 분석", "환경 정화", "장비 보호"],
+        "광전사": ["집단 축복", "야외 치료", "보물 탐지"],
+        # 모든 직업이 기본 스킬들을 사용할 수 있도록
+        "기본": ["보물 탐지", "야외 치료", "자물쇠 해제", "환경 정화", "장비 수리", "내구도 분석"]
     }
     
     FIELD_SKILLS = {
-        "정령 치유": {
+        "보물 탐지": {
             "cooldown_steps": 300,
+            "mp_cost": 15,
+            "success_rate": 0.7,
+            "target_type": "none",
+            "description": "숨겨진 보물이나 비밀 통로를 찾습니다.",
+            "classes": ["전사", "아크메이지", "궁수", "도적", "바드", "암살자", "기계공학자", "해적", "드루이드", "연금술사", "검투사", "마검사", "광전사", "기본"]
+        },
+        "야외 치료": {
+            "cooldown_steps": 400,
             "mp_cost": 20,
             "heal_ratio": 0.4,
             "target_type": "ally",
-            "description": "정령의 힘으로 아군을 치료합니다.",
-            "classes": ["무당"]
-        },
-        "환경 정화": {
-            "cooldown_steps": 400,
-            "mp_cost": 18,
-            "target_type": "party",
-            "description": "주변 환경과 파티의 독성을 정화합니다.",
-            "classes": ["무당"]
-        },
-        "영혼 분석": {
-            "cooldown_steps": 200,
-            "mp_cost": 12,
-            "target_type": "none",
-            "description": "적의 정보와 던전의 비밀을 파악합니다.",
-            "classes": ["무당", "네크로맨서"]
-        },
-        "자연 은신": {
-            "cooldown_steps": 600,
-            "mp_cost": 22,
-            "duration": 180,
-            "target_type": "party",
-            "description": "자연의 힘으로 파티를 은신시킵니다.",
-            "classes": ["무당"]
-        },
-        "용의 숨결": {
-            "cooldown_steps": 800,
-            "mp_cost": 25,
-            "target_type": "none",
-            "description": "용의 힘으로 강력한 화염 공격을 합니다.",
-            "classes": ["용기사"]
-        },
-        "위압": {
-            "cooldown_steps": 500,
-            "mp_cost": 15,
-            "target_type": "none",
-            "description": "용기사의 위압으로 주변 적들을 압도합니다.",
-            "classes": ["용기사"]
-        },
-        "집단 보호": {
-            "cooldown_steps": 700,
-            "mp_cost": 30,
-            "duration": 300,
-            "target_type": "party",
-            "description": "용의 가호로 파티 전체를 보호합니다.",
-            "classes": ["용기사"]
+            "description": "자연의 힘으로 아군을 치료합니다.",
+            "classes": ["전사", "성기사", "몽크", "정령술사", "무당", "드루이드", "연금술사", "검투사", "기사", "신관", "광전사", "기본"]
         },
         "마법 이동": {
             "cooldown_steps": 1000,
             "mp_cost": 25,
             "target_type": "none",
             "description": "마법으로 안전한 곳으로 순간이동합니다.",
-            "classes": ["용기사", "무당"]
-        },
-        "일섬": {
-            "cooldown_steps": 400,
-            "mp_cost": 20,
-            "target_type": "none",
-            "description": "사무라이의 비기로 장애물을 일격에 베어냅니다.",
-            "classes": ["사무라이"]
-        },
-        "명상": {
-            "cooldown_steps": 300,
-            "mp_cost": 15,
-            "heal_ratio": 0.3,
-            "target_type": "party",
-            "description": "명상으로 파티의 정신력과 MP를 회복합니다.",
-            "classes": ["사무라이"]
+            "classes": ["아크메이지", "암흑기사", "네크로맨서", "용기사", "정령술사", "시간술사", "마검사", "차원술사"]
         },
         "자물쇠 해제": {
-            "cooldown_steps": 100,
+            "cooldown_steps": 200,
             "mp_cost": 10,
             "success_rate": 0.8,
             "target_type": "none",
-            "description": "복잡한 자물쇠나 봉인을 해제합니다.",
-            "classes": ["사무라이"]
+            "description": "잠긴 문이나 상자를 엽니다.",
+            "classes": ["도적", "검성", "암살자", "기계공학자", "해적", "사무라이", "기본"]
         },
-        "집중": {
-            "cooldown_steps": 200,
-            "mp_cost": 8,
-            "target_type": "none",
-            "description": "깊은 집중으로 숨겨진 것을 감지합니다.",
-            "classes": ["사무라이"]
+        "환경 정화": {
+            "cooldown_steps": 500,
+            "mp_cost": 18,
+            "target_type": "party",
+            "description": "독성, 저주 등 환경 디버프를 정화합니다.",
+            "classes": ["아크메이지", "성기사", "암흑기사", "바드", "네크로맨서", "정령술사", "무당", "드루이드", "철학자", "시간술사", "연금술사", "신관", "차원술자", "기본"]
         },
-        "언데드 소환": {
+        "집단 은신": {
             "cooldown_steps": 600,
-            "mp_cost": 30,
-            "target_type": "none",
-            "description": "언데드를 소환하여 도움을 받습니다.",
-            "classes": ["네크로맨서"]
+            "mp_cost": 22,
+            "duration": 180,
+            "target_type": "party",
+            "description": "파티 전체를 은신시켜 적의 탐지를 피합니다.",
+            "classes": ["궁수", "도적", "암살자", "해적"]
         },
-        "영혼 탐지": {
-            "cooldown_steps": 300,
+        "던전 분석": {
+            "cooldown_steps": 400,
             "mp_cost": 15,
             "target_type": "none",
-            "description": "영혼의 힘으로 숨겨진 보물과 비밀을 찾습니다.",
-            "classes": ["네크로맨서"]
+            "description": "던전의 구조와 위험 요소를 분석합니다.",
+            "classes": ["궁수", "암흑기사", "몽크", "네크로맨서", "검성", "기계공학자", "사무라이", "철학자", "시간술사", "기사", "차원술사"]
         },
-        "생명력 흡수": {
-            "cooldown_steps": 400,
-            "mp_cost": 18,
-            "heal_ratio": 0.25,
-            "target_type": "ally",
-            "description": "생명력을 흡수하여 아군을 치료합니다.",
-            "classes": ["네크로맨서"]
+        "집단 축복": {
+            "cooldown_steps": 800,
+            "mp_cost": 30,
+            "duration": 300,
+            "target_type": "party",
+            "description": "파티 전체에 축복을 내려 능력치를 증가시킵니다.",
+            "classes": ["전사", "성기사", "몽크", "바드", "용기사", "검성", "무당", "철학자", "검투사", "기사", "신관", "마검사", "광전사"]
         },
-        "저주": {
-            "cooldown_steps": 500,
+        # 내구도 관련 필드 스킬들
+        "장비 수리": {
+            "cooldown_steps": 300,
             "mp_cost": 20,
+            "target_type": "ally",
+            "description": "손상된 장비를 마법으로 수리합니다.",
+            "classes": ["전사", "기계공학자", "연금술사", "철학자", "드루이드", "검투사", "기본"]
+        },
+        "내구도 강화": {
+            "cooldown_steps": 600,
+            "mp_cost": 35,
+            "target_type": "ally",
+            "description": "장비의 최대 내구도를 일시적으로 증가시킵니다.",
+            "classes": ["아크메이지", "성기사", "기계공학자", "정령술사", "무당", "연금술사", "마검사"]
+        },
+        "완벽 수리": {
+            "cooldown_steps": 1200,
+            "mp_cost": 60,
+            "target_type": "party",
+            "description": "파티의 모든 장비를 완전히 수리합니다.",
+            "classes": ["아크메이지", "기계공학자", "연금술사", "시간술사"]
+        },
+        "내구도 분석": {
+            "cooldown_steps": 100,  # 150 -> 100으로 쿨다운도 감소
+            "mp_cost": 3,           # 8 -> 3으로 MP 소모 크게 감소
             "target_type": "none",
-            "description": "주변 적들에게 저주를 내립니다.",
-            "classes": ["네크로맨서"]
+            "description": "파티 장비의 상태를 마법으로 정밀 분석하고 수리 계획을 제공합니다.",
+            "classes": ["기계공학자", "연금술사", "철학자", "시간술사", "검성", "기본"]
+        },
+        "장비 보호": {
+            "cooldown_steps": 800,
+            "mp_cost": 40,
+            "target_type": "party",
+            "description": "일정 시간 동안 장비 내구도 감소를 방지합니다.",
+            "classes": ["아크메이지", "성기사", "정령술사", "무당", "드루이드", "마검사", "차원술사"]
         }
     }
+    
+    @staticmethod
+    def get_available_skills(character_class: str) -> List[str]:
+        """캐릭터 클래스에 따른 사용 가능한 필드 스킬 반환"""
+        return FieldSkillBalance.CLASS_FIELD_SKILLS.get(character_class, [])
+    
+    @staticmethod
+    def get_skill_info(skill_name: str) -> Dict[str, Any]:
+        """특정 필드 스킬의 정보 반환"""
+        return FieldSkillBalance.FIELD_SKILLS.get(skill_name, {})
     
     @staticmethod
     def calculate_heal_amount(caster_stats: Dict[str, int], base_ratio: float = 0.3) -> int:

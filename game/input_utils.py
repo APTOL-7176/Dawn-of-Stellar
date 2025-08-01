@@ -11,7 +11,15 @@ class KeyboardInput:
     
     def __init__(self, sound_manager=None):
         self.getch_func = self._get_getch_function()
-        self.sound_manager = sound_manager
+        # 오디오 매니저 자동 설정
+        if not sound_manager:
+            try:
+                from .audio_system import get_audio_manager
+                self.sound_manager = get_audio_manager()
+            except ImportError:
+                self.sound_manager = None
+        else:
+            self.sound_manager = sound_manager
     
     def _get_getch_function(self):
         """OS에 맞는 getch 함수 반환"""
@@ -48,27 +56,27 @@ class KeyboardInput:
                 if isinstance(key, bytes):
                     key = key.decode('utf-8', errors='ignore')
                     
-                # 키 입력 효과음 재생
-                if self.sound_manager:
-                    self.sound_manager.play_sfx("menu_navigate")
+                # 키 입력 효과음 비활성화 (중복 방지 - cursor_menu_system에서 처리)
+                # if self.sound_manager:
+                #     self.sound_manager.play_sfx("menu_select")
                     
                 return key.lower()
             else:
                 # Unix 계열
                 key = self.getch_func().lower()
                 
-                # 키 입력 효과음 재생
-                if self.sound_manager:
-                    self.sound_manager.play_sfx("menu_navigate")
+                # 키 입력 효과음 비활성화 (중복 방지 - cursor_menu_system에서 처리)
+                # if self.sound_manager:
+                #     self.sound_manager.play_sfx("menu_select")
                     
                 return key
         except:
             # 에러 발생시 백업으로 input() 사용
             result = input("명령: ").lower().strip()[:1]
             
-            # 키 입력 효과음 재생
-            if self.sound_manager:
-                self.sound_manager.play_sfx("menu_navigate")
+            # 키 입력 효과음 비활성화 (중복 방지 - cursor_menu_system에서 처리)
+            # if self.sound_manager:
+            #     self.sound_manager.play_sfx("menu_select")
                 
             return result
     
@@ -87,6 +95,25 @@ class KeyboardInput:
             key = self.get_key()
             print()  # 줄바꿈
             return key
+    
+    def get_string_input(self, prompt: str = "") -> str:
+        """문자열 입력 받기 (숫자 입력용)"""
+        try:
+            if prompt:
+                print(prompt, end='', flush=True)
+            
+            # AI 자동 모드 체크
+            import sys
+            if hasattr(sys.modules.get('__main__'), 'ai_auto_mode') and sys.modules.get('__main__').ai_auto_mode:
+                print("🤖 자동 입력: 기본값")
+                return ""
+            
+            # 실제 문자열 입력 받기
+            result = input().strip()
+            return result
+            
+        except (EOFError, KeyboardInterrupt):
+            return ""
 
 def get_single_key_input(prompt: str = "") -> str:
     """단일 키 입력 받기 (편의 함수)"""

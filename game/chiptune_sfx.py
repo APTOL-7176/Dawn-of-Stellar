@@ -21,7 +21,7 @@ class ChiptuneGenerator:
         pygame.mixer.init()
         
     def generate_tone(self, frequency: float, duration: float, 
-                     wave_type: str = "square", volume: float = 0.5) -> np.ndarray:
+                     wave_type: str = "square", volume: float = 0.5) -> np.ndarray:  # 원래대로 복구
         """기본 톤 생성 (스테레오)"""
         frames = int(duration * self.sample_rate)
         arr = np.zeros((frames, 2))  # 스테레오 배열
@@ -49,7 +49,7 @@ class ChiptuneGenerator:
         return arr
         
     def generate_chord(self, frequencies: list, duration: float, 
-                      wave_type: str = "square", volume: float = 0.2) -> np.ndarray:
+                      wave_type: str = "square", volume: float = 0.2) -> np.ndarray:  # 원래대로 복구
         """화음 생성"""
         result = np.zeros(int(duration * self.sample_rate))
         for freq in frequencies:
@@ -263,13 +263,7 @@ def get_chiptune_sfx() -> ChiptuneSFX:
     return _chiptune_sfx
 
 def play_chiptune_sound(sound_name: str, volume: float = 0.7):
-    """칩튠 사운드 재생"""
-    sfx = get_chiptune_sfx()
-    if sfx:
-        try:
-            sfx.play_sound(sound_name, volume)
-        except Exception as e:
-            print(f"사운드 재생 실패 ({sound_name}): {e}")
-    else:
-        # 폴백: 텍스트 표시
-        print(f"♪ {sound_name} 사운드")
+    """칩튠 사운드 재생 - 중복 방지를 위해 비활성화"""
+    # 중복 효과음 방지를 위해 완전히 비활성화
+    # audio.py의 AudioManager만 사용
+    pass

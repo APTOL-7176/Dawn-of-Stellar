@@ -287,7 +287,11 @@ class RandomEncounter:
         
         handler = encounter_handlers.get(self.encounter_type)
         if handler:
-            return handler(party, current_floor)
+            result = handler(party, current_floor)
+            # 인카운터 타입 정보 추가
+            if isinstance(result, dict):
+                result['type'] = self.encounter_type.value
+            return result
         
         return {"success": False, "message": "알 수 없는 조우입니다."}
     
@@ -672,6 +676,15 @@ class RandomEncounterManager:
         
         return encounters
     
+    def check_encounter(self, party: List, current_floor: int, steps_taken: int = 0) -> Optional[Dict[str, Any]]:
+        """확률 기반 인카운터 체크"""
+        encounter_chance = self.get_encounter_chance(current_floor, steps_taken)
+        
+        if random.random() < encounter_chance:
+            return self.trigger_random_encounter(party, current_floor)
+        
+        return None
+    
     def trigger_random_encounter(self, party: List, current_floor: int) -> Optional[Dict[str, Any]]:
         """랜덤 조우 발생"""
         # 현재 층에서 가능한 조우들 필터링
@@ -688,12 +701,12 @@ class RandomEncounterManager:
         return selected_encounter.trigger(party, current_floor)
     
     def get_encounter_chance(self, floor: int, steps_taken: int) -> float:
-        """층과 이동 거리에 따른 조우 확률"""
-        base_chance = 0.05  # 기본 5%
-        floor_modifier = min(floor * 0.01, 0.10)  # 층당 1% 증가, 최대 10%
-        step_modifier = min(steps_taken * 0.02, 0.15)  # 걸음당 2% 증가, 최대 15%
+        """층과 이동 거리에 따른 조우 확률 (매우 낮은 빈도로 조정)"""
+        base_chance = 0.003  # 기본 0.3% (0.8% → 0.3%로 더욱 낮춤)
+        floor_modifier = min(floor * 0.0005, 0.003)  # 층당 0.05% 증가, 최대 0.3%
+        step_modifier = min(steps_taken * 0.0002, 0.004)  # 걸음당 0.02% 증가, 최대 0.4%
         
-        return min(base_chance + floor_modifier + step_modifier, 0.30)  # 최대 30%
+        return min(base_chance + floor_modifier + step_modifier, 0.01)  # 최대 1% (2.5% → 1%로 낮춤)
     
     def get_combat_chance(self) -> float:
         """랜덤 인카운터에서 전투가 발생할 확률"""

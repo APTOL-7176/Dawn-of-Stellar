@@ -1,5 +1,16 @@
 @echo off
 chcp 65001 >nul 2>&1
+
+REM 가상환경 활성화 (안전한 방법)
+if exist ".venv\Scripts\activate.bat" (
+    echo 🔄 가상환경 활성화 중...
+    call ".venv\Scripts\activate.bat"
+) else (
+    echo ⚠️ 가상환경을 찾을 수 없습니다. 파이썬_설치.bat을 먼저 실행하세요.
+    pause
+    exit /b 1
+)
+
 setlocal enabledelayedexpansion
 
 echo ================================================================================
@@ -19,8 +30,8 @@ if not exist ".venv" (
 
 REM 가상환경 활성화
 echo 🔌 가상환경 활성화 중...
-call .venv\Scripts\activate.bat
-if %errorlevel__ neq 0 (
+call ".venv\Scripts\activate.bat"
+if %errorlevel% neq 0 (
     echo ❌ 가상환경 활성화에 실패했습니다.
     echo.
     echo "파이썬_설치.bat"을 다시 실행해주세요.

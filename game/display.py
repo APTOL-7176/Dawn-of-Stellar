@@ -241,27 +241,27 @@ class GameDisplay:
                 
                 # HP 상태
                 if hp_ratio >= 0.8:
-                    hp_display = f"💚 {bright_green(f'{member.current_hp}/{member.max_hp}')}"
+                    hp_display = f"💚 HP {bright_green(f'{member.current_hp}/{member.max_hp}')}"
                 elif hp_ratio >= 0.6:
-                    hp_display = f"💛 {yellow(f'{member.current_hp}/{member.max_hp}')}"
+                    hp_display = f"💛 HP {yellow(f'{member.current_hp}/{member.max_hp}')}"
                 elif hp_ratio >= 0.4:
-                    hp_display = f"🧡 {yellow(f'{member.current_hp}/{member.max_hp}')}"
+                    hp_display = f"🧡 HP {yellow(f'{member.current_hp}/{member.max_hp}')}"
                 elif hp_ratio >= 0.2:
-                    hp_display = f"❤️ {bright_red(f'{member.current_hp}/{member.max_hp}')}"
+                    hp_display = f"❤️ HP {bright_red(f'{member.current_hp}/{member.max_hp}')}"
                 else:
-                    hp_display = f"💔 {red(f'{member.current_hp}/{member.max_hp}')}"
+                    hp_display = f"💔 HP {red(f'{member.current_hp}/{member.max_hp}')}"
                 
                 # MP 색상과 이모지 계산
                 if mp_ratio >= 0.8:
-                    mp_display = f"💙 {bright_cyan(f'{member.current_mp}/{member.max_mp}')}"
+                    mp_display = f"💙 MP {bright_cyan(f'{member.current_mp}/{member.max_mp}')}"
                 elif mp_ratio >= 0.6:
-                    mp_display = f"💙 {cyan(f'{member.current_mp}/{member.max_mp}')}"
+                    mp_display = f"💙 MP {cyan(f'{member.current_mp}/{member.max_mp}')}"
                 elif mp_ratio >= 0.4:
-                    mp_display = f"💙 {blue(f'{member.current_mp}/{member.max_mp}')}"
+                    mp_display = f"💙 MP {blue(f'{member.current_mp}/{member.max_mp}')}"
                 elif mp_ratio >= 0.2:
-                    mp_display = f"💜 {magenta(f'{member.current_mp}/{member.max_mp}')}"
+                    mp_display = f"💜 MP {magenta(f'{member.current_mp}/{member.max_mp}')}"
                 else:
-                    mp_display = f"❤️ {red(f'{member.current_mp}/{member.max_mp}')}"
+                    mp_display = f"❤️ MP {red(f'{member.current_mp}/{member.max_mp}')}"
                 
                 print(f"    HP: {hp_display} | MP: {mp_display}")
             else:

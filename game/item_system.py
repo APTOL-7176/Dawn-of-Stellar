@@ -395,3 +395,7 @@ def use_consumable(consumable: Consumable, user, target=None, party=None):
     consumable.uses_remaining -= 1
     
     return True, success_message
+
+def get_item_database():
+    """아이템 데이터베이스 반환 (호환성 함수)"""
+    return get_consumable_database()

@@ -581,7 +581,82 @@ def get_tutorial_manager() -> TutorialManager:
 
 
 def show_tutorial_selection_menu():
-    """튜토리얼 선택 메뉴 표시"""
+    """튜토리얼 선택 메뉴 표시 - 커서 방식"""
+    try:
+        from .cursor_menu_system import create_simple_menu
+        
+        progress = tutorial_manager.get_tutorial_progress()
+        
+        while True:
+            print("\n" + "="*60)
+            print("📚 튜토리얼 메뉴")
+            print("="*60)
+            print(f"진행도: {progress['completed']}/{progress['total']} ({progress['percentage']:.1f}%)")
+            
+            if progress['current_tutorial']:
+                current = progress['current_tutorial']
+                print(f"현재 튜토리얼: {current['title']} ({current['step']}/{current['total_steps']})")
+            
+            print("\n" + "-"*60)
+            
+            menu_data = tutorial_manager.show_tutorial_menu()
+            
+            # 튜토리얼 항목들을 커서 메뉴로 변환
+            options = []
+            descriptions = []
+            choice_map = {}
+            choice_num = 0
+            
+            for category_data in menu_data:
+                # 카테고리 헤더는 비활성화된 항목으로 추가
+                options.append(f"📂 {category_data['title']}")
+                descriptions.append("카테고리")
+                choice_map[choice_num] = None  # 선택 불가
+                choice_num += 1
+                
+                # 카테고리 내 항목들 추가
+                for item in category_data['items']:
+                    choice_map[choice_num] = item['type']
+                    status_color = "✅" if "완료" in item['status'] else "📚"
+                    options.append(f"  {status_color} {item['title']} ({item['difficulty']}, {item['time']})")
+                    descriptions.append(f"{item['description']} | 상태: {item['status']}")
+                    choice_num += 1
+            
+            # 메뉴 하단 옵션들
+            options.append("🔧 튜토리얼 설정")
+            descriptions.append("튜토리얼 관련 설정을 변경합니다")
+            choice_map[choice_num] = "settings"
+            choice_num += 1
+            
+            options.append("🚪 메뉴 나가기")
+            descriptions.append("메인 메뉴로 돌아갑니다")
+            choice_map[choice_num] = "exit"
+            
+            menu = create_simple_menu("� 튜토리얼 선택", options, descriptions)
+            result = menu.run()
+            
+            if result == -1:  # 취소
+                break
+            
+            # 선택된 항목 처리
+            selected_action = choice_map.get(result)
+            if selected_action is None:
+                continue  # 카테고리 헤더 선택시 무시
+            elif selected_action == "exit":
+                break
+            elif selected_action == "settings":
+                handle_tutorial_settings()
+            else:
+                # 특정 튜토리얼 실행
+                tutorial_manager.start_tutorial(selected_action)
+                progress = tutorial_manager.get_tutorial_progress()  # 진행도 업데이트
+        
+    except ImportError:
+        # 폴백: 기존 텍스트 메뉴
+        _show_tutorial_selection_menu_fallback()
+
+def _show_tutorial_selection_menu_fallback():
+    """튜토리얼 선택 메뉴 폴백 (기존 방식)"""
     print("\n" + "="*60)
     print("📚 튜토리얼 메뉴")
     print("="*60)
@@ -618,7 +693,77 @@ def show_tutorial_selection_menu():
 
 
 def handle_tutorial_settings():
-    """튜토리얼 설정 메뉴"""
+    """튜토리얼 설정 메뉴 - 커서 방식"""
+    try:
+        from .cursor_menu_system import create_simple_menu
+        
+        while True:
+            prefs = tutorial_manager.user_preferences
+            
+            # 현재 설정 상태로 옵션 텍스트 생성
+            options = [
+                f"💡 힌트 표시: {'켜짐' if prefs['show_hints'] else '꺼짐'}",
+                f"⏩ 자동 진행: {'켜짐' if prefs['auto_advance'] else '꺼짐'}",
+                f"🎭 데모 모드: {'켜짐' if prefs['demo_mode'] else '꺼짐'}",
+                f"✅ 완료된 튜토리얼 숨기기: {'켜짐' if prefs['skip_completed'] else '꺼짐'}",
+                f"🔄 자동 트리거: {'켜짐' if tutorial_manager.auto_trigger else '꺼짐'}",
+                f"📚 튜토리얼 시스템: {'켜짐' if tutorial_manager.tutorial_enabled else '꺼짐'}",
+                "🗑️ 모든 진행도 초기화",
+                "❌ 돌아가기"
+            ]
+            
+            descriptions = [
+                "튜토리얼 중 힌트를 표시합니다",
+                "튜토리얼을 자동으로 진행합니다",
+                "데모 모드를 활성화합니다",
+                "완료된 튜토리얼을 목록에서 숨깁니다",
+                "상황에 맞는 튜토리얼을 자동으로 시작합니다",
+                "전체 튜토리얼 시스템을 켜거나 끕니다",
+                "모든 튜토리얼 진행도를 초기화합니다",
+                "설정 메뉴를 나갑니다"
+            ]
+            
+            menu = create_simple_menu("🔧 튜토리얼 설정", options, descriptions)
+            result = menu.run()
+            
+            if result == -1 or result == 7:  # 돌아가기
+                break
+            elif result == 0:  # 힌트 표시
+                tutorial_manager.user_preferences['show_hints'] = not prefs['show_hints']
+                print("✅ 설정이 변경되었습니다.")
+            elif result == 1:  # 자동 진행
+                tutorial_manager.user_preferences['auto_advance'] = not prefs['auto_advance']
+                print("✅ 설정이 변경되었습니다.")
+            elif result == 2:  # 데모 모드
+                tutorial_manager.user_preferences['demo_mode'] = not prefs['demo_mode']
+                print("✅ 설정이 변경되었습니다.")
+            elif result == 3:  # 완료된 튜토리얼 숨기기
+                tutorial_manager.user_preferences['skip_completed'] = not prefs['skip_completed']
+                print("✅ 설정이 변경되었습니다.")
+            elif result == 4:  # 자동 트리거
+                tutorial_manager.auto_trigger = not tutorial_manager.auto_trigger
+                print("✅ 설정이 변경되었습니다.")
+            elif result == 5:  # 튜토리얼 시스템
+                tutorial_manager.tutorial_enabled = not tutorial_manager.tutorial_enabled
+                if tutorial_manager.tutorial_enabled:
+                    print("✅ 튜토리얼 시스템이 활성화되었습니다.")
+                else:
+                    print("⚠️ 튜토리얼 시스템이 비활성화되었습니다.")
+            elif result == 6:  # 모든 진행도 초기화
+                from .cursor_menu_system import create_yes_no_menu
+                confirm_menu = create_yes_no_menu("정말로 모든 튜토리얼 진행도를 초기화하시겠습니까?")
+                confirm_result = confirm_menu.run()
+                
+                if confirm_result == 0:  # 예
+                    tutorial_manager.reset_all_progress()
+                    print("✅ 모든 튜토리얼 진행도가 초기화되었습니다.")
+                    
+    except ImportError:
+        # 폴백: 기존 텍스트 메뉴
+        _handle_tutorial_settings_fallback()
+
+def _handle_tutorial_settings_fallback():
+    """튜토리얼 설정 메뉴 폴백 (기존 방식)"""
     print("\n" + "="*50)
     print("🔧 튜토리얼 설정")
     print("="*50)
@@ -633,7 +778,7 @@ def handle_tutorial_settings():
     print("7. 모든 진행도 초기화")
     print("8. 돌아가기")
     
-    return {
+    settings_map = {
         1: ("show_hints", not prefs['show_hints']),
         2: ("auto_advance", not prefs['auto_advance']),
         3: ("demo_mode", not prefs['demo_mode']),

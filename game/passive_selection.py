@@ -61,15 +61,18 @@ class PassiveSelectionSystem:
                     self.selected_passives[character.name] = character.active_traits
                     print(f"\n{GREEN}✓ {character.name}의 패시브 선택 완료{RESET}")
                     
-                    # 확인 메시지
-                    print(f"{CYAN}선택 내용을 확인하시겠습니까? (y/n){RESET}")
-                    confirm = input(f"{CYAN}>>> {RESET}").strip().lower()
+                    # 선택된 특성들을 자세히 표시하는 확인창
+                    self._show_selection_confirmation(character)
                     
-                    if confirm in ['y', 'yes', '예', 'ㅇ']:
+                    # 커서 메뉴로 확인 옵션 제공
+                    if self._confirm_selection_with_cursor(character):
+                        print(f"\n{GREEN}🎉 {character.name}의 특성 선택이 확정되었습니다!{RESET}")
+                        input(f"{YELLOW}계속하려면 Enter를 누르세요...{RESET}")
                         return True
                     else:
                         # 선택 초기화하고 다시
                         character.active_traits = []
+                        print(f"\n{YELLOW}선택을 초기화합니다. 다시 선택해주세요.{RESET}")
                         continue
                         
             except KeyboardInterrupt:
@@ -78,6 +81,97 @@ class PassiveSelectionSystem:
             except Exception as e:
                 print(f"{RED}오류가 발생했습니다: {e}{RESET}")
                 continue
+    
+    def _show_selection_confirmation(self, character: Character):
+        """선택된 특성들을 확인창으로 표시"""
+        print(f"\n{BOLD}{GREEN}{'='*60}{RESET}")
+        print(f"{BOLD}{WHITE}🎯 {character.name}의 선택된 특성{RESET}")
+        print(f"{BOLD}{GREEN}{'='*60}{RESET}")
+        
+        for i, trait in enumerate(character.active_traits, 1):
+            # 특성 타입에 따른 아이콘
+            if trait.effect_type == "passive":
+                icon = "🛡️"
+            elif trait.effect_type == "trigger":
+                icon = "⚡"
+            elif trait.effect_type == "active":
+                icon = "🔥"
+            else:
+                icon = "✨"
+            
+            print(f"{CYAN}{i}. {icon} {BOLD}{trait.name}{RESET}")
+            print(f"   {WHITE}└─ {trait.description}{RESET}")
+            
+            # 효과 분석
+            effect_hints = []
+            effect_str = str(trait.effect_value)
+            
+            if "damage" in effect_str.lower():
+                effect_hints.append("⚔️ 공격력 관련")
+            if "defense" in effect_str.lower():
+                effect_hints.append("🛡️ 방어력 관련")
+            if "crit" in effect_str.lower():
+                effect_hints.append("💥 크리티컬 관련")
+            if "heal" in effect_str.lower():
+                effect_hints.append("💚 회복 관련")
+            if "speed" in effect_str.lower():
+                effect_hints.append("💨 속도 관련")
+            
+            if effect_hints:
+                print(f"   {MAGENTA}   ({' | '.join(effect_hints)}){RESET}")
+            print()
+        
+        print(f"{YELLOW}총 {len(character.active_traits)}개의 특성이 선택되었습니다.{RESET}")
+    
+    def _confirm_selection_with_cursor(self, character: Character) -> bool:
+        """커서 메뉴로 선택 확인"""
+        try:
+            # CursorMenu import 시도
+            from .cursor_menu_system import CursorMenu
+            
+            print(f"\n{CYAN}{'='*50}{RESET}")
+            print(f"{YELLOW}이 선택으로 확정하시겠습니까?{RESET}")
+            print(f"{CYAN}{'='*50}{RESET}")
+            
+            options = [
+                "✅ 확정하기",
+                "🔄 다시 선택하기",
+                "📋 선택 내용 다시 보기"
+            ]
+            descriptions = [
+                f"{character.name}의 특성 선택을 확정합니다",
+                "선택을 초기화하고 다시 선택합니다",
+                "선택된 특성들을 다시 확인합니다"
+            ]
+            
+            menu = CursorMenu("🎯 특성 선택 확인", options, descriptions, clear_screen=False)
+            
+            while True:
+                choice = menu.run()
+                
+                if choice == 0:  # 확정하기
+                    return True
+                elif choice == 1:  # 다시 선택하기
+                    return False
+                elif choice == 2:  # 선택 내용 다시 보기
+                    import os
+                    os.system('cls' if os.name == 'nt' else 'clear')
+                    self._show_selection_confirmation(character)
+                    print(f"\n{CYAN}{'='*50}{RESET}")
+                    print(f"{YELLOW}이 선택으로 확정하시겠습니까?{RESET}")
+                    print(f"{CYAN}{'='*50}{RESET}")
+                    continue
+                else:  # 취소 또는 기타
+                    return False
+                    
+        except ImportError:
+            # CursorMenu를 사용할 수 없는 경우 기존 방식 사용
+            print(f"\n{CYAN}{'='*50}{RESET}")
+            print(f"{YELLOW}이 선택으로 확정하시겠습니까?{RESET}")
+            print(f"{WHITE}Y: 확정 | N: 다시 선택{RESET}")
+            print(f"{CYAN}{'='*50}{RESET}")
+            confirm = input(f"{CYAN}>>> {RESET}").strip().lower()
+            return confirm in ['y', 'yes', '예', 'ㅇ']
     
     def display_party_passives(self, party: List[Character]):
         """파티 전체의 선택된 패시브 표시"""
@@ -184,3 +278,7 @@ passive_system = PassiveSelectionSystem()
 def get_passive_system() -> PassiveSelectionSystem:
     """패시브 선택 시스템 반환"""
     return passive_system
+
+def show_passive_selection_ui(*args, **kwargs):
+    """패시브 선택 UI 표시 (호환성 함수)"""
+    return passive_system.select_passives_for_party(*args, **kwargs)

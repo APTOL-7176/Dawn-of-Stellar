@@ -320,7 +320,7 @@ class PassiveSystem:
 
 
 def show_passive_selection_menu(player_stats: Dict) -> PassiveSystem:
-    """패시브 선택 메뉴 표시"""
+    """패시브 선택 메뉴 표시 - 커서 방식"""
     passive_system = PassiveSystem()
     available_passives = passive_system.get_available_passives(player_stats)
     
@@ -328,10 +328,110 @@ def show_passive_selection_menu(player_stats: Dict) -> PassiveSystem:
         print("❌ 선택 가능한 패시브가 부족합니다. (최소 2개 필요)")
         return passive_system
     
-    print("\n" + "="*80)
-    print("🎯 패시브 선택 - 2개를 선택하세요")
-    print("="*80)
-    
+    try:
+        from .cursor_menu_system import create_simple_menu
+        
+        print("\n" + "="*80)
+        print("🎯 패시브 선택 - 2개를 선택하세요")
+        print("="*80)
+        
+        # 첫 번째 패시브 선택
+        options = []
+        descriptions = []
+        
+        for passive in available_passives:
+            unlock_status = "🔓" if passive.is_unlocked else "🔒"
+            type_icon = {
+                PassiveType.COMBAT_MASTERY: "⚔️",
+                PassiveType.SURVIVAL_INSTINCT: "🛡️", 
+                PassiveType.TREASURE_HUNTER: "💰",
+                PassiveType.ARCANE_KNOWLEDGE: "🔮",
+                PassiveType.TACTICAL_GENIUS: "🧠",
+                PassiveType.FORTUNE_SEEKER: "🍀"
+            }.get(passive.passive_type, "❓")
+            
+            option_text = f"{unlock_status} {type_icon} {passive.name}"
+            if not passive.is_unlocked:
+                option_text += " [잠김]"
+                
+            options.append(option_text)
+            
+            desc = passive.description
+            if not passive.is_unlocked and passive.unlock_condition:
+                desc += f" | 🔒 해금 조건: {passive.unlock_condition}"
+            descriptions.append(desc)
+        
+        # 첫 번째 선택
+        menu1 = create_simple_menu("1번째 패시브 선택", options, descriptions)
+        first_result = menu1.run()
+        
+        if first_result == -1 or first_result >= len(available_passives):
+            return passive_system
+            
+        first_passive = available_passives[first_result]
+        if not first_passive.is_unlocked:
+            print("❌ 잠긴 패시브입니다!")
+            return passive_system
+        
+        # 두 번째 패시브 선택 (첫 번째 제외)
+        second_options = []
+        second_descriptions = []
+        second_available = []
+        
+        for i, passive in enumerate(available_passives):
+            if i == first_result:  # 이미 선택된 패시브는 제외
+                continue
+                
+            unlock_status = "🔓" if passive.is_unlocked else "🔒"
+            type_icon = {
+                PassiveType.COMBAT_MASTERY: "⚔️",
+                PassiveType.SURVIVAL_INSTINCT: "🛡️", 
+                PassiveType.TREASURE_HUNTER: "💰",
+                PassiveType.ARCANE_KNOWLEDGE: "🔮",
+                PassiveType.TACTICAL_GENIUS: "🧠",
+                PassiveType.FORTUNE_SEEKER: "🍀"
+            }.get(passive.passive_type, "❓")
+            
+            option_text = f"{unlock_status} {type_icon} {passive.name}"
+            if not passive.is_unlocked:
+                option_text += " [잠김]"
+                
+            second_options.append(option_text)
+            
+            desc = passive.description
+            if not passive.is_unlocked and passive.unlock_condition:
+                desc += f" | 🔒 해금 조건: {passive.unlock_condition}"
+            second_descriptions.append(desc)
+            second_available.append(passive)
+        
+        menu2 = create_simple_menu("2번째 패시브 선택", second_options, second_descriptions)
+        second_result = menu2.run()
+        
+        if second_result == -1 or second_result >= len(second_available):
+            return passive_system
+            
+        second_passive = second_available[second_result]
+        if not second_passive.is_unlocked:
+            print("❌ 잠긴 패시브입니다!")
+            return passive_system
+        
+        # 선택 적용
+        passive_system.select_passives(first_passive, second_passive)
+        
+        print(f"\n🎯 최종 선택:")
+        print(passive_system.get_passive_description())
+        
+        # 선택 저장
+        passive_system.save_selection()
+        
+        return passive_system
+        
+    except ImportError:
+        # 폴백: 기존 텍스트 메뉴
+        return _show_passive_selection_menu_fallback(player_stats, passive_system, available_passives)
+
+def _show_passive_selection_menu_fallback(player_stats: Dict, passive_system, available_passives) -> PassiveSystem:
+    """패시브 선택 메뉴 폴백 (기존 방식)"""
     print("\n📋 선택 가능한 패시브:")
     for i, passive in enumerate(available_passives, 1):
         unlock_status = "🔓" if passive.is_unlocked else "🔒"

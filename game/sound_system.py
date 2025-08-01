@@ -35,7 +35,7 @@ class SoundManager:
     def __init__(self):
         self.enabled = PYGAME_AVAILABLE
         self.bgm_volume = 0.5
-        self.sfx_volume = 0.7
+        self.sfx_volume = 0.7  # 원래대로 복구
         self.sounds: Dict[str, any] = {}
         self.current_bgm = None
         
@@ -66,36 +66,10 @@ class SoundManager:
             return False
             
     def play_sfx(self, name: str, volume: Optional[float] = None):
-        """효과음 재생"""
-        if not self.enabled or name not in self.sounds:
-            # 칩튠 대체 사운드 재생
-            if CHIPTUNE_AVAILABLE:
-                play_chiptune_sound(name)
-            return
-            
-        try:
-            sound_data = self.sounds[name]
-            if sound_data["type"] == SoundType.SFX:
-                if "dummy" in sound_data:
-                    # 더미 사운드의 경우 텍스트 출력 또는 칩튠으로 대체
-                    if "text" in sound_data:
-                        print(sound_data["text"])
-                    elif CHIPTUNE_AVAILABLE:
-                        play_chiptune_sound(name)
-                    else:
-                        print(f"♪ {name} 사운드 재생")
-                elif "sound" in sound_data:
-                    sound = sound_data["sound"]
-                    if volume is not None:
-                        sound.set_volume(volume)
-                    else:
-                        sound.set_volume(self.sfx_volume)
-                    sound.play()
-        except Exception as e:
-            print(f"효과음 재생 실패 ({name}): {e}")
-            # 실패 시 칩튠으로 대체
-            if CHIPTUNE_AVAILABLE:
-                play_chiptune_sound(name)
+        """효과음 재생 - 중복 방지를 위해 비활성화"""
+        # 중복 효과음 방지를 위해 sound_system의 효과음은 완전히 비활성화
+        # audio.py의 AudioManager가 담당하도록 함
+        return
             
     def play_bgm(self, name: str, loops: int = -1, volume: Optional[float] = None):
         """배경음악 재생"""
@@ -356,60 +330,44 @@ class GameSounds:
             print(f"🎵 BGM: {bgm_key}")
             
     def play_brave_attack(self):
-        """Brave 공격 사운드"""
-        if self.sound_manager.enabled:
-            self.sound_manager.play_sfx("brave_attack")
-        else:
-            print("♪ Brave 공격")
+        """Brave 공격 사운드 - 비활성화"""
+        # 중복 방지를 위해 비활성화
+        pass
             
     def play_hp_attack(self):
-        """HP 공격 사운드"""
-        if self.sound_manager.enabled:
-            self.sound_manager.play_sfx("hp_attack")
-        else:
-            print("♪ HP 공격")
+        """HP 공격 사운드 - 비활성화"""
+        # 중복 방지를 위해 비활성화
+        pass
             
     def play_break_sound(self):
-        """Break 사운드"""
-        if self.sound_manager.enabled:
-            self.sound_manager.play_sfx("break_sound")
-        else:
-            print("B R E A K !")
+        """Break 사운드 - 비활성화"""
+        # 중복 방지를 위해 비활성화
+        pass
             
     def play_critical_hit(self):
-        """크리티컬 히트 사운드"""
-        if self.sound_manager.enabled:
-            self.sound_manager.play_sfx("critical_hit")
-        else:
-            print("CRITICAL!")
+        """크리티컬 히트 사운드 - 비활성화"""
+        # 중복 방지를 위해 비활성화
+        pass
             
     def play_heal_sound(self):
-        """치유 사운드"""
-        if self.sound_manager.enabled:
-            self.sound_manager.play_sfx("heal")
-        else:
-            print("♪ 치유")
+        """치유 사운드 - 비활성화"""
+        # 중복 방지를 위해 비활성화
+        pass
             
     def play_menu_sound(self):
-        """메뉴 선택 사운드"""
-        if self.sound_manager.enabled:
-            self.sound_manager.play_sfx("menu_select")
-        else:
-            print("♪ 메뉴")
+        """메뉴 선택 사운드 - 비활성화"""
+        # 중복 방지를 위해 비활성화
+        pass
     
     def play_item_get_sound(self):
-        """아이템 획득 사운드"""
-        if self.sound_manager.enabled:
-            self.sound_manager.play_sfx("item_get")
-        else:
-            print("♪ 아이템 획득")
+        """아이템 획득 사운드 - 비활성화"""
+        # 중복 방지를 위해 비활성화
+        pass
     
     def play_combat_start_sound(self):
-        """전투 시작 사운드"""
-        if self.sound_manager.enabled:
-            self.sound_manager.play_sfx("combat_start")
-        else:
-            print("♪ 전투 시작")
+        """전투 시작 사운드 - 비활성화"""
+        # 중복 방지를 위해 비활성화
+        pass
 
 
 # 전역 사운드 매니저 인스턴스
@@ -431,30 +389,7 @@ def get_game_sounds() -> GameSounds:
     return _game_sounds
 
 def play_sound_effect(effect_name: str):
-    """간편한 효과음 재생 함수 (칩튠 우선)"""
-    # 먼저 칩튠 사운드 시도
-    if CHIPTUNE_AVAILABLE:
-        try:
-            play_chiptune_sound(effect_name)
-            return
-        except Exception as e:
-            print(f"칩튠 사운드 재생 실패: {e}")
-    
-    # 폴백: 기존 사운드 시스템 또는 텍스트
-    sounds = get_game_sounds()
-    
-    effect_map = {
-        "brave_attack": sounds.play_brave_attack,
-        "hp_attack": sounds.play_hp_attack,
-        "break": sounds.play_break_sound,
-        "critical": sounds.play_critical_hit,
-        "heal": sounds.play_heal_sound,
-        "menu": sounds.play_menu_sound,
-        "item_get": sounds.play_item_get_sound,
-        "combat_start": sounds.play_combat_start_sound,
-    }
-    
-    if effect_name in effect_map:
-        effect_map[effect_name]()
-    else:
-        print(f"♪ {effect_name} 사운드")
+    """간편한 효과음 재생 함수 - 비활성화 (중복 방지)"""
+    # 중복 효과음 방지를 위해 sound_system의 효과음은 완전히 비활성화
+    # audio.py의 AudioManager가 모든 효과음을 담당
+    pass

@@ -54,7 +54,7 @@ class AutoPartyBuilder:
         "기계공학자 + 연금술사": {"bonus": "과학 조합", "effect": "아이템 효과 증가"}
     }
 
-    def create_balanced_party(self, user_selected: List[str] = None, party_size: int = 4) -> List[Character]:
+    def create_balanced_party(self, user_selected: List[str] = None, party_size: int = 4, auto_select_traits: bool = True) -> List[Character]:
         """밸런스 잡힌 파티 생성"""
         if user_selected is None:
             user_selected = []
@@ -83,8 +83,9 @@ class AutoPartyBuilder:
         
         for i, class_name in enumerate(party_classes):
             character = self._create_character(class_name, i + 1)
-            # 자동 패시브 선택
-            self._auto_select_passives(character)
+            # 특성 자동 선택 (옵션)
+            if auto_select_traits:
+                self._auto_select_passives(character)
             party_members.append(character)
         
         # 파티 분석 및 시너지 확인

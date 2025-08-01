@@ -81,13 +81,20 @@ echo.
 
 REM 가상환경 활성화
 echo 🔌 가상환경 활성화 중...
-call .venv\Scripts\activate.bat
-if %errorlevel% neq 0 (
-    echo ❌ 가상환경 활성화에 실패했습니다.
+if exist ".venv\Scripts\activate.bat" (
+    call ".venv\Scripts\activate.bat"
+    if %errorlevel% neq 0 (
+        echo ❌ 가상환경 활성화에 실패했습니다.
+        pause
+        exit /b 1
+    )
+    echo ✅ 가상환경 활성화 완료
+) else (
+    echo ❌ .venv\Scripts\activate.bat 파일을 찾을 수 없습니다.
+    echo    가상환경이 제대로 생성되지 않았을 수 있습니다.
     pause
     exit /b 1
 )
-echo ✅ 가상환경 활성화 완료
 echo.
 
 REM requirements.txt 설치
@@ -114,7 +121,7 @@ if exist "requirements.txt" (
     echo ⚠️  requirements.txt 파일을 찾을 수 없습니다.
     echo    수동으로 필수 패키지를 설치합니다...
     python -m pip install pygame numpy colorama keyboard
-    if %errorlevel__ neq 0 (
+    if %errorlevel% neq 0 (
         echo ❌ 패키지 설치에 실패했습니다.
         pause
         exit /b 1
@@ -126,7 +133,7 @@ echo.
 REM 설치 검증
 echo 🧪 설치 검증 중...
 python -c "import pygame, numpy, colorama, keyboard; print('✅ 모든 패키지가 정상적으로 설치되었습니다!')" 2>nul
-if %errorlevel__ neq 0 (
+if %errorlevel% neq 0 (
     echo ⚠️  일부 패키지에 문제가 있을 수 있습니다.
     echo    하지만 게임은 정상적으로 실행될 가능성이 높습니다.
 ) else (
@@ -138,7 +145,7 @@ REM 게임 실행 가능 확인
 echo 🎮 게임 실행 가능성 확인 중...
 if exist "main.py" (
     python -c "import main" 2>nul
-    if %errorlevel__ == 0 (
+    if %errorlevel% == 0 (
         echo ✅ 게임 실행 준비 완료!
     ) else (
         echo ⚠️  게임 모듈에 문제가 있을 수 있지만, 실행은 가능할 것입니다.

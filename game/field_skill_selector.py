@@ -121,7 +121,7 @@ class FieldSkillSelector:
         return capable_members
     
     def select_skill_user(self, party: PartyManager, skill_id: str) -> Optional[Character]:
-        """필드 스킬 사용자 선택 인터페이스"""
+        """필드 스킬 사용자 선택 인터페이스 - 커서 방식"""
         if skill_id not in self.field_skills:
             print(f"❌ 알 수 없는 스킬: {skill_id}")
             return None
@@ -139,8 +139,61 @@ class FieldSkillSelector:
             # 사용 가능한 멤버가 1명뿐이면 자동 선택
             return capable_members[0]
         
-        # 여러 명이 사용 가능하면 선택 메뉴 표시
         skill_info = self.field_skills[skill_id]
+        
+        try:
+            from .cursor_menu_system import create_simple_menu
+            
+            # 커서 메뉴로 사용자 선택
+            options = []
+            descriptions = []
+            
+            for member in capable_members:
+                mp_status = f"{member.current_mp}/{member.max_mp}"
+                hp_status = f"{member.current_hp}/{member.max_hp}"
+                
+                options.append(f"👤 {member.name} ({member.character_class})")
+                
+                desc = f"HP: {hp_status} | MP: {mp_status}"
+                # 특별한 상태 표시
+                if hasattr(member, 'status_manager'):
+                    active_effects = member.status_manager.get_active_effects()
+                    if active_effects:
+                        desc += f" | 상태: {', '.join(active_effects)}"
+                        
+                descriptions.append(desc)
+            
+            options.append("❌ 취소")
+            descriptions.append("스킬 사용을 취소합니다")
+            
+            menu_title = f"🎯 {skill_info['name']} 사용자 선택"
+            menu = create_simple_menu(menu_title, options, descriptions)
+            
+            # 스킬 정보를 상단에 표시
+            print(f"\n📝 {skill_info['description']}")
+            print(f"💙 MP 소모: {skill_info['mp_cost']}")
+            print("─" * 50)
+            
+            result = menu.run()
+            
+            if result == -1 or result >= len(capable_members):  # 취소
+                return None
+            else:
+                selected_member = capable_members[result]
+                
+                # 효과음 재생
+                if self.sound_system:
+                    self.sound_system.play_sfx("menu_confirm")
+                
+                print(f"✅ {selected_member.name}이(가) {skill_info['name']} 스킬을 사용합니다!")
+                return selected_member
+                
+        except ImportError:
+            # 폴백: 기존 텍스트 메뉴
+            return self._select_skill_user_fallback(capable_members, skill_info)
+    
+    def _select_skill_user_fallback(self, capable_members: List[Character], skill_info: Dict) -> Optional[Character]:
+        """필드 스킬 사용자 선택 폴백 (기존 방식)"""
         print(f"\n🎯 {skill_info['name']} 스킬 사용자 선택")
         print(f"📝 {skill_info['description']}")
         print(f"💙 MP 소모: {skill_info['mp_cost']}")

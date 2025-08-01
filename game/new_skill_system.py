@@ -226,6 +226,13 @@ class NewSkillSystem:
     
     def __init__(self):
         self.skills_by_class = self._initialize_all_skills()
+        self.cooldowns = {}  # {character_id: {skill_name: remaining_turns}}
+        # 스킬 계수 전역 배수 (1.5배로 모든 스킬 데미지 증가)
+        self.skill_power_multiplier = 1.5
+        # 적 스킬 전용 계수 (1.1배로 적 스킬 강화)
+        self.enemy_skill_power_multiplier = 1.1
+        # 아군 스킬 MP 소모량 배수 (1.6배로 증가)
+        self.ally_mp_cost_multiplier = 1.6
     
     def _initialize_all_skills(self) -> Dict[str, List[Dict[str, Any]]]:
         """28종 직업별 스킬 초기화 - 각 직업의 개성과 유기성 강화"""
@@ -248,10 +255,10 @@ class NewSkillSystem:
                  "damage_type": DamageType.PHYSICAL,
                  "status_effects": [{"type": StatusType.BOOST_ATK, "duration": 4, "intensity": 1.2}]},
                 {"name": "돌진 베기", "type": SkillType.HP_ATTACK, "target": TargetType.SINGLE_ENEMY,
-                 "mp_cost": 6, "hp_power": 140, "cast_time": 1, "description": "물리공격력 기반 HP 직접 타격",
+                 "mp_cost": 6, "hp_power": 140, "cast_time": 15, "description": "물리공격력 기반 HP 직접 타격",
                  "damage_type": DamageType.PHYSICAL},
                 {"name": "광전사의 각성", "type": SkillType.ULTIMATE, "target": TargetType.SELF,
-                 "mp_cost": 12, "cooldown": 6, "cast_time": 2, "description": "물리공격력과 물리방어력 대폭 증가",
+                 "mp_cost": 12, "cooldown": 6, "cast_time": 25, "description": "물리공격력과 물리방어력 대폭 증가",
                  "damage_type": DamageType.PHYSICAL, "defense_type": DefenseType.PHYSICAL_DEF,
                  "status_effects": [{"type": StatusType.BERSERK, "duration": 5, "intensity": 2.0}]}
             ],
@@ -276,7 +283,7 @@ class NewSkillSystem:
                  "damage_type": DamageType.PHYSICAL, "penetration_type": PenetrationType.PHYSICAL_PIERCE,
                  "penetration_rate": 0.3},
                 {"name": "무념무상", "type": SkillType.ULTIMATE, "target": TargetType.SELF,
-                 "mp_cost": 15, "cooldown": 8, "cast_time": 3, "description": "모든 디버프 무효, 완벽한 검술",
+                 "mp_cost": 15, "cooldown": 8, "cast_time": 40, "description": "모든 디버프 무효, 완벽한 검술",
                  "special_effects": ["immunity", "perfect_accuracy"]}
             ],
             
@@ -295,7 +302,7 @@ class NewSkillSystem:
                  "mp_cost": 6, "description": "HP 낮을수록 공격력 증가",
                  "special_effects": ["honor_boost"]},
                 {"name": "콜로세움의 왕", "type": SkillType.ULTIMATE, "target": TargetType.ALL_ENEMIES,
-                 "mp_cost": 18, "brv_power": 100, "hp_power": 80, "cooldown": 7, "cast_time": 2,
+                 "mp_cost": 18, "brv_power": 100, "hp_power": 80, "cooldown": 7, "cast_time": 30,
                  "description": "검투장을 지배하는 궁극기", "damage_type": DamageType.PHYSICAL,
                  "penetration_type": PenetrationType.PHYSICAL_PIERCE, "penetration_rate": 0.35}
             ],
@@ -315,7 +322,7 @@ class NewSkillSystem:
                 {"name": "분노 폭발", "type": SkillType.BRV_HP_ATTACK, "target": TargetType.ALL_ENEMIES,
                  "mp_cost": 8, "brv_power": 85, "hp_power": 65, "description": "모든 적에게 광기의 힘"},
                 {"name": "버서커의 최후", "type": SkillType.ULTIMATE, "target": TargetType.ALL_ENEMIES,
-                 "mp_cost": 15, "brv_power": 120, "hp_power": 100, "cooldown": 5, "cast_time": 1,
+                 "mp_cost": 15, "brv_power": 120, "hp_power": 100, "cooldown": 5, "cast_time": 10,
                  "description": "생명을 바쳐 최대 위력 발휘", "damage_type": DamageType.PHYSICAL,
                  "special_effects": ["sacrifice_power"], "penetration_type": PenetrationType.PHYSICAL_PIERCE,
                  "penetration_rate": 0.5}
@@ -335,10 +342,10 @@ class NewSkillSystem:
                  "mp_cost": 6, "cooldown": 3, "description": "아군 전체 방어력 증가",
                  "status_effects": [{"type": StatusType.BOOST_DEF, "duration": 4, "intensity": 1.3}]},
                 {"name": "성스러운 돌격", "type": SkillType.HP_ATTACK, "target": TargetType.SINGLE_ENEMY,
-                 "mp_cost": 8, "hp_power": 130, "element": ElementType.LIGHT, "cast_time": 1,
+                 "mp_cost": 8, "hp_power": 130, "element": ElementType.LIGHT, "cast_time": 12,
                  "description": "성스러운 힘의 돌격"},
                 {"name": "수호기사의 맹세", "type": SkillType.ULTIMATE, "target": TargetType.ALL_ALLIES,
-                 "mp_cost": 16, "cooldown": 6, "cast_time": 2, "description": "아군 전체를 완벽하게 보호",
+                 "mp_cost": 16, "cooldown": 6, "cast_time": 35, "description": "아군 전체를 완벽하게 보호",
                  "status_effects": [{"type": StatusType.BARRIER, "duration": 6, "intensity": 2.0}]}
             ],
             
@@ -358,10 +365,10 @@ class NewSkillSystem:
                  "mp_cost": 6, "heal_power": 110, "element": ElementType.LIGHT, 
                  "description": "마법공격력 기반 성스러운 치유", "damage_type": DamageType.MAGICAL},
                 {"name": "부활", "type": SkillType.SPECIAL, "target": TargetType.DEAD_ALLY,
-                 "mp_cost": 15, "cast_time": 2, "cooldown": 5, "element": ElementType.LIGHT,
+                 "mp_cost": 15, "cast_time": 45, "cooldown": 5, "element": ElementType.LIGHT,
                  "description": "죽은 아군을 HP 50%로 부활시킴", "special_effects": ["resurrect"]},
                 {"name": "천사의 강림", "type": SkillType.ULTIMATE, "target": TargetType.ALL_ENEMIES,
-                 "mp_cost": 18, "hp_power": 100, "element": ElementType.LIGHT, "cooldown": 8, "cast_time": 3,
+                 "mp_cost": 18, "hp_power": 100, "element": ElementType.LIGHT, "cooldown": 8, "cast_time": 50,
                  "description": "마법공격력 기반 천사의 심판", "damage_type": DamageType.MAGICAL}
             ],
             
@@ -390,7 +397,7 @@ class NewSkillSystem:
                  "special_effects": ["vampire_strike"]},
                 {"name": "어둠의 지배자", "type": SkillType.ULTIMATE, "target": TargetType.ALL_ENEMIES,
                  "mp_cost": 18, "brv_power": 90, "hp_power": 75, "element": ElementType.DARK,
-                 "cooldown": 7, "cast_time": 2, "description": "물리+마법혼합 어둠의 저주", 
+                 "cooldown": 7, "cast_time": 35, "description": "물리+마법혼합 어둠의 저주", 
                  "damage_type": DamageType.HYBRID,
                  "status_effects": [{"type": StatusType.FEAR, "duration": 3, "intensity": 1.0},
                                    {"type": StatusType.CURSE, "duration": 6, "intensity": 1.5},
@@ -417,11 +424,11 @@ class NewSkillSystem:
                                    {"type": StatusType.REDUCE_DEF, "duration": 4, "intensity": 0.7},
                                    {"type": StatusType.TERROR, "duration": 2, "intensity": 1.0}]},
                 {"name": "드래곤 스피어", "type": SkillType.HP_ATTACK, "target": TargetType.SINGLE_ENEMY,
-                 "mp_cost": 9, "hp_power": 150, "element": ElementType.FIRE, "cast_time": 1,
+                 "mp_cost": 9, "hp_power": 150, "element": ElementType.FIRE, "cast_time": 18,
                  "description": "물리공격력 기반 용의 힘이 깃든 창술", "damage_type": DamageType.PHYSICAL},
                 {"name": "드래곤 로드", "type": SkillType.ULTIMATE, "target": TargetType.ALL_ENEMIES,
                  "mp_cost": 22, "brv_power": 110, "hp_power": 90, "element": ElementType.FIRE,
-                 "cooldown": 8, "cast_time": 3, "description": "물리+마법혼합 진정한 용의 힘 해방", 
+                 "cooldown": 8, "cast_time": 60, "description": "물리+마법혼합 진정한 용의 힘 해방", 
                  "damage_type": DamageType.HYBRID,
                  "status_effects": [{"type": StatusType.BURN, "duration": 5, "intensity": 1.5},
                                    {"type": StatusType.TERROR, "duration": 3, "intensity": 1.0},
@@ -445,12 +452,12 @@ class NewSkillSystem:
                  "defense_type": DefenseType.MAGICAL_DEF,
                  "status_effects": [{"type": StatusType.BOOST_DEF, "duration": 5, "intensity": 1.3}]},
                 {"name": "라이트닝 볼트", "type": SkillType.HP_ATTACK, "target": TargetType.SINGLE_ENEMY,
-                 "mp_cost": 10, "hp_power": 140, "element": ElementType.LIGHTNING, "cast_time": 1,
+                 "mp_cost": 10, "hp_power": 140, "element": ElementType.LIGHTNING, "cast_time": 20,
                  "description": "마법공격력 기반 강력한 번개 마법", "damage_type": DamageType.MAGICAL,
                  "penetration_type": PenetrationType.MAGICAL_PIERCE, "penetration_rate": 0.25},
                 {"name": "메테오", "type": SkillType.ULTIMATE, "target": TargetType.ALL_ENEMIES,
                  "mp_cost": 25, "brv_power": 120, "hp_power": 100, "element": ElementType.FIRE,
-                 "cooldown": 8, "cast_time": 4, "description": "마법공격력 기반 운석 소환 마법",
+                 "cooldown": 8, "cast_time": 80, "description": "마법공격력 기반 운석 소환 마법",
                  "damage_type": DamageType.MAGICAL, "penetration_type": PenetrationType.MAGICAL_PIERCE,
                  "penetration_rate": 0.4}
             ],
@@ -474,10 +481,10 @@ class NewSkillSystem:
                  "defense_type": DefenseType.MAGICAL_DEF,
                  "status_effects": [{"type": StatusType.BOOST_SPD, "duration": 4, "intensity": 1.4}]},
                 {"name": "대지 정령의 분노", "type": SkillType.HP_ATTACK, "target": TargetType.ALL_ENEMIES,
-                 "mp_cost": 12, "hp_power": 110, "element": ElementType.EARTH, "cast_time": 2,
+                 "mp_cost": 12, "hp_power": 110, "element": ElementType.EARTH, "cast_time": 25,
                  "description": "마법공격력 기반 대지가 분노하여 모든 적 공격", "damage_type": DamageType.MAGICAL},
                 {"name": "사대 정령 소환", "type": SkillType.ULTIMATE, "target": TargetType.ALL_ENEMIES,
-                 "mp_cost": 28, "brv_power": 100, "hp_power": 85, "cooldown": 9, "cast_time": 4,
+                 "mp_cost": 28, "brv_power": 100, "hp_power": 85, "cooldown": 9, "cast_time": 70,
                  "description": "마법공격력 기반 모든 정령의 힘을 빌려 공격", "damage_type": DamageType.MAGICAL,
                  "penetration_type": PenetrationType.MAGICAL_PIERCE, "penetration_rate": 0.35}
             ],
@@ -499,13 +506,13 @@ class NewSkillSystem:
                  "defense_type": DefenseType.MAGICAL_DEF,
                  "special_effects": ["foresight"]},
                 {"name": "시간 정지", "type": SkillType.FIELD, "target": TargetType.ALL_ENEMIES,
-                 "mp_cost": 8, "cooldown": 5, "cast_time": 2, "description": "마법공격력으로 적들의 시간 정지",
+                 "mp_cost": 8, "cooldown": 5, "cast_time": 30, "description": "마법공격력으로 적들의 시간 정지",
                  "damage_type": DamageType.MAGICAL,
                  "status_effects": [{"type": StatusType.TIME_STOP, "duration": 1, "intensity": 1.0},
                                    {"type": StatusType.PARALYZE, "duration": 2, "intensity": 1.0}],
                  "is_field_skill": True},
                 {"name": "시공간 붕괴", "type": SkillType.ULTIMATE, "target": TargetType.ALL_ENEMIES,
-                 "mp_cost": 30, "brv_power": 130, "hp_power": 110, "cooldown": 10, "cast_time": 5,
+                 "mp_cost": 30, "brv_power": 130, "hp_power": 110, "cooldown": 10, "cast_time": 90,
                  "description": "마법공격력 기반 시공간을 비틀어 절대적 파괴", "damage_type": DamageType.MAGICAL,
                  "penetration_type": PenetrationType.TRUE_DAMAGE, "penetration_rate": 0.3}
             ],
@@ -527,10 +534,10 @@ class NewSkillSystem:
                  "defense_type": DefenseType.MAGICAL_DEF,
                  "status_effects": [{"type": StatusType.BARRIER, "duration": 4, "intensity": 1.5}]},
                 {"name": "공간 절단", "type": SkillType.HP_ATTACK, "target": TargetType.SINGLE_ENEMY,
-                 "mp_cost": 14, "hp_power": 160, "cast_time": 2, "description": "마법공격력으로 공간 자체를 베어내기",
+                 "mp_cost": 14, "hp_power": 160, "cast_time": 28, "description": "마법공격력으로 공간 자체를 베어내기",
                  "damage_type": DamageType.MAGICAL},
                 {"name": "차원 폭풍", "type": SkillType.ULTIMATE, "target": TargetType.ALL_ENEMIES,
-                 "mp_cost": 32, "brv_power": 140, "hp_power": 120, "cooldown": 9, "cast_time": 4,
+                 "mp_cost": 32, "brv_power": 140, "hp_power": 120, "cooldown": 9, "cast_time": 75,
                  "description": "마법공격력 기반 다차원의 폭풍으로 모든 것을 삼킴", "damage_type": DamageType.MAGICAL}
             ],
             
@@ -550,13 +557,13 @@ class NewSkillSystem:
                  "damage_type": DamageType.MAGICAL,
                  "status_effects": [{"type": StatusType.BOOST_ATK, "duration": 4, "intensity": 1.2}]},
                 {"name": "존재 부정", "type": SkillType.HP_ATTACK, "target": TargetType.SINGLE_ENEMY,
-                 "mp_cost": 12, "hp_power": 140, "cast_time": 2, "description": "마법공격력으로 적의 존재 자체를 부정",
+                 "mp_cost": 12, "hp_power": 140, "cast_time": 25, "description": "마법공격력으로 적의 존재 자체를 부정",
                  "damage_type": DamageType.MAGICAL},
                 {"name": "철학적 사고", "type": SkillType.SPECIAL, "target": TargetType.ALL_ALLIES,
                  "mp_cost": 10, "cooldown": 4, "description": "깊은 사고로 모든 상태이상 해제",
                  "special_effects": ["dispel_all"]},
                 {"name": "절대 진리", "type": SkillType.ULTIMATE, "target": TargetType.ALL_ENEMIES,
-                 "mp_cost": 35, "brv_power": 150, "hp_power": 130, "cooldown": 10, "cast_time": 5,
+                 "mp_cost": 35, "brv_power": 150, "hp_power": 130, "cooldown": 10, "cast_time": 100,
                  "description": "마법공격력 기반 절대적 진리의 힘으로 모든 것을 압도", "damage_type": DamageType.MAGICAL,
                  "penetration_type": PenetrationType.TRUE_DAMAGE, "penetration_rate": 0.25}
             ],
@@ -582,7 +589,7 @@ class NewSkillSystem:
                  "mp_cost": 7, "brv_power": 80, "hp_power": 60, "description": "물리공격력 기반 조준 상태시 추가 피해",
                  "damage_type": DamageType.PHYSICAL},
                 {"name": "천공의 화살", "type": SkillType.ULTIMATE, "target": TargetType.ALL_ENEMIES,
-                 "mp_cost": 18, "brv_power": 110, "hp_power": 90, "cooldown": 6, "cast_time": 2,
+                 "mp_cost": 18, "brv_power": 110, "hp_power": 90, "cooldown": 6, "cast_time": 35,
                  "description": "물리공격력 기반 하늘을 가르는 완벽한 화살", "damage_type": DamageType.PHYSICAL,
                  "penetration_type": PenetrationType.PHYSICAL_PIERCE, "penetration_rate": 0.3}
             ],
@@ -964,8 +971,8 @@ class NewSkillSystem:
         skills = self.get_class_skills(class_name)
         return [skill for skill in skills if skill["type"] == SkillType.ULTIMATE]
     
-    def calculate_skill_damage(self, skill: Dict, attacker_stats: Dict, defender_stats: Dict = None) -> Dict:
-        """스킬 데미지 계산"""
+    def calculate_skill_damage(self, skill: Dict, attacker_stats: Dict, defender_stats: Dict = None, is_ally_attacker: bool = True) -> Dict:
+        """스킬 데미지 계산 (아군/적 구분하여 배수 적용)"""
         damage_result = {
             "brv_damage": 0,
             "hp_damage": 0,
@@ -973,9 +980,12 @@ class NewSkillSystem:
             "elemental_bonus": 1.0
         }
         
+        # 사용할 배수 결정
+        multiplier = self.skill_power_multiplier if is_ally_attacker else self.enemy_skill_power_multiplier
+        
         # BRV 데미지 계산
         if "brv_power" in skill:
-            base_brv = attacker_stats.get("atk", 100) * (skill["brv_power"] / 100)
+            base_brv = attacker_stats.get("atk", 100) * (skill["brv_power"] / 100) * multiplier
             if defender_stats:
                 defense_factor = max(0.1, 1.0 - (defender_stats.get("def", 50) / 200))
                 damage_result["brv_damage"] = int(base_brv * defense_factor)
@@ -984,7 +994,7 @@ class NewSkillSystem:
         
         # HP 데미지 계산
         if "hp_power" in skill:
-            base_hp = attacker_stats.get("atk", 100) * (skill["hp_power"] / 100)
+            base_hp = attacker_stats.get("atk", 100) * (skill["hp_power"] / 100) * multiplier
             if defender_stats:
                 defense_factor = max(0.1, 1.0 - (defender_stats.get("def", 50) / 200))
                 damage_result["hp_damage"] = int(base_hp * defense_factor)
@@ -993,21 +1003,59 @@ class NewSkillSystem:
         
         return damage_result
     
-    def can_use_skill(self, skill: Dict, caster_stats: Dict) -> tuple[bool, str]:
+    def get_adjusted_mp_cost(self, skill: Dict, is_ally: bool = True) -> int:
+        """아군/적에 따른 MP 소모량 계산"""
+        base_mp_cost = skill.get("mp_cost", 0)
+        if is_ally:
+            # 아군은 MP 소모량 증가
+            return int(base_mp_cost * self.ally_mp_cost_multiplier)
+        else:
+            # 적은 기본 MP 소모량
+            return base_mp_cost
+    
+    def can_use_skill(self, skill: Dict, caster_stats: Dict, is_ally: bool = True) -> tuple[bool, str]:
         """스킬 사용 가능 여부 확인"""
-        # MP 확인
+        # MP 확인 (아군/적에 따른 조정된 MP 소모량)
         current_mp = caster_stats.get("current_mp", 0)
-        required_mp = skill.get("mp_cost", 0)
+        required_mp = self.get_adjusted_mp_cost(skill, is_ally)
         
         if current_mp < required_mp:
             return False, f"MP 부족 (필요: {required_mp}, 현재: {current_mp})"
         
         # 쿨다운 확인 (실제 구현 시 필요)
         if skill.get("cooldown", 0) > 0:
-            # 쿨다운 시스템이 구현되면 여기서 확인
-            pass
+            skill_cooldown = self.get_skill_cooldown(caster_stats.get("character_id", "unknown"), skill["name"])
+            if skill_cooldown > 0:
+                return False, f"쿨다운 중 (남은 턴: {skill_cooldown})"
         
         return True, "사용 가능"
+    
+    def get_skill_cooldown(self, character_id: str, skill_name: str) -> int:
+        """캐릭터의 특정 스킬 쿨다운 확인"""
+        if character_id not in self.cooldowns:
+            return 0
+        return self.cooldowns[character_id].get(skill_name, 0)
+    
+    def set_skill_cooldown(self, character_id: str, skill_name: str, cooldown_turns: int):
+        """캐릭터의 스킬 쿨다운 설정"""
+        if character_id not in self.cooldowns:
+            self.cooldowns[character_id] = {}
+        self.cooldowns[character_id][skill_name] = cooldown_turns
+    
+    def reduce_cooldowns(self, character_id: str):
+        """캐릭터의 모든 스킬 쿨다운 1턴 감소"""
+        if character_id in self.cooldowns:
+            for skill_name in list(self.cooldowns[character_id].keys()):
+                self.cooldowns[character_id][skill_name] = max(0, self.cooldowns[character_id][skill_name] - 1)
+                if self.cooldowns[character_id][skill_name] == 0:
+                    del self.cooldowns[character_id][skill_name]
+    
+    def reduce_all_cooldowns(self):
+        """모든 캐릭터의 쿨다운 1턴 감소"""
+        for character_id in list(self.cooldowns.keys()):
+            self.reduce_cooldowns(character_id)
+            if not self.cooldowns[character_id]:  # 빈 딕셔너리면 삭제
+                del self.cooldowns[character_id]
     
     def get_skills(self, class_name: str) -> List[Dict[str, Any]]:
         """특정 클래스의 스킬 목록 반환 (호환성을 위한 메서드)"""
@@ -1016,9 +1064,18 @@ class NewSkillSystem:
     def get_class_skills(self, class_name: str) -> List[Dict[str, Any]]:
         """특정 클래스의 스킬 목록 반환"""
         return self.skills_by_class.get(class_name, [])
-
-
-# 전역 스킬 시스템 인스턴스
+    
+    def get_skill_mp_cost(self, skill: Dict[str, Any], is_ally: bool = True) -> int:
+        """스킬의 실제 MP 소모량 계산 (아군은 배수 적용)"""
+        base_mp_cost = skill.get('mp_cost', 0)
+        if is_ally:
+            return int(base_mp_cost * self.ally_mp_cost_multiplier)
+        else:
+            return base_mp_cost  # 적은 MP 배수 적용 안함
+    
+    def get_enemy_skill_power(self, skill_power: float) -> float:
+        """적 스킬의 위력에 배수 적용"""
+        return skill_power * self.enemy_skill_power_multiplier
 skill_system = NewSkillSystem()
 
 # 편의 함수들

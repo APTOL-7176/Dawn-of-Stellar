@@ -136,11 +136,11 @@ class CombatAction:
 class CombatManager:
     """ATB 전투 관리자 (Brave 시스템 포함)"""
     
-    def __init__(self):
+    def __init__(self, audio_system=None, sound_manager=None):
         self.party_members: List[Character] = []
         self.enemies: List[Character] = []
         self.combat_active = False
-        self.brave_combat = BraveCombatSystem()  # Brave 전투 시스템
+        self.brave_combat = BraveCombatSystem(audio_system, sound_manager)  # Brave 전투 시스템
         self.turn_queue: List[Character] = []
         self.combat_log: List[str] = []
         
@@ -1025,7 +1025,10 @@ class CombatManager:
     
     def calculate_skill_damage(self, attacker: Character, target: Character, skill: dict, power_multiplier: float) -> int:
         """스킬 데미지 계산 (관통 시스템 포함)"""
-        from .new_skill_system import DamageType, PenetrationType
+        from .new_skill_system import DamageType, PenetrationType, new_skill_system
+        
+        # 스킬 시스템에서 전역 배수 적용
+        global_multiplier = new_skill_system.skill_power_multiplier  # 1.5배
         
         damage_type = skill.get("damage_type", DamageType.PHYSICAL)
         penetration_type = skill.get("penetration_type", PenetrationType.NONE)
@@ -1045,24 +1048,24 @@ class CombatManager:
         # 관통 시스템 적용
         if penetration_type == PenetrationType.TRUE_DAMAGE:
             # TRUE_DAMAGE: 일부는 방어무시, 나머지는 일반계산
-            true_damage = base_attack * power_multiplier * penetration_rate
-            normal_damage = (base_attack / max(1, target_defense)) * power_multiplier * (1 - penetration_rate)
+            true_damage = base_attack * power_multiplier * penetration_rate * global_multiplier
+            normal_damage = (base_attack / max(1, target_defense)) * power_multiplier * (1 - penetration_rate) * global_multiplier
             total_damage = true_damage + normal_damage
         elif penetration_type == PenetrationType.PHYSICAL_PIERCE:
             # 물리 방어력 일부 무시
             reduced_defense = target_defense * (1 - penetration_rate)
-            total_damage = (base_attack / max(1, reduced_defense)) * power_multiplier
+            total_damage = (base_attack / max(1, reduced_defense)) * power_multiplier * global_multiplier
         elif penetration_type == PenetrationType.MAGICAL_PIERCE:
             # 마법 방어력 일부 무시  
             reduced_defense = target_defense * (1 - penetration_rate)
-            total_damage = (base_attack / max(1, reduced_defense)) * power_multiplier
+            total_damage = (base_attack / max(1, reduced_defense)) * power_multiplier * global_multiplier
         elif penetration_type == PenetrationType.ARMOR_BREAK:
             # 방어구 파괴 후 공격
             target_defense = max(1, target_defense * (1 - penetration_rate))
-            total_damage = (base_attack / target_defense) * power_multiplier
+            total_damage = (base_attack / target_defense) * power_multiplier * global_multiplier
         else:
             # 일반 데미지 계산
-            total_damage = (base_attack / max(1, target_defense)) * power_multiplier
+            total_damage = (base_attack / max(1, target_defense)) * power_multiplier * global_multiplier
         
         # 원소 상성 적용
         element_multiplier = self.calculate_element_multiplier(skill, target)
@@ -1514,6 +1517,21 @@ class CombatManager:
             
         if not target.is_alive:
             self.log(f"{target.name}이(가) 쓰러졌습니다!")
+            
+            # GameWorld 성과 추적 시스템과 연동
+            try:
+                # world 인스턴스를 찾아서 적 처치 추적
+                import sys
+                for name, obj in sys.modules.items():
+                    if hasattr(obj, 'world') and hasattr(obj.world, 'track_enemy_defeat'):
+                        obj.world.track_enemy_defeat()
+                        break
+                # 또는 전역 world 인스턴스 확인
+                if hasattr(self, 'world') and hasattr(self.world, 'track_enemy_defeat'):
+                    self.world.track_enemy_defeat()
+            except Exception:
+                pass  # 성과 추적 실패해도 게임 진행에는 영향 없음
+            
             # 적 사망 효과음
             try:
                 from .audio import get_unified_audio_system
@@ -1571,12 +1589,14 @@ class CombatManager:
         return False
         
     def give_rewards(self):
-        """보상 지급"""
-        exp_reward = random.randint(50, 100)
+        """보상 지급 - 드롭 시스템과 연동하지 않는 기본 버전"""
+        # 기본 경험치를 더 높게 설정 (각 파티원이 받을 양)
+        exp_reward = random.randint(80, 120)  # 50-100에서 80-120으로 증가
         self.log(f"경험치 {exp_reward}를 획득했습니다!")
         
         for member in self.party_members:
             if member.is_alive:
+                # 각 파티원이 전체 경험치를 받도록 수정 (분배하지 않음)
                 leveled_up = member.gain_experience(exp_reward)
                 if leveled_up:
                     # 레벨업 효과음 및 시각 효과

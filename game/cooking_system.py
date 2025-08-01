@@ -225,6 +225,237 @@ class CookingSystem:
         self._init_recipes()
         self._load_permanent_recipes()  # 영구 레시피 로드
     
+    def show_cooking_menu(self):
+        """요리 메뉴 표시 - 메인 인터페이스"""
+        try:
+            from game.cursor_menu_system import create_simple_menu
+            
+            options = [
+                "🥘 요리하기",
+                "🍽️ 요리 섭취",
+                "📦 식재료 확인",
+                "🍳 완성된 요리 확인",
+                "✨ 활성 버프 확인",
+                "🌍 채집지 정보",
+                "📖 레시피 컬렉션"
+            ]
+            
+            descriptions = [
+                "보유한 재료로 요리를 만듭니다",
+                "완성된 요리를 먹어서 버프를 받습니다",
+                "현재 보유한 식재료를 확인합니다", 
+                "완성된 요리 목록을 확인합니다",
+                "현재 활성화된 요리 버프를 확인합니다",
+                "채집 가능한 장소들을 확인합니다",
+                "발견한 레시피들을 확인합니다"
+            ]
+            
+            while True:
+                # 상태 정보 표시
+                print(f"\n📊 요리 시스템 상태:")
+                print(f"  요리 레벨: {self.cooking_level}")
+                print(f"  식재료: {len(self.ingredients_inventory)}종류")
+                print(f"  완성 요리: {len(self.cooked_food_inventory)}종류")
+                print(f"  활성 버프: {len(self.active_buffs)}개")
+                print(f"  무게: {self.get_total_inventory_weight():.1f}/{self.get_max_inventory_weight():.1f}kg")
+                print(self.get_food_status())
+                
+                menu = create_simple_menu("🍳 요리 시스템", options, descriptions)
+                result = menu.run()
+                
+                if result is None:  # 취소
+                    break
+                elif result == 0:  # 요리하기
+                    self._show_cooking_recipes()
+                elif result == 1:  # 요리 섭취
+                    self._show_food_consumption()
+                elif result == 2:  # 식재료 확인
+                    self.show_ingredients_inventory()
+                    input("아무 키나 눌러 계속...")
+                elif result == 3:  # 완성된 요리 확인
+                    self.show_cooked_food_inventory()
+                    input("아무 키나 눌러 계속...")
+                elif result == 4:  # 활성 버프 확인
+                    self.show_active_buffs()
+                    input("아무 키나 눌러 계속...")
+                elif result == 5:  # 채집지 정보
+                    self.show_gathering_locations()
+                    input("아무 키나 눌러 계속...")
+                elif result == 6:  # 레시피 컬렉션
+                    show_recipe_collection()
+                    
+        except ImportError:
+            # 폴백: 기존 텍스트 메뉴
+            self._show_cooking_menu_fallback()
+    
+    def _show_cooking_menu_fallback(self):
+        """요리 메뉴 폴백 (기존 방식)"""
+        while True:
+            print(f"\n{CYAN}{'='*60}{RESET}")
+            print(f"{WHITE}{BOLD}🍳 요리 시스템{RESET}")
+            print(f"{CYAN}{'='*60}{RESET}")
+            
+            # 상태 정보 표시
+            print(f"요리 레벨: {self.cooking_level}")
+            print(f"식재료: {len(self.ingredients_inventory)}종류")
+            print(f"완성 요리: {len(self.cooked_food_inventory)}종류")
+            print(f"활성 버프: {len(self.active_buffs)}개")
+            print(f"무게: {self.get_total_inventory_weight():.1f}/{self.get_max_inventory_weight():.1f}kg")
+            print(self.get_food_status())
+            
+            print(f"\n{YELLOW}1. 🥘 요리하기{RESET}")
+            print(f"{YELLOW}2. 🍽️ 요리 섭취{RESET}")
+            print(f"{YELLOW}3. 📦 식재료 확인{RESET}")
+            print(f"{YELLOW}4. 🍳 완성된 요리 확인{RESET}")
+            print(f"{YELLOW}5. ✨ 활성 버프 확인{RESET}")
+            print(f"{YELLOW}6. 🌍 채집지 정보{RESET}")
+            print(f"{YELLOW}7. 📖 레시피 컬렉션{RESET}")
+            print(f"{YELLOW}0. 돌아가기{RESET}")
+            
+            try:
+                choice = input(f"\n{WHITE}선택: {RESET}").strip()
+                
+                if choice == '0':
+                    break
+                elif choice == '1':
+                    self._show_cooking_recipes()
+                elif choice == '2':
+                    self._show_food_consumption()
+                elif choice == '3':
+                    self.show_ingredients_inventory()
+                    input("아무 키나 눌러 계속...")
+                elif choice == '4':
+                    self.show_cooked_food_inventory()
+                    input("아무 키나 눌러 계속...")
+                elif choice == '5':
+                    self.show_active_buffs()
+                    input("아무 키나 눌러 계속...")
+                elif choice == '6':  
+                    self.show_gathering_locations()
+                    input("아무 키나 눌러 계속...")
+                elif choice == '7':
+                    show_recipe_collection()
+                else:
+                    print("올바른 선택지를 입력하세요.")
+                    
+            except (ValueError, KeyboardInterrupt):
+                break
+
+    def _show_cooking_recipes(self):
+        """요리 제작 메뉴"""
+        print(f"\n{CYAN}{'='*80}{RESET}")
+        print(f"{WHITE}{BOLD}🥘 요리 제작{RESET}")
+        print(f"{CYAN}{'='*80}{RESET}")
+        
+        # 발견한 레시피 중 제작 가능한 것들 표시
+        quick_recipes = self.get_quick_cooking_menu()
+        if quick_recipes:
+            print(f"\n{GREEN}⚡ 빠른 요리 (발견한 레시피):{RESET}")
+            for i, recipe_name in enumerate(quick_recipes[:10], 1):
+                recipe = self.all_recipes[recipe_name]
+                print(f"  [{i}] {recipe.icon} {recipe_name} - {recipe.description}")
+            
+            try:
+                choice = input(f"\n빠른 요리 선택 (1-{len(quick_recipes[:10])}) 또는 0(돌아가기): ").strip()
+                if choice == '0':
+                    return
+                elif choice.isdigit() and 1 <= int(choice) <= len(quick_recipes[:10]):
+                    selected_recipe = quick_recipes[int(choice) - 1]
+                    success, message = self.quick_cook_dish(selected_recipe)
+                    print(f"\n{GREEN if success else RED}{message}{RESET}")
+                    input("아무 키나 눌러 계속...")
+                    return
+            except (ValueError, IndexError):
+                print("올바른 선택지를 입력하세요.")
+        
+        # 실험적 요리 (모든 레시피 시도 가능)
+        print(f"\n{YELLOW}🧪 실험적 요리 (모든 레시피 시도 가능):{RESET}")
+        print("재료가 있으면 모든 레시피를 시도할 수 있습니다.")
+        
+        available_recipes = []
+        for recipe_name, recipe in self.all_recipes.items():
+            if recipe_name == "곤죽":  # 실패작은 제외
+                continue
+            can_cook, _ = self.can_cook_with_substitutes(recipe_name)
+            if can_cook:
+                available_recipes.append(recipe_name)
+        
+        if available_recipes:
+            print(f"\n{CYAN}제작 가능한 레시피:{RESET}")
+            for i, recipe_name in enumerate(available_recipes[:20], 1):  # 최대 20개
+                recipe = self.all_recipes[recipe_name]
+                new_mark = " 🆕" if recipe_name not in self.discovered_recipes else ""
+                print(f"  [{i}] {recipe.icon} {recipe_name}{new_mark}")
+            
+            try:
+                choice = input(f"\n실험 요리 선택 (1-{len(available_recipes[:20])}) 또는 0(돌아가기): ").strip()
+                if choice == '0':
+                    return
+                elif choice.isdigit() and 1 <= int(choice) <= len(available_recipes[:20]):
+                    selected_recipe = available_recipes[int(choice) - 1]
+                    success, message = self.cook_dish(selected_recipe)
+                    print(f"\n{GREEN if success else RED}{message}{RESET}")
+                    if success and selected_recipe not in self.discovered_recipes:
+                        print(f"{MAGENTA}🎉 새로운 레시피를 발견했습니다: {selected_recipe}!{RESET}")
+                    input("아무 키나 눌러 계속...")
+            except (ValueError, IndexError):
+                print("올바른 선택지를 입력하세요.")
+        else:
+            print(f"{RED}현재 제작 가능한 요리가 없습니다.{RESET}")
+            input("아무 키나 눌러 계속...")
+
+    def _show_food_consumption(self):
+        """요리 섭취 메뉴"""
+        print(f"\n{CYAN}{'='*60}{RESET}")
+        print(f"{WHITE}{BOLD}🍽️ 요리 섭취{RESET}")
+        print(f"{CYAN}{'='*60}{RESET}")
+        
+        # 현재 상태 표시
+        print(self.get_food_status())
+        
+        if not self.cooked_food_inventory:
+            print(f"\n{RED}섭취할 수 있는 요리가 없습니다.{RESET}")
+            input("아무 키나 눌러 계속...")
+            return
+        
+        # 이미 배부른 상태면 섭취 불가
+        if self.active_food_effect is not None:
+            print(f"\n{RED}이미 배부른 상태입니다. 다른 요리를 먹을 수 없습니다.{RESET}")
+            input("아무 키나 눌러 계속...")
+            return
+        
+        print(f"\n{GREEN}섭취 가능한 요리:{RESET}")
+        foods = list(self.cooked_food_inventory.items())
+        for i, (food_name, amount) in enumerate(foods, 1):
+            recipe = self.all_recipes.get(food_name)
+            if recipe:
+                print(f"  [{i}] {recipe.icon} {food_name} x{amount}")
+                print(f"      {recipe.description}")
+        
+        try:
+            choice = input(f"\n섭취할 요리 선택 (1-{len(foods)}) 또는 0(돌아가기): ").strip()
+            if choice == '0':
+                return
+            elif choice.isdigit() and 1 <= int(choice) <= len(foods):
+                selected_food = foods[int(choice) - 1][0]
+                success, message = self.consume_food(selected_food)
+                print(f"\n{GREEN if success else RED}{message}{RESET}")
+                
+                if success:
+                    # 효과 상세 표시
+                    recipe = self.all_recipes[selected_food] 
+                    print(f"\n{CYAN}적용된 효과:{RESET}")
+                    for effect, value in recipe.effects.items():
+                        print(f"  • {effect}: +{value}")
+                    if recipe.special_effects:
+                        print(f"  • 특수효과: {', '.join(recipe.special_effects)}")
+                    print(f"  • 지속시간: {recipe.duration_steps}걸음")
+                
+                input("아무 키나 눌러 계속...")
+        except (ValueError, IndexError):
+            print("올바른 선택지를 입력하세요.")
+            input("아무 키나 눌러 계속...")
+
     def set_party_manager(self, party_manager):
         """파티 매니저 설정"""
         self.party_manager = party_manager
@@ -1694,3 +1925,100 @@ cooking_system = CookingSystem()
 def get_cooking_system():
     """요리 시스템 인스턴스 반환"""
     return cooking_system
+
+def show_recipe_collection():
+    """해금된 레시피 컬렉션 확인 - 커서 방식"""
+    try:
+        from .cursor_menu_system import create_simple_menu, MenuItem
+        
+        print("\n" + "="*80)
+        print("🍳 레시피 컬렉션 - 발견한 레시피들")
+        print("="*80)
+        
+        if not cooking_system.discovered_recipes:
+            print("\n아직 발견한 레시피가 없습니다.")
+            print("요리를 시도해보세요!")
+            from .input_utils import KeyboardInput
+            KeyboardInput().wait_for_key("아무 키나 눌러 계속...")
+            return
+        
+        # 발견한 레시피들을 정리
+        options = []
+        descriptions = []
+        
+        for recipe_name in sorted(cooking_system.discovered_recipes):
+            if recipe_name in cooking_system.recipes:
+                recipe = cooking_system.recipes[recipe_name]
+                
+                # 재료 정보
+                ingredients = ", ".join([f"{ingredient}({count}개)" 
+                                       for ingredient, count in recipe.ingredients.items()])
+                
+                # 효과 정보
+                effects = []
+                for effect in recipe.buffs:
+                    effects.append(f"{effect.stat_name} +{effect.value}")
+                effects_str = ", ".join(effects) if effects else "효과 없음"
+                
+                # 등급 아이콘
+                grade_icon = {
+                    "기본": "⭐",
+                    "고급": "⭐⭐", 
+                    "희귀": "⭐⭐⭐",
+                    "전설": "⭐⭐⭐⭐"
+                }.get(recipe.grade, "⭐")
+                
+                option_text = f"{grade_icon} {recipe_name}"
+                desc = f"재료: {ingredients} | 효과: {effects_str} | 지속: {recipe.duration_steps}턴"
+                
+                options.append(option_text)
+                descriptions.append(desc)
+        
+        menu = create_simple_menu("레시피 컬렉션", options, descriptions)
+        menu.run()
+        
+    except ImportError:
+        # 폴백: 기존 텍스트 방식
+        _show_recipe_collection_fallback()
+
+def _show_recipe_collection_fallback():
+    """레시피 컬렉션 폴백 (기존 방식)"""
+    print("\n" + "="*60)
+    print("🍳 레시피 컬렉션 - 발견한 레시피들")
+    print("="*60)
+    
+    if not cooking_system.discovered_recipes:
+        print("\n아직 발견한 레시피가 없습니다.")
+        print("요리를 시도해보세요!")
+        input("\n아무 키나 눌러 계속...")
+        return
+    
+    for i, recipe_name in enumerate(sorted(cooking_system.discovered_recipes), 1):
+        if recipe_name in cooking_system.recipes:
+            recipe = cooking_system.recipes[recipe_name]
+            
+            # 재료 정보
+            ingredients = ", ".join([f"{ingredient}({count}개)" 
+                                   for ingredient, count in recipe.ingredients.items()])
+            
+            # 효과 정보  
+            effects = []
+            for effect in recipe.buffs:
+                effects.append(f"{effect.stat_name} +{effect.value}")
+            effects_str = ", ".join(effects) if effects else "효과 없음"
+            
+            # 등급 아이콘
+            grade_icon = {
+                "기본": "⭐",
+                "고급": "⭐⭐", 
+                "희귀": "⭐⭐⭐",
+                "전설": "⭐⭐⭐⭐"
+            }.get(recipe.grade, "⭐")
+            
+            print(f"\n{i:2}. {grade_icon} {recipe_name}")
+            print(f"     재료: {ingredients}")
+            print(f"     효과: {effects_str}")
+            print(f"     지속: {recipe.duration_steps}턴")
+    
+    print(f"\n총 {len(cooking_system.discovered_recipes)}개의 레시피를 발견했습니다!")
+    input("\n아무 키나 눌러 계속...")

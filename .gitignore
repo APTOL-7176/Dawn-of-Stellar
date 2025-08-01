@@ -1,4 +1,11 @@
-# Python
+# ===================================================================
+# Dawn Of Stellar v2.0.0 - Git Ignore 파일 (엄격한 버전)
+# 게임 실행에 필수적인 파일만 Git에 포함
+# ===================================================================
+
+# ===================================================================
+# Python 관련 파일들
+# ===================================================================
 __pycache__/
 *.py[cod]
 *$py.class
@@ -21,81 +28,234 @@ wheels/
 *.egg
 MANIFEST
 
-# Virtual environments
+# ===================================================================
+# 가상환경 및 Python 설치 파일들
+# ===================================================================
 .venv/
 venv/
 ENV/
 env/
-
-# Portable Python (too large for git)
 python/
+Scripts/
 
-# IDE/Editor
+# ===================================================================
+# IDE/에디터 및 OS 관련
+# ===================================================================
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+.DS_Store
+Thumbs.db
+desktop.ini
 
-# MyPy
+# ===================================================================
+# 타입 체킹 및 린팅
+# ===================================================================
 .mypy_cache/
 .dmypy.json
 dmypy.json
+.pylint.d/
+.coverage
+htmlcov/
 
-# Game specific files to ignore
-saves/
-auto_saves/
-__pycache__/
-*.log
-*.tmp
+# ===================================================================
+# 모든 테스트 및 개발 파일들 (완전 제외)
+# ===================================================================
 
-# Audio files (too large for git) - COMMENTED OUT TO INCLUDE SOUNDS
-# game/audio/
-# sounds/
-
-# Test files and development scripts
+# 테스트 파일들
 test_*.py
 *_test.py
-demo_*.py
+testing_*.py
+*_testing.py
 simple_test.py
 combat_log_test.py
-complete_*.py
+updated_system_test.py
 system_test*.py
-fix_*.py
-trait_methods.py
-launcher_old.py
-launcher_simple.py
 
-# Reports and documentation (development only)
+# 데모 및 실험 파일들
+demo_*.py
+*_demo.py
+simple_ai_test.py
+new_vision_system_demo.py
+experimental_*.py
+prototype_*.py
+
+# 임시/완료된 시스템 파일들
+complete_*.py
+*_complete.py
+temp_*.py
+*_temp.py
+old_*.py
+*_old.py
+backup_*.py
+*_backup.py
+
+# 수정/픽스 파일들
+fix_*.py
+*_fix.py
+patch_*.py
+*_patch.py
+repair_*.py
+*_repair.py
+
+# 기타 개발용 파일들
+trait_methods.py
+debug_*.py
+*_debug.py
+
+# ===================================================================
+# 문서 및 리포트 파일들 (개발 전용)
+# ===================================================================
 *_REPORT.md
 *_GUIDE.md
+*_NOTES.md
+*_TODO.md
 BGM_Guide.md
 BRAVE_SYSTEM_REPORT.md
+FINAL_COMPLETION_REPORT.md
 GAME_EXPANSION_PLAN.md
 GAME_LAUNCHER_GUIDE.md
+PORTABLE_GUIDE.md
 PROJECT_CLEANUP_REPORT.md
 RECIPE_WIKI*.md
+SOUND_FIX_GUIDE.md
 SYSTEM_COMPLETION_REPORT.md
 TODO_ROADMAP.md
 AI_SYSTEM_COMPLETE.txt
+CHANGELOG_*.md
+DEVLOG_*.md
 
-# Archive and backup files
+# ===================================================================
+# 백업 및 아카이브 디렉토리/파일들
+# ===================================================================
 archive/
+backup/
+old/
+temp/
+tmp/
+release/
+dist/
 *.backup
+*.bak
 *.py.backup
+*.py.bak
+*_backup.*
+*_old.*
+config_backup*.py
+config_broken_backup.py
+launcher_old.py
+launcher_simple.py
 
-# Progress and save files
+# 백업된 README 파일들
+README_OLD.md
+README_NEW.md
+README_v*.md
+README_backup*.md
+
+# ===================================================================
+# 사용자 데이터 및 세이브 파일들
+# ===================================================================
+saves/
+auto_saves/
+test_saves/
+user_data/
+progress/
+*.save
+*.sav
 combat_log.json
 game_settings.json
 meta_progress.json
 permanent_progress.json
+passive_selection.json
+player_data.json
+user_*.json
+save_*.json
+
+# ===================================================================
+# 로그 및 임시 파일들
+# ===================================================================
+*.log
+*.tmp
+*.temp
 test_output.txt
+debug_output.txt
+error_log.txt
+crash_report.txt
+performance_log.txt
 
-# Batch files are now INCLUDED (commented out)
-# *.bat
-
-# Exclude specific development batch files
+# ===================================================================
+# 개발용 배치/스크립트 파일들
+# ===================================================================
 개발모드.bat
-일반모드.bat
+개발환경_관리.bat
+문제해결.bat
+파이썬_설치.bat
+debug_*.bat
+test_*.bat
+*_debug.bat
+*_test.bat
 
-# Cache files
+# 개발용 스크립트
+dev_*.py
+*_dev.py
+build_*.py
+*_build.py
+
+# PyInstaller 관련 (빌드용)
+*.spec
+build_executable.bat
+build_with_sounds.py
+
+# ===================================================================
+# 설정 파일들 (개발용)
+# ===================================================================
+mypy.ini
+.pylintrc
+setup.cfg
+tox.ini
+pytest.ini
+
+# ===================================================================
+# 캐시 및 컴파일 파일들
+# ===================================================================
+*.pyc
+*.pyo
+*.pyd
+.cache/
+.pytest_cache/
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# ===================================================================
+# 포함할 핵심 파일들 (명시적 목록)
+# ===================================================================
+
+# 반드시 포함되어야 하는 파일들:
+# 
+# 🎮 게임 핵심 파일들:
+# ✅ main.py (게임 메인 진입점)
+# ✅ launcher.py (게임 런처)
+# ✅ config.py (게임 설정)
+# ✅ version.py (버전 정보)
+# ✅ requirements.txt (의존성 목록)
+# 
+# 📁 게임 디렉토리:
+# ✅ game/ (전체 게임 로직 - 핵심 모듈들만)
+# ✅ sounds/ (오디오 파일들)
+# ✅ .github/ (GitHub Actions, 워크플로우)
+# 
+# 📋 사용자 문서:
+# ✅ README.md (메인 사용 설명서)
+# ✅ LICENSE (라이선스 파일)
+# 
+# 🚀 설치 및 실행 파일들:
+# ✅ 자동설치.bat (자동 설치 스크립트) 
+# ✅ 게임시작_*.bat (게임 실행 스크립트들)
+# ✅ setup_portable.* (포터블 설치)
+# ✅ setup_complete.bat (완전 설치)
+#
+# 기타 모든 파일들은 개발용으로 간주하여 제외됩니다.

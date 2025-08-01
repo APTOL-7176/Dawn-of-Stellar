@@ -116,7 +116,7 @@ class SaveManager:
             print(f"🔍 저장 시작 - save_name: {save_name}")
             
             if save_name is None:
-                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 save_name = f"save_{timestamp}"
                 print(f"📅 자동 파일명 생성: {save_name}")
             
@@ -417,7 +417,78 @@ class GameStateSerializer:
 
 
 def show_save_menu(save_manager: SaveManager) -> Optional[str]:
-    """저장 메뉴 표시"""
+    """저장 메뉴 표시 - 커서 방식"""
+    try:
+        from .cursor_menu_system import create_simple_menu
+        
+        # 커서 메뉴 생성
+        options = [
+            "💨 빠른 저장 (자동 이름)",
+            "📝 이름 지정해서 저장", 
+            "🔄 기존 저장 파일 덮어쓰기",
+            "❌ 취소"
+        ]
+        
+        descriptions = [
+            "현재 시간으로 자동 이름 생성",
+            "사용자가 직접 파일명 입력",
+            "기존 저장 파일 목록에서 선택",
+            "저장을 취소하고 돌아갑니다"
+        ]
+        
+        menu = create_simple_menu("💾 게임 저장", options, descriptions)
+        result = menu.run()
+        
+        if result == -1 or result == 3:  # 취소
+            return "CANCEL"
+        elif result == 0:  # 빠른 저장
+            import datetime
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            return f"autosave_{timestamp}"
+        elif result == 1:  # 이름 지정 저장
+            from .input_utils import KeyboardInput
+            keyboard = KeyboardInput()
+            print("\n저장 파일 이름을 입력하세요: ", end='', flush=True)
+            save_name = keyboard.get_string_input()
+            if save_name:
+                return save_name
+            else:
+                print("올바른 파일명을 입력하세요.")
+                return None
+        elif result == 2:  # 기존 파일 덮어쓰기
+            saves = save_manager.list_saves()
+            if not saves:
+                print("\n기존 저장 파일이 없습니다.")
+                from .input_utils import KeyboardInput
+                KeyboardInput().wait_for_key("아무 키나 눌러 계속...")
+                return None
+            
+            # 기존 파일 선택을 위한 커서 메뉴
+            file_options = []
+            file_descriptions = []
+            for save_info in saves:
+                file_options.append(f"📁 {save_info['filename']}")
+                file_descriptions.append(f"레벨 {save_info['level']}, 점수 {save_info['score']}")
+            
+            file_options.append("❌ 취소")
+            file_descriptions.append("덮어쓰기를 취소합니다")
+            
+            file_menu = create_simple_menu("기존 저장 파일 선택", file_options, file_descriptions)
+            file_result = file_menu.run()
+            
+            if file_result == -1 or file_result >= len(saves):
+                return None
+            else:
+                return saves[file_result]['filename']
+        
+        return None
+        
+    except ImportError:
+        # 폴백: 기존 텍스트 메뉴
+        return _show_save_menu_fallback(save_manager)
+
+def _show_save_menu_fallback(save_manager: SaveManager) -> Optional[str]:
+    """저장 메뉴 폴백 (기존 방식)"""
     from .input_utils import KeyboardInput
     
     keyboard = KeyboardInput()
@@ -485,16 +556,57 @@ def show_save_menu(save_manager: SaveManager) -> Optional[str]:
 
 
 def show_load_menu(save_manager: SaveManager) -> Optional[str]:
-    """불러오기 메뉴 표시"""
-    from .input_utils import KeyboardInput
-    
+    """불러오기 메뉴 표시 - 커서 방식"""
     saves = save_manager.list_saves()
-    keyboard = KeyboardInput()
     
     if not saves:
         print("\n저장된 게임이 없습니다.")
-        keyboard.wait_for_key("아무 키나 눌러 계속...")
+        from .input_utils import KeyboardInput
+        KeyboardInput().wait_for_key("아무 키나 눌러 계속...")
         return None
+    
+    try:
+        from .cursor_menu_system import create_simple_menu
+        
+        # 저장 파일 목록을 커서 메뉴로 생성
+        options = []
+        descriptions = []
+        
+        for save_info in saves:
+            save_time = save_info['save_time']
+            if save_time != '알 수 없음':
+                try:
+                    dt = datetime.datetime.fromisoformat(save_time)
+                    save_time = dt.strftime("%Y-%m-%d %H:%M:%S")
+                except:
+                    pass
+            
+            party_str = ", ".join(save_info['party_names'][:2])
+            if len(save_info['party_names']) > 2:
+                party_str += "..."
+            
+            options.append(f"📁 {save_info['filename']}")
+            descriptions.append(f"레벨 {save_info['level']}, 점수 {save_info['score']} | 파티: {party_str} | {save_time}")
+        
+        options.append("❌ 취소")
+        descriptions.append("불러오기를 취소하고 돌아갑니다")
+        
+        menu = create_simple_menu("📁 게임 불러오기", options, descriptions)
+        result = menu.run()
+        
+        if result == -1 or result >= len(saves):  # 취소
+            return None
+        else:
+            return saves[result]['filename']
+            
+    except ImportError:
+        # 폴백: 기존 텍스트 메뉴
+        return _show_load_menu_fallback(save_manager, saves)
+
+def _show_load_menu_fallback(save_manager: SaveManager, saves: List) -> Optional[str]:
+    """불러오기 메뉴 폴백 (기존 방식)"""
+    from .input_utils import KeyboardInput
+    keyboard = KeyboardInput()
     
     print("\n" + "="*50)
     print("📁 게임 불러오기")

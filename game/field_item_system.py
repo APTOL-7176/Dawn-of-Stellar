@@ -26,7 +26,7 @@ class FieldItemSystem:
         self.item_db = ItemDatabase()
     
     def show_field_item_menu(self, party: PartyManager) -> bool:
-        """필드 아이템 메뉴 표시"""
+        """필드 아이템 메뉴 표시 - 커서 방식"""
         print(f"\n{CYAN}💼 필드 아이템 메뉴{RESET}")
         print("="*60)
         
@@ -36,29 +36,59 @@ class FieldItemSystem:
             print(f"{RED}사용 가능한 파티원이 없습니다.{RESET}")
             return False
         
-        print("아이템을 사용할 파티원을 선택하세요:")
-        for i, member in enumerate(alive_members, 1):
-            hp_bar = self._get_hp_bar(member)
-            mp_bar = self._get_mp_bar(member)
-            print(f"{i}. {member.name} | {hp_bar} | {mp_bar}")
-        print(f"{len(alive_members)+1}. 취소")
-        
         try:
-            choice = int(self.keyboard.get_key()) - 1
-            if choice == len(alive_members):
+            from .cursor_menu_system import create_simple_menu
+            
+            # 파티원 목록을 커서 메뉴로 생성
+            options = []
+            descriptions = []
+            
+            for member in alive_members:
+                hp_bar = self._get_hp_bar(member)
+                mp_bar = self._get_mp_bar(member)
+                options.append(f"👤 {member.name}")
+                descriptions.append(f"{hp_bar} | {mp_bar}")
+            
+            options.append("❌ 취소")
+            descriptions.append("아이템 사용을 취소합니다")
+            
+            menu = create_simple_menu("🎒 아이템 사용 - 대상 선택", options, descriptions)
+            result = menu.run()
+            
+            if result == -1 or result >= len(alive_members):  # 취소
                 return False
-            elif 0 <= choice < len(alive_members):
-                selected_member = alive_members[choice]
-                return self._show_member_items(selected_member, party)
             else:
-                print(f"{RED}잘못된 선택입니다.{RESET}")
+                selected_member = alive_members[result]
+                return self._show_member_items(selected_member, party)
+                
+        except ImportError:
+            # 폴백: 기존 텍스트 메뉴
+            print("아이템을 사용할 파티원을 선택하세요:")
+            for i, member in enumerate(alive_members, 1):
+                hp_bar = self._get_hp_bar(member)
+                mp_bar = self._get_mp_bar(member)
+                print(f"{i}. {member.name} | {hp_bar} | {mp_bar}")
+            print(f"{len(alive_members)+1}. 취소")
+            
+            try:
+                choice = int(self.keyboard.get_key()) - 1
+                if choice == len(alive_members):
+                    return False
+                elif 0 <= choice < len(alive_members):
+                    selected_member = alive_members[choice]
+                    return self._show_member_items(selected_member, party)
+                else:
+                    print(f"{RED}잘못된 선택입니다.{RESET}")
+                    return False
+            except ValueError:
+                print(f"{RED}숫자를 입력하세요.{RESET}")
                 return False
         except ValueError:
             print(f"{RED}숫자를 입력하세요.{RESET}")
             return False
     
     def _show_member_items(self, user: Character, party: PartyManager) -> bool:
-        """선택된 파티원의 아이템 목록 표시"""
+        """선택된 파티원의 아이템 목록 표시 - 커서 방식"""
         print(f"\n{WHITE}{user.name}의 필드 아이템:{RESET}")
         print("-" * 50)
         
@@ -74,29 +104,55 @@ class FieldItemSystem:
             print(f"{CYAN}💡 야영 텐트, 치료 포션, 귀환 두루마리 등을 구입해보세요!{RESET}")
             return False
         
-        # 아이템 목록 표시
-        print("사용할 아이템을 선택하세요:")
-        for i, (item, quantity) in enumerate(field_items, 1):
-            effect_desc = item.get_effect_description() if hasattr(item, 'get_effect_description') else item.description
-            usable_info = self._get_usability_info(item)
-            print(f"{i}. {item.name} ({quantity}개) {usable_info}")
-            print(f"   📝 {effect_desc}")
-            print()
-        print(f"{len(field_items)+1}. 취소")
-        
         try:
-            choice = int(self.keyboard.get_key()) - 1
-            if choice == len(field_items):
+            from .cursor_menu_system import create_simple_menu
+            
+            # 아이템 목록을 커서 메뉴로 생성
+            options = []
+            descriptions = []
+            
+            for item, quantity in field_items:
+                effect_desc = item.get_effect_description() if hasattr(item, 'get_effect_description') else item.description
+                usable_info = self._get_usability_info(item)
+                options.append(f"💊 {item.name} ({quantity}개) {usable_info}")
+                descriptions.append(effect_desc)
+            
+            options.append("❌ 취소")
+            descriptions.append("아이템 사용을 취소합니다")
+            
+            menu = create_simple_menu(f"{user.name}의 아이템", options, descriptions)
+            result = menu.run()
+            
+            if result == -1 or result >= len(field_items):  # 취소
                 return False
-            elif 0 <= choice < len(field_items):
-                selected_item, quantity = field_items[choice]
-                return self._use_field_item(user, selected_item, party)
             else:
-                print(f"{RED}잘못된 선택입니다.{RESET}")
+                selected_item, quantity = field_items[result]
+                return self._use_field_item(user, selected_item, party)
+                
+        except ImportError:
+            # 폴백: 기존 텍스트 메뉴
+            print("사용할 아이템을 선택하세요:")
+            for i, (item, quantity) in enumerate(field_items, 1):
+                effect_desc = item.get_effect_description() if hasattr(item, 'get_effect_description') else item.description
+                usable_info = self._get_usability_info(item)
+                print(f"{i}. {item.name} ({quantity}개) {usable_info}")
+                print(f"   📝 {effect_desc}")
+                print()
+            print(f"{len(field_items)+1}. 취소")
+            
+            try:
+                choice = int(self.keyboard.get_key()) - 1
+                if choice == len(field_items):
+                    return False
+                elif 0 <= choice < len(field_items):
+                    selected_item, quantity = field_items[choice]
+                    return self._use_field_item(user, selected_item, party)
+                else:
+                    print(f"{RED}잘못된 선택입니다.{RESET}")
+                    return False
+            except ValueError:
+                print(f"{RED}숫자를 입력하세요.{RESET}")
                 return False
-        except ValueError:
-            print(f"{RED}숫자를 입력하세요.{RESET}")
-            return False
     
     def _use_field_item(self, user: Character, item, party: PartyManager) -> bool:
         """필드 아이템 사용"""

@@ -543,6 +543,32 @@ class AudioManager:
                 "heal": SFXType.HEAL,
                 "sword_hit": SFXType.SWORD_HIT,
                 "battle_start": SFXType.BATTLE_SWIRL,  # 042.wav - 전투 시작 소용돌이
+                "critical_hit": SFXType.CRITICAL_HIT,  # 크리티컬 히트
+                "dodge": SFXType.DODGE,  # 회피
+                "protect": SFXType.BUFF_ON,  # 프로텍트 (버프 적용음)
+                "silence": SFXType.DEBUFF_ON,  # 사일런스 (디버프 적용음)
+                "poison": SFXType.POISON,  # 독
+                "haste": SFXType.BUFF_ON,  # 헤이스트
+                "slow": SFXType.DEBUFF_ON,  # 슬로우
+                "barrier": SFXType.BUFF_ON,  # 배리어
+                "berserk": SFXType.BUFF_ON,  # 버서크
+                "stop": SFXType.DEBUFF_ON,  # 스톱
+                "gun_hit": SFXType.GUN_SHOT,  # 총격
+                "gun_critical": SFXType.CRITICAL_HIT,  # 총 크리티컬
+                "punch_hit": SFXType.SWORD_HIT,  # 주먹 공격 (검격과 동일)
+                "magic_hit": SFXType.MAGIC_HIT,  # 마법 명중
+                "limit_break": SFXType.ULTIMATE,  # 리미트 브레이크
+                "summon": SFXType.SUMMON,  # 소환
+                "fire": SFXType.MAGIC_HIT,  # 화염 마법
+                "fire2": SFXType.MAGIC_HIT,  # 화염 마법 2단계
+                "fire3": SFXType.ULTIMATE,  # 화염 마법 3단계
+                "ice3": SFXType.ULTIMATE,  # 얼음 마법 3단계
+                "thunder": SFXType.MAGIC_HIT,  # 번개 마법
+                "thunder3": SFXType.ULTIMATE,  # 번개 마법 3단계
+                "heal2": SFXType.HEAL,  # 2단계 치유
+                "heal3": SFXType.HEAL,  # 3단계 치유
+                "sleep": SFXType.DEBUFF_ON,  # 수면
+                "ultima": SFXType.ULTIMATE,  # 알테마
                 
                 # 기타
                 "teleport": SFXType.TELEPORT,

@@ -506,8 +506,8 @@ class CharacterTrait:
         # 암흑기사 특성
         if trigger_type == "fatal_damage" and "undying_will" in effect:
             if self.stack_count < effect["undying_will"]:
-                character.hp = character.max_hp
-                character.mp = character.max_mp
+                character.current_hp = character.max_hp
+                character.current_mp = character.max_mp
                 self.stack_count += 1
                 return True
         
@@ -524,24 +524,206 @@ class CharacterTrait:
         return False
     
     def activate_effect(self, character):
-        """액티브 효과 발동"""
+        """액티브 효과 발동 - 완전 구현"""
         if not self.is_active or self.effect_type != "active" or self.cooldown > 0:
             return False
             
         effect = self.effect_value
+        activated = False
         
-        # 도적 특성
+        # 도적 특성 - 은신
         if "stealth_duration" in effect:
             character.stealth_turns = effect["stealth_duration"]
             self.cooldown = 10  # 10턴 쿨다운
-            return True
+            self.max_cooldown = 10
+            activated = True
+            print(f"✨ {character.name}이(가) 은신 상태에 진입했습니다! (지속: {effect['stealth_duration']}턴)")
         
-        return False
+        # 암살자 특성 - 연막탄
+        if "smoke_bomb" in effect:
+            character.stealth_turns = 3
+            # 적의 명중률 감소 (지속시간 포함)
+            character.temp_enemy_accuracy_down = getattr(character, 'temp_enemy_accuracy_down', 0) + 30
+            character.temp_enemy_accuracy_duration = 4  # 4턴 지속
+            self.cooldown = 8
+            self.max_cooldown = 8
+            activated = True
+            print(f"💨 {character.name}이(가) 연막탄을 사용했습니다! 은신 및 적 명중률 감소! (4턴)")
+        
+        # 기계공학자 특성 - 자동 포탑
+        if "auto_turret" in effect:
+            # 포탑 설치 (전투에서 지속 피해 제공) - 물리공격력 비례
+            character.temp_turret_damage = int(character.physical_attack * 0.8)  # 물리공격력의 80%
+            character.temp_turret_duration = 5
+            self.cooldown = 12
+            self.max_cooldown = 12
+            activated = True
+            print(f"🔧 {character.name}이(가) 자동 포탑을 설치했습니다! (지속: 5턴, 턴당 {character.temp_turret_damage} 피해)")
+        
+        # 기계공학자 특성 - 오버클럭
+        if "overclock" in effect:
+            # 모든 능력치 일시 증가
+            boost_amount = effect["overclock"]
+            character.temp_attack_bonus = getattr(character, 'temp_attack_bonus', 0) + int(character.physical_attack * boost_amount)
+            character.temp_magic_bonus = getattr(character, 'temp_magic_bonus', 0) + int(character.magic_attack * boost_amount)
+            character.temp_speed_bonus = getattr(character, 'temp_speed_bonus', 0) + int(character.speed * boost_amount)
+            character.temp_overclock_duration = 3  # 3턴 지속
+            self.cooldown = 15
+            self.max_cooldown = 15
+            activated = True
+            print(f"⚡ {character.name}이(가) 오버클럭을 활성화했습니다! 모든 능력치 {int(boost_amount*100)}% 증가! (3턴)")
+        
+        # 드루이드 특성 - 식물 조종
+        if "plant_control" in effect:
+            # 적의 이동 제한 및 피해 - 마법공격력 비례
+            character.temp_plant_control_damage = int(character.magic_attack * 0.6)  # 마법공격력의 60%
+            character.temp_plant_control_duration = 4
+            self.cooldown = 10
+            self.max_cooldown = 10
+            activated = True
+            print(f"🌿 {character.name}이(가) 식물을 조종하여 적을 속박합니다! (4턴간 턴당 {character.temp_plant_control_damage} 피해)")
+        
+        # 드루이드 특성 - 동물 변신
+        if "shape_shift" in effect:
+            # 이미 전투 시스템에서 처리됨
+            self.cooldown = 6
+            self.max_cooldown = 6
+            activated = True
+        
+        # 철학자 특성 - 시간 정지
+        if "time_stop" in effect:
+            # 다음 턴에 2번 행동
+            character.temp_extra_turn = True
+            self.cooldown = 20
+            self.max_cooldown = 20
+            activated = True
+            print(f"⏰ {character.name}이(가) 시간을 조작합니다! 다음 턴에 2번 행동 가능!")
+        
+        # 연금술사 특성 - 대폭발
+        if "mega_explosion" in effect:
+            # 광역 피해 및 자신도 피해
+            character.temp_mega_explosion = True
+            character.temp_explosion_damage = character.magic_attack * 3
+            self.cooldown = 25
+            self.max_cooldown = 25
+            activated = True
+            print(f"💥 {character.name}이(가) 대폭발을 준비합니다! 강력한 광역 피해!")
+        
+        # 차원술사 특성 - 차원 이동
+        if "dimension_teleport" in effect:
+            # 회피율 100% 및 반격 기회
+            character.temp_dimension_dodge = True
+            character.temp_dimension_duration = 2
+            self.cooldown = 18
+            self.max_cooldown = 18
+            activated = True
+            print(f"🌀 {character.name}이(가) 차원을 이동합니다! 2턴간 모든 공격 회피!")
+        
+        # 차원술사 특성 - 차원 균열
+        if "dimension_rift" in effect:
+            # 마법공격력 비례 고정 피해 (보스는 50% 감소)
+            dimension_damage = int(character.magic_attack * 2.5)  # 마법공격력의 250%
+            character.temp_dimension_rift_damage = dimension_damage
+            character.temp_dimension_rift_duration = 1  # 즉시 적용
+            self.cooldown = 25
+            self.max_cooldown = 25
+            activated = True
+            print(f"🌌 {character.name}이(가) 차원 균열을 생성합니다! 강력한 공간 피해! ({dimension_damage} 피해)")
+        
+        # 시간술사 특성 - 시간 역행
+        if "time_rewind" in effect:
+            # HP/MP 완전 회복 및 모든 쿨다운 초기화
+            character.current_hp = character.max_hp
+            character.current_mp = character.max_mp
+            # 다른 특성들의 쿨다운 초기화
+            for trait in character.traits:
+                if trait != self:  # 자신은 제외
+                    trait.cooldown = 0
+            self.cooldown = 30  # 매우 긴 쿨다운
+            self.max_cooldown = 30
+            activated = True
+            print(f"⏪ {character.name}이(가) 시간을 역행시킵니다! HP/MP 완전 회복 및 모든 쿨다운 초기화!")
+        
+        # 광전사 특성 - 광전사 모드
+        if "berserker_mode" in effect:
+            # 공격력 대폭 증가, 방어력 감소, 상태이상 무시
+            character.temp_berserker_attack = int(character.physical_attack * 1.5)
+            character.temp_berserker_defense = int(character.physical_defense * 0.5)
+            character.temp_status_immunity = True
+            character.temp_berserker_duration = 5
+            self.cooldown = 20
+            self.max_cooldown = 20
+            activated = True
+            print(f"😤 {character.name}이(가) 광전사 모드에 돌입! 공격력 150%, 방어력 50%, 상태이상 무시! (5턴)")
+        
+        # 성공적으로 활성화된 경우에만 쿨다운 적용
+        return activated
     
     def update_cooldown(self):
-        """쿨다운 업데이트"""
+        """쿨다운 업데이트 - 개선된 버전"""
         if self.cooldown > 0:
             self.cooldown -= 1
+            return True  # 쿨다운 중
+        return False  # 쿨다운 완료
+    
+    def update_duration_effects(self, character):
+        """지속 효과 업데이트"""
+        updated_effects = []
+        
+        # 오버클럭 지속시간 관리
+        if hasattr(character, 'temp_overclock_duration') and character.temp_overclock_duration > 0:
+            character.temp_overclock_duration -= 1
+            if character.temp_overclock_duration <= 0:
+                # 오버클럭 효과 제거
+                character.temp_attack_bonus = max(0, getattr(character, 'temp_attack_bonus', 0) - int(character.physical_attack * 0.5))
+                character.temp_magic_bonus = max(0, getattr(character, 'temp_magic_bonus', 0) - int(character.magic_attack * 0.5))
+                character.temp_speed_bonus = max(0, getattr(character, 'temp_speed_bonus', 0) - int(character.speed * 0.5))
+                updated_effects.append("오버클럭 효과 종료")
+        
+        # 자동 포탑 지속시간 관리
+        if hasattr(character, 'temp_turret_duration') and character.temp_turret_duration > 0:
+            character.temp_turret_duration -= 1
+            if character.temp_turret_duration <= 0:
+                character.temp_turret_damage = 0
+                updated_effects.append("자동 포탑 해제")
+        
+        # 식물 조종 지속시간 관리
+        if hasattr(character, 'temp_plant_control_duration') and character.temp_plant_control_duration > 0:
+            character.temp_plant_control_duration -= 1
+            if character.temp_plant_control_duration <= 0:
+                character.temp_plant_control_damage = 0
+                updated_effects.append("식물 조종 효과 종료")
+        
+        # 차원 이동 지속시간 관리
+        if hasattr(character, 'temp_dimension_duration') and character.temp_dimension_duration > 0:
+            character.temp_dimension_duration -= 1
+            if character.temp_dimension_duration <= 0:
+                character.temp_dimension_dodge = False
+                updated_effects.append("차원 이동 효과 종료")
+        
+        # 광전사 모드 지속시간 관리
+        if hasattr(character, 'temp_berserker_duration') and character.temp_berserker_duration > 0:
+            character.temp_berserker_duration -= 1
+            if character.temp_berserker_duration <= 0:
+                character.temp_berserker_attack = 0
+                character.temp_berserker_defense = 0
+                character.temp_status_immunity = False
+                updated_effects.append("광전사 모드 종료")
+        
+        # 은신 지속시간 관리
+        if hasattr(character, 'stealth_turns') and character.stealth_turns > 0:
+            character.stealth_turns -= 1
+            if character.stealth_turns <= 0:
+                updated_effects.append("은신 효과 종료")
+        
+        # 적 명중률 감소 지속시간 관리
+        if hasattr(character, 'temp_enemy_accuracy_duration') and character.temp_enemy_accuracy_duration > 0:
+            character.temp_enemy_accuracy_duration -= 1
+            if character.temp_enemy_accuracy_duration <= 0:
+                character.temp_enemy_accuracy_down = 0
+                updated_effects.append("연막탄 효과 종료")
+        
+        return updated_effects
     
     def reset_temp_effects(self, character):
         """임시 효과 초기화"""
@@ -773,7 +955,7 @@ class CharacterClassManager:
                 CharacterTrait("자연의 가호", "턴 시작 시 HP/MP 소량 회복", "passive", {"nature_blessing_heal": True}),
                 CharacterTrait("자연 치유", "야외에서 지속적인 HP 회복", "passive", {"nature_heal": True}),
                 CharacterTrait("식물 조종", "적의 이동 제한 스킬", "active", {"plant_control": True}),
-                CharacterTrait("동물 변신", "전투 중 능력치 배분 변경 가능", "active", {"shape_shift": True}),
+                CharacterTrait("동물 변신", "늑대형태: 공속+30%, 곰형태: 방어+30%, 독수리형태: 회피+25%", "active", {"shape_shift": True}),
                 CharacterTrait("계절의 힘", "전투마다 랜덤 속성 강화", "passive", {"seasonal_power": True})
             ],
             
@@ -836,7 +1018,7 @@ class CharacterClassManager:
             "차원술사": [
                 CharacterTrait("차원 보관", "무제한 아이템 보관", "passive", {"dimension_storage": True}),
                 CharacterTrait("공간 이동", "위치 변경으로 공격 회피", "trigger", {"teleport": True}),
-                CharacterTrait("차원 균열", "적에게 고정 피해 (보스 50% 감소)", "active", {"dimension_rift": True}),
+                CharacterTrait("차원 균열", "마법공격력 비례 차원 피해 (보스 50% 감소)", "active", {"dimension_rift": True}),
                 CharacterTrait("평행우주", "공격 실패 시 재시도 가능", "trigger", {"parallel_world": True}),
                 CharacterTrait("공간 왜곡", "적의 정확도 30% 감소", "passive", {"space_distortion": 0.3})
             ],
@@ -1117,6 +1299,11 @@ class Character(BraveMixin):
         self.atb_speed = speed  # ATB 충전 속도는 스피드 수치 기반
         self.is_alive = True
         
+        # 속성 시스템 추가
+        self.element_affinity = self._get_class_element_affinity(character_class)
+        self.element_weaknesses = self._get_class_element_weaknesses(character_class)
+        self.element_resistances = self._get_class_element_resistances(character_class)
+        
         # 크리티컬 및 명중/회피 시스템
         self.critical_rate = self._get_class_base_critical_rate(character_class)  # 기본 크리티컬 확률
         self.accuracy = 85 + (speed // 10)  # 기본 명중률 (85% + 스피드 보너스)
@@ -1126,6 +1313,7 @@ class Character(BraveMixin):
         available_traits = CharacterClassManager.get_class_traits(character_class)
         self.available_traits = available_traits  # 선택 가능한 모든 특성
         self.active_traits = []  # 선택된 활성 특성 (최대 2개)
+        self.selected_traits = []  # easy_character_creator 호환성을 위한 별칭
         self.specialization = specialization
         self.preferred_damage_type = specialization.get("damage_type", "physical")
         
@@ -1282,6 +1470,81 @@ class Character(BraveMixin):
         self.equipment_defense_bonus = 0
         self.equipment_magic_bonus = 0
         self.equipment_speed_bonus = 0
+    
+    def _get_class_element_affinity(self, character_class: str) -> str:
+        """클래스별 기본 속성 친화도 반환 (모든 직업은 기본적으로 무속성)"""
+        # 기본적으로 모든 직업은 무속성으로 설정
+        class_elements = {
+            "전사": "무속성",
+            "검성": "무속성", 
+            "검투사": "무속성",
+            "광전사": "무속성",
+            "기사": "무속성",
+            "성기사": "무속성",  # 빛 속성으로 변경할 수도 있음
+            "암흑기사": "무속성",  # 어둠 속성으로 변경할 수도 있음
+            "용기사": "무속성",
+            "아크메이지": "무속성",
+            "정령술사": "무속성",  # 다양한 원소 사용
+            "시간술사": "무속성",
+            "차원술사": "무속성",
+            "철학자": "무속성",
+            "궁수": "무속성",
+            "암살자": "무속성",
+            "도적": "무속성",
+            "해적": "무속성",
+            "사무라이": "무속성",
+            "바드": "무속성",
+            "무당": "무속성",
+            "드루이드": "무속성",
+            "신관": "무속성",
+            "성직자": "무속성",
+            "몽크": "무속성",
+            "마검사": "무속성",
+            "연금술사": "무속성",
+            "기계공학자": "무속성",
+            "네크로맨서": "무속성"
+        }
+        return class_elements.get(character_class, "무속성")
+    
+    def _get_class_element_weaknesses(self, character_class: str) -> List[str]:
+        """클래스별 약점 속성 반환 (기본적으로 약점 없음)"""
+        # 현재는 모든 직업이 약점 없음으로 설정
+        # 추후 밸런스에 따라 조정 가능
+        return []
+    
+    def _get_class_element_resistances(self, character_class: str) -> List[str]:
+        """클래스별 저항 속성 반환 (기본적으로 저항 없음)"""
+        # 현재는 모든 직업이 저항 없음으로 설정
+        # 추후 밸런스에 따라 조정 가능
+        return []
+    
+    def get_element_display_info(self) -> Dict[str, Any]:
+        """속성 정보를 표시용으로 반환"""
+        return {
+            "affinity": self.element_affinity,
+            "weaknesses": self.element_weaknesses,
+            "resistances": self.element_resistances,
+            "display_text": self._format_element_display()
+        }
+    
+    def _format_element_display(self) -> str:
+        """속성 정보를 문자열로 포맷팅"""
+        lines = []
+        lines.append(f"🔮 기본 속성: {self.element_affinity}")
+        
+        if self.element_weaknesses:
+            weakness_str = ", ".join(self.element_weaknesses)
+            lines.append(f"💔 약점: {weakness_str}")
+        else:
+            lines.append(f"💔 약점: 없음")
+            
+        if self.element_resistances:
+            resistance_str = ", ".join(self.element_resistances)
+            lines.append(f"🛡️ 저항: {resistance_str}")
+        else:
+            lines.append(f"🛡️ 저항: 없음")
+            
+        return "\n".join(lines)
     
     def _get_class_base_mp(self, character_class: str) -> int:
         """클래스별 기본 최대 MP 반환"""
@@ -1516,6 +1779,7 @@ class Character(BraveMixin):
                 return False
         
         self.active_traits = selected_traits
+        self.selected_traits = selected_traits  # easy_character_creator 호환성을 위해 추가
         
         if len(selected_traits) == 0:
             print(f"{YELLOW}{self.name}이(가) 패시브 특성을 선택하지 않았습니다.{RESET}")
@@ -1525,6 +1789,128 @@ class Character(BraveMixin):
                 print(f"  {YELLOW}• {trait.name}{RESET}: {trait.description}")
         
         return True
+    
+    def select_traits(self, mode: str = "normal"):
+        """특성 선택 메서드 - 커서 메뉴 시스템 사용"""
+        try:
+            from game.cursor_menu_system import CursorMenu
+            from game.color_text import bright_cyan, bright_yellow, yellow, green, red, bright_white, cyan, white
+            
+            # 캐릭터 정보 헤더 표시
+            print(f"\n{bright_cyan('='*60)}")
+            print(f"{bright_cyan(f'🎭 {self.name} ({self.character_class}) - 특성 선택')}")
+            print(f"{bright_cyan('='*60)}")
+            
+            # 캐릭터 기본 능력치 표시
+            print(f"{cyan('📊 기본 능력치:')}")
+            print(f"  💪 물리공격: {self.physical_attack:3d}  🔮 마법공격: {self.magic_attack:3d}")
+            print(f"  🛡️  물리방어: {self.physical_defense:3d}  🛡️ 마법방어: {self.magic_defense:3d}")
+            print(f"  ❤️  H  P: {self.max_hp:3d}  💙 M  P: {self.max_mp:3d}")
+            print(f"  ⚡ 초기BRV: {self.initial_brave:3d}  🔥 최대BRV: {self.max_brave:3d}")
+            print(f"  🏃 속  도: {self.speed:3d}")
+            print()
+            
+            print(f"{bright_yellow('💡 0-2개의 특성을 선택할 수 있습니다 (패시브 없이도 게임 가능)')}")
+            print(f"{yellow('❓ 특성을 선택하면 게임에서 자동으로 발동됩니다')}")
+            print()
+            
+            # 개발 모드 확인
+            from config import game_config
+            is_dev_mode = hasattr(game_config, 'DEVELOPMENT_MODE') and game_config.DEVELOPMENT_MODE
+            
+            available_traits = []
+            if is_dev_mode:
+                available_traits = self.available_traits
+                print(f"{cyan('🔧 개발 모드: 모든 특성 사용 가능')}")
+            else:
+                # 일반 모드에서는 해금된 특성만
+                unlocked_names = self._get_unlocked_traits()
+                available_traits = [trait for trait in self.available_traits if trait.name in unlocked_names]
+                if available_traits:
+                    print(f"{green(f'🔓 해금된 특성: {len(available_traits)}개')}")
+                else:
+                    print(f"{red('🔒 해금된 특성이 없습니다')}")
+            
+            if not available_traits:
+                print(f"\n{yellow('패시브 없이 게임을 진행합니다.')}")
+                input(f"{white('계속하려면 Enter를 누르세요...')}")
+                return
+            
+            # 선택된 특성들 저장
+            selected_traits = []
+            
+            while len(selected_traits) < 2:
+                # 메뉴 옵션 생성
+                options = []
+                descriptions = []
+                
+                # 사용 가능한 특성들 (선택되지 않은 것만)
+                available_for_selection = [trait for trait in available_traits if trait not in selected_traits]
+                
+                for trait in available_for_selection:
+                    status = "✅" if is_dev_mode else "🔓"
+                    options.append(f"{trait.name} {status}")
+                    descriptions.append(f"💡 {trait.description}")
+                
+                # 선택 완료 옵션 (1개 이상 선택했을 때만)
+                if len(selected_traits) > 0:
+                    options.append(f"✅ {bright_white('선택 완료')}")
+                    descriptions.append(f"현재 선택된 특성 {len(selected_traits)}개로 게임을 시작합니다")
+                
+                # 패시브 없이 시작 옵션
+                options.append(f"❌ {bright_white('패시브 없이 시작')}")
+                descriptions.append("특성을 선택하지 않고 게임을 시작합니다")
+                
+                # 현재 선택 상태 표시
+                selected_names = [trait.name for trait in selected_traits]
+                current_selection = ", ".join(selected_names) if selected_names else "없음"
+                title = f"🎮 특성 선택 ({len(selected_traits)}/2)\n현재 선택: {current_selection}"
+                
+                # 커서 메뉴 생성 및 실행 (취소 가능하도록 설정)
+                menu = CursorMenu(title, options, descriptions, cancellable=True)
+                result = menu.run()
+                
+                if result is None or result == -1:  # 취소 (Q키)
+                    print(f"\n{yellow('❌ 특성 선택이 취소되었습니다.')}")
+                    print(f"{yellow('패시브 없이 게임을 진행합니다.')}")
+                    selected_traits = []
+                    break
+                elif result < len(available_for_selection):
+                    # 특성 선택
+                    selected_trait = available_for_selection[result]
+                    selected_traits.append(selected_trait)
+                    print(f"\n{green(f'✅ {selected_trait.name} 특성이 선택되었습니다!')}")
+                    print(f"{cyan(f'💡 효과: {selected_trait.description}')}")
+                    
+                    if len(selected_traits) == 2:
+                        print(f"\n{bright_yellow('🎯 최대 개수(2개)의 특성을 선택했습니다!')}")
+                        break
+                elif len(selected_traits) > 0 and result == len(available_for_selection):
+                    # 선택 완료 (1개 이상 선택된 경우)
+                    break
+                else:
+                    # 패시브 없이 시작
+                    selected_traits = []
+                    break
+            
+            # 선택된 특성 적용
+            self.active_traits = selected_traits
+            self.selected_traits = selected_traits  # easy_character_creator 호환성을 위해 추가
+            
+            # 최종 결과 표시
+            print(f"\n{bright_cyan('='*50)}")
+            if len(selected_traits) == 0:
+                print(f"{yellow(f'🚀 {self.name}이(가) 패시브 특성 없이 게임을 시작합니다.')}")
+            else:
+                print(f"{green(f'🎉 {self.name}의 최종 선택된 특성:')}")
+                for i, trait in enumerate(self.active_traits, 1):
+                    print(f"  {bright_yellow(f'{i}. {trait.name}')}: {white(trait.description)}")
+            print(f"{bright_cyan('='*50)}")
+            
+        except ImportError as e:
+            print(f"커서 메뉴 시스템을 불러올 수 없습니다: {e}")
+            # 폴백: 기존 시스템 사용
+            self.select_passive_traits([])
     
     def _get_unlocked_traits(self) -> List[str]:
         """일반 모드에서 해금된 패시브 특성 목록 반환"""
@@ -1706,24 +2092,59 @@ class Character(BraveMixin):
         
         if self.current_hp <= 0:
             self.current_hp = 0
+            
+            # 재기의 기회 (Second Chance) 능력 확인
+            if hasattr(self, 'game_instance') and self.game_instance:
+                if hasattr(self.game_instance, 'permanent_progression'):
+                    permanent_prog = self.game_instance.permanent_progression
+                    if permanent_prog.has_ability("second_chance"):
+                        # 게임당 사용 가능 횟수 확인
+                        if not hasattr(self.game_instance, 'second_chance_uses'):
+                            self.game_instance.second_chance_uses = 0
+                        
+                        max_uses = permanent_prog.upgrades["second_chance"].current_level
+                        if self.game_instance.second_chance_uses < max_uses:
+                            # 20% 확률로 부활
+                            import random
+                            if random.random() < 0.20:  # 20% 확률
+                                revival_hp = int(self.max_hp * 0.30)  # 30% HP로 부활
+                                self.current_hp = revival_hp
+                                self.is_alive = True
+                                self.game_instance.second_chance_uses += 1
+                                
+                                print(f"\n✨ {self.name}이(가) 재기의 기회로 부활했습니다! ({self.game_instance.second_chance_uses}/{max_uses})")
+                                print(f"💖 HP {revival_hp}로 되살아났습니다!")
+                                return actual_damage
+            
+            # 부활하지 못했거나 능력이 없는 경우
             self.is_alive = False
             print(f"{self.name}이(가) 쓰러졌습니다!")
             
         return actual_damage
         
     def heal(self, heal_amount: int) -> int:
-        """회복하고 실제 회복량 반환"""
+        """회복하고 실제 회복량 반환 - 영구 성장 보너스 적용"""
         if not self.is_alive:
             return 0
             
+        # 상처 치유술 업그레이드 보너스 적용
+        healing_bonus = 1.0
+        if hasattr(self, 'game_instance') and self.game_instance and hasattr(self.game_instance, 'permanent_progression'):
+            wound_healing_bonus = self.game_instance.permanent_progression.get_passive_bonus("wound_healing")
+            if wound_healing_bonus > 0:
+                healing_bonus = 1.0 + (wound_healing_bonus / 100.0)
+                
+        # 치유량에 보너스 적용
+        enhanced_heal_amount = int(heal_amount * healing_bonus)
+        
         # 제한된 최대 HP까지 회복
-        possible_heal = min(heal_amount, self.limited_max_hp - self.current_hp)
+        possible_heal = min(enhanced_heal_amount, self.limited_max_hp - self.current_hp)
         self.current_hp += possible_heal
         
-        # 초과 회복량이 있다면 상처 회복
-        excess_heal = heal_amount - possible_heal
+        # 초과 회복량이 있다면 상처 회복 (보너스도 적용)
+        excess_heal = enhanced_heal_amount - possible_heal
         if excess_heal > 0:
-            wound_heal = int(excess_heal * 0.25)
+            wound_heal = int(excess_heal * 0.25 * healing_bonus)  # 상처 치유에도 보너스 적용
             actual_wound_heal = min(wound_heal, self.wounds)
             self.wounds -= actual_wound_heal
             
@@ -1950,8 +2371,10 @@ class Character(BraveMixin):
             stat_gains = self.calculate_level_up_gains()
             self.apply_level_up_gains(stat_gains)
             
-            # 다음 레벨까지 필요한 경험치 계산 (레벨당 증가)
-            self.experience_to_next = 30 + (self.level - 1) * 8
+            # 다음 레벨까지 필요한 경험치 계산 (더 가파른 곡선)
+            # 기본 90 + 레벨^1.3 * 40로 곡선 증가
+            import math
+            self.experience_to_next = int(90 + (self.level ** 1.3) * 40)
             
             print(f"🎉 {self.name}이(가) 레벨 {old_level} → {self.level}로 상승!")
             self.show_stat_gains(stat_gains)
