@@ -29,7 +29,8 @@ jobs:
         sys.path.insert(0, '.')
         try:
             import version
-            print(f'✅ Version: {version.VERSION}')
+            print(f'✅ Version: {version.__version__}')
+            print(f'✅ Game Title: {version.GAME_TITLE}')
             print('✅ 기본 테스트 통과')
         except Exception as e:
             print(f'❌ 테스트 실패: {e}')

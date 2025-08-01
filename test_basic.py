@@ -62,8 +62,9 @@ def test_version_file():
     
     try:
         import version
-        assert hasattr(version, 'VERSION'), "version.py에 VERSION 상수가 없습니다"
-        assert version.VERSION == "2.0.0", f"예상 버전: 2.0.0, 실제: {version.VERSION}"
+        assert hasattr(version, '__version__'), "version.py에 __version__ 상수가 없습니다"
+        assert version.__version__ == "2.0.0", f"예상 버전: 2.0.0, 실제: {version.__version__}"
+        assert hasattr(version, 'GAME_TITLE'), "version.py에 GAME_TITLE 상수가 없습니다"
     except ImportError as e:
         pytest.fail(f"version.py를 import할 수 없습니다: {e}")
 
