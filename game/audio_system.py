@@ -684,6 +684,7 @@ class AudioManager:
         # 문자열을 BGMType으로 매핑
         bgm_mapping = {
             "main theme of ffvii": BGMType.MENU,
+            "main_theme": BGMType.MENU,  # ← 누락된 매핑 추가!
             "title": BGMType.MENU,
             "prelude": BGMType.MENU,
             "character_select": BGMType.MENU,
@@ -704,6 +705,13 @@ class AudioManager:
         }
         
         bgm_type = bgm_mapping.get(bgm_name.lower(), BGMType.FLOOR_1_3)
+        
+        # 디버그: 매핑 정보 출력
+        if bgm_name.lower() in bgm_mapping:
+            print(f"🎵 BGM 매핑: '{bgm_name}' → {bgm_type.name}")
+        else:
+            print(f"⚠️ BGM 매핑 없음: '{bgm_name}' → 기본값 {bgm_type.name} 사용")
+        
         self._play_bgm_internal(bgm_type, loop=loop, fade_in=fade_in)
     
     def _play_bgm_internal(self, bgm_type: BGMType, loop: bool = True, fade_in: int = 1000):
