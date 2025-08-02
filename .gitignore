@@ -175,7 +175,7 @@ user_*.json
 save_*.json
 
 # ===================================================================
-# 로그 및 임시 파일들
+# 로그 및 분석 파일들
 # ===================================================================
 *.log
 *.tmp
@@ -185,6 +185,25 @@ debug_output.txt
 error_log.txt
 crash_report.txt
 performance_log.txt
+
+# 전투 로그 및 분석 파일들
+combat_logs/
+combat_log*.json
+combat_analysis*.py
+combat_damage_analyzer.py
+combat_logger.py
+damage_calculator.py
+quick_damage_analysis.py
+find_low_cast_skills.py
+update_cast_times.py
+
+# 개발용 분석 도구들
+analysis_*.py
+*_analysis.py
+analyzer_*.py
+*_analyzer.py
+calculator_*.py
+*_calculator.py
 
 # ===================================================================
 # 개발용 배치/스크립트 파일들
@@ -208,6 +227,9 @@ build_*.py
 *.spec
 build_executable.bat
 build_with_sounds.py
+
+# 자동 설치 스크립트 (개발용)
+auto_install.bat
 
 # ===================================================================
 # 설정 파일들 (개발용)
