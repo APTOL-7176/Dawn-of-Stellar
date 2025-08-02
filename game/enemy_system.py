@@ -211,7 +211,8 @@ class Enemy(Character):
         # AI 정보
         self.ai_type = self._determine_ai_type()
         self.aggression = random.randint(1, 10)
-        self.intelligence = random.randint(1, 10)
+        # 적 강화: 지능, BRV 관련 스탯 2배 상향
+        self.intelligence = random.randint(1, 10) * 2  # 지능 2배 상향
         
         # 보상 정보
         self.exp_reward = self._calculate_exp_reward()
@@ -375,10 +376,10 @@ class Enemy(Character):
             elif stat_name == "speed":
                 self.speed = final_value
             elif stat_name in ["init_brv", "max_brv"]:
-                # BRV 값들도 스탯별 성장 적용 (속도와 비슷한 패턴)
+                # BRV 값들도 스탯별 성장 적용 (속도와 비슷한 패턴) - 성장률 2배 증가, 총 4배 강화
                 brv_floor_multiplier = floor_multiplier * 1.1  # BRV 성장 (속도보다 약간 높음)
-                brv_level_multiplier = 1 + (self.level - 1) * 0.06  # 레벨당 6%
-                brv_final_value = int(base_value * brv_floor_multiplier * rank_multiplier * brv_level_multiplier)
+                brv_level_multiplier = 1 + (self.level - 1) * 0.12  # 레벨당 12% (6%에서 2배 증가)
+                brv_final_value = int(base_value * brv_floor_multiplier * rank_multiplier * brv_level_multiplier * 4.0)  # 총 4배 강화
                 
                 if stat_name == "init_brv":
                     self.current_brv = brv_final_value
@@ -403,17 +404,17 @@ class Enemy(Character):
             if not hasattr(self, 'current_brv'):
                 # BRV가 계산되지 않은 경우에만 기본값 적용
                 init_brv = base_stats.get("init_brv", 500)
-                # 층수와 레벨에 맞게 초기 BRV 조정
+                # 층수와 레벨에 맞게 초기 BRV 조정 + 3배 강화 + 성장률 2배 증가 (2배에서 1.5배 증가)
                 brv_floor_multiplier = floor_multiplier * 1.1
-                brv_level_multiplier = 1 + (self.level - 1) * 0.06
-                self.current_brv = int(init_brv * brv_floor_multiplier * rank_multiplier * brv_level_multiplier)
+                brv_level_multiplier = 1 + (self.level - 1) * 0.12  # 레벨당 12% (6%에서 2배 증가)
+                self.current_brv = int(init_brv * brv_floor_multiplier * rank_multiplier * brv_level_multiplier * 3.0)  # 2배에서 3배로 증가
             if not hasattr(self, 'max_brv'):
-                # max_brv가 계산되지 않은 경우에만 기본값 적용
+                # max_brv가 계산되지 않은 경우에만 기본값 적용 + 3배 강화 (2배에서 1.5배 증가)
                 max_brv = base_stats.get("max_brv", 2500)
-                # 층수와 레벨에 맞게 최대 BRV 조정
+                # 층수와 레벨에 맞게 최대 BRV 조정 + 3배 강화 + 성장률 2배 증가 (2배에서 1.5배 증가)
                 brv_floor_multiplier = floor_multiplier * 1.1
-                brv_level_multiplier = 1 + (self.level - 1) * 0.06
-                self.max_brv = int(max_brv * brv_floor_multiplier * rank_multiplier * brv_level_multiplier)
+                brv_level_multiplier = 1 + (self.level - 1) * 0.12  # 레벨당 12% (6%에서 2배 증가)
+                self.max_brv = int(max_brv * brv_floor_multiplier * rank_multiplier * brv_level_multiplier * 3.0)  # 2배에서 3배로 증가
             
             # 추가 BRV 관련 속성들 (플레이어와 호환)
             self.int_brv = self.current_brv  # 초기 BRV = 현재 BRV
@@ -431,123 +432,123 @@ class Enemy(Character):
     def _get_base_stats_by_type(self) -> Dict[str, int]:
         """적 타입별 기본 스탯 (명확한 원소 속성 포함)"""
         stats_table = {
-            # 일반 몬스터 (1-10층) - 1층부터 위협적이게 조정
+            # 일반 몬스터 (1-10층) - 1층부터 위협적이게 조정 + BRV 2배 증가
             EnemyType.GOBLIN: {
                 "max_hp": 140, "max_mp": 35, "attack": 30, "defense": 20,
                 "magic_power": 18, "magic_defense": 15, "speed": 30,
-                "init_brv": 400, "max_brv": 800, "element": ElementType.NEUTRAL
+                "init_brv": 800, "max_brv": 1600, "element": ElementType.NEUTRAL
             },
             EnemyType.ORC: {
                 "max_hp": 180, "max_mp": 55, "attack": 42, "defense": 32,
                 "magic_power": 25, "magic_defense": 28, "speed": 25,
-                "init_brv": 720, "max_brv": 1440, "element": ElementType.NEUTRAL
+                "init_brv": 1440, "max_brv": 2880, "element": ElementType.NEUTRAL
             },
             EnemyType.SKELETON: {
                 "max_hp": 150, "max_mp": 65, "attack": 34, "defense": 30,
                 "magic_power": 30, "magic_defense": 36, "speed": 30,
-                "init_brv": 650, "max_brv": 1320, "element": ElementType.DARK  # 언데드
+                "init_brv": 1300, "max_brv": 2640, "element": ElementType.DARK  # 언데드
             },
             EnemyType.ZOMBIE: {
                 "max_hp": 200, "max_mp": 35, "attack": 38, "defense": 28,
                 "magic_power": 16, "magic_defense": 24, "speed": 15,
-                "init_brv": 680, "max_brv": 1350, "element": ElementType.DARK  # 언데드
+                "init_brv": 1360, "max_brv": 2700, "element": ElementType.DARK  # 언데드
             },
             EnemyType.SPIDER: {
                 "max_hp": 120, "max_mp": 50, "attack": 36, "defense": 22,
                 "magic_power": 26, "magic_defense": 24, "speed": 45,
-                "init_brv": 540, "max_brv": 1080, "element": ElementType.POISON  # 독거미
+                "init_brv": 1080, "max_brv": 2160, "element": ElementType.POISON  # 독거미
             },
             EnemyType.RAT: {
                 "max_hp": 100, "max_mp": 40, "attack": 30, "defense": 20,
                 "magic_power": 18, "magic_defense": 16, "speed": 50,
-                "init_brv": 480, "max_brv": 840, "element": ElementType.NEUTRAL
+                "init_brv": 960, "max_brv": 1680, "element": ElementType.NEUTRAL
             },
             EnemyType.BAT: {
                 "max_hp": 110, "max_mp": 55, "attack": 32, "defense": 18,
                 "magic_power": 22, "magic_defense": 20, "speed": 55,
-                "init_brv": 520, "max_brv": 980, "element": ElementType.DARK  # 어둠 속성
+                "init_brv": 1040, "max_brv": 1960, "element": ElementType.DARK  # 어둠 속성
             },
             EnemyType.WOLF: {
                 "max_hp": 160, "max_mp": 50, "attack": 40, "defense": 26,
                 "magic_power": 20, "magic_defense": 22, "speed": 40,
-                "init_brv": 640, "max_brv": 1260, "element": ElementType.NEUTRAL
+                "init_brv": 1280, "max_brv": 2520, "element": ElementType.NEUTRAL
             },
             EnemyType.SLIME: {
                 "max_hp": 170, "max_mp": 60, "attack": 28, "defense": 36,
                 "magic_power": 32, "magic_defense": 32, "speed": 20,
-                "init_brv": 580, "max_brv": 1180, "element": ElementType.POISON  # 독성 슬라임
+                "init_brv": 1160, "max_brv": 2360, "element": ElementType.POISON  # 독성 슬라임
             },
             EnemyType.IMP: {
                 "max_hp": 135, "max_mp": 75, "attack": 34, "defense": 24,
                 "magic_power": 38, "magic_defense": 28, "speed": 38,
-                "init_brv": 560, "max_brv": 1140, "element": ElementType.FIRE  # 화염 임프
+                "init_brv": 1120, "max_brv": 2280, "element": ElementType.FIRE  # 화염 임프
             },
             
-            # 중급 몬스터 (11-20층)
+            # 중급 몬스터 (11-20층) - BRV 2배 증가
             EnemyType.DARK_ELF: {
                 "max_hp": 120, "max_mp": 80, "attack": 35, "defense": 20,
                 "magic_power": 30, "magic_defense": 25, "speed": 48,
-                "init_brv": 680, "max_brv": 1320, "element": ElementType.DARK  # 어둠 암살자
+                "init_brv": 1360, "max_brv": 2640, "element": ElementType.DARK  # 어둠 암살자
             },
             EnemyType.TROLL: {
                 "max_hp": 200, "max_mp": 40, "attack": 40, "defense": 35,
                 "magic_power": 15, "magic_defense": 25, "speed": 20,
-                "init_brv": 800, "max_brv": 1800, "element": ElementType.EARTH  # 대지 트롤
+                "init_brv": 1600, "max_brv": 3600, "element": ElementType.EARTH  # 대지 트롤
             },
             EnemyType.OGRE: {
                 "max_hp": 250, "max_mp": 35, "attack": 45, "defense": 30,
                 "magic_power": 12, "magic_defense": 20, "speed": 18,
-                "init_brv": 900, "max_brv": 2100, "element": ElementType.NEUTRAL
+                "init_brv": 1800, "max_brv": 4200, "element": ElementType.NEUTRAL
             },
             EnemyType.HOBGOBLIN: {
                 "max_hp": 140, "max_mp": 80, "attack": 32, "defense": 25,
                 "magic_power": 35, "magic_defense": 30, "speed": 35,
-                "init_brv": 720, "max_brv": 1500, "element": ElementType.LIGHTNING  # 번개술사
+                "init_brv": 1440, "max_brv": 3000, "element": ElementType.LIGHTNING  # 번개술사
             },
             EnemyType.WIGHT: {
                 "max_hp": 160, "max_mp": 90, "attack": 35, "defense": 28,
                 "magic_power": 40, "magic_defense": 35, "speed": 25,
-                "init_brv": 760, "max_brv": 1680, "element": ElementType.DARK  # 강력한 언데드
+                "init_brv": 1520, "max_brv": 3360, "element": ElementType.DARK  # 강력한 언데드
             },
             EnemyType.WRAITH: {
                 "max_hp": 120, "max_mp": 100, "attack": 30, "defense": 20,
                 "magic_power": 45, "magic_defense": 40, "speed": 45,
-                "init_brv": 720, "max_brv": 1440, "element": ElementType.DARK  # 영체
+                "init_brv": 1440, "max_brv": 2880, "element": ElementType.DARK  # 영체
             },
             EnemyType.GARGOYLE: {
                 "max_hp": 180, "max_mp": 60, "attack": 38, "defense": 40,
                 "magic_power": 25, "magic_defense": 35, "speed": 30,
-                "init_brv": 780, "max_brv": 1740, "element": ElementType.EARTH  # 석상
+                "init_brv": 1560, "max_brv": 3480, "element": ElementType.EARTH  # 석상
             },
             EnemyType.MINOTAUR: {
                 "max_hp": 220, "max_mp": 50, "attack": 48, "defense": 35,
                 "magic_power": 20, "magic_defense": 25, "speed": 28,
-                "init_brv": 840, "max_brv": 1920, "element": ElementType.NEUTRAL
+                "init_brv": 1680, "max_brv": 3840, "element": ElementType.NEUTRAL
             },
             EnemyType.CENTAUR: {
                 "max_hp": 170, "max_mp": 70, "attack": 42, "defense": 32,
                 "magic_power": 30, "magic_defense": 28, "speed": 42,
-                "init_brv": 760, "max_brv": 1680, "element": ElementType.WIND  # 바람의 궁수
+                "init_brv": 1520, "max_brv": 3360, "element": ElementType.WIND  # 바람의 궁수
             },
             EnemyType.HARPY: {
                 "max_hp": 130, "max_mp": 85, "attack": 36, "defense": 22,
                 "magic_power": 38, "magic_defense": 30, "speed": 50,
-                "init_brv": 720, "max_brv": 1440, "element": ElementType.WIND  # 바람 하피
+                "init_brv": 1440, "max_brv": 2880, "element": ElementType.WIND  # 바람 하피
             },
             EnemyType.BASILISK: {
                 "max_hp": 190, "max_mp": 95, "attack": 40, "defense": 38,
                 "magic_power": 42, "magic_defense": 40, "speed": 32,
-                "init_brv": 800, "max_brv": 1800, "element": ElementType.POISON  # 독 바실리스크
+                "init_brv": 1600, "max_brv": 3600, "element": ElementType.POISON  # 독 바실리스크
             },
             EnemyType.FIRE_SALAMANDER: {
                 "max_hp": 160, "max_mp": 80, "attack": 38, "defense": 30,
                 "magic_power": 45, "magic_defense": 35, "speed": 35,
-                "init_brv": 740, "max_brv": 1560, "element": ElementType.FIRE  # 화염 도롱뇽
+                "init_brv": 1480, "max_brv": 3120, "element": ElementType.FIRE  # 화염 도롱뇽
             },
             EnemyType.ICE_GOLEM: {
                 "max_hp": 200, "max_mp": 60, "attack": 35, "defense": 50,
                 "magic_power": 30, "magic_defense": 45, "speed": 20,
-                "init_brv": 800, "max_brv": 1800, "element": ElementType.ICE  # 얼음 골렘
+                "init_brv": 1600, "max_brv": 3600, "element": ElementType.ICE  # 얼음 골렘
             },
             
             # 고급 몬스터 (21-30층)
@@ -660,15 +661,15 @@ class Enemy(Character):
             EnemyType.ELEMENTAL: {
                 "max_hp": 200, "max_mp": 250, "attack": 35, "defense": 30,
                 "magic_power": 85, "magic_defense": 80, "speed": 38,
-                "init_brv": 800, "max_brv": 1800, "element": ElementType.FIRE  # 기본 화염, 소환시 변경됨
+                "init_brv": 1600, "max_brv": 3600, "element": ElementType.FIRE  # 기본 화염, 소환시 변경됨
             }
         }
         
-        # 기본값 (정의되지 않은 몬스터용)
+        # 기본값 (정의되지 않은 몬스터용) - BRV 2배 증가
         default_stats = {
             "max_hp": 100, "max_mp": 40, "attack": 20, "defense": 15,
             "magic_power": 12, "magic_defense": 10, "speed": 30,
-            "init_brv": 400, "max_brv": 900, "element": ElementType.NEUTRAL
+            "init_brv": 800, "max_brv": 1800, "element": ElementType.NEUTRAL
         }
         
         return stats_table.get(self.enemy_type, default_stats)
@@ -1769,10 +1770,10 @@ def get_enemy_brave_stats_dict():
                 "brv_loss_resistance": 0.9
             }
         except:
-            # 기본값 사용
+            # 기본값 사용 - BRV 2배 증가
             enemy_stats[enemy_type] = {
-                "int_brv": 300,
-                "max_brv": 1500,
+                "int_brv": 600,
+                "max_brv": 3000,
                 "brv_efficiency": 0.8,
                 "brv_loss_resistance": 0.9
             }

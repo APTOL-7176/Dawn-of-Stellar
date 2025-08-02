@@ -20,7 +20,8 @@ class BraveSkill:
     
     def __init__(self, name: str, attack_type: BraveAttackType, 
                  brave_multiplier: float = 1.0, hp_multiplier: float = 1.0,
-                 uses: int = -1, mp_cost: int = 0, description: str = ""):
+                 uses: int = -1, mp_cost: int = 0, description: str = "", 
+                 hp_sacrifice_rate: float = 0.0):
         self.name = name
         self.attack_type = attack_type
         self.brave_multiplier = brave_multiplier  # Brave 데미지 배율
@@ -31,11 +32,23 @@ class BraveSkill:
         self.description = description
         self.effects = []                         # 특수 효과들
         self.is_healing_skill = self._check_if_healing()  # 회복 스킬 여부
+        self.hp_sacrifice_rate = hp_sacrifice_rate  # HP 희생 비율 (0.0 ~ 1.0)
         
     def _check_if_healing(self) -> bool:
         """회복 스킬인지 확인"""
         healing_keywords = ["치유", "회복", "힐", "부활", "대치유"]
         return any(keyword in self.name for keyword in healing_keywords)
+    
+    def get_description_with_type(self) -> str:
+        """공격 타입을 포함한 스킬 설명 반환"""
+        type_indicators = {
+            BraveAttackType.BRAVE: "🎯BRV",
+            BraveAttackType.HP: "💥HP", 
+            BraveAttackType.HYBRID: "⚡복합"
+        }
+        
+        type_indicator = type_indicators.get(self.attack_type, "❓")
+        return f"[{type_indicator}] {self.description}"
         
     def calculate_healing_amount(self, caster) -> int:
         """시전자의 스탯을 기반으로 회복량 계산"""
@@ -97,12 +110,19 @@ class BraveManager:
         return base_int_brv + level_bonus + equipment_bonus
         
     def get_max_brave(self, character) -> int:
-        """캐릭터의 최대 Brave 계산 (MAX BRV)"""
+        """캐릭터의 최대 Brave 계산 (MAX BRV) - 아군 2배 보너스"""
         base_max_brv = getattr(character, 'max_brv', self.max_brave)
         # 레벨과 장비에 따른 보정
         level_bonus = (character.level - 1) * 100 if hasattr(character, 'level') else 0
         equipment_bonus = self._get_equipment_max_brv_bonus(character)
-        return base_max_brv + level_bonus + equipment_bonus
+        
+        calculated_max_brv = base_max_brv + level_bonus + equipment_bonus
+        
+        # 🎯 아군은 MAX BRV 2배 보너스 적용
+        if hasattr(character, 'character_class') and character.character_class != "Enemy":
+            calculated_max_brv *= 2
+            
+        return calculated_max_brv
         
     def _get_equipment_int_brv_bonus(self, character) -> int:
         """장비로부터 INT BRV 보너스 계산"""
@@ -150,7 +170,7 @@ class BraveManager:
             target_defense = getattr(target, 'p_def', 10)  # 기본값
         
         brave_damage = GameBalance.calculate_brave_damage(
-            base_attack, target_defense, skill.brave_multiplier
+            base_attack, target_defense, skill.brave_multiplier, attacker
         )
         
         # 요리 효과 적용 (BRV 게인 보너스)
@@ -195,8 +215,15 @@ class BraveManager:
         is_break = getattr(target, 'is_broken', False)
         
         hp_damage = GameBalance.calculate_hp_damage(
-            brave_points, skill.hp_multiplier, is_break
+            brave_points, skill.hp_multiplier, is_break, attacker  # attacker 추가
         )
+        
+        # 희생 위력 보너스 적용
+        sacrifice_bonus = getattr(attacker, 'temp_sacrifice_power', 0)
+        if sacrifice_bonus > 0:
+            hp_damage += sacrifice_bonus
+            # 희생 위력 보너스 사용 후 제거
+            attacker.temp_sacrifice_power = 0
         
         # 요리 효과 적용 (BRV 데미지 보너스)
         try:
@@ -301,22 +328,26 @@ class BraveSkillDatabase:
         """캐릭터 클래스별 스킬 반환 (MP 비용 포함) - 대폭 확장"""
         skill_sets = {
             "전사": [
+                # 기본 공격
+                BraveSkill("검 공격", BraveAttackType.BRAVE, 1.0, mp_cost=0, description="[BRV] 기본적인 검 공격"),
                 # 기본 스킬
-                BraveSkill("강타", BraveAttackType.BRAVE, 1.5, mp_cost=5, description="강력한 일격으로 Brave를 크게 증가"),
-                BraveSkill("분노의 일격", BraveAttackType.HP, 0.0, 1.8, mp_cost=12, description="분노로 강화된 HP 공격"),
-                BraveSkill("방어 태세", BraveAttackType.BRAVE, 0.5, mp_cost=8, description="방어력 향상, 피해 감소"),
+                BraveSkill("강타", BraveAttackType.BRAVE, 1.5, mp_cost=5, description="[BRV] 강력한 일격으로 Brave를 크게 증가 (1.5배 데미지, MP 5 소모)"),
+                BraveSkill("분노의 일격", BraveAttackType.HP, 0.0, 1.8, mp_cost=12, description="[HP] 분노로 강화된 HP 공격 (1.8배 데미지, 축적된 BRV로 HP 피해, MP 12 소모)"),
+                BraveSkill("방어 태세", BraveAttackType.BRAVE, 0.5, mp_cost=8, description="[BRV] 방어력 향상, 받는 피해 감소 (0.5배 약한 공격, MP 8 소모)"),
                 
                 # 고급 스킬
-                BraveSkill("연속 공격", BraveAttackType.BRAVE, 0.8, mp_cost=15, description="3번 연속 공격으로 Brave 축적"),
-                BraveSkill("도발", BraveAttackType.BRAVE, 0.3, mp_cost=6, description="적의 공격을 집중시키고 적 Brave 감소"),
-                BraveSkill("광전사의 분노", BraveAttackType.HP, 0.0, 2.5, mp_cost=25, description="체력이 낮을수록 강한 필살기"),
-                BraveSkill("대지 강타", BraveAttackType.BRAVE, 1.2, mp_cost=10, description="땅을 강타해 광역 Brave 피해"),
-                BraveSkill("불굴의 의지", BraveAttackType.BRAVE, 0.0, mp_cost=20, description="Break 상태에서 즉시 회복"),
-                BraveSkill("전사의 외침", BraveAttackType.BRAVE, 0.0, mp_cost=15, description="아군 전체의 공격력 증가"),
-                BraveSkill("무쌍난무", BraveAttackType.HP, 0.0, 3.0, 1, mp_cost=40, description="모든 적을 베는 궁극기")
+                BraveSkill("연속 공격", BraveAttackType.BRAVE, 0.8, mp_cost=15, description="[BRV] 3번 연속 공격으로 Brave 축적 (0.8배×3회, MP 15 소모)"),
+                BraveSkill("도발", BraveAttackType.BRAVE, 0.3, mp_cost=6, description="[BRV] 적의 공격을 집중시키고 적 Brave 감소 (0.3배 약한 공격, MP 6 소모)"),
+                BraveSkill("광전사의 분노", BraveAttackType.HP, 0.0, 2.5, mp_cost=25, description="[HP공격] 현재 HP의 30%를 소모하여 강력한 피해 (2.5배), 희생한 HP만큼 추가 데미지 보너스", hp_sacrifice_rate=0.30),
+                BraveSkill("대지 강타", BraveAttackType.BRAVE, 1.2, mp_cost=10, description="[BRV] 땅을 강타해 광역 Brave 피해 (1.2배 데미지, 광역 공격, MP 10 소모)"),
+                BraveSkill("불굴의 의지", BraveAttackType.BRAVE, 0.0, mp_cost=20, description="[특수] Break 상태에서 즉시 회복 (MP 20 소모)"),
+                BraveSkill("전사의 외침", BraveAttackType.BRAVE, 0.0, mp_cost=15, description="[버프] 아군 전체의 공격력 증가 (MP 15 소모)"),
+                BraveSkill("무쌍난무", BraveAttackType.HP, 0.0, 3.0, 1, mp_cost=40, description="[궁극기] 모든 적을 베는 최강 광역 공격 (3.0배 데미지, 1회 사용, MP 40 소모)")
             ],
             
             "마법사": [
+                # 기본 공격
+                BraveSkill("마법탄", BraveAttackType.BRAVE, 1.0, mp_cost=0, description="[BRV] 기본적인 마법 공격"),
                 # 원소 마법
                 BraveSkill("파이어볼", BraveAttackType.BRAVE, 1.3, mp_cost=8, description="화염구로 마법 Brave 피해"),
                 BraveSkill("아이스 스파이크", BraveAttackType.BRAVE, 1.1, mp_cost=7, description="얼음 가시로 적을 둔화"),
@@ -334,6 +365,8 @@ class BraveSkillDatabase:
             ],
             
             "궁수": [
+                # 기본 공격
+                BraveSkill("사격", BraveAttackType.BRAVE, 1.0, mp_cost=0, description="[BRV] 기본적인 활 사격"),
                 # 기본 사격
                 BraveSkill("정확한 사격", BraveAttackType.BRAVE, 1.4, mp_cost=6, description="정밀한 조준으로 높은 Brave 피해"),
                 BraveSkill("연발사격", BraveAttackType.BRAVE, 0.6, mp_cost=12, description="빠른 연속 화살"),
@@ -350,6 +383,8 @@ class BraveSkillDatabase:
             ],
             
             "도적": [
+                # 기본 공격
+                BraveSkill("단검 공격", BraveAttackType.BRAVE, 1.0, mp_cost=0, description="[BRV] 기본적인 단검 공격"),
                 # 암살 기술
                 BraveSkill("백스탭", BraveAttackType.BRAVE, 1.8, mp_cost=8, description="뒤에서 기습으로 큰 Brave 피해"),
                 BraveSkill("암살", BraveAttackType.HP, 0.0, 2.5, mp_cost=20, description="치명적인 급소 공격"),
@@ -366,6 +401,8 @@ class BraveSkillDatabase:
             ],
             
             "성기사": [
+                # 기본 공격
+                BraveSkill("성검 공격", BraveAttackType.BRAVE, 1.0, mp_cost=0, description="[BRV] 기본적인 성검 공격"),
                 # 성스러운 공격
                 BraveSkill("성스러운 일격", BraveAttackType.BRAVE, 1.3, mp_cost=10, description="신성한 힘이 깃든 공격"),
                 BraveSkill("심판의 빛", BraveAttackType.HP, 0.0, 1.7, mp_cost=20, description="악을 심판하는 성스러운 빛"),
@@ -482,14 +519,32 @@ class BraveMixin:
         return consumed
         
     def recover_int_brv_on_turn_start(self):
-        """턴 시작 시 INT BRV 회복 (BREAK 상태는 유지)"""
-        # BRV가 0일 때 INT BRV로 회복
+        """턴 시작 시 INT BRV 회복 (BREAK 상태는 더 오래 유지)"""
+        # BREAK 상태일 때는 BRV 회복을 지연시킴
+        if hasattr(self, 'is_broken_state') and self.is_broken_state:
+            # BREAK 턴 카운터 증가
+            if not hasattr(self, 'break_turn_count'):
+                self.break_turn_count = 0
+            self.break_turn_count += 1
+            
+            # BREAK 상태를 1턴 동안만 지속 (BREAK된 본인 기준)
+            if self.break_turn_count >= 1:
+                # 1턴 후에 BRV 회복 및 BREAK 해제
+                int_brv = self.brave_manager.get_initial_brave(self)
+                self.brave_points = int_brv
+                self.is_broken_state = False
+                self.break_turn_count = 0
+                print(f"💫 {self.name}의 BREAK 상태가 해제되고 BRV가 회복되었습니다!")
+                return int_brv
+            else:
+                # 아직 BREAK 상태 유지
+                print(f"💀 {self.name}은(는) BREAK 상태입니다! (본인 턴에 해제됨)")
+                return 0
+        
+        # 일반적인 경우: BRV가 0일 때만 회복
         if self.brave_points <= 0:
             int_brv = self.brave_manager.get_initial_brave(self)
             self.brave_points = int_brv
-            # BRV 회복 시에만 BREAK 상태 해제
-            if hasattr(self, 'is_broken_state'):
-                self.is_broken_state = False
             return int_brv
         return 0
         
@@ -503,8 +558,19 @@ class BraveMixin:
         return getattr(self, 'is_broken_state', False)
         
     def apply_break_if_needed(self) -> bool:
-        """BREAK 적용 - BRV가 0이 되었을 때"""
+        """BREAK 적용 - BRV가 0이 되었을 때 (연속 BREAK 방지)"""
+        # 이미 BREAK 상태면 추가 BREAK 방지
+        if hasattr(self, 'is_broken_state') and self.is_broken_state:
+            print(f"🛡️ {self.name}은(는) 이미 BREAK 상태이므로 추가 BREAK를 방지합니다!")
+            return False
+        
         self.is_broken_state = True
+        
+        # BREAK 시 ATB 게이지 초기화
+        if hasattr(self, 'atb_gauge'):
+            self.atb_gauge = 0
+            print(f"💥 {self.name}의 ATB 게이지가 초기화되었습니다!")
+        
         return True
         
     def clear_break_state(self):
@@ -530,3 +596,10 @@ class BraveMixin:
             class_name = getattr(self, 'character_class', '전사')
             self.brave_skills = BraveSkillDatabase.get_character_skills(class_name)
         return self.brave_skills
+    
+    def get_total_speed(self) -> int:
+        """장비 보너스가 포함된 총 속도 (안전한 구현)"""
+        base_speed = getattr(self, 'speed', 20)  # 기본값 20
+        temp_bonus = getattr(self, 'temp_speed_bonus', 0)
+        equipment_bonus = getattr(self, 'equipment_speed_bonus', 0)
+        return base_speed + temp_bonus + equipment_bonus

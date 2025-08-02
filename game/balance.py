@@ -12,9 +12,9 @@ class GameBalance:
     """게임 밸런스 설정"""
     
     # Brave 시스템 밸런스 (전투 속도 개선)
-    BRAVE_DAMAGE_MULTIPLIER = 1.5      # Brave 공격 데미지 배율 (0.8 → 1.5, 빠른 전투)
-    HP_DAMAGE_MULTIPLIER = 0.20        # HP 공격 데미지 배율 (0.12 → 0.20, 스킬 데미지 강화)
-    BREAK_DAMAGE_BONUS = 1.5           # Break 상태 시 HP 데미지 증가율 (2.0 → 1.5)
+    BRAVE_DAMAGE_MULTIPLIER = 1.0      # Brave 공격 데미지 배율 (1.5 → 1.0, 적정 수준)
+    HP_DAMAGE_MULTIPLIER = 0.15        # HP 공격 데미지 배율 (원래대로 복구)
+    BREAK_DAMAGE_BONUS = 1.3           # Break 상태 시 HP 데미지 증가율 (1.5 → 1.3, 더 균형적)
     
     # Brave 수치 범위 제한 (대폭 하향 조정)
     MIN_BRAVE = 0
@@ -32,11 +32,23 @@ class GameBalance:
             "brv_efficiency": 1.0,
             "brv_loss_resistance": 0.9
         },
+        "전사": {
+            "int_brv_base": 450,
+            "max_brv_base": 3200,
+            "brv_efficiency": 1.0,
+            "brv_loss_resistance": 0.95
+        },
         "대마법사": {
             "int_brv_base": 300,           # 낮은 시작값
             "max_brv_base": 3500,          # 높은 최대값
             "brv_efficiency": 1.3,
             "brv_loss_resistance": 0.7
+        },
+        "아크메이지": {
+            "int_brv_base": 280,
+            "max_brv_base": 3600,
+            "brv_efficiency": 1.4,
+            "brv_loss_resistance": 0.6
         },
         "성기사": {
             "int_brv_base": 500,           # 높은 시작값
@@ -49,6 +61,12 @@ class GameBalance:
             "max_brv_base": 3200,
             "brv_efficiency": 1.1,
             "brv_loss_resistance": 0.8
+        },
+        "도적": {
+            "int_brv_base": 370,
+            "max_brv_base": 3100,
+            "brv_efficiency": 1.1,
+            "brv_loss_resistance": 0.85
         },
         "정령술사": {
             "int_brv_base": 320,
@@ -67,6 +85,131 @@ class GameBalance:
             "max_brv_base": 2700,
             "brv_efficiency": 0.9,
             "brv_loss_resistance": 1.1
+        },
+        "무당": {
+            "int_brv_base": 380,
+            "max_brv_base": 3300,
+            "brv_efficiency": 1.2,
+            "brv_loss_resistance": 0.9
+        },
+        "마검사": {
+            "int_brv_base": 420,
+            "max_brv_base": 3400,
+            "brv_efficiency": 1.15,
+            "brv_loss_resistance": 0.85
+        },
+        "시간술사": {
+            "int_brv_base": 300,
+            "max_brv_base": 3700,
+            "brv_efficiency": 1.5,
+            "brv_loss_resistance": 0.7
+        },
+        # 탱커 클래스들
+        "기사": {
+            "int_brv_base": 480,
+            "max_brv_base": 2900,
+            "brv_efficiency": 0.85,
+            "brv_loss_resistance": 1.15
+        },
+        "암흑기사": {
+            "int_brv_base": 460,
+            "max_brv_base": 3100,
+            "brv_efficiency": 1.0,
+            "brv_loss_resistance": 1.0
+        },
+        # 물리 딜러들
+        "검성": {
+            "int_brv_base": 430,
+            "max_brv_base": 3300,
+            "brv_efficiency": 1.1,
+            "brv_loss_resistance": 0.9
+        },
+        "사무라이": {
+            "int_brv_base": 410,
+            "max_brv_base": 3250,
+            "brv_efficiency": 1.2,
+            "brv_loss_resistance": 0.85
+        },
+        "몽크": {
+            "int_brv_base": 450,
+            "max_brv_base": 3150,
+            "brv_efficiency": 1.0,
+            "brv_loss_resistance": 0.95
+        },
+        "검투사": {
+            "int_brv_base": 440,
+            "max_brv_base": 3200,
+            "brv_efficiency": 1.1,
+            "brv_loss_resistance": 0.9
+        },
+        "광전사": {
+            "int_brv_base": 400,
+            "max_brv_base": 3400,
+            "brv_efficiency": 1.3,
+            "brv_loss_resistance": 0.7
+        },
+        "해적": {
+            "int_brv_base": 390,
+            "max_brv_base": 3100,
+            "brv_efficiency": 1.15,
+            "brv_loss_resistance": 0.8
+        },
+        "기계공학자": {
+            "int_brv_base": 360,
+            "max_brv_base": 3300,
+            "brv_efficiency": 1.1,
+            "brv_loss_resistance": 0.85
+        },
+        # 마법사들
+        "네크로맨서": {
+            "int_brv_base": 320,
+            "max_brv_base": 3500,
+            "brv_efficiency": 1.3,
+            "brv_loss_resistance": 0.75
+        },
+        "연금술사": {
+            "int_brv_base": 310,
+            "max_brv_base": 3400,
+            "brv_efficiency": 1.25,
+            "brv_loss_resistance": 0.8
+        },
+        "차원술사": {
+            "int_brv_base": 290,
+            "max_brv_base": 3800,
+            "brv_efficiency": 1.6,
+            "brv_loss_resistance": 0.6
+        },
+        # 서포터들
+        "바드": {
+            "int_brv_base": 370,
+            "max_brv_base": 3000,
+            "brv_efficiency": 0.95,
+            "brv_loss_resistance": 1.0
+        },
+        "드루이드": {
+            "int_brv_base": 400,
+            "max_brv_base": 3200,
+            "brv_efficiency": 1.1,
+            "brv_loss_resistance": 1.05
+        },
+        "신관": {
+            "int_brv_base": 420,
+            "max_brv_base": 2800,
+            "brv_efficiency": 0.9,
+            "brv_loss_resistance": 1.2
+        },
+        # 특수 클래스들
+        "용기사": {
+            "int_brv_base": 450,
+            "max_brv_base": 3500,
+            "brv_efficiency": 1.2,
+            "brv_loss_resistance": 0.9
+        },
+        "철학자": {
+            "int_brv_base": 350,
+            "max_brv_base": 3600,
+            "brv_efficiency": 1.4,
+            "brv_loss_resistance": 0.8
         }
     }
     
@@ -264,35 +407,53 @@ class GameBalance:
     
     @staticmethod
     def calculate_brave_damage(attacker_atk: int, defender_def: int, 
-                             skill_multiplier: float = 1.0) -> int:
-        """밸런스 조정된 Brave 데미지 계산"""
+                             skill_multiplier: float = 1.0, attacker=None) -> int:
+        """밸런스 조정된 Brave 데미지 계산 - 플레이어/적 구분하여 조정"""
         try:
             attacker_atk = max(1, int(attacker_atk))
             defender_def = max(1, int(defender_def))
-            skill_multiplier = max(0.1, min(skill_multiplier, 3.0))  # 배율 제한
+            skill_multiplier = max(0.1, min(skill_multiplier, 100000.0))
             
-            # 빠른 전투를 위한 개선된 데미지 공식
-            base_damage = (attacker_atk / defender_def) * 80  # 기본 배율 증가 (40 → 80)
+            # 🎯 플레이어와 적의 기본 배율 차별화 (아군 BRV 피해량 0.33배로 조정)
+            if attacker and hasattr(attacker, 'character_class') and attacker.character_class != "Enemy":
+                # 플레이어 → 적: 기본 배율 100 (300 × 0.33 = 99 ≈ 100)
+                base_multiplier = 100
+            else:
+                # 적 → 플레이어: 높은 배율 1200 유지 (위협적이어야 함)
+                base_multiplier = 1200
+            
+            base_damage = (attacker_atk / defender_def) * base_multiplier
             final_damage = base_damage * skill_multiplier * GameBalance.BRAVE_DAMAGE_MULTIPLIER
             
-            # 더 높은 데미지 범위로 조정
-            return max(25, min(int(final_damage), 400))  # 25-400 범위 (15-200 → 25-400)
+            # 적의 BRV 피해량에 75% 적용
+            if attacker and hasattr(attacker, 'character_class') and attacker.character_class == "Enemy":
+                final_damage *= 0.75
+            
+            # 적정 데미지 범위로 조정
+            return max(1, min(int(final_damage), 99999))  # 1-99999 범위로 감소
             
         except Exception as e:
             logger.error(f"Error calculating brave damage: {e}")
-            return 50  # 안전한 기본값
+            return 1  # 기본값을 1로 설정
     
     @staticmethod
     def calculate_hp_damage(brave_points: int, skill_multiplier: float = 1.0,
-                          is_break: bool = False) -> int:
+                          is_break: bool = False, attacker=None) -> int:
         """밸런스 조정된 HP 데미지 계산 - Opera Omnia 방식"""
         try:
             brave_points = max(0, int(brave_points))
             skill_multiplier = max(0.1, min(skill_multiplier, 5.0))  # 배율 제한 (버그 방지용)
             
-            # Opera Omnia 스타일이지만 밸런스 조정: BRV의 10%를 HP 데미지로
-            hp_damage_ratio = 0.1  # BRV 대비 HP 데미지 비율 (10%)
-            base_damage = brave_points * skill_multiplier * hp_damage_ratio
+            # 🎯 플레이어와 적의 HP 공격 차별화 (8배 증가)
+            if attacker and hasattr(attacker, 'character_class') and attacker.character_class != "Enemy":
+                # 플레이어 → 적: BRV의 4%를 HP 데미지로 (6% × 8배 = 48%)
+                hp_damage_ratio = 0.5
+            else:
+                # 적 → 플레이어: BRV의 10%를 HP 데미지로 (2% × 8배 = 16%)
+                hp_damage_ratio = 0.08
+            
+            # HP_DAMAGE_MULTIPLIER 적용
+            base_damage = brave_points * skill_multiplier * hp_damage_ratio * GameBalance.HP_DAMAGE_MULTIPLIER
             
             if is_break:
                 base_damage *= GameBalance.BREAK_DAMAGE_BONUS

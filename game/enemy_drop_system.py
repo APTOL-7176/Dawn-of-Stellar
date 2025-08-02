@@ -252,19 +252,23 @@ class EnemyDropSystem:
             if not member.is_alive:
                 continue
                 
-            # 골드 관련 특성
-            if hasattr(member, 'traits'):
-                for trait in member.traits:
-                    if hasattr(trait, 'effects'):
-                        if 'treasure_hunter' in trait.effects:
-                            gold_bonus += trait.effects['treasure_hunter']
-                        if 'lucky_strike' in trait.effects:
-                            # 크리티컬 시 골드 보너스 (여기서는 일반 보너스로 적용)
-                            gold_bonus += trait.effects['lucky_strike'] * 0.5
-                        if 'pirate_exp' in trait.effects:
-                            exp_bonus += trait.effects['pirate_exp']
-                        if 'enlightenment' in trait.effects:
-                            exp_bonus += trait.effects['enlightenment']
+            # 골드 관련 특성 - 방어 코드 추가
+            try:
+                if hasattr(member, 'traits') and member.traits:
+                    for trait in member.traits:
+                        if hasattr(trait, 'effects') and trait.effects:
+                            if 'treasure_hunter' in trait.effects:
+                                gold_bonus += trait.effects['treasure_hunter']
+                            if 'lucky_strike' in trait.effects:
+                                # 크리티컬 시 골드 보너스 (여기서는 일반 보너스로 적용)
+                                gold_bonus += trait.effects['lucky_strike'] * 0.5
+                            if 'pirate_exp' in trait.effects:
+                                exp_bonus += trait.effects['pirate_exp']
+                            if 'enlightenment' in trait.effects:
+                                exp_bonus += trait.effects['enlightenment']
+            except Exception as e:
+                # 특성 처리 중 오류 발생 시 무시하고 계속
+                continue
         
         # 보너스 적용
         drops['gold'] = int(drops['gold'] * (1.0 + gold_bonus))

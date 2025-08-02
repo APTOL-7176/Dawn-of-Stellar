@@ -1,0 +1,132 @@
+{
+  "session_info": {
+    "start_time": "2025-08-02T14:36:18.822014",
+    "session_id": "20250802_143618"
+  },
+  "battles": [
+    {
+      "battle_id": 1,
+      "start_time": "2025-08-02T14:36:19.228226",
+      "party": [
+        {
+          "name": "칼렙",
+          "level": 1,
+          "hp": 80,
+          "max_hp": 80,
+          "brv": 1663,
+          "max_brv": 1989,
+          "attack": 38,
+          "defense": 54,
+          "magic_attack": 76,
+          "magic_defense": 86,
+          "speed": 49,
+          "character_class": "철학자"
+        },
+        {
+          "name": "오웬",
+          "level": 1,
+          "hp": 408,
+          "max_hp": 408,
+          "brv": 1103,
+          "max_brv": 3467,
+          "attack": 97,
+          "defense": 22,
+          "magic_attack": 13,
+          "magic_defense": 21,
+          "speed": 74,
+          "character_class": "광전사"
+        },
+        {
+          "name": "이사벨라",
+          "level": 1,
+          "hp": 167,
+          "max_hp": 167,
+          "brv": 1343,
+          "max_brv": 3041,
+          "attack": 74,
+          "defense": 58,
+          "magic_attack": 45,
+          "magic_defense": 53,
+          "speed": 67,
+          "character_class": "사무라이"
+        },
+        {
+          "name": "잭",
+          "level": 1,
+          "hp": 90,
+          "max_hp": 90,
+          "brv": 1751,
+          "max_brv": 2183,
+          "attack": 49,
+          "defense": 42,
+          "magic_attack": 85,
+          "magic_defense": 69,
+          "speed": 59,
+          "character_class": "정령술사"
+        }
+      ],
+      "enemies": [
+        {
+          "name": "쥐",
+          "level": 1,
+          "hp": 140,
+          "max_hp": 140,
+          "brv": 528,
+          "max_brv": 924,
+          "attack": 39,
+          "defense": 24,
+          "magic_attack": 18,
+          "magic_defense": 15,
+          "speed": 50,
+          "character_class": "Enemy"
+        }
+      ],
+      "turns": [],
+      "damage_log": [
+        {
+          "timestamp": "2025-08-02T14:36:51.982833",
+          "damage_type": "BRV",
+          "attacker": "오웬",
+          "target": "쥐",
+          "base_damage": 202,
+          "final_damage": 7294,
+          "calculation_details": {
+            "공격자_물리공격력": 97,
+            "대상_물리방어력": 24,
+            "기본_BRV_데미지": 202,
+            "스킬_배율": "120%",
+            "스킬_배율_적용후": 242,
+            "기본_스킬_배율_1.5x": 363,
+            "플레이어_보너스_18.75x": 6806,
+            "랜덤_배율": "1.072",
+            "랜덤_적용후": 7294
+          }
+        },
+        {
+          "timestamp": "2025-08-02T14:36:51.984833",
+          "damage_type": "HP",
+          "attacker": "오웬",
+          "target": "쥐",
+          "base_damage": 1103,
+          "final_damage": 165,
+          "calculation_details": {
+            "공격자_BRV_포인트": 1103,
+            "HP_스킬_배율": "100%",
+            "기본_계산": "1103 × 100% × 0.10 = 110",
+            "플레이어_배율_1.0x": 110,
+            "Break_보너스_1.5x": 165
+          }
+        }
+      ],
+      "end_time": "2025-08-02T14:36:51.984833",
+      "winner": "플레이어",
+      "duration_seconds": 32.75660705566406
+    }
+  ],
+  "damage_stats": {
+    "total_player_damage": 7459,
+    "total_enemy_damage": 0,
+    "total_healing": 0,
+    "damage_breakdown": {}
+  }
+}

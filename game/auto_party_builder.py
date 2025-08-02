@@ -347,7 +347,7 @@ class AutoPartyBuilder:
             "신관": {"hp": 143, "physical_attack": 42, "magic_attack": 79, "physical_defense": 57, "magic_defense": 89, "speed": 52},
             "마검사": {"hp": 164, "physical_attack": 67, "magic_attack": 70, "physical_defense": 54, "magic_defense": 61, "speed": 58},
             "차원술사": {"hp": 84, "physical_attack": 33, "magic_attack": 88, "physical_defense": 28, "magic_defense": 72, "speed": 47},
-            "광전사": {"hp": 327, "physical_attack": 97, "magic_attack": 13, "physical_defense": 22, "magic_defense": 21, "speed": 74}
+            "광전사": {"hp": 327, "physical_attack": 64, "magic_attack": 13, "physical_defense": 22, "magic_defense": 21, "speed": 74}
         }
         
         return fixed_stats.get(class_name, {

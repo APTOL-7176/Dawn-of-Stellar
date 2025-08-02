@@ -39,6 +39,14 @@ class GameSettings:
                 "music_enabled": True,
                 "volume": 50
             },
+            "atb": {
+                "animation_enabled": True,
+                "animation_fps": 20,
+                "update_speed": 1.0,
+                "show_percentage": True,
+                "smooth_animation": True,
+                "frame_delay": 0.05
+            },
             "debug": {
                 "debug_mode": False,
                 "show_enemy_hp": False,
@@ -81,6 +89,10 @@ class GameSettings:
     def get(self, category: str, key: str, default=None):
         """설정값 가져오기"""
         return self.settings.get(category, {}).get(key, default)
+    
+    def get_section(self, category: str):
+        """설정 섹션 전체 가져오기"""
+        return self.settings.get(category, {})
     
     def set(self, category: str, key: str, value: Any):
         """설정값 변경"""
@@ -133,6 +145,7 @@ class GameSettings:
                     f"💾 자동 저장: {'✅' if self.get('gameplay', 'auto_save') else '❌'}",
                     f"⚡ 난이도: {self.get('gameplay', 'difficulty')}",
                     f"🚀 빠른 전투: {'✅' if self.get('gameplay', 'fast_combat') else '❌'}",
+                    f"⏳ ATB 시스템 설정",
                     f"🔊 오디오 설정",
                     "🤔 튜토리얼 초기화",
                     "❌ 돌아가기"
@@ -148,6 +161,7 @@ class GameSettings:
                     "자동 저장 기능을 켜거나 끕니다",
                     "게임 난이도를 조정합니다 (쉬움/보통/어려움)",
                     "전투 애니메이션을 빠르게 합니다",
+                    "ATB 게이지 애니메이션과 속도를 설정합니다",
                     "사운드와 음악 설정을 변경합니다",
                     "모든 튜토리얼 진행도를 초기화합니다",
                     "설정 메뉴를 나갑니다"
@@ -156,7 +170,7 @@ class GameSettings:
                 menu = create_simple_menu("⚙️ 게임 설정", options, descriptions)
                 result = menu.run()
                 
-                if result == -1 or result == 11:  # 돌아가기
+                if result == -1 or result == 12:  # 돌아가기
                     break
                 elif result == 0:  # 튜토리얼 완료 상태
                     self.toggle_setting("tutorial", "tutorial_completed")
@@ -170,10 +184,10 @@ class GameSettings:
                     self.toggle_setting("tutorial", "show_advanced_tips")
                     print("✅ 설정이 변경되었습니다.")
                     self._wait_for_key()
-                elif result == 3:  # 화면 설정
-                    self._show_display_settings()
-                elif result == 4:  # 오디오 설정
-                    self._show_audio_settings()
+                elif result == 3:  # 화면 너비
+                    self._change_screen_width()
+                elif result == 4:  # 맵 크기
+                    self._change_map_size()
                 elif result == 5:  # 색상 활성화
                     self.toggle_setting("display", "color_enabled")
                     print("✅ 설정이 변경되었습니다.")
@@ -188,10 +202,12 @@ class GameSettings:
                     self.toggle_setting("gameplay", "fast_combat")
                     print("✅ 설정이 변경되었습니다.")
                     self._wait_for_key()
-                elif result == 9:  # 튜토리얼 초기화
+                elif result == 9:  # ATB 시스템 설정
+                    self._show_atb_settings()
+                elif result == 10:  # 오디오 설정
+                    self._show_audio_settings()
+                elif result == 11:  # 튜토리얼 초기화
                     self._reset_tutorials()
-                elif result == 10:  # 돌아가기
-                    break
                     
         except ImportError:
             # 폴백: 기존 텍스트 메뉴
@@ -351,6 +367,306 @@ class GameSettings:
             print("✅ 튜토리얼이 초기화되었습니다.")
             self._wait_for_key()
     
+    def _show_atb_settings(self):
+        """ATB 시스템 설정"""
+        try:
+            from .cursor_menu_system import create_simple_menu
+            
+            while True:
+                # 현재 ATB 설정 상태로 옵션 텍스트 생성
+                options = [
+                    f"🎬 ATB 애니메이션: {'✅' if self.get('atb', 'animation_enabled') else '❌'}",
+                    f"🎯 애니메이션 FPS: {self.get('atb', 'animation_fps', 20)}",
+                    f"⚡ ATB 업데이트 속도: {self.get('atb', 'update_speed', 1.0)}x",
+                    f"📊 퍼센트 표시: {'✅' if self.get('atb', 'show_percentage') else '❌'}",
+                    f"🌊 부드러운 애니메이션: {'✅' if self.get('atb', 'smooth_animation') else '❌'}",
+                    "🔄 ATB 설정 초기화",
+                    "❌ 돌아가기"
+                ]
+                
+                descriptions = [
+                    "ATB 게이지 애니메이션을 켜거나 끕니다",
+                    "ATB 애니메이션의 프레임 속도를 조정합니다",
+                    "ATB 게이지 증가 속도를 조정합니다",
+                    "ATB 게이지에 퍼센트를 표시합니다",
+                    "ATB 게이지 변화를 부드럽게 합니다",
+                    "모든 ATB 설정을 기본값으로 되돌립니다",
+                    "ATB 설정 메뉴를 나갑니다"
+                ]
+                
+                menu = create_simple_menu("⏳ ATB 시스템 설정", options, descriptions)
+                result = menu.run()
+                
+                if result == -1 or result == 6:  # 돌아가기
+                    break
+                elif result == 0:  # ATB 애니메이션 토글
+                    self.toggle_setting("atb", "animation_enabled")
+                    print("✅ ATB 애니메이션 설정이 변경되었습니다.")
+                    self._wait_for_key()
+                elif result == 1:  # FPS 변경
+                    self._change_atb_fps()
+                elif result == 2:  # 업데이트 속도 변경
+                    self._change_atb_speed()
+                elif result == 3:  # 퍼센트 표시 토글
+                    self.toggle_setting("atb", "show_percentage")
+                    print("✅ 퍼센트 표시 설정이 변경되었습니다.")
+                    self._wait_for_key()
+                elif result == 4:  # 부드러운 애니메이션 토글
+                    self.toggle_setting("atb", "smooth_animation")
+                    print("✅ 부드러운 애니메이션 설정이 변경되었습니다.")
+                    self._wait_for_key()
+                elif result == 5:  # ATB 설정 초기화
+                    self._reset_atb_settings()
+                    
+        except ImportError:
+            # 폴백: 텍스트 메뉴
+            while True:
+                print("\n" + "="*60)
+                print("⏳ ATB 시스템 설정")
+                print("="*60)
+                print(f"1. ATB 애니메이션: {'✅' if self.get('atb', 'animation_enabled') else '❌'}")
+                print(f"2. 애니메이션 FPS: {self.get('atb', 'animation_fps', 20)}")
+                print(f"3. ATB 업데이트 속도: {self.get('atb', 'update_speed', 1.0)}x")
+                print(f"4. 퍼센트 표시: {'✅' if self.get('atb', 'show_percentage') else '❌'}")
+                print(f"5. 부드러운 애니메이션: {'✅' if self.get('atb', 'smooth_animation') else '❌'}")
+                print("r. ATB 설정 초기화")
+                print("0. 돌아가기")
+                
+                choice = input("선택: ").strip()
+                
+                if choice == '1':
+                    self.toggle_setting("atb", "animation_enabled")
+                    print("✅ 설정이 변경되었습니다.")
+                elif choice == '2':
+                    self._change_atb_fps()
+                elif choice == '3':
+                    self._change_atb_speed()
+                elif choice == '4':
+                    self.toggle_setting("atb", "show_percentage")
+                    print("✅ 설정이 변경되었습니다.")
+                elif choice == '5':
+                    self.toggle_setting("atb", "smooth_animation")
+                    print("✅ 설정이 변경되었습니다.")
+                elif choice == 'r':
+                    self._reset_atb_settings()
+                elif choice == '0':
+                    break
+                else:
+                    print("❌ 유효하지 않은 선택입니다.")
+
+    def _change_atb_fps(self):
+        """ATB 애니메이션 FPS 변경"""
+        try:
+            from .cursor_menu_system import create_simple_menu
+            
+            fps_options = ["10 FPS", "15 FPS", "20 FPS (기본)", "30 FPS", "60 FPS", "❌ 취소"]
+            fps_descriptions = [
+                "낮은 FPS - 부드럽지 않지만 성능 절약",
+                "보통 FPS - 적당한 성능과 품질",
+                "기본 FPS - 권장 설정",
+                "높은 FPS - 부드럽지만 더 많은 자원 사용",
+                "최고 FPS - 매우 부드럽지만 높은 자원 사용",
+                "FPS 변경을 취소합니다"
+            ]
+            
+            menu = create_simple_menu("ATB 애니메이션 FPS 선택", fps_options, fps_descriptions)
+            result = menu.run()
+            
+            fps_values = [10, 15, 20, 30, 60]
+            if result != -1 and result < len(fps_values):
+                self.set("atb", "animation_fps", fps_values[result])
+                # frame_delay도 자동으로 조정
+                frame_delay = 1.0 / fps_values[result]
+                self.set("atb", "frame_delay", frame_delay)
+                print(f"✅ ATB 애니메이션 FPS가 {fps_values[result]}로 변경되었습니다.")
+                self._wait_for_key()
+        except ImportError:
+            # 폴백
+            print("FPS 선택: 1) 10 FPS  2) 15 FPS  3) 20 FPS  4) 30 FPS  5) 60 FPS")
+            choice = input("선택 (1-5): ").strip()
+            fps_values = [10, 15, 20, 30, 60]
+            try:
+                idx = int(choice) - 1
+                if 0 <= idx < len(fps_values):
+                    self.set("atb", "animation_fps", fps_values[idx])
+                    frame_delay = 1.0 / fps_values[idx]
+                    self.set("atb", "frame_delay", frame_delay)
+                    print(f"✅ FPS가 {fps_values[idx]}로 변경되었습니다.")
+                else:
+                    print("❌ 유효하지 않은 선택입니다.")
+            except ValueError:
+                print("❌ 숫자를 입력해주세요.")
+
+    def _change_atb_speed(self):
+        """ATB 업데이트 속도 변경"""
+        try:
+            from .cursor_menu_system import create_simple_menu
+            
+            speed_options = [
+                "0.5x (매우 느림)", "0.75x (느림)", "1.0x (기본)", 
+                "1.25x (조금 빠름)", "1.5x (빠름)", "2.0x (매우 빠름)", "3.0x (극한)", "❌ 취소"
+            ]
+            speed_descriptions = [
+                "ATB가 매우 천천히 증가합니다",
+                "ATB가 천천히 증가합니다", 
+                "기본 ATB 증가 속도입니다",
+                "ATB가 조금 빠르게 증가합니다",
+                "ATB가 빠르게 증가합니다",
+                "ATB가 매우 빠르게 증가합니다",
+                "ATB가 극한으로 빠르게 증가합니다",
+                "속도 변경을 취소합니다"
+            ]
+            
+            menu = create_simple_menu("ATB 업데이트 속도 선택", speed_options, speed_descriptions)
+            result = menu.run()
+            
+            speed_values = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0]
+            if result != -1 and result < len(speed_values):
+                self.set("atb", "update_speed", speed_values[result])
+                print(f"✅ ATB 업데이트 속도가 {speed_values[result]}x로 변경되었습니다.")
+                self._wait_for_key()
+        except ImportError:
+            # 폴백
+            print("속도 선택: 1) 0.5x  2) 0.75x  3) 1.0x  4) 1.25x  5) 1.5x  6) 2.0x  7) 3.0x")
+            choice = input("선택 (1-7): ").strip()
+            speed_values = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0]
+            try:
+                idx = int(choice) - 1
+                if 0 <= idx < len(speed_values):
+                    self.set("atb", "update_speed", speed_values[idx])
+                    print(f"✅ 속도가 {speed_values[idx]}x로 변경되었습니다.")
+                else:
+                    print("❌ 유효하지 않은 선택입니다.")
+            except ValueError:
+                print("❌ 숫자를 입력해주세요.")
+
+    def _reset_atb_settings(self):
+        """ATB 설정 초기화"""
+        try:
+            from .cursor_menu_system import create_yes_no_menu
+            
+            confirm_menu = create_yes_no_menu("ATB 설정을 초기화하시겠습니까?")
+            confirm_result = confirm_menu.run()
+            
+            if confirm_result == 0:  # 예
+                # 기본 ATB 설정으로 초기화
+                self.set("atb", "animation_enabled", True)
+                self.set("atb", "animation_fps", 20)
+                self.set("atb", "update_speed", 1.0)
+                self.set("atb", "show_percentage", True)
+                self.set("atb", "smooth_animation", True)
+                self.set("atb", "frame_delay", 0.05)
+                print("✅ ATB 설정이 초기화되었습니다.")
+                self._wait_for_key()
+        except ImportError:
+            # 폴백
+            confirm = input("ATB 설정을 초기화하시겠습니까? (y/n): ").strip().lower()
+            if confirm == 'y':
+                self.set("atb", "animation_enabled", True)
+                self.set("atb", "animation_fps", 20)
+                self.set("atb", "update_speed", 1.0)
+                self.set("atb", "show_percentage", True)
+                self.set("atb", "smooth_animation", True)
+                self.set("atb", "frame_delay", 0.05)
+                print("✅ ATB 설정이 초기화되었습니다.")
+
+    def _show_audio_settings(self):
+        """오디오 설정"""
+        try:
+            from .cursor_menu_system import create_simple_menu
+            
+            while True:
+                # 현재 오디오 설정 상태로 옵션 텍스트 생성
+                options = [
+                    f"🔊 사운드 효과: {'✅' if self.get('audio', 'sound_enabled') else '❌'}",
+                    f"🎵 배경음악: {'✅' if self.get('audio', 'music_enabled') else '❌'}",
+                    f"🔉 볼륨: {self.get('audio', 'volume', 50)}%",
+                    "❌ 돌아가기"
+                ]
+                
+                descriptions = [
+                    "게임 사운드 효과를 켜거나 끕니다",
+                    "배경음악을 켜거나 끕니다",
+                    "전체 볼륨을 조정합니다 (0-100%)",
+                    "오디오 설정 메뉴를 나갑니다"
+                ]
+                
+                menu = create_simple_menu("🔊 오디오 설정", options, descriptions)
+                result = menu.run()
+                
+                if result == -1 or result == 3:  # 돌아가기
+                    break
+                elif result == 0:  # 사운드 효과 토글
+                    self.toggle_setting("audio", "sound_enabled")
+                    print("✅ 사운드 효과 설정이 변경되었습니다.")
+                    self._wait_for_key()
+                elif result == 1:  # 배경음악 토글
+                    self.toggle_setting("audio", "music_enabled")
+                    print("✅ 배경음악 설정이 변경되었습니다.")
+                    self._wait_for_key()
+                elif result == 2:  # 볼륨 조정
+                    self._change_volume()
+                    
+        except ImportError:
+            # 폴백: 텍스트 메뉴
+            while True:
+                print("\n" + "="*60)
+                print("🔊 오디오 설정")
+                print("="*60)
+                print(f"1. 사운드 효과: {'✅' if self.get('audio', 'sound_enabled') else '❌'}")
+                print(f"2. 배경음악: {'✅' if self.get('audio', 'music_enabled') else '❌'}")
+                print(f"3. 볼륨: {self.get('audio', 'volume', 50)}%")
+                print("0. 돌아가기")
+                
+                choice = input("선택: ").strip()
+                
+                if choice == '1':
+                    self.toggle_setting("audio", "sound_enabled")
+                    print("✅ 설정이 변경되었습니다.")
+                elif choice == '2':
+                    self.toggle_setting("audio", "music_enabled")
+                    print("✅ 설정이 변경되었습니다.")
+                elif choice == '3':
+                    self._change_volume()
+                elif choice == '0':
+                    break
+                else:
+                    print("❌ 유효하지 않은 선택입니다.")
+
+    def _change_volume(self):
+        """볼륨 변경"""
+        try:
+            from .input_utils import KeyboardInput
+            keyboard = KeyboardInput()
+            
+            print("새 볼륨 (0-100): ", end='', flush=True)
+            volume_str = keyboard.get_string_input()
+            
+            if volume_str:
+                volume = int(volume_str)
+                if 0 <= volume <= 100:
+                    self.set("audio", "volume", volume)
+                    print("✅ 볼륨이 변경되었습니다.")
+                    keyboard.wait_for_key("아무 키나 눌러 계속...")
+                else:
+                    print("❌ 유효한 범위가 아닙니다.")
+                    keyboard.wait_for_key("아무 키나 눌러 계속...")
+            else:
+                print("❌ 입력이 취소되었습니다.")
+                keyboard.wait_for_key("아무 키나 눌러 계속...")
+        except ValueError:
+            print("❌ 숫자를 입력해주세요.")
+            try:
+                keyboard.wait_for_key("아무 키나 눌러 계속...")
+            except:
+                pass
+        except Exception as e:
+            print(f"❌ 오류 발생: {e}")
+            try:
+                keyboard.wait_for_key("아무 키나 눌러 계속...")
+            except:
+                pass
+
     def _wait_for_key(self):
         """키 입력 대기"""
         try:
@@ -456,6 +772,177 @@ class GameSettings:
                 if confirm == 'y':
                     self.reset_tutorial()
                     print("✅ 튜토리얼이 초기화되었습니다.")
+            elif choice == '0':
+                break
+            else:
+                print("❌ 유효하지 않은 선택입니다.")
+    
+    def _show_atb_settings(self):
+        """ATB 시스템 설정 메뉴"""
+        try:
+            from .cursor_menu_system import create_simple_menu
+            
+            while True:
+                atb_settings = self.get_section("atb")
+                
+                options = [
+                    f"🎬 애니메이션 활성화: {'✅' if atb_settings.get('animation_enabled', True) else '❌'}",
+                    f"⚡ 애니메이션 FPS: {atb_settings.get('animation_fps', 20)}",
+                    f"🚀 업데이트 속도: {atb_settings.get('update_speed', 1.0):.1f}x",
+                    f"📊 퍼센트 표시: {'✅' if atb_settings.get('show_percentage', True) else '❌'}",
+                    f"🌊 부드러운 애니메이션: {'✅' if atb_settings.get('smooth_animation', True) else '❌'}",
+                    "🔄 기본값으로 초기화",
+                    "❌ 돌아가기"
+                ]
+                
+                descriptions = [
+                    "ATB 게이지 애니메이션을 활성화/비활성화합니다",
+                    "ATB 애니메이션의 초당 프레임 수를 설정합니다 (10-60)",
+                    "ATB 게이지 증가 속도를 조정합니다 (0.5x-3.0x)",
+                    "ATB 게이지에 퍼센트 숫자를 표시할지 설정합니다",
+                    "ATB 게이지 변화를 부드럽게 애니메이션으로 표시합니다",
+                    "모든 ATB 설정을 기본값으로 재설정합니다",
+                    "이전 메뉴로 돌아갑니다"
+                ]
+                
+                menu = create_simple_menu("⏳ ATB 시스템 설정", options, descriptions)
+                result = menu.run()
+                
+                if result == -1 or result == 6:  # 돌아가기
+                    break
+                elif result == 0:  # 애니메이션 활성화
+                    self.toggle_setting("atb", "animation_enabled")
+                    print("✅ ATB 애니메이션 설정이 변경되었습니다.")
+                    self._wait_for_key()
+                elif result == 1:  # 애니메이션 FPS
+                    self._change_atb_fps()
+                elif result == 2:  # 업데이트 속도
+                    self._change_atb_speed()
+                elif result == 3:  # 퍼센트 표시
+                    self.toggle_setting("atb", "show_percentage")
+                    print("✅ ATB 퍼센트 표시 설정이 변경되었습니다.")
+                    self._wait_for_key()
+                elif result == 4:  # 부드러운 애니메이션
+                    self.toggle_setting("atb", "smooth_animation")
+                    print("✅ ATB 부드러운 애니메이션 설정이 변경되었습니다.")
+                    self._wait_for_key()
+                elif result == 5:  # 기본값으로 초기화
+                    self._reset_atb_settings()
+                    
+        except ImportError:
+            # 폴백: 간단한 텍스트 메뉴
+            self._show_atb_settings_fallback()
+    
+    def _change_atb_fps(self):
+        """ATB FPS 설정 변경"""
+        try:
+            from .cursor_menu_system import create_simple_menu
+            
+            fps_options = ["10 FPS (매우 느림)", "15 FPS (느림)", "20 FPS (기본)", "30 FPS (빠름)", "60 FPS (매우 빠름)"]
+            fps_values = [10, 15, 20, 30, 60]
+            
+            menu = create_simple_menu("🎬 ATB 애니메이션 FPS", fps_options, 
+                                    ["매우 느린 애니메이션", "느린 애니메이션", "기본 속도 (권장)", "빠른 애니메이션", "매우 빠른 애니메이션"])
+            result = menu.run()
+            
+            if result is not None and 0 <= result < len(fps_values):
+                new_fps = fps_values[result]
+                self.set("atb", "animation_fps", new_fps)
+                self.set("atb", "frame_delay", 1.0 / new_fps)
+                print(f"✅ ATB FPS가 {new_fps}로 설정되었습니다.")
+                self._wait_for_key()
+                
+        except ImportError:
+            # 폴백
+            print("FPS 설정 (10-60): ", end='', flush=True)
+            try:
+                new_fps = int(input())
+                if 10 <= new_fps <= 60:
+                    self.set("atb", "animation_fps", new_fps)
+                    self.set("atb", "frame_delay", 1.0 / new_fps)
+                    print(f"✅ ATB FPS가 {new_fps}로 설정되었습니다.")
+                else:
+                    print("❌ 10-60 사이의 값을 입력하세요.")
+            except ValueError:
+                print("❌ 올바른 숫자를 입력하세요.")
+    
+    def _change_atb_speed(self):
+        """ATB 속도 설정 변경"""
+        try:
+            from .cursor_menu_system import create_simple_menu
+            
+            speed_options = ["0.5x (매우 느림)", "0.75x (느림)", "1.0x (기본)", "1.25x (조금 빠름)", "1.5x (빠름)", "2.0x (매우 빠름)", "3.0x (초고속)"]
+            speed_values = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0]
+            
+            menu = create_simple_menu("🚀 ATB 업데이트 속도", speed_options,
+                                    ["매우 느린 전투", "느린 전투", "기본 속도", "조금 빠른 전투", "빠른 전투", "매우 빠른 전투", "초고속 전투"])
+            result = menu.run()
+            
+            if result is not None and 0 <= result < len(speed_values):
+                new_speed = speed_values[result]
+                self.set("atb", "update_speed", new_speed)
+                print(f"✅ ATB 속도가 {new_speed}x로 설정되었습니다.")
+                self._wait_for_key()
+                
+        except ImportError:
+            # 폴백
+            print("속도 배율 (0.5-3.0): ", end='', flush=True)
+            try:
+                new_speed = float(input())
+                if 0.5 <= new_speed <= 3.0:
+                    self.set("atb", "update_speed", new_speed)
+                    print(f"✅ ATB 속도가 {new_speed}x로 설정되었습니다.")
+                else:
+                    print("❌ 0.5-3.0 사이의 값을 입력하세요.")
+            except ValueError:
+                print("❌ 올바른 숫자를 입력하세요.")
+    
+    def _reset_atb_settings(self):
+        """ATB 설정 초기화"""
+        default_atb = {
+            "animation_enabled": True,
+            "animation_fps": 20,
+            "update_speed": 1.0,
+            "show_percentage": True,
+            "smooth_animation": True,
+            "frame_delay": 0.05
+        }
+        
+        for key, value in default_atb.items():
+            self.set("atb", key, value)
+        
+        print("✅ ATB 설정이 기본값으로 초기화되었습니다.")
+        self._wait_for_key()
+    
+    def _show_atb_settings_fallback(self):
+        """ATB 설정 폴백 메뉴"""
+        while True:
+            atb_settings = self.get_section("atb")
+            
+            print("\n" + "="*50)
+            print("⏳ ATB 시스템 설정")
+            print("="*50)
+            print(f"1. 애니메이션: {'ON' if atb_settings.get('animation_enabled', True) else 'OFF'}")
+            print(f"2. FPS: {atb_settings.get('animation_fps', 20)}")
+            print(f"3. 속도: {atb_settings.get('update_speed', 1.0):.1f}x")
+            print(f"4. 퍼센트 표시: {'ON' if atb_settings.get('show_percentage', True) else 'OFF'}")
+            print("5. 기본값 초기화")
+            print("0. 돌아가기")
+            
+            choice = input("\n선택하세요: ")
+            
+            if choice == '1':
+                self.toggle_setting("atb", "animation_enabled")
+                print("✅ 설정이 변경되었습니다.")
+            elif choice == '2':
+                self._change_atb_fps()
+            elif choice == '3':
+                self._change_atb_speed()
+            elif choice == '4':
+                self.toggle_setting("atb", "show_percentage")
+                print("✅ 설정이 변경되었습니다.")
+            elif choice == '5':
+                self._reset_atb_settings()
             elif choice == '0':
                 break
             else:

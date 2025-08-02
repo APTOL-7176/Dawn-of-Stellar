@@ -81,12 +81,12 @@ class ASCIIVisualEffects:
     @staticmethod
     def show_heal_numbers(heal: int):
         """회복 수치 표시"""
-        print(f"    💚 +{heal:,} 💚")
+        print(f"    💚 +{heal} 💚")
         
     @staticmethod
     def show_brave_gain(amount: int, total: int):
-        """Brave 획득 표시"""
-        print(f"    ⚡ Brave {amount:,} (총 {total:,}) ⚡")
+        """Brave 획득 표시 - 중복 방지를 위해 비활성화"""
+        pass  # combat_visual.py에서 이미 처리하므로 중복 제거
         
     @staticmethod
     def show_break_effect():

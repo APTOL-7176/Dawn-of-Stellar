@@ -180,7 +180,7 @@ class StableDisplay:
                 
                 # 상처 정보
                 if hasattr(char, 'wounds') and char.wounds > 0:
-                    info2 += f" {Color.RED}상처:{char.wounds}{Color.RESET}"
+                    info2 += f" {Color.RED}🩸 WOUND:{char.wounds}{Color.RESET}"
                 
                 self.safe_print(f"  {info1}")
                 self.safe_print(f"  {info2}")

@@ -172,11 +172,11 @@ class GameDisplay:
                 if hasattr(member, 'wounds') and member.wounds > 0:
                     wound_ratio = member.wounds / member.max_hp if member.max_hp > 0 else 0
                     if wound_ratio >= 0.5:
-                        wounds_info = f" {red('🩸 중상:' + str(member.wounds))}"
+                        wounds_info = f" {red('🩸 WOUND:' + str(member.wounds))}"
                     elif wound_ratio >= 0.3:
-                        wounds_info = f" {yellow('🩹 경상:' + str(member.wounds))}"
+                        wounds_info = f" {yellow('� WOUND:' + str(member.wounds))}"
                     else:
-                        wounds_info = f" {bright_red('상처:' + str(member.wounds))}"
+                        wounds_info = f" {bright_red('🩸 WOUND:' + str(member.wounds))}"
                 
                 # 최종 상태 라인
                 hp_text = f"{hp_emoji}HP:{hp_color(f'{member.current_hp:3}/{member.max_hp:3}')}"
@@ -263,7 +263,7 @@ class GameDisplay:
                 else:
                     mp_display = f"❤️ MP {red(f'{member.current_mp}/{member.max_mp}')}"
                 
-                print(f"    HP: {hp_display} | MP: {mp_display}")
+                print(f"    HP: {hp_display}  |  MP: {mp_display}")
             else:
                 print(f"\n[{bright_yellow(str(i))}] {class_emoji} {red(member.name)} - {red(member.character_class)} {red('💀 사망')}")
             
@@ -452,8 +452,8 @@ class GameDisplay:
             print(f"    상태: {effect_str}")
             
     def format_number(self, number: int) -> str:
-        """숫자 포맷팅 (3자리마다 콤마)"""
-        return f"{number:,}"
+        """숫자 포맷팅 (콤마 없음)"""
+        return f"{number}"
         
     def show_inventory_grid(self, items: List, grid_width: int = 8):
         """인벤토리 그리드 표시"""

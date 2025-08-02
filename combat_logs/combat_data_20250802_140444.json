@@ -1,0 +1,136 @@
+{
+  "session_info": {
+    "start_time": "2025-08-02T14:04:44.811498",
+    "session_id": "20250802_140444"
+  },
+  "battles": [
+    {
+      "battle_id": 1,
+      "start_time": "2025-08-02T14:04:45.217513",
+      "party": [
+        {
+          "name": "데클란",
+          "level": 1,
+          "hp": 175,
+          "max_hp": 175,
+          "brv": 1535,
+          "max_brv": 2071,
+          "attack": 53,
+          "defense": 48,
+          "magic_attack": 81,
+          "magic_defense": 69,
+          "speed": 59,
+          "character_class": "드루이드"
+        },
+        {
+          "name": "루나",
+          "level": 1,
+          "hp": 226,
+          "max_hp": 226,
+          "brv": 1371,
+          "max_brv": 2614,
+          "attack": 67,
+          "defense": 76,
+          "magic_attack": 38,
+          "magic_defense": 62,
+          "speed": 43,
+          "character_class": "성기사"
+        },
+        {
+          "name": "에이스",
+          "level": 1,
+          "hp": 172,
+          "max_hp": 172,
+          "brv": 1365,
+          "max_brv": 2261,
+          "attack": 74,
+          "defense": 52,
+          "magic_attack": 34,
+          "magic_defense": 41,
+          "speed": 77,
+          "character_class": "해적"
+        },
+        {
+          "name": "카터",
+          "level": 1,
+          "hp": 90,
+          "max_hp": 90,
+          "brv": 1751,
+          "max_brv": 2183,
+          "attack": 49,
+          "defense": 42,
+          "magic_attack": 85,
+          "magic_defense": 69,
+          "speed": 59,
+          "character_class": "정령술사"
+        }
+      ],
+      "enemies": [
+        {
+          "name": "오크",
+          "level": 1,
+          "hp": 251,
+          "max_hp": 251,
+          "brv": 792,
+          "max_brv": 1584,
+          "attack": 54,
+          "defense": 38,
+          "magic_attack": 25,
+          "magic_defense": 26,
+          "speed": 25,
+          "character_class": "Enemy"
+        }
+      ],
+      "turns": [],
+      "damage_log": [
+        {
+          "timestamp": "2025-08-02T14:05:01.454902",
+          "damage_type": "BRV",
+          "attacker": "에이스",
+          "target": "오크",
+          "base_damage": 97,
+          "final_damage": 3344,
+          "calculation_details": {
+            "공격자_물리공격력": 74,
+            "대상_물리방어력": 38,
+            "기본_BRV_데미지": 97,
+            "스킬_배율": "115%",
+            "스킬_배율_적용후": 111,
+            "기본_스킬_배율_1.5x": 166,
+            "플레이어_보너스_18.75x": 3112,
+            "랜덤_배율": "1.075",
+            "랜덤_적용후": 3344
+          }
+        },
+        {
+          "timestamp": "2025-08-02T14:06:12.523543",
+          "damage_type": "BRV",
+          "attacker": "데클란",
+          "target": "오크",
+          "base_damage": 69,
+          "final_damage": 1953,
+          "calculation_details": {
+            "공격자_물리공격력": 53,
+            "대상_물리방어력": 38,
+            "기본_BRV_데미지": 69,
+            "스킬_배율": "100%",
+            "스킬_배율_적용후": 69,
+            "기본_스킬_배율_1.5x": 103,
+            "플레이어_보너스_18.75x": 1931,
+            "랜덤_배율": "1.011",
+            "랜덤_적용후": 1953
+          }
+        }
+      ],
+      "end_time": "2025-08-02T14:07:10.797126",
+      "winner": "플레이어",
+      "duration_seconds": 145.57961249351501
+    }
+  ],
+  "damage_stats": {
+    "total_player_damage": 5297,
+    "total_enemy_damage": 0,
+    "total_healing": 0,
+    "damage_breakdown": {}
+  }
+}

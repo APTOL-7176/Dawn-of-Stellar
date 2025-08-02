@@ -436,6 +436,13 @@ class DawnOfStellarGame:
             # 게임 인스턴스 참조 추가 (second_chance 능력을 위해)
             member.game_instance = self
             
+            # 파티 매니저에도 게임 인스턴스 참조 추가 (시야 계산용)
+            if hasattr(self.party_manager, 'set_game_instance'):
+                self.party_manager.set_game_instance(self)
+            else:
+                # 파티 매니저에 게임 인스턴스 참조 직접 설정
+                self.party_manager.game_instance = self
+            
             # 영구 강화 시스템 보너스 적용
             self.permanent_progression.load_from_file()
             
@@ -1248,24 +1255,44 @@ class DawnOfStellarGame:
             
             # 파티 전체에 적용되는 효과들
             if effect_type == "hp_bonus":
+                # effect_value가 딕셔너리인 경우 적절한 값 추출
+                if isinstance(effect_value, dict):
+                    bonus_rate = effect_value.get("hp", 0)
+                else:
+                    bonus_rate = effect_value
+                    
                 for member in self.party_manager.members:
-                    bonus_hp = int(member.max_hp * effect_value)
+                    bonus_hp = int(member.max_hp * bonus_rate)
                     member.max_hp += bonus_hp
                     member.current_hp += bonus_hp
                     
             elif effect_type == "mp_bonus":
+                if isinstance(effect_value, dict):
+                    bonus_rate = effect_value.get("mp", 0)
+                else:
+                    bonus_rate = effect_value
+                    
                 for member in self.party_manager.members:
-                    bonus_mp = int(member.max_mp * effect_value)
+                    bonus_mp = int(member.max_mp * bonus_rate)
                     member.max_mp += bonus_mp
                     member.current_mp += bonus_mp
                     
             elif effect_type == "speed_bonus":
+                if isinstance(effect_value, dict):
+                    bonus_rate = effect_value.get("speed", 0)
+                else:
+                    bonus_rate = effect_value
+                    
                 for member in self.party_manager.members:
-                    member.speed = int(member.speed * (1 + effect_value))
+                    member.speed = int(member.speed * (1 + bonus_rate))
                     
             elif effect_type == "legendary_hero":
                 # 모든 능력치 증가
-                stats_bonus = effect_value.get("all_stats", 0)
+                if isinstance(effect_value, dict):
+                    stats_bonus = effect_value.get("all_stats", 0)
+                else:
+                    stats_bonus = effect_value  # effect_value가 직접 숫자인 경우
+                    
                 for member in self.party_manager.members:
                     member.physical_attack = int(member.physical_attack * (1 + stats_bonus))
                     member.magic_attack = int(member.magic_attack * (1 + stats_bonus))
@@ -1275,7 +1302,11 @@ class DawnOfStellarGame:
                     
             elif effect_type == "elemental_affinity":
                 # 원소 친화력 - 속성 공격력 증가 (멤버의 속성에 따라)
-                damage_bonus = effect_value.get("damage", 0)
+                if isinstance(effect_value, dict):
+                    damage_bonus = effect_value.get("damage", 0)
+                else:
+                    damage_bonus = effect_value  # effect_value가 직접 숫자인 경우
+                    
                 for member in self.party_manager.members:
                     if hasattr(member, 'magic_attack'):
                         member.magic_attack = int(member.magic_attack * (1 + damage_bonus))
@@ -1364,9 +1395,10 @@ class DawnOfStellarGame:
             from game.save_system import SaveManager
             save_manager = SaveManager()
             
-            # 게임 상태 생성
+            # 게임 상태 생성 - party_characters 키 사용
             game_state = {
-                'party': [],
+                'party': [],  # 레거시 호환성
+                'party_characters': [],  # 새로운 표준
                 'party_passive_effects': self.party_passive_effects,
                 'world_state': {},
                 'save_version': '2.0'
@@ -1391,7 +1423,8 @@ class DawnOfStellarGame:
                     'speed': member.speed,
                     'active_traits': [{'name': trait.name, 'description': trait.description} for trait in member.active_traits]
                 }
-                game_state['party'].append(member_data)
+                game_state['party'].append(member_data)  # 레거시
+                game_state['party_characters'].append(member_data)  # 새로운 표준
             
             # 저장 실행
             if save_manager.save_game(game_state):
@@ -1406,58 +1439,109 @@ class DawnOfStellarGame:
         """게임 불러오기 (패시브 효과 포함)"""
         if not SAVE_SYSTEM_AVAILABLE:
             print("💾 저장 시스템을 사용할 수 없습니다.")
+            input("확인하려면 Enter를 누르세요...")
             return False
             
         try:
             from game.save_system import SaveManager
+            
             save_manager = SaveManager()
+            print(f"✅ SaveManager 인스턴스 생성 완료")
+            
             saves = save_manager.get_save_list()
             
             if not saves:
                 print("❌ 저장된 게임이 없습니다.")
+                input("확인하려면 Enter를 누르세요...")
                 return False
             
             # 저장 파일 선택 UI (간단한 버전)
             print("\n📁 저장된 게임 목록:")
+            print("=" * 60)
             for i, save_info in enumerate(saves, 1):
                 print(f"{i}. {save_info['name']} - {save_info['date']}")
+            print("=" * 60)
+            print("불러올 세이브 파일을 선택하세요...")
             
             choice = input("\n불러올 저장 파일 번호: ").strip()
+            
             try:
                 save_index = int(choice) - 1
+                
                 if 0 <= save_index < len(saves):
                     save_name = saves[save_index]['name']
+                    print(f"\n🔄 '{save_name}' 파일을 불러오는 중...")
                     game_state = save_manager.load_game(save_name)
                     
                     if game_state:
-                        self.restore_game_state(game_state)
-                        print("✅ 게임을 성공적으로 불러왔습니다!")
-                        return True
+                        print(f"✅ 세이브 파일 로드 완료!")
+                        
+                        # 게임 상태 복원 및 성공 여부 확인
+                        if self.restore_game_state(game_state):
+                            print("✅ 게임을 성공적으로 불러왔습니다!")
+                            return True
+                        else:
+                            print("❌ 게임 상태 복원에 실패했습니다.")
+                            input("메인 메뉴로 돌아가려면 Enter를 누르세요...")
+                            return False
                     else:
                         print("❌ 게임 불러오기에 실패했습니다.")
+                        input("메인 메뉴로 돌아가려면 Enter를 누르세요...")
                         return False
                 else:
-                    print("❌ 잘못된 번호입니다.")
+                    print(f"❌ 잘못된 번호입니다. 유효범위: 1-{len(saves)}")
+                    input("확인하려면 Enter를 누르세요...")
                     return False
             except ValueError:
-                print("❌ 숫자를 입력해주세요.")
+                print(f"❌ 숫자를 입력해주세요.")
+                input("확인하려면 Enter를 누르세요...")
+                return False
+            except Exception as choice_error:
+                print(f"❌ 선택 처리 중 오류: {choice_error}")
+                import traceback
+                traceback.print_exc()
+                input("확인하려면 Enter를 누르세요...")
                 return False
                 
         except Exception as e:
             print(f"❌ 불러오기 중 오류 발생: {e}")
+            print(f"📋 오류 상세 정보:")
+            print(f"   - 오류 타입: {type(e).__name__}")
+            print(f"   - 오류 메시지: {str(e)}")
+            print(f"   - 발생 위치: load_game 함수")
+            import traceback
+            traceback.print_exc()
+            print("\n오류 진단을 위해 위 정보를 확인하세요...")
+            input("메인 메뉴로 돌아가려면 Enter를 누르세요...")
             return False
     
     def restore_game_state(self, game_state):
         """게임 상태 복원 (패시브 효과 포함)"""
         try:
-            # 파티 복원
+            print("🔄 게임 상태 복원 중...")
+            
+            # 파티 복원 - 올바른 키 이름 사용
             self.party_manager.members.clear()
-            for member_data in game_state.get('party', []):
+            party_data = game_state.get('party_characters', game_state.get('party', []))
+            
+            if not party_data:
+                print("❌ 저장된 파티 정보가 없습니다.")
+                return False
+            
+            restored_count = 0
+            for member_data in party_data:
                 # 캐릭터 재생성 (기본 캐릭터 생성 후 상태 복원)
                 try:
-                    from game.easy_character_creator import EasyCharacterCreator
-                    creator = EasyCharacterCreator()
-                    character = creator._create_single_character(member_data['character_class'], 1)
+                    if EASY_CREATOR_AVAILABLE:
+                        from game.easy_character_creator import EasyCharacterCreator
+                        creator = EasyCharacterCreator()
+                        character = creator._create_single_character(member_data['character_class'], 1)
+                    else:
+                        # 폴백: 기본 캐릭터 생성
+                        from game.character import Character
+                        character = Character(member_data.get('name', '알 수 없음'))
+                        character.character_class = member_data.get('character_class', '전사')
+                    
                     character.name = member_data['name']
                     
                     # 저장된 상태 복원
@@ -1471,25 +1555,58 @@ class DawnOfStellarGame:
                     
                     # 특성 복원
                     character.active_traits = []
-                    for trait_data in member_data.get('active_traits', []):
+                    trait_count = 0
+                    traits_data = member_data.get('active_traits', [])
+                    for trait_data in traits_data:
                         # 특성 객체 재생성 (간단한 버전)
-                        from game.character import Trait
-                        trait = Trait(trait_data['name'], trait_data['description'], "passive", None)
-                        character.active_traits.append(trait)
+                        try:
+                            from game.character import CharacterTrait
+                            trait = CharacterTrait(trait_data['name'], trait_data['description'], "passive", None)
+                            character.active_traits.append(trait)
+                            trait_count += 1
+                        except Exception as trait_error:
+                            print(f"⚠️ 특성 복원 실패: {trait_error}")
+                            continue
                     
                     self.party_manager.add_member(character)
+                    restored_count += 1
+                    print(f"✅ {character.name} 복원 완료")
+                    
                 except Exception as e:
                     print(f"❌ 캐릭터 복원 중 오류: {e}")
                     continue
+            
+            if restored_count == 0:
+                print("❌ 파티 멤버를 복원할 수 없습니다.")
+                return False
             
             # 패시브 효과 복원
             self.party_passive_effects = game_state.get('party_passive_effects', [])
             if self.party_passive_effects:
                 print(f"🌟 파티 패시브 효과 {len(self.party_passive_effects)}개를 복원했습니다.")
-                self.apply_passive_effects_to_party()
+                try:
+                    self.apply_passive_effects_to_party()
+                    print("✅ 패시브 효과 적용 완료")
+                except Exception as passive_error:
+                    print(f"⚠️ 패시브 효과 적용 중 오류: {passive_error}")
+            
+            print(f"✅ 게임 상태 복원 완료 ({restored_count}명의 캐릭터)")
+            for i, member in enumerate(self.party_manager.members, 1):
+                print(f"     {i}. {member.name} (Lv.{member.level}, {member.character_class})")
+            print("\n복원 상세 로그를 확인하세요...")
+            input("게임을 시작하려면 Enter를 누르세요...")
+            return True
             
         except Exception as e:
             print(f"❌ 게임 상태 복원 중 오류: {e}")
+            import traceback
+            traceback.print_exc()
+            print(f"\n게임 상태 복원 실패 상세 정보:")
+            print(f"오류 타입: {type(e).__name__}")
+            print(f"오류 메시지: {str(e)}")
+            print("\n오류 로그를 확인하세요...")
+            input("아무 키나 눌러 계속...")
+            return False
     
     def show_character_selection_legacy_fallback(self):
         """⚠️ 최종 폴백 캐릭터 생성 시스템 (매우 기본적) - 다른 모든 시스템 실패시에만 사용"""
@@ -1882,15 +1999,20 @@ class DawnOfStellarGame:
         else:
             return bright_red(f"{current_hp}/{max_hp}")
         
-    def start_adventure(self):
+    def start_adventure(self, skip_passive_selection=False):
         """모험 시작 - 간단한 게임 시작"""
         print(f"\n{bright_cyan('🌟 모험을 시작합니다!', True)}")
         
-        # 파티 전체 패시브 효과 선택 (게임 시작 직전)
-        print(f"\n{bright_cyan('🌟 파티 패시브 효과 선택')}")
-        print(f"{bright_yellow('파티 전체에 적용되는 패시브 효과를 선택하세요!')}")
-        print(f"{bright_white('💡 팁: 선택된 패시브는 이번 게임에만 적용되며, 세이브파일에 저장됩니다.')}")
-        self.select_party_passive_effects()
+        # 불러오기가 아닌 경우에만 파티 전체 패시브 효과 선택
+        if not skip_passive_selection:
+            print(f"\n{bright_cyan('🌟 파티 패시브 효과 선택')}")
+            print(f"{bright_yellow('파티 전체에 적용되는 패시브 효과를 선택하세요!')}")
+            print(f"{bright_white('💡 팁: 선택된 패시브는 이번 게임에만 적용되며, 세이브파일에 저장됩니다.')}")
+            self.select_party_passive_effects()
+        else:
+            print(f"\n{bright_cyan('📋 저장된 패시브 효과가 적용되었습니다.')}")
+            if self.party_passive_effects:
+                print(f"🌟 활성 패시브: {len(self.party_passive_effects)}개")
         
         # 파티 상태 디버깅
         print(f"\n{bright_yellow('🔍 파티 상태 확인...')}")
@@ -2129,10 +2251,22 @@ class DawnOfStellarGame:
         """게임 불러오기"""
         try:
             if SAVE_SYSTEM_AVAILABLE and self.save_manager:
-                result = save_system_show_load_menu(self.save_manager)
-                if result:
-                    print("✅ 게임을 성공적으로 불러왔습니다!")
-                    return True
+                # 1. 저장 파일 선택
+                save_filename = save_system_show_load_menu(self.save_manager)
+                if save_filename:
+                    # 2. 선택된 파일에서 게임 상태 로드
+                    game_state = self.save_manager.load_game(save_filename)
+                    if game_state:
+                        # 3. 게임 상태 복원
+                        if self.restore_game_state(game_state):
+                            print("✅ 게임을 성공적으로 불러왔습니다!")
+                            return True
+                        else:
+                            print("❌ 게임 상태 복원에 실패했습니다.")
+                            return False
+                    else:
+                        print("❌ 저장 파일을 읽는데 실패했습니다.")
+                        return False
                 else:
                     print("❌ 게임 불러오기가 취소되었습니다.")
                     return False
@@ -2141,6 +2275,8 @@ class DawnOfStellarGame:
                 return False
         except Exception as e:
             print(f"❌ 게임 불러오기 중 오류: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def show_difficulty_menu(self):
@@ -2512,7 +2648,9 @@ class DawnOfStellarGame:
             for i, map_size in enumerate(map_sizes, 1):
                 info = game_config.get_map_size_info(map_size)
                 current = " ✓" if map_size == game_config.current_map_size else ""
-                print(f"{i}. {info['name']} ({info['dimensions'][0]}x{info['dimensions'][1]}){current}")
+                width = info.get('width', 35)
+                height = info.get('height', 35)
+                print(f"{i}. {info['name']} ({width}x{height}){current}")
                 print(f"   {info['description']}")
                 print()
             
@@ -2701,6 +2839,7 @@ class DawnOfStellarGame:
                     f"🔒 포커스 잃을 시 일시정지: {green('켜짐') if game_config.PAUSE_ON_LOST_FOCUS else red('꺼짐')}",
                     f"❓ 종료 시 확인: {green('켜짐') if game_config.CONFIRM_EXIT else red('꺼짐')}",
                     f"🎥 카메라 부드러움: {green('켜짐') if game_config.CAMERA_SMOOTHING else red('꺼짐')}",
+                    f"⏳ ATB 시스템 설정",
                     "⬅️ 돌아가기"
                 ]
                 
@@ -2712,13 +2851,14 @@ class DawnOfStellarGame:
                     "게임 창이 포커스를 잃으면 자동으로 일시정지합니다",
                     "게임 종료 시 확인 대화상자를 표시합니다",
                     "카메라 이동을 부드럽게 만듭니다",
+                    "ATB 게이지 애니메이션과 속도를 설정합니다",
                     "이전 메뉴로 돌아갑니다"
                 ]
                 
                 menu = CursorMenu("🎮 게임플레이 설정", options, descriptions)
                 result = menu.run()
                 
-                if result is None or result == 7:
+                if result is None or result == 8:  # 돌아가기 (인덱스 변경)
                     break
                 elif result == 0:  # 자동 저장
                     game_config.toggle_auto_save()
@@ -2749,9 +2889,158 @@ class DawnOfStellarGame:
                     game_config.save_settings()
                     print(f"✅ 카메라 부드러움이 {'켜짐' if game_config.CAMERA_SMOOTHING else '꺼짐'}으로 설정되었습니다.")
                     input("아무 키나 눌러 계속...")
+                elif result == 7:  # ATB 시스템 설정
+                    self._show_atb_settings_menu()
                     
         except Exception as e:
             print(f"❌ 게임플레이 설정 메뉴 오류: {e}")
+
+    def _show_atb_settings_menu(self):
+        """ATB 시스템 설정 메뉴"""
+        try:
+            from game.cursor_menu_system import CursorMenu
+            from game.settings import game_settings
+            from game.color_text import bright_cyan, green, red, yellow
+            
+            while True:
+                # ATB 설정 현재 상태 가져오기
+                atb_settings = game_settings.get_section("atb")
+                
+                options = [
+                    f"🎬 ATB 애니메이션: {green('켜짐') if atb_settings.get('animation_enabled', True) else red('꺼짐')}",
+                    f"🎯 애니메이션 FPS: {atb_settings.get('animation_fps', 20)}",
+                    f"⚡ ATB 업데이트 속도: {atb_settings.get('update_speed', 1.0)}x",
+                    f"📊 퍼센트 표시: {green('켜짐') if atb_settings.get('show_percentage', True) else red('꺼짐')}",
+                    f"🌊 부드러운 애니메이션: {green('켜짐') if atb_settings.get('smooth_animation', True) else red('꺼짐')}",
+                    "🔄 ATB 설정 초기화",
+                    "⬅️ 돌아가기"
+                ]
+                
+                descriptions = [
+                    "ATB 게이지 애니메이션을 켜거나 끕니다",
+                    "ATB 애니메이션의 프레임 속도를 조정합니다 (10-60 FPS)",
+                    "ATB 게이지 증가 속도를 조정합니다 (0.5x-3.0x)",
+                    "ATB 게이지에 퍼센트를 표시합니다",
+                    "ATB 게이지 변화를 부드럽게 애니메이션으로 표시합니다",
+                    "모든 ATB 설정을 기본값으로 되돌립니다",
+                    "이전 메뉴로 돌아갑니다"
+                ]
+                
+                menu = CursorMenu("⏳ ATB 시스템 설정", options, descriptions)
+                result = menu.run()
+                
+                if result is None or result == 6:  # 돌아가기
+                    break
+                elif result == 0:  # ATB 애니메이션 토글
+                    game_settings.toggle_setting("atb", "animation_enabled")
+                    print("✅ ATB 애니메이션 설정이 변경되었습니다.")
+                    input("아무 키나 눌러 계속...")
+                elif result == 1:  # FPS 변경
+                    self._change_atb_fps()
+                elif result == 2:  # 업데이트 속도 변경
+                    self._change_atb_speed()
+                elif result == 3:  # 퍼센트 표시 토글
+                    game_settings.toggle_setting("atb", "show_percentage")
+                    print("✅ 퍼센트 표시 설정이 변경되었습니다.")
+                    input("아무 키나 눌러 계속...")
+                elif result == 4:  # 부드러운 애니메이션 토글
+                    game_settings.toggle_setting("atb", "smooth_animation")
+                    print("✅ 부드러운 애니메이션 설정이 변경되었습니다.")
+                    input("아무 키나 눌러 계속...")
+                elif result == 5:  # ATB 설정 초기화
+                    self._reset_atb_settings()
+                    
+        except Exception as e:
+            print(f"❌ ATB 설정 메뉴 오류: {e}")
+            input("아무 키나 눌러 계속...")
+
+    def _change_atb_fps(self):
+        """ATB 애니메이션 FPS 변경"""
+        try:
+            from game.cursor_menu_system import CursorMenu
+            from game.settings import game_settings
+            
+            fps_options = ["10 FPS", "15 FPS", "20 FPS (기본)", "30 FPS", "60 FPS"]
+            fps_descriptions = [
+                "낮은 FPS - 부드럽지 않지만 성능 절약",
+                "보통 FPS - 적당한 성능과 품질",
+                "기본 FPS - 권장 설정",
+                "높은 FPS - 부드럽지만 더 많은 자원 사용",
+                "최고 FPS - 매우 부드럽지만 높은 자원 사용"
+            ]
+            
+            menu = CursorMenu("ATB 애니메이션 FPS 선택", fps_options, fps_descriptions)
+            result = menu.run()
+            
+            fps_values = [10, 15, 20, 30, 60]
+            if result is not None and 0 <= result < len(fps_values):
+                game_settings.set("atb", "animation_fps", fps_values[result])
+                # frame_delay도 자동으로 조정
+                frame_delay = 1.0 / fps_values[result]
+                game_settings.set("atb", "frame_delay", frame_delay)
+                print(f"✅ ATB 애니메이션 FPS가 {fps_values[result]}로 변경되었습니다.")
+                input("아무 키나 눌러 계속...")
+        except Exception as e:
+            print(f"❌ FPS 변경 오류: {e}")
+            input("아무 키나 눌러 계속...")
+
+    def _change_atb_speed(self):
+        """ATB 업데이트 속도 변경"""
+        try:
+            from game.cursor_menu_system import CursorMenu
+            from game.settings import game_settings
+            
+            speed_options = [
+                "0.5x (매우 느림)", "0.75x (느림)", "1.0x (기본)", 
+                "1.25x (조금 빠름)", "1.5x (빠름)", "2.0x (매우 빠름)", "3.0x (극한)"
+            ]
+            speed_descriptions = [
+                "ATB가 매우 천천히 증가합니다",
+                "ATB가 천천히 증가합니다", 
+                "기본 ATB 증가 속도입니다",
+                "ATB가 조금 빠르게 증가합니다",
+                "ATB가 빠르게 증가합니다",
+                "ATB가 매우 빠르게 증가합니다",
+                "ATB가 극한으로 빠르게 증가합니다"
+            ]
+            
+            menu = CursorMenu("ATB 업데이트 속도 선택", speed_options, speed_descriptions)
+            result = menu.run()
+            
+            speed_values = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0]
+            if result is not None and 0 <= result < len(speed_values):
+                game_settings.set("atb", "update_speed", speed_values[result])
+                print(f"✅ ATB 업데이트 속도가 {speed_values[result]}x로 변경되었습니다.")
+                input("아무 키나 눌러 계속...")
+        except Exception as e:
+            print(f"❌ 속도 변경 오류: {e}")
+            input("아무 키나 눌러 계속...")
+
+    def _reset_atb_settings(self):
+        """ATB 설정 초기화"""
+        try:
+            from game.cursor_menu_system import CursorMenu
+            from game.settings import game_settings
+            
+            confirm_options = ["예, 초기화합니다", "아니오, 취소합니다"]
+            confirm_descriptions = ["모든 ATB 설정을 기본값으로 되돌립니다", "초기화를 취소하고 돌아갑니다"]
+            
+            menu = CursorMenu("ATB 설정을 초기화하시겠습니까?", confirm_options, confirm_descriptions)
+            result = menu.run()
+            
+            if result == 0:  # 예
+                # 기본 ATB 설정으로 초기화
+                game_settings.set("atb", "animation_enabled", True)
+                game_settings.set("atb", "animation_fps", 20)
+                game_settings.set("atb", "update_speed", 1.0)
+                game_settings.set("atb", "show_percentage", True)
+                game_settings.set("atb", "smooth_animation", True)
+                game_settings.set("atb", "frame_delay", 0.05)
+                print("✅ ATB 설정이 초기화되었습니다.")
+                input("아무 키나 눌러 계속...")
+        except Exception as e:
+            print(f"❌ ATB 설정 초기화 오류: {e}")
+            input("아무 키나 눌러 계속...")
 
     def _show_accessibility_settings_menu(self):
         """접근성 설정 메뉴"""
@@ -2918,48 +3207,71 @@ class DawnOfStellarGame:
             while True:
                 options = [
                     f"🔧 개발 모드: {green('켜짐') if game_config.DEVELOPMENT_MODE else red('꺼짐')}",
-                    f"🐛 디버그 모드: {green('켜짐') if game_config.DEBUG_MODE else red('꺼짐')}",
-                    f"👁️ 데미지 계산 표시: {green('켜짐') if game_config.SHOW_DAMAGE_CALCULATIONS else red('꺼짐')}",
-                    f"♾️ 무한 자원: {green('켜짐') if game_config.INFINITE_RESOURCES else red('꺼짐')}",
+                    f"🐛 디버그 모드: {green('켜짐') if getattr(game_config, 'DEBUG_MODE', False) else red('꺼짐')}",
+                    f"👁️ 데미지 계산 표시: {green('켜짐') if getattr(game_config, 'SHOW_DAMAGE_CALCULATIONS', False) else red('꺼짐')}",
+                    f"♾️ 무한 자원: {green('켜짐') if getattr(game_config, 'INFINITE_RESOURCES', False) else red('꺼짐')}",
+                    "📊 개발자 정보 확인",
                     "⬅️ 돌아가기"
                 ]
                 
                 descriptions = [
-                    "개발자 전용 기능들을 활성화합니다",
+                    "개발자 전용 기능들을 활성화합니다 (모든 직업 해금 등)",
                     "상세한 디버그 정보를 표시합니다",
                     "전투 시 데미지 계산 과정을 표시합니다",
                     "HP, MP, 골드 등이 무제한으로 사용됩니다",
+                    "현재 개발자 설정 상태를 확인합니다",
                     "이전 메뉴로 돌아갑니다"
                 ]
                 
                 menu = CursorMenu("📊 개발자 옵션", options, descriptions)
                 result = menu.run()
                 
-                if result is None or result == 4:
+                if result is None or result == 5:  # 돌아가기
                     break
-                elif result == 0:  # 개발 모드
-                    game_config.DEVELOPMENT_MODE = not game_config.DEVELOPMENT_MODE
-                    # 개발 모드 변경 시 관련 설정도 업데이트
-                    game_config.DEBUG_MODE = game_config.DEVELOPMENT_MODE
-                    game_config.SHOW_DAMAGE_CALCULATIONS = game_config.DEVELOPMENT_MODE
-                    game_config.INFINITE_RESOURCES = game_config.DEVELOPMENT_MODE
-                    game_config.save_settings()
-                    print(f"✅ 개발 모드가 {'켜짐' if game_config.DEVELOPMENT_MODE else '꺼짐'}으로 설정되었습니다.")
-                elif result == 1:  # 디버그 모드
+                elif result == 0:  # 개발 모드 토글
+                    game_config.toggle_development_mode()
+                    status = "켜짐" if game_config.DEVELOPMENT_MODE else "꺼짐"
+                    print(f"✅ 개발 모드가 {status}으로 설정되었습니다.")
+                    if game_config.DEVELOPMENT_MODE:
+                        print("🔓 모든 직업과 특성이 해금되었습니다!")
+                        print("⚠️ 게임을 재시작하면 완전히 적용됩니다.")
+                    else:
+                        print("🔒 기본 4개 직업만 사용 가능합니다.")
+                        print("⚠️ 게임을 재시작하면 완전히 적용됩니다.")
+                    input("아무 키나 눌러 계속...")
+                elif result == 1:  # 디버그 모드 토글
+                    # DEBUG_MODE가 없으면 추가
+                    if not hasattr(game_config, 'DEBUG_MODE'):
+                        game_config.DEBUG_MODE = False
                     game_config.DEBUG_MODE = not game_config.DEBUG_MODE
                     game_config.save_settings()
-                    print(f"✅ 디버그 모드가 {'켜짐' if game_config.DEBUG_MODE else '꺼짐'}으로 설정되었습니다.")
-                elif result == 2:  # 데미지 계산 표시
+                    status = "켜짐" if game_config.DEBUG_MODE else "꺼짐"
+                    print(f"✅ 디버그 모드가 {status}으로 설정되었습니다.")
+                    input("아무 키나 눌러 계속...")
+                elif result == 2:  # 데미지 계산 표시 토글
+                    # SHOW_DAMAGE_CALCULATIONS가 없으면 추가
+                    if not hasattr(game_config, 'SHOW_DAMAGE_CALCULATIONS'):
+                        game_config.SHOW_DAMAGE_CALCULATIONS = False
                     game_config.SHOW_DAMAGE_CALCULATIONS = not game_config.SHOW_DAMAGE_CALCULATIONS
                     game_config.save_settings()
-                    print(f"✅ 데미지 계산 표시가 {'켜짐' if game_config.SHOW_DAMAGE_CALCULATIONS else '꺼짐'}으로 설정되었습니다.")
-                elif result == 3:  # 무한 자원
+                    status = "켜짐" if game_config.SHOW_DAMAGE_CALCULATIONS else "꺼짐"
+                    print(f"✅ 데미지 계산 표시가 {status}으로 설정되었습니다.")
+                    input("아무 키나 눌러 계속...")
+                elif result == 3:  # 무한 자원 토글
+                    # INFINITE_RESOURCES가 없으면 추가
+                    if not hasattr(game_config, 'INFINITE_RESOURCES'):
+                        game_config.INFINITE_RESOURCES = False
                     game_config.INFINITE_RESOURCES = not game_config.INFINITE_RESOURCES
                     game_config.save_settings()
-                    print(f"✅ 무한 자원이 {'켜짐' if game_config.INFINITE_RESOURCES else '꺼짐'}으로 설정되었습니다.")
+                    status = "켜짐" if game_config.INFINITE_RESOURCES else "꺼짐"
+                    print(f"✅ 무한 자원이 {status}으로 설정되었습니다.")
+                    input("아무 키나 눌러 계속...")
+                elif result == 4:  # 개발자 정보 확인
+                    self._show_dev_mode_info()
                     
         except Exception as e:
             print(f"❌ 개발자 옵션 메뉴 오류: {e}")
+            input("아무 키나 눌러 계속...")
 
     def _show_all_settings_view(self):
         """모든 설정 보기"""
@@ -3136,7 +3448,19 @@ class DawnOfStellarGame:
                                         if item:
                                             # 아이템 타입이 장비인 경우만 장비로 분류
                                             if item.item_type in [ItemType.WEAPON, ItemType.ARMOR, ItemType.ACCESSORY]:
-                                                equipment_items.append(f"{item_name} x{quantity} ({member.name})")
+                                                # 내구도 정보 추가
+                                                durability_info = ""
+                                                if hasattr(item, 'get_durability_percentage'):
+                                                    durability_pct = item.get_durability_percentage()
+                                                    if durability_pct < 100:
+                                                        durability_color = "🟢" if durability_pct > 80 else "🟡" if durability_pct > 50 else "🟠" if durability_pct > 20 else "🔴"
+                                                        durability_info = f" {durability_color}{durability_pct:.0f}%"
+                                                elif hasattr(item, 'current_durability') and hasattr(item, 'max_durability'):
+                                                    durability_pct = (item.current_durability / item.max_durability * 100) if item.max_durability > 0 else 0
+                                                    durability_color = "🟢" if durability_pct > 80 else "🟡" if durability_pct > 50 else "🟠" if durability_pct > 20 else "🔴"
+                                                    durability_info = f" {durability_color}{durability_pct:.0f}%"
+                                                
+                                                equipment_items.append(f"{item_name} x{quantity} ({member.name}){durability_info}")
                                                 
                                                 # 장비 타입별 설명
                                                 type_desc = {
@@ -3151,8 +3475,15 @@ class DawnOfStellarGame:
                                                         if value > 0:
                                                             stats_desc.append(f"{stat}+{value}")
                                                 
-                                                desc = f"{type_desc}" + (f" ({', '.join(stats_desc)})" if stats_desc else "")
-                                                equipment_descriptions.append(desc[:50] + "..." if len(desc) > 50 else desc)
+                                                # 내구도 정보를 설명에도 추가
+                                                durability_desc = ""
+                                                if hasattr(item, 'current_durability') and hasattr(item, 'max_durability'):
+                                                    durability_desc = f" | 내구도: {item.current_durability}/{item.max_durability}"
+                                                elif hasattr(item, 'get_durability_percentage'):
+                                                    durability_desc = f" | 내구도: {item.get_durability_percentage():.0f}%"
+                                                
+                                                desc = f"{type_desc}" + (f" ({', '.join(stats_desc)})" if stats_desc else "") + durability_desc
+                                                equipment_descriptions.append(desc[:70] + "..." if len(desc) > 70 else desc)
                                         else:
                                             # 아이템 DB에 없는 경우 이름 기반 판별 (fallback)
                                             item_name_lower = item_name.lower()
@@ -3237,7 +3568,7 @@ class DawnOfStellarGame:
                         details.append(f"🔮 마법공격력: {magic_attack} | 🌟 마법방어력: {magic_defense}")
                         
                         if hasattr(member, 'wounds') and member.wounds > 0:
-                            details.append(f"🩸 상처: {member.wounds}")
+                            details.append(f"🩸 WOUND: {member.wounds}")
                         
                         member_descriptions.append(" | ".join(details))
                     
@@ -3371,7 +3702,12 @@ class DawnOfStellarGame:
                                 if hasattr(item, 'get_durability_percentage'):
                                     durability_pct = item.get_durability_percentage()
                                     if durability_pct < 100:
-                                        durability_info = f" ({durability_pct:.0f}%)"
+                                        durability_color = "🟢" if durability_pct > 80 else "🟡" if durability_pct > 50 else "🟠" if durability_pct > 20 else "🔴"
+                                        durability_info = f" {durability_color}{durability_pct:.0f}%"
+                                elif hasattr(item, 'current_durability') and hasattr(item, 'max_durability'):
+                                    durability_pct = (item.current_durability / item.max_durability * 100) if item.max_durability > 0 else 0
+                                    durability_color = "🟢" if durability_pct > 80 else "🟡" if durability_pct > 50 else "🟠" if durability_pct > 20 else "🔴"
+                                    durability_info = f" {durability_color}{durability_pct:.0f}%"
                                 
                                 print(f"   {slot}: {display_name}{durability_info}")
                                 
@@ -3482,6 +3818,9 @@ class DawnOfStellarGame:
                     # 순회 상인 만나기 - 층별 관리
                     try:
                         current_floor = getattr(self, 'current_floor', 1)
+                        if current_floor is None or not isinstance(current_floor, int):
+                            current_floor = 1
+                            
                         merchant = self.merchant_manager.try_spawn_merchant(current_floor)
                         
                         if merchant:
@@ -3636,7 +3975,10 @@ class DawnOfStellarGame:
         try:
             if hasattr(self, 'encounter_manager') and self.encounter_manager:
                 # 파티 정보 가져오기
-                party = getattr(self.party_manager, 'members', self.characters) if hasattr(self, 'party_manager') else self.characters
+                party = []
+                if hasattr(self, 'party_manager') and self.party_manager and hasattr(self.party_manager, 'members'):
+                    party = self.party_manager.members
+                
                 if not party:
                     return  # 파티가 없으면 인카운터 발생 안함
                 
@@ -3733,10 +4075,19 @@ class DawnOfStellarGame:
         print("🎲 랜덤 조우 발생!")
         print("="*60)
         
-        # 연타 방지를 위한 2초 대기
+        # 연타 방지를 위한 강화된 대기 및 입력 버퍼 클리어
         import time
         print("⏳ 잠시 대기 중... (연타 방지)")
-        time.sleep(2.0)
+        
+        # 입력 버퍼 클리어 (여러 번 실행하여 확실히 클리어)
+        for _ in range(3):
+            self.keyboard.clear_input_buffer()
+            time.sleep(0.1)
+        
+        time.sleep(2.5)  # 대기 시간 증가
+        
+        # 다시 한 번 입력 버퍼 클리어
+        self.keyboard.clear_input_buffer()
         
         if encounter and isinstance(encounter, dict):
             # 인카운터 타입 확인
@@ -3804,8 +4155,19 @@ class DawnOfStellarGame:
                     
                     elif effect == 'lucky_wish':
                         print(f"\n🪙 {bright_yellow('동전을 던지시겠습니까?')}")
-                        choice = input("y/n: ").lower().strip()
-                        if choice in ['y', 'yes', '예', 'ㅇ']:
+                        
+                        from game.cursor_menu_system import CursorMenu
+                        wish_menu = CursorMenu(
+                            "🪙 동전 던지기",
+                            ["예, 동전을 던집니다", "아니오, 그만둡니다"],
+                            ["60% 확률로 보상을 받을 수 있습니다", "안전하게 지나갑니다"],
+                            audio_manager=getattr(self, 'audio_manager', None),
+                            keyboard=self.keyboard,
+                            clear_screen=True
+                        )
+                        
+                        choice = wish_menu.run()
+                        if choice == 0:  # 예
                             import random
                             if random.random() < 0.6:  # 60% 성공률
                                 reward_type = random.choice(['gold', 'exp', 'heal'])
@@ -3911,7 +4273,6 @@ class DawnOfStellarGame:
                         print(f"\n🌑 {bright_yellow('그림자 통로를 이용하시겠습니까?')}")
                         choice = input("y/n: ").lower().strip()
                         if choice in ['y', 'yes', '예', 'ㅇ']:
-                            import random
                             if random.random() < 0.7:  # 70% 성공률
                                 print(f"🌟 {bright_green('그림자를 통해 안전하게 이동했습니다!')} 적들을 피할 수 있었습니다.")
                                 # 인카운터 확률 감소 효과 (구현 필요)
@@ -4249,6 +4610,9 @@ class DawnOfStellarGame:
         time.sleep(1.0)  # 완료 메시지 표시 후 대기
         print("📖 위의 내용을 확인하세요...")
         time.sleep(0.5)  # 추가 확인 시간
+        
+        # 인카운터 처리 완료 후 입력 버퍼 클리어
+        self.keyboard.clear_input_buffer()
         input("🎮 아무 키나 눌러 게임을 계속...")
     
     def advance_to_next_floor(self):
@@ -4759,11 +5123,51 @@ class DawnOfStellarGame:
         elif choice == '2':
             # 게임 불러오기
             self.safe_play_sfx("menu_select")
+            print(f"\n🔄 게임 불러오기를 시작합니다...")
+            print(f"📊 현재 영구 진행상황: {self.permanent_progression}")
+            
             load_game = DawnOfStellarGame()  # 새 인스턴스 생성
             load_game.permanent_progression = self.permanent_progression  # 영구 진행상황 유지
-            load_game.load_game()
-            if len(load_game.party_manager.members) > 0:  # 불러오기 성공시
-                load_game.start_adventure()  # main_loop 대신 start_adventure 사용
+            
+            print(f"✅ 새 게임 인스턴스 생성 완료")
+            print(f"🔄 불러오기 함수 호출 중...")
+            
+            try:
+                load_result = load_game.load_game()  # 불러오기 성공 여부 확인
+                print(f"📊 불러오기 결과: {load_result}")
+                
+                if load_result:  # 불러오기 성공
+                    print(f"✅ 불러오기 성공! 파티 멤버 수 확인 중...")
+                    party_count = len(load_game.party_manager.members) if hasattr(load_game, 'party_manager') else 0
+                    print(f"📊 파티 멤버 수: {party_count}")
+                    
+                    if party_count > 0:  # 파티가 제대로 복원되었는지 확인
+                        print(f"✅ 파티 복원 확인 완료. 게임 시작 중...")
+                        input("게임을 시작하려면 Enter를 누르세요...")
+                        load_game.start_adventure(skip_passive_selection=True)  # 불러오기 시 패시브 선택 건너뛰기
+                    else:
+                        print("❌ 파티 정보가 복원되지 않았습니다.")
+                        print("💡 가능한 원인:")
+                        print("   - 세이브 파일의 파티 데이터 손상")
+                        print("   - 캐릭터 복원 과정에서 오류")
+                        print(f"\n{bright_cyan('메인 메뉴로 돌아갑니다.')}")
+                        input("확인하려면 Enter를 누르세요...")
+                        self._play_main_menu_bgm()
+                        del load_game
+                else:
+                    print("❌ 게임 불러오기 실패")
+                    print(f"\n{bright_cyan('메인 메뉴로 돌아갑니다.')}")
+                    input("확인하려면 Enter를 누르세요...")
+                    self._play_main_menu_bgm()
+                    del load_game
+            except Exception as load_error:
+                print(f"❌ 불러오기 중 예외 발생: {load_error}")
+                import traceback
+                traceback.print_exc()
+                print(f"\n불러오기 오류 상세 정보를 확인하세요...")
+                input("메인 메뉴로 돌아가려면 Enter를 누르세요...")
+                self._play_main_menu_bgm()
+                del load_game
         
         elif choice == '3':
             # 메타 진행 (통합 메뉴)
@@ -6574,14 +6978,9 @@ class DawnOfStellarGame:
             print(f"\n{item.name}을(를) 장착하시겠습니까?")
             print(f"소유자: {owner.name}")
             
-            # 파티원 선택 메뉴
-            from game.cursor_menu_system import create_simple_menu
-            member_options = [f"{member.name} ({member.character_class})" for member in self.party_manager.members]
-            member_options.append("취소")
-            member_descriptions = [f"레벨 {member.level}" for member in self.party_manager.members]
-            member_descriptions.append("장착을 취소합니다")
-            
-            member_menu = create_simple_menu("장착할 파티원 선택", member_options, member_descriptions)
+            # 파티원 선택 메뉴 (상세 정보 포함)
+            from game.cursor_menu_system import create_character_detail_menu
+            member_menu = create_character_detail_menu("장착할 파티원 선택", self.party_manager.members)
             member_choice = member_menu.run()
             
             if member_choice is not None and member_choice < len(self.party_manager.members):
@@ -6674,15 +7073,27 @@ class DawnOfStellarGame:
                 equipped = member.get_equipped_items()
                 for slot, item in equipped.items():
                     if item:
-                        # 아이템 표시 이름
+                        # 아이템 표시 이름 (내구도 포함)
                         if hasattr(item, 'get_display_name'):
                             display_name = item.get_display_name()
                         else:
                             display_name = item.name
                         
-                        equipped_items.append(f"{member.name}: {display_name} ({slot})")
+                        # 내구도 정보 추가
+                        durability_info = ""
+                        if hasattr(item, 'get_durability_percentage'):
+                            durability_pct = item.get_durability_percentage()
+                            if durability_pct < 100:
+                                durability_color = "🟢" if durability_pct > 80 else "🟡" if durability_pct > 50 else "🟠" if durability_pct > 20 else "🔴"
+                                durability_info = f" {durability_color}{durability_pct:.0f}%"
+                        elif hasattr(item, 'current_durability') and hasattr(item, 'max_durability'):
+                            durability_pct = (item.current_durability / item.max_durability * 100) if item.max_durability > 0 else 0
+                            durability_color = "🟢" if durability_pct > 80 else "🟡" if durability_pct > 50 else "🟠" if durability_pct > 20 else "🔴"
+                            durability_info = f" {durability_color}{durability_pct:.0f}%"
                         
-                        # 설명 (능력치 보너스 포함)
+                        equipped_items.append(f"{member.name}: {display_name} ({slot}){durability_info}")
+                        
+                        # 설명 (능력치 보너스 및 내구도 포함)
                         description = f"{slot} 슬롯"
                         if hasattr(item, 'get_effective_stats'):
                             effective_stats = item.get_effective_stats()
@@ -6705,6 +7116,12 @@ class DawnOfStellarGame:
                             if stat_bonuses:
                                 description += f" ({', '.join(stat_bonuses)})"
                         
+                        # 내구도 정보를 설명에도 추가
+                        if hasattr(item, 'current_durability') and hasattr(item, 'max_durability'):
+                            description += f" | 내구도: {item.current_durability}/{item.max_durability}"
+                        elif hasattr(item, 'get_durability_percentage'):
+                            description += f" | 내구도: {item.get_durability_percentage():.0f}%"
+                        
                         equipped_descriptions.append(description)
                         member_slot_pairs.append((member, slot))
             
@@ -6714,55 +7131,112 @@ class DawnOfStellarGame:
                 self.keyboard.wait_for_key("아무 키나 눌러 계속...")
                 return
             
-            # 장비 선택 메뉴
-            menu = create_simple_menu("🔧 해제할 장비 선택", equipped_items, equipped_descriptions)
+            # 장비 선택 메뉴 (커서 기반)
+            from game.cursor_menu_system import CursorMenu
+            
+            menu_title = "🔧 해제할 장비 선택"
+            menu_options = equipped_items
+            menu_descriptions = equipped_descriptions
+            
+            menu = CursorMenu(
+                menu_title,
+                menu_options, 
+                menu_descriptions,
+                audio_manager=getattr(self, 'audio_manager', None),
+                keyboard=self.keyboard,
+                clear_screen=True,
+                extra_content="💡 장비를 선택하여 해제하세요"
+            )
+            
             result = menu.run()
             
             if result is not None and 0 <= result < len(member_slot_pairs):
                 member, slot = member_slot_pairs[result]
                 selected_item_name = equipped_items[result]
                 
-                print(f"\n{selected_item_name}을(를) 해제하시겠습니까? (Y/N)")
-                choice = input().strip().upper()
+                # 커서 기반 확인 메뉴
+                confirm_menu = CursorMenu(
+                    f"장비 해제 확인",
+                    ["예, 해제합니다", "아니오, 취소합니다"],
+                    [
+                        f"{selected_item_name}을(를) 해제하고 인벤토리에 추가합니다",
+                        "장비 해제를 취소하고 이전 메뉴로 돌아갑니다"
+                    ],
+                    audio_manager=getattr(self, 'audio_manager', None),
+                    keyboard=self.keyboard,
+                    clear_screen=True,
+                    extra_content=f"📦 선택된 장비: {selected_item_name}"
+                )
                 
-                if choice == 'Y':
-                    # 장비 해제 (복사 방지를 위한 안전 장치)
+                confirm_result = confirm_menu.run()
+                
+                if confirm_result == 0:  # 예
+                    # 장비 해제 전 현재 장착 상태 확인
                     equipped_item = getattr(member, f"equipped_{slot}", None)
+                    
+                    if not equipped_item:
+                        # 한글 슬롯명으로 다시 시도
+                        slot_mapping = {
+                            "무기": "weapon",
+                            "방어구": "armor", 
+                            "장신구": "accessory",
+                            "weapon": "무기",
+                            "armor": "방어구",
+                            "accessory": "장신구"
+                        }
+                        
+                        alternative_slot = slot_mapping.get(slot)
+                        if alternative_slot:
+                            equipped_item = getattr(member, f"equipped_{alternative_slot}", None)
+                            if equipped_item:
+                                slot = alternative_slot  # 올바른 슬롯명으로 변경
+                    
                     if not equipped_item:
                         print("❌ 해당 슬롯에 장비가 없습니다.")
                         self.keyboard.wait_for_key("아무 키나 눌러 계속...")
                         return
                     
-                    # 중복 해제 방지 - 한 번만 실행되도록 확인
-                    unequipped_item = member.unequip_item(slot)
-                    
-                    if unequipped_item:
-                        # 해제 후 다시 확인하여 실제로 해제되었는지 검증
-                        still_equipped = getattr(member, f"equipped_{slot}", None)
-                        if still_equipped is not None:
-                            print("❌ 장비 해제 과정에서 오류가 발생했습니다.")
-                            self.keyboard.wait_for_key("아무 키나 눌러 계속...")
-                            return
+                    # 장비 해제 실행
+                    try:
+                        unequipped_item = member.unequip_item(slot)
                         
-                        # 인벤토리에 공간이 있는지 확인
-                        if hasattr(member, 'inventory'):
-                            can_add, reason = member.inventory.can_add_item(unequipped_item)
-                            if can_add:
-                                member.inventory.add_item(unequipped_item)
-                                print(f"✅ {unequipped_item.name}을(를) 해제하고 인벤토리에 추가했습니다.")
+                        if unequipped_item:
+                            # 해제 후 검증
+                            still_equipped = getattr(member, f"equipped_{slot}", None)
+                            
+                            if still_equipped is not None:
+                                print("❌ 장비 해제 과정에서 오류가 발생했습니다.")
+                                self.keyboard.wait_for_key("아무 키나 눌러 계속...")
+                                return
+                            
+                            # 장비 효과 재적용
+                            if hasattr(member, '_apply_equipment_effects'):
+                                member._apply_equipment_effects()
+                            
+                            # 인벤토리에 추가
+                            if hasattr(member, 'inventory'):
+                                can_add, reason = member.inventory.can_add_item(unequipped_item)
+                                if can_add:
+                                    member.inventory.add_item(unequipped_item)
+                                    print(f"✅ {unequipped_item.name}을(를) 해제하고 인벤토리에 추가했습니다.")
+                                    self.keyboard.wait_for_key("아무 키나 눌러 계속...")
+                                else:
+                                    print(f"⚠️ 인벤토리에 공간이 부족합니다: {reason}\n장비를 다시 장착합니다.")
+                                    self.keyboard.wait_for_key("아무 키나 눌러 계속...")
+                                    # 다시 장착
+                                    member.equip_item(unequipped_item)
                             else:
-                                print(f"⚠️ 인벤토리에 공간이 부족합니다: {reason}")
-                                print("장비를 다시 장착합니다.")
-                                # 다시 장착
-                                member.equip_item(unequipped_item)
+                                print(f"✅ {unequipped_item.name}을(를) 해제했습니다.")
+                                self.keyboard.wait_for_key("아무 키나 눌러 계속...")
                         else:
-                            print(f"✅ {unequipped_item.name}을(를) 해제했습니다.")
-                    else:
-                        print("❌ 장비 해제에 실패했습니다.")
-                else:
+                            print("❌ 장비 해제에 실패했습니다.")
+                            self.keyboard.wait_for_key("아무 키나 눌러 계속...")
+                    except Exception as e:
+                        print(f"❌ 장비 해제 중 오류 발생: {str(e)}")
+                        self.keyboard.wait_for_key("아무 키나 눌러 계속...")
+                elif confirm_result == 1:  # 아니오
                     print("장비 해제를 취소했습니다.")
-                
-                self.keyboard.wait_for_key("아무 키나 눌러 계속...")
+                    self.keyboard.wait_for_key("아무 키나 눌러 계속...")
                 
         except ImportError:
             print("장비 해제 시스템을 불러올 수 없습니다.")

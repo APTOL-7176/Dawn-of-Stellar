@@ -1,0 +1,245 @@
+{
+  "session_info": {
+    "start_time": "2025-08-02T14:50:54.808917",
+    "session_id": "20250802_145054"
+  },
+  "battles": [
+    {
+      "battle_id": 1,
+      "start_time": "2025-08-02T14:50:55.216485",
+      "party": [
+        {
+          "name": "패트릭",
+          "level": 1,
+          "hp": 90,
+          "max_hp": 90,
+          "brv": 1587,
+          "max_brv": 2301,
+          "attack": 43,
+          "defense": 38,
+          "magic_attack": 66,
+          "magic_defense": 58,
+          "speed": 69,
+          "character_class": "바드"
+        },
+        {
+          "name": "가브리엘",
+          "level": 1,
+          "hp": 408,
+          "max_hp": 408,
+          "brv": 1103,
+          "max_brv": 3467,
+          "attack": 97,
+          "defense": 22,
+          "magic_attack": 13,
+          "magic_defense": 21,
+          "speed": 74,
+          "character_class": "광전사"
+        },
+        {
+          "name": "조슈아",
+          "level": 1,
+          "hp": 167,
+          "max_hp": 167,
+          "brv": 1343,
+          "max_brv": 3041,
+          "attack": 74,
+          "defense": 58,
+          "magic_attack": 45,
+          "magic_defense": 53,
+          "speed": 67,
+          "character_class": "사무라이"
+        },
+        {
+          "name": "크리스티나",
+          "level": 1,
+          "hp": 108,
+          "max_hp": 108,
+          "brv": 1687,
+          "max_brv": 2223,
+          "attack": 43,
+          "defense": 33,
+          "magic_attack": 78,
+          "magic_defense": 67,
+          "speed": 58,
+          "character_class": "아크메이지"
+        }
+      ],
+      "enemies": [
+        {
+          "name": "슬라임",
+          "level": 3,
+          "hp": 433,
+          "max_hp": 433,
+          "brv": 2000,
+          "max_brv": 4070,
+          "attack": 63,
+          "defense": 72,
+          "magic_attack": 51,
+          "magic_defense": 48,
+          "speed": 32,
+          "character_class": "Enemy"
+        },
+        {
+          "name": "고블린",
+          "level": 2,
+          "hp": 270,
+          "max_hp": 270,
+          "brv": 1119,
+          "max_brv": 2238,
+          "attack": 52,
+          "defense": 31,
+          "magic_attack": 23,
+          "magic_defense": 18,
+          "speed": 38,
+          "character_class": "Enemy"
+        }
+      ],
+      "turns": [],
+      "damage_log": [
+        {
+          "timestamp": "2025-08-02T14:51:52.215869",
+          "damage_type": "BRV",
+          "attacker": "패트릭",
+          "target": "슬라임",
+          "base_damage": 29,
+          "final_damage": 877,
+          "calculation_details": {
+            "공격자_물리공격력": 43,
+            "대상_물리방어력": 72,
+            "기본_BRV_데미지": 29,
+            "스킬_배율": "100%",
+            "스킬_배율_적용후": 29,
+            "기본_스킬_배율_1.5x": 43,
+            "플레이어_보너스_18.75x": 806,
+            "랜덤_배율": "1.089",
+            "랜덤_적용후": 877
+          }
+        },
+        {
+          "timestamp": "2025-08-02T14:51:58.253513",
+          "damage_type": "BRV",
+          "attacker": "조슈아",
+          "target": "슬라임",
+          "base_damage": 51,
+          "final_damage": 1319,
+          "calculation_details": {
+            "공격자_물리공격력": 74,
+            "대상_물리방어력": 72,
+            "기본_BRV_데미지": 51,
+            "스킬_배율": "100%",
+            "스킬_배율_적용후": 51,
+            "기본_스킬_배율_1.5x": 76,
+            "플레이어_보너스_18.75x": 1425,
+            "랜덤_배율": "0.926",
+            "랜덤_적용후": 1319
+          }
+        },
+        {
+          "timestamp": "2025-08-02T14:52:00.129761",
+          "damage_type": "BRV",
+          "attacker": "가브리엘",
+          "target": "슬라임",
+          "base_damage": 67,
+          "final_damage": 1399,
+          "calculation_details": {
+            "공격자_물리공격력": 97,
+            "대상_물리방어력": 72,
+            "기본_BRV_데미지": 67,
+            "스킬_배율": "70%",
+            "스킬_배율_적용후": 46,
+            "기본_스킬_배율_1.5x": 69,
+            "플레이어_보너스_18.75x": 1293,
+            "랜덤_배율": "1.082",
+            "랜덤_적용후": 1399
+          }
+        },
+        {
+          "timestamp": "2025-08-02T14:52:00.433970",
+          "damage_type": "BRV",
+          "attacker": "가브리엘",
+          "target": "슬라임",
+          "base_damage": 67,
+          "final_damage": 1346,
+          "calculation_details": {
+            "공격자_물리공격력": 97,
+            "대상_물리방어력": 72,
+            "기본_BRV_데미지": 67,
+            "스킬_배율": "70%",
+            "스킬_배율_적용후": 46,
+            "기본_스킬_배율_1.5x": 69,
+            "플레이어_보너스_18.75x": 1293,
+            "랜덤_배율": "1.041",
+            "랜덤_적용후": 1346
+          }
+        },
+        {
+          "timestamp": "2025-08-02T14:52:00.737515",
+          "damage_type": "BRV",
+          "attacker": "가브리엘",
+          "target": "슬라임",
+          "base_damage": 67,
+          "final_damage": 1311,
+          "calculation_details": {
+            "공격자_물리공격력": 97,
+            "대상_물리방어력": 72,
+            "기본_BRV_데미지": 67,
+            "스킬_배율": "70%",
+            "스킬_배율_적용후": 46,
+            "기본_스킬_배율_1.5x": 69,
+            "플레이어_보너스_18.75x": 1293,
+            "랜덤_배율": "1.014",
+            "랜덤_적용후": 1311
+          }
+        },
+        {
+          "timestamp": "2025-08-02T14:52:01.041221",
+          "damage_type": "BRV",
+          "attacker": "가브리엘",
+          "target": "슬라임",
+          "base_damage": 67,
+          "final_damage": 1356,
+          "calculation_details": {
+            "공격자_물리공격력": 97,
+            "대상_물리방어력": 72,
+            "기본_BRV_데미지": 67,
+            "스킬_배율": "70%",
+            "스킬_배율_적용후": 46,
+            "기본_스킬_배율_1.5x": 69,
+            "플레이어_보너스_18.75x": 1293,
+            "랜덤_배율": "1.049",
+            "랜덤_적용후": 1356
+          }
+        },
+        {
+          "timestamp": "2025-08-02T14:53:04.609881",
+          "damage_type": "BRV",
+          "attacker": "조슈아",
+          "target": "고블린",
+          "base_damage": 119,
+          "final_damage": 4391,
+          "calculation_details": {
+            "공격자_물리공격력": 74,
+            "대상_물리방어력": 31,
+            "기본_BRV_데미지": 119,
+            "스킬_배율": "125%",
+            "스킬_배율_적용후": 148,
+            "기본_스킬_배율_1.5x": 222,
+            "플레이어_보너스_18.75x": 4162,
+            "랜덤_배율": "1.055",
+            "랜덤_적용후": 4391
+          }
+        }
+      ],
+      "end_time": "2025-08-02T14:55:42.529464",
+      "winner": "플레이어",
+      "duration_seconds": 287.31297874450684
+    }
+  ],
+  "damage_stats": {
+    "total_player_damage": 11999,
+    "total_enemy_damage": 0,
+    "total_healing": 0,
+    "damage_breakdown": {}
+  }
+}

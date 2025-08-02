@@ -381,6 +381,79 @@ def create_yes_no_menu(question: str, audio_manager=None, keyboard=None) -> Curs
     menu.set_items(items)
     return menu
 
+def create_character_detail_menu(title: str, characters: List[Any], audio_manager=None, keyboard=None) -> CursorMenu:
+    """캐릭터 선택 메뉴 생성 (상세 정보 포함)"""
+    menu = CursorMenu(title, audio_manager=audio_manager, keyboard=keyboard, clear_screen=True)
+    
+    # 캐릭터 옵션과 기본 설명 생성
+    options = [f"{char.name} ({char.character_class})" for char in characters]
+    options.append("취소")
+    
+    descriptions = [f"레벨 {char.level}" for char in characters]
+    descriptions.append("선택을 취소합니다")
+    
+    # 기존 메뉴 시스템과 호환되도록 설정
+    menu.options = options
+    menu.descriptions = descriptions
+    menu.characters = characters  # 캐릭터 데이터 저장
+    
+    # MenuItem 객체로 생성
+    items = []
+    for i, char in enumerate(characters):
+        items.append(MenuItem(options[i], description=descriptions[i], value=char))
+    items.append(MenuItem("취소", description="선택을 취소합니다", value=None))
+    
+    menu.set_items(items)
+    
+    # 커스텀 디스플레이 메서드 오버라이드
+    original_display_footer = menu._display_menu_footer
+    
+    def custom_display_footer():
+        """캐릭터 상세 정보를 포함한 푸터 표시"""
+        # 현재 선택된 캐릭터의 상세 정보 표시
+        if menu.selected_index < len(characters):
+            char = characters[menu.selected_index]
+            
+            print(f"\n{'─' * 50}")
+            print(f"📋 {char.name} 상세 정보")
+            print(f"{'─' * 50}")
+            print(f"🎭 직업: {char.character_class}")
+            print(f"⭐ 레벨: {char.level}")
+            print(f"💝 HP: {char.current_hp}/{char.max_hp}")
+            print(f"💙 MP: {char.current_mp}/{char.max_mp}")
+            print(f"⚔️ 공격력: {char.physical_attack}")
+            print(f"🛡️ 방어력: {char.physical_defense}")
+            print(f"✨ 마법력: {char.magic_attack}")
+            print(f"🔮 마법방어: {char.magic_defense}")
+            print(f"🏃 속도: {char.speed}")
+            print(f"💰 BRV: {char.brave_points}")
+            
+            # 장착 장비 정보
+            print(f"\n🎒 장착 장비:")
+            weapon = getattr(char, 'equipped_weapon', None)
+            armor = getattr(char, 'equipped_armor', None)
+            accessory = getattr(char, 'equipped_accessory', None)
+            
+            print(f"  🗡️ 무기: {weapon.name if weapon else '없음'}")
+            print(f"  🛡️ 방어구: {armor.name if armor else '없음'}")
+            print(f"  💍 장신구: {accessory.name if accessory else '없음'}")
+        else:
+            # 취소 선택 시
+            print(f"\n💡 {descriptions[menu.selected_index]}")
+        
+        # 조작법 표시
+        print(f"\n{'─' * 50}")
+        controls = []
+        if len(menu.options) > 1:
+            controls.append("W/S: 위/아래")
+        controls.append("Enter: 선택")
+        controls.append("Q: 취소")
+        
+        print(f"🎮 {' | '.join(controls)}")
+    
+    menu._display_menu_footer = custom_display_footer
+    return menu
+
 # 테스트용 함수
 def demo_cursor_menu():
     """커서 메뉴 데모"""

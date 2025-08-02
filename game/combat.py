@@ -966,6 +966,13 @@ class CombatManager:
                     heal = actual_damage // 2
                     caster.heal(heal)
                     self.log(f"  → {target.name}에게 {actual_damage} 데미지, {caster.name}이(가) {heal} HP 회복!")
+            elif effect == "sacrifice_power":
+                # 체력 희생으로 위력 증가 (12%로 조정)
+                sacrifice_hp = max(1, int(caster.current_hp * 0.12))  # 현재 HP의 12% 희생
+                caster.current_hp = max(1, caster.current_hp - sacrifice_hp)
+                self.log(f"  → {caster.name}이(가) {sacrifice_hp} HP를 희생하여 위력을 극대화!")
+                # 희생한 HP에 비례하여 데미지 증가 (스킬 데미지 계산 시 반영)
+                caster.temp_sacrifice_power = sacrifice_hp * 2  # 희생 HP의 2배만큼 추가 데미지
             else:
                 self.log(f"  → 특수 효과 '{effect}' 발동!")
         
@@ -1044,6 +1051,14 @@ class CombatManager:
         else:  # HYBRID
             base_attack = (attacker.physical_attack + attacker.magic_attack) / 2
             target_defense = (target.physical_defense + target.magic_defense) / 2
+        
+        # 희생 위력 보너스 적용
+        sacrifice_bonus = getattr(attacker, 'temp_sacrifice_power', 0)
+        base_attack += sacrifice_bonus
+        
+        # 희생 위력 보너스 사용 후 제거
+        if sacrifice_bonus > 0:
+            attacker.temp_sacrifice_power = 0
         
         # 관통 시스템 적용
         if penetration_type == PenetrationType.TRUE_DAMAGE:

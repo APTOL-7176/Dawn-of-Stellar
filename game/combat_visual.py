@@ -104,6 +104,10 @@ class CombatVisualizer:
     
     def get_character_sprite(self, character):
         """캐릭터 스프라이트 반환"""
+        # character가 유효한 객체인지 확인
+        if not hasattr(character, 'name'):
+            return '❓'  # name 속성이 없으면 기본 스프라이트 반환
+            
         class_name = getattr(character, 'character_class', '전사')
         name = character.name.lower()
         
@@ -318,6 +322,10 @@ class CombatVisualizer:
     
     def show_attack_effect(self, attacker, target, damage: int, effect_type: EffectType, skill_name: str = None):
         """공격 이펙트 표시 - 안정적인 버전"""
+        # attacker와 target이 유효한 객체인지 확인
+        if not hasattr(attacker, 'name') or not hasattr(target, 'name'):
+            return  # name 속성이 없으면 출력하지 않음
+            
         color = self.effect_colors.get(effect_type, Color.WHITE)
         attacker_sprite = self.get_character_sprite(attacker)
         target_sprite = self.get_character_sprite(target)
@@ -336,7 +344,7 @@ class CombatVisualizer:
             effect_icon = "💚"
             action_text = "치료"
         elif effect_type == EffectType.DEFEND:
-            effect_icon = "�️"
+            effect_icon = "🛡️"
             action_text = "방어"
         else:
             effect_icon = "✨"
@@ -361,6 +369,10 @@ class CombatVisualizer:
     
     def show_skill_effect(self, caster, skill_name: str, effect_type: EffectType):
         """스킬 이펙트 표시 - 간소화 버전"""
+        # caster가 유효한 객체인지 확인
+        if not hasattr(caster, 'name'):
+            return  # name 속성이 없으면 출력하지 않음
+            
         color = self.effect_colors.get(effect_type, Color.BRIGHT_MAGENTA)
         caster_sprite = self.get_character_sprite(caster)
         
@@ -385,6 +397,10 @@ class CombatVisualizer:
     
     def show_brave_change(self, character, old_brave: int, new_brave: int):
         """Brave 포인트 변화 표시 - 간소화"""
+        # character가 유효한 객체인지 확인
+        if not hasattr(character, 'name'):
+            return  # name 속성이 없으면 출력하지 않음
+            
         change = new_brave - old_brave
         sprite = self.get_character_sprite(character)
         
@@ -408,6 +424,10 @@ class CombatVisualizer:
     
     def show_status_change(self, character, status_name: str, is_positive: bool = True):
         """상태 변화 표시 - 간소화"""
+        # character가 유효한 객체인지 확인
+        if not hasattr(character, 'name'):
+            return  # name 속성이 없으면 출력하지 않음
+            
         sprite = self.get_character_sprite(character)
         color = Color.BRIGHT_GREEN if is_positive else Color.BRIGHT_RED
         effect = "✨" if is_positive else "💀"

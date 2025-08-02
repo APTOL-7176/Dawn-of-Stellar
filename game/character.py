@@ -38,15 +38,141 @@ class StatusManager:
                 return effect
         return None
     
-    def process_turn_effects(self) -> List[str]:
-        """턴 처리 - 호환성 유지"""
+    def process_turn_effects(self, character=None) -> List[str]:
+        """턴 처리 - 상태이상 효과 적용 (확장)"""
         messages = []
+        
+        # 캐릭터 객체가 제공되지 않으면 빈 메시지 리스트 반환
+        if character is None:
+            return messages
+            
+        # 캐릭터 이름 안전하게 가져오기
+        char_name = getattr(character, 'name', '알 수 없는 캐릭터')
+        
         for effect in self.status_effects[:]:
+            # 독 데미지 처리
+            if effect.status_type == StatusType.POISON:
+                damage = int(character.max_hp * 0.05 * effect.intensity)
+                character.current_hp = max(1, character.current_hp - damage)
+                messages.append(f"☠️ {char_name}이(가) 독 데미지 {damage}를 받았습니다!")
+            
+            # 화상 데미지 처리
+            elif effect.status_type == StatusType.BURN:
+                damage = int(character.max_hp * 0.03 * effect.intensity)
+                character.current_hp = max(1, character.current_hp - damage)
+                messages.append(f"🔥 {char_name}이(가) 화상 데미지 {damage}를 받았습니다!")
+            
+            # 재생 효과 처리
+            elif effect.status_type == StatusType.REGENERATION:
+                heal = int(character.max_hp * 0.08 * effect.intensity)
+                old_hp = character.current_hp
+                character.current_hp = min(character.max_hp, character.current_hp + heal)
+                actual_heal = character.current_hp - old_hp
+                if actual_heal > 0:
+                    messages.append(f"💚 {char_name}이(가) 재생으로 {actual_heal} 회복했습니다!")
+            
+            # 출혈 효과
+            elif effect.status_type == StatusType.BLEED:
+                damage = int(character.max_hp * 0.04 * effect.intensity)
+                character.current_hp = max(1, character.current_hp - damage)
+                messages.append(f"🩸 {char_name}이(가) 출혈로 {damage} 피해를 받았습니다!")
+            
+            # 부식 효과
+            elif effect.status_type == StatusType.CORRODE:
+                damage = int(character.max_hp * 0.03 * effect.intensity)
+                character.current_hp = max(1, character.current_hp - damage)
+                messages.append(f"🧪 {char_name}이(가) 부식으로 {damage} 피해를 받았습니다!")
+            
+            # 괴사 효과
+            elif effect.status_type == StatusType.NECROSIS:
+                damage = int(character.max_hp * 0.08 * effect.intensity)
+                character.current_hp = max(1, character.current_hp - damage)
+                messages.append(f"💀 {char_name}이(가) 괴사로 {damage} 피해를 받았습니다!")
+            
+            # 냉기 효과
+            elif effect.status_type == StatusType.CHILL:
+                if hasattr(character, 'temp_speed_bonus'):
+                    character.temp_speed_bonus = getattr(character, 'temp_speed_bonus', 0) - int(character.speed * 0.2 * effect.intensity)
+                messages.append(f"🧊 {char_name}이(가) 냉기에 움직임이 둔해졌습니다!")
+            
+            # 감전 효과
+            elif effect.status_type == StatusType.SHOCK:
+                if hasattr(character, 'temp_cooldown_increase'):
+                    character.temp_cooldown_increase = getattr(character, 'temp_cooldown_increase', 0) + 1
+                messages.append(f"⚡ {char_name}이(가) 감전으로 인해 행동이 둔해졌습니다!")
+            
+            # MP 재생
+            elif effect.status_type == StatusType.MP_REGEN:
+                if hasattr(character, 'current_mp') and hasattr(character, 'max_mp'):
+                    mp_heal = int(character.max_mp * 0.05 * effect.intensity)
+                    old_mp = character.current_mp
+                    character.current_mp = min(character.max_mp, character.current_mp + mp_heal)
+                    actual_mp_heal = character.current_mp - old_mp
+                    if actual_mp_heal > 0:
+                        messages.append(f"💙 {char_name}이(가) {actual_mp_heal} MP를 회복했습니다!")
+            
+            # MP 소모
+            elif effect.status_type == StatusType.MP_DRAIN:
+                if hasattr(character, 'current_mp'):
+                    mp_damage = int(character.max_mp * 0.04 * effect.intensity)
+                    character.current_mp = max(0, character.current_mp - mp_damage)
+                    messages.append(f"💜 {char_name}이(가) {mp_damage} MP를 잃었습니다!")
+            
+            # 공포 효과
+            elif effect.status_type == StatusType.FEAR:
+                if hasattr(self, 'temp_accuracy_penalty'):
+                    character.temp_accuracy_penalty = getattr(self, 'temp_accuracy_penalty', 0) + int(20 * effect.intensity)
+                    character.temp_dodge_penalty = getattr(self, 'temp_dodge_penalty', 0) + int(15 * effect.intensity)
+                messages.append(f"😰 {character.name}이(가) 공포에 떨고 있습니다!")
+            
+            # 매혹 효과
+            elif effect.status_type == StatusType.CHARM:
+                messages.append(f"💖 {character.name}이(가) 매혹에 빠져 있습니다!")
+            
+            # 지배 효과
+            elif effect.status_type == StatusType.DOMINATE:
+                messages.append(f"👁️ {character.name}이(가) 정신을 지배당하고 있습니다!")
+            
+            # 혼란 효과
+            elif effect.status_type == StatusType.CONFUSION:
+                messages.append(f"😵‍💫 {character.name}이(가) 혼란에 빠져 있습니다!")
+            
+            # 광기 효과
+            elif effect.status_type == StatusType.MADNESS:
+                if hasattr(self, 'temp_attack_bonus'):
+                    character.temp_attack_bonus = getattr(self, 'temp_attack_bonus', 0) + int(15 * effect.intensity)
+                if hasattr(self, 'temp_defense_bonus'):
+                    self.temp_defense_bonus = getattr(self, 'temp_defense_bonus', 0) - int(10 * effect.intensity)
+                messages.append(f"🤪 {self.name}이(가) 광기에 휩싸였습니다!")
+            
+            # 저주 효과
+            elif effect.status_type == StatusType.CURSE:
+                curse_penalty = int(5 * effect.intensity)
+                for stat in ['temp_attack_bonus', 'temp_defense_bonus', 'temp_magic_bonus', 'temp_speed_bonus']:
+                    if hasattr(self, stat):
+                        setattr(self, stat, getattr(self, stat, 0) - curse_penalty)
+                messages.append(f"🌑 {self.name}이(가) 저주에 걸려 모든 능력이 감소했습니다!")
+            
+            # 축복 효과
+            elif effect.status_type == StatusType.BLESSING:
+                blessing_bonus = int(8 * effect.intensity)
+                for stat in ['temp_attack_bonus', 'temp_defense_bonus', 'temp_magic_bonus', 'temp_speed_bonus']:
+                    if hasattr(self, stat):
+                        setattr(self, stat, getattr(self, stat, 0) + blessing_bonus)
+                messages.append(f"✨ {self.name}이(가) 축복을 받아 모든 능력이 증가했습니다!")
+            
+            # 버프/디버프 효과는 스탯 계산에서 처리
+            elif effect.status_type in [StatusType.STRENGTHEN, StatusType.WEAKEN, 
+                                       StatusType.HASTE, StatusType.SLOW, StatusType.SHIELD]:
+                # 이미 get_stat_modifiers에서 처리됨
+                pass
+            
+            # 상태이상 지속시간 감소
             effect.duration -= 1
             if effect.duration <= 0:
                 self.status_effects.remove(effect)
-                messages.append(f"{effect.status_type.value} 효과가 해제되었습니다.")
-        self.effects = self.status_effects  # 별칭 업데이트
+                messages.append(f"✨ {self.name}의 {effect.status_type.value} 효과가 해제되었습니다!")
+        
         return messages
     
     def get_status_display(self) -> str:
@@ -57,12 +183,39 @@ class StatusManager:
         return " ".join(icons)
     
     def can_act(self) -> bool:
-        """행동 가능 여부"""
-        blocking = [StatusType.STUN, StatusType.SLEEP, StatusType.FREEZE, StatusType.PETRIFY]
-        return not any(effect.status_type in blocking for effect in self.status_effects)
+        """행동 가능 여부 - 확장된 상태이상 체크"""
+        # 완전 행동 불가 상태
+        blocking_states = [
+            StatusType.STUN, StatusType.SLEEP, StatusType.FREEZE, 
+            StatusType.PETRIFY, StatusType.PARALYZE, StatusType.TIME_STOP
+        ]
+        
+        if any(effect.status_type in blocking_states for effect in self.status_effects):
+            return False
+            
+        # 혼란/매혹/지배 상태에서는 행동 가능하지만 제어 불가
+        return True
+    
+    def can_use_skills(self) -> bool:
+        """스킬 사용 가능 여부"""
+        silencing_states = [StatusType.SILENCE, StatusType.MADNESS]
+        return not any(effect.status_type in silencing_states for effect in self.status_effects)
+    
+    def is_controlled(self) -> bool:
+        """적에게 조종당하는 상태인지"""
+        control_states = [StatusType.CHARM, StatusType.DOMINATE, StatusType.CONFUSION]
+        return any(effect.status_type in control_states for effect in self.status_effects)
+    
+    def has_stealth(self) -> bool:
+        """은신 상태인지"""
+        return any(effect.status_type == StatusType.STEALTH for effect in self.status_effects)
+    
+    def has_invincibility(self) -> bool:
+        """무적 상태인지"""
+        return any(effect.status_type == StatusType.INVINCIBLE for effect in self.status_effects)
     
     def get_stat_modifiers(self) -> dict:
-        """스탯 수정치 반환 (곱셈용 배율)"""
+        """스탯 수정치 반환 (곱셈용 배율) - 확장된 상태이상 포함"""
         modifiers = {
             'physical_attack': 1.0,
             'magic_attack': 1.0,
@@ -75,22 +228,84 @@ class StatusManager:
         }
         
         for effect in self.status_effects:
-            if effect.status_type == StatusType.BUFF_ATTACK:
-                modifiers['physical_attack'] *= (1.0 + effect.value * 0.01)
-                modifiers['magic_attack'] *= (1.0 + effect.value * 0.01)
-            elif effect.status_type == StatusType.BUFF_DEFENSE:
-                modifiers['physical_defense'] *= (1.0 + effect.value * 0.01)
-                modifiers['magic_defense'] *= (1.0 + effect.value * 0.01)
-            elif effect.status_type == StatusType.BUFF_SPEED:
-                modifiers['speed'] *= (1.0 + effect.value * 0.01)
-            elif effect.status_type == StatusType.DEBUFF_ATTACK:
-                modifiers['physical_attack'] *= (1.0 - effect.value * 0.01)
-                modifiers['magic_attack'] *= (1.0 - effect.value * 0.01)
-            elif effect.status_type == StatusType.DEBUFF_DEFENSE:
-                modifiers['physical_defense'] *= (1.0 - effect.value * 0.01)
-                modifiers['magic_defense'] *= (1.0 - effect.value * 0.01)
-            elif effect.status_type == StatusType.DEBUFF_SPEED:
-                modifiers['speed'] *= (1.0 - effect.value * 0.01)
+            # 기본 버프/디버프
+            if effect.status_type == StatusType.BOOST_ATK:
+                modifiers['physical_attack'] *= (1.0 + effect.intensity * 0.2)
+                modifiers['magic_attack'] *= (1.0 + effect.intensity * 0.2)
+            elif effect.status_type == StatusType.BOOST_DEF:
+                modifiers['physical_defense'] *= (1.0 + effect.intensity * 0.2)
+                modifiers['magic_defense'] *= (1.0 + effect.intensity * 0.2)
+            elif effect.status_type == StatusType.BOOST_SPD:
+                modifiers['speed'] *= (1.0 + effect.intensity * 0.3)
+            elif effect.status_type == StatusType.BOOST_ACCURACY:
+                modifiers['accuracy'] *= (1.0 + effect.intensity * 0.15)
+            elif effect.status_type == StatusType.BOOST_CRIT:
+                modifiers['critical_rate'] *= (1.0 + effect.intensity * 0.25)
+            elif effect.status_type == StatusType.BOOST_DODGE:
+                modifiers['evasion'] *= (1.0 + effect.intensity * 0.2)
+                
+            # 디버프
+            elif effect.status_type == StatusType.REDUCE_ATK:
+                modifiers['physical_attack'] *= (1.0 - effect.intensity * 0.2)
+                modifiers['magic_attack'] *= (1.0 - effect.intensity * 0.2)
+            elif effect.status_type == StatusType.REDUCE_DEF:
+                modifiers['physical_defense'] *= (1.0 - effect.intensity * 0.2)
+                modifiers['magic_defense'] *= (1.0 - effect.intensity * 0.2)
+            elif effect.status_type == StatusType.REDUCE_SPD:
+                modifiers['speed'] *= (1.0 - effect.intensity * 0.3)
+            elif effect.status_type == StatusType.REDUCE_ACCURACY:
+                modifiers['accuracy'] *= (1.0 - effect.intensity * 0.15)
+                
+            # 특수 상태
+            elif effect.status_type == StatusType.VULNERABLE:
+                modifiers['physical_defense'] *= 0.5
+                modifiers['magic_defense'] *= 0.5
+            elif effect.status_type == StatusType.EXPOSED:
+                modifiers['evasion'] *= 0.3
+            elif effect.status_type == StatusType.WEAKNESS:
+                modifiers['physical_attack'] *= 0.7
+                modifiers['magic_attack'] *= 0.7
+            elif effect.status_type == StatusType.HASTE:
+                modifiers['speed'] *= 1.5
+            elif effect.status_type == StatusType.SLOW:
+                modifiers['speed'] *= 0.6
+            elif effect.status_type == StatusType.FOCUS:
+                modifiers['accuracy'] *= 1.3
+                modifiers['critical_rate'] *= 1.2
+            elif effect.status_type == StatusType.RAGE:
+                modifiers['physical_attack'] *= 1.4
+                modifiers['physical_defense'] *= 0.8
+            elif effect.status_type == StatusType.BERSERK:
+                modifiers['physical_attack'] *= 1.6
+                modifiers['magic_attack'] *= 1.6
+                modifiers['physical_defense'] *= 0.6
+                modifiers['magic_defense'] *= 0.6
+                modifiers['accuracy'] *= 0.8
+            elif effect.status_type == StatusType.BLIND:
+                modifiers['accuracy'] *= 0.3
+            elif effect.status_type == StatusType.TERROR:
+                modifiers['physical_attack'] *= 0.6
+                modifiers['magic_attack'] *= 0.6
+                modifiers['speed'] *= 0.7
+                
+            # 호환성을 위한 이전 버프/디버프
+            elif hasattr(effect.status_type, 'value'):
+                if 'BUFF_ATTACK' in effect.status_type.value:
+                    modifiers['physical_attack'] *= (1.0 + effect.intensity * 0.01)
+                    modifiers['magic_attack'] *= (1.0 + effect.intensity * 0.01)
+                elif 'BUFF_DEFENSE' in effect.status_type.value:
+                    modifiers['physical_defense'] *= (1.0 + effect.intensity * 0.01)
+                    modifiers['magic_defense'] *= (1.0 + effect.intensity * 0.01)
+                elif 'BUFF_SPEED' in effect.status_type.value:
+                    modifiers['speed'] *= (1.0 + effect.intensity * 0.01)
+                elif 'DEBUFF_ATTACK' in effect.status_type.value:
+                    modifiers['physical_attack'] *= (1.0 - effect.intensity * 0.01)
+                    modifiers['magic_attack'] *= (1.0 - effect.intensity * 0.01)
+                elif 'DEBUFF_DEFENSE' in effect.status_type.value:
+                    modifiers['physical_defense'] *= (1.0 - effect.intensity * 0.01)
+                    modifiers['magic_defense'] *= (1.0 - effect.intensity * 0.01)
+                elif 'DEBUFF_SPEED' in effect.status_type.value:
+                    modifiers['speed'] *= (1.0 - effect.intensity * 0.01)
         
         return modifiers
     
@@ -1296,8 +1511,15 @@ class Character(BraveMixin):
         self.experience = 0
         self.experience_to_next = 30  # 다음 레벨까지 필요한 경험치
         self.atb_gauge = 0  # ATB 게이지 (0-100)
-        self.atb_speed = speed  # ATB 충전 속도는 스피드 수치 기반
+        self.atb_speed = speed  # ATB 충전 속도는 스피드 수치 기반 (나중에 장비 적용 시 업데이트됨)
         self.is_alive = True
+        
+        # 캐스팅 시스템 속성
+        self.casting_skill = None      # 현재 캐스팅 중인 스킬
+        self.casting_targets = None    # 캐스팅 대상들
+        self.casting_start_time = None # 캐스팅 시작 시간
+        self.casting_duration = None   # 캐스팅 지속 시간
+        self.is_casting = False        # 캐스팅 상태 플래그
         
         # 속성 시스템 추가
         self.element_affinity = self._get_class_element_affinity(character_class)
@@ -1308,6 +1530,26 @@ class Character(BraveMixin):
         self.critical_rate = self._get_class_base_critical_rate(character_class)  # 기본 크리티컬 확률
         self.accuracy = 85 + (speed // 10)  # 기본 명중률 (85% + 스피드 보너스)
         self.evasion = 10 + (speed // 5)   # 기본 회피율 (10% + 스피드 보너스)
+        
+        # 상태이상 관련 속성 추가
+        self.stunned = False
+        self.silenced = False
+        self.paralyzed = False
+        self.sleeping = False
+        self.frozen = False
+        self.blinded = False
+        self.charmed = False
+        self.feared = False
+        self.cursed = False
+        self.blessed = False
+        self.weakened = False
+        self.strengthened = False
+        self.hasted = False
+        self.slowed = False
+        self.shielded = False
+        self.poisoned = False
+        self.burning = False
+        self.regenerating = False
         
         # 특성 시스템
         available_traits = CharacterClassManager.get_class_traits(character_class)
@@ -1642,66 +1884,177 @@ class Character(BraveMixin):
         return effects
     
     def _apply_passive_trait(self, trait, situation: str, **kwargs) -> Dict[str, Any]:
-        """패시브 특성 효과 적용"""
+        """패시브 특성 효과 적용 (대폭 확장)"""
         effects = {}
         
         # trait가 딕셔너리인 경우와 객체인 경우 모두 처리
         if isinstance(trait, dict):
             effect_value = trait.get('effect_value', {})
+            trait_name = trait.get('name', '')
         else:
             effect_value = getattr(trait, 'effect_value', {})
+            trait_name = getattr(trait, 'name', '')
         
-        # 전사 특성들
-        if "low_hp_damage_boost" in effect_value and self.current_hp <= self.max_hp * 0.25:
-            effects["damage_multiplier"] = effect_value["low_hp_damage_boost"]
+        # 전사 계열 특성들
+        if trait_name == "불굴의 의지" and self.current_hp <= self.max_hp * 0.25:
+            effects["damage_multiplier"] = 1.5  # 50% 데미지 증가
+            effects["status_resistance"] = 0.8  # 80% 상태이상 저항
         
-        if "defense_bonus" in effect_value and situation == "defending":
-            effects["defense_bonus"] = effect_value["defense_bonus"]
+        if trait_name == "방어 숙련" and situation == "defending":
+            effects["defense_bonus"] = 0.3  # 30% 방어력 증가
+            effects["damage_reduction"] = 0.15  # 15% 데미지 감소
             
-        # 마법사 특성들
-        if "mana_efficiency" in effect_value and situation == "skill_use":
-            if random.random() < effect_value["mana_efficiency"]:
-                effects["mp_cost_reduction"] = 0.5
-                
-        if "exp_bonus" in effect_value and situation == "combat_end":
-            effects["exp_multiplier"] = 1.0 + effect_value["exp_bonus"]
+        if trait_name == "피의 갈증" and situation == "attacking":
+            if self.current_hp < self.max_hp:
+                missing_hp_ratio = 1.0 - (self.current_hp / self.max_hp)
+                effects["damage_multiplier"] = 1.0 + (missing_hp_ratio * 0.8)  # 최대 80% 증가
+        
+        if trait_name == "전투 광기" and situation == "attacking":
+            effects["crit_chance_bonus"] = 0.25  # 25% 크리티컬 확률 증가
+            effects["accuracy_bonus"] = 0.2  # 20% 명중률 증가
             
-        # 궁수 특성들  
-        if "crit_chance_bonus" in effect_value and situation == "attacking":
-            effects["crit_chance_bonus"] = effect_value["crit_chance_bonus"]
+        if trait_name == "위협적 존재" and situation == "combat_start":
+            effects["enemy_debuff"] = {"attack": -0.1, "accuracy": -0.15}  # 적 디버프
+        
+        # 마법사 계열 특성들
+        if trait_name == "마력 집중" and situation == "skill_use":
+            effects["mp_cost_reduction"] = 0.25  # 25% MP 소모 감소
+            effects["spell_power"] = 1.2  # 20% 마법 위력 증가
             
-        if "dodge_bonus" in effect_value and situation == "defending":
-            effects["dodge_chance_bonus"] = effect_value["dodge_bonus"]
+        if trait_name == "마나 순환" and situation == "turn_end":
+            effects["mp_regeneration"] = int(self.max_mp * 0.1)  # 최대 MP의 10% 회복
             
-        # 도적 특성들
-        if "item_no_turn" in effect_value and situation == "item_use":
-            effects["no_turn_cost"] = True
+        if trait_name == "원소 지배" and situation == "magic_attack":
+            effects["elemental_mastery"] = True
+            effects["spell_power"] = 1.3  # 30% 마법 위력 증가
             
-        # 성기사 특성들
-        if "holy_resistance" in effect_value and situation == "taking_damage":
+        if trait_name == "마법 폭주" and situation == "low_mp":
+            if self.current_mp <= self.max_mp * 0.3:
+                effects["spell_power"] = 1.5  # 50% 마법 위력 증가
+                effects["mp_cost_reduction"] = 0.5  # 50% MP 소모 감소
+        
+        if trait_name == "마법 연구자" and situation == "combat_end":
+            effects["exp_multiplier"] = 1.3  # 30% 경험치 증가
+            
+        # 궁수 계열 특성들
+        if trait_name == "정밀 사격" and situation == "ranged_attack":
+            effects["crit_chance_bonus"] = 0.3  # 30% 크리티컬 확률 증가
+            effects["accuracy_bonus"] = 0.25  # 25% 명중률 증가
+            
+        if trait_name == "민첩한 몸놀림" and situation in ["defending", "dodging"]:
+            effects["dodge_chance_bonus"] = 0.25  # 25% 회피율 증가
+            effects["speed_bonus"] = 0.2  # 20% 속도 증가
+            
+        if trait_name == "원거리 숙련" and situation == "ranged_attack":
+            effects["damage_multiplier"] = 1.25  # 25% 데미지 증가
+            effects["range_bonus"] = 2  # 사거리 증가
+            
+        if trait_name == "바람의 가호" and situation == "turn_start":
+            effects["speed_bonus"] = 0.15  # 15% 속도 증가
+            effects["atb_bonus"] = 10  # ATB 보너스
+            
+        if trait_name == "사냥꾼의 직감" and situation == "combat_start":
+            effects["first_strike"] = True  # 선제공격 확률 증가
+            
+        # 도적 계열 특성들
+        if trait_name == "빠른 손놀림" and situation == "item_use":
+            effects["no_turn_cost"] = True  # 아이템 사용 시 턴 소모 없음
+            
+        if trait_name == "그림자 은신" and situation in ["stealth", "surprise_attack"]:
+            effects["stealth_bonus"] = True
+            effects["crit_damage_bonus"] = 0.5  # 50% 크리티컬 데미지 증가
+            
+        if trait_name == "독 숙련" and situation == "poison_attack":
+            effects["poison_chance"] = 0.4  # 40% 독 부여 확률
+            effects["poison_duration"] = 3  # 독 지속시간 증가
+            
+        if trait_name == "치명적 급소" and situation == "attacking":
+            effects["crit_damage_bonus"] = 0.4  # 40% 크리티컬 데미지 증가
+            
+        if trait_name == "도적의 직감" and situation == "trap_detection":
+            effects["trap_detection"] = True
+            effects["treasure_bonus"] = 0.2  # 20% 보물 발견율 증가
+            
+        # 성기사 계열 특성들
+        if trait_name == "치유의 빛" and situation in ["healing", "turn_end"]:
+            effects["healing_bonus"] = 0.3  # 30% 치유량 증가
+            effects["self_regeneration"] = int(self.max_hp * 0.05)  # 5% HP 재생
+            
+        if trait_name == "신성한 가호" and situation == "defending":
+            effects["holy_resistance"] = 0.5  # 50% 어둠/언데드 저항
+            effects["status_immunity"] = ["curse", "fear"]  # 저주, 공포 면역
+            
+        if trait_name == "축복받은 무기" and situation == "attacking":
             enemy_type = kwargs.get("enemy_type", "")
-            if enemy_type in ["undead", "demon"]:
-                effects["damage_reduction"] = effect_value["holy_resistance"]
+            if enemy_type in ["undead", "demon", "dark"]:
+                effects["holy_damage"] = 1.5  # 150% 신성 데미지
                 
-        if "holy_damage" in effect_value and situation == "attacking":
-            effects["holy_damage_bonus"] = True
+        if trait_name == "수호의 맹세" and situation == "protecting":
+            effects["protect_bonus"] = True
+            effects["damage_reduction"] = 0.3  # 30% 데미지 감소
             
-        # 암흑기사 특성들
-        if "life_steal" in effect_value and situation == "attacking":
-            effects["life_steal_bonus"] = effect_value["life_steal"]
+        if trait_name == "정의의 분노" and situation == "ally_injured":
+            effects["damage_multiplier"] = 1.4  # 40% 데미지 증가
+            effects["accuracy_bonus"] = 0.3  # 30% 명중률 증가
             
-        if "dark_pact" in effect_value and situation == "attacking":
-            hp_ratio = self.current_hp / self.max_hp
-            damage_bonus = (1.0 - hp_ratio) * 1.0  # 낮을수록 최대 100% 증가
-            effects["damage_multiplier"] = 1.0 + damage_bonus
+        # 암흑기사 계열 특성들
+        if trait_name == "생명 흡수" and situation == "attacking":
+            effects["life_steal"] = 0.3  # 30% 생명력 흡수
             
-        # 몽크 특성들
-        if "combo_multiplier" in effect_value and situation == "attacking":
+        if trait_name == "어둠의 계약" and situation == "attacking":
+            hp_cost = int(self.max_hp * 0.1)  # HP 10% 소모
+            if self.current_hp > hp_cost:
+                effects["hp_cost"] = hp_cost
+                effects["damage_multiplier"] = 1.5  # 50% 데미지 증가
+                
+        if trait_name == "불사의 의지" and situation == "near_death":
+            if self.current_hp <= self.max_hp * 0.2:
+                effects["death_resistance"] = 0.7  # 70% 죽음 저항
+                effects["damage_reduction"] = 0.4  # 40% 데미지 감소
+                
+        if trait_name == "어둠 조작" and situation == "magic_attack":
+            effects["dark_mastery"] = True
+            effects["spell_power"] = 1.25  # 25% 마법 위력 증가
+            
+        if trait_name == "공포 오라" and situation == "combat_presence":
+            effects["enemy_debuff"] = {"accuracy": -0.2, "speed": -0.15}  # 적 디버프
+            
+        # 몽크 계열 특성들
+        if trait_name == "내공 순환" and situation in ["turn_end", "meditation"]:
+            effects["mp_regeneration"] = int(self.max_mp * 0.15)  # 15% MP 회복
+            effects["hp_regeneration"] = int(self.max_hp * 0.08)  # 8% HP 회복
+            
+        if trait_name == "연타 숙련" and situation == "combo_attack":
             combo_count = kwargs.get("combo_count", 0)
-            effects["combo_damage"] = 1.0 + (combo_count * effect_value["combo_multiplier"])
+            effects["combo_multiplier"] = 1.0 + (combo_count * 0.2)  # 콤보당 20% 증가
             
-        if "status_resist" in effect_value and situation == "status_effect":
-            effects["status_resistance"] = effect_value["status_resist"]
+        if trait_name == "정신 수양" and situation in ["status_effect", "mental_attack"]:
+            effects["status_resistance"] = 0.6  # 60% 상태이상 저항
+            effects["mental_immunity"] = True  # 정신 계열 면역
+            
+        if trait_name == "참선의 깨달음" and situation == "turn_start":
+            effects["wisdom_bonus"] = True
+            effects["skill_cooldown_reduction"] = 1  # 스킬 쿨다운 1턴 감소
+            
+        if trait_name == "기절 공격" and situation == "unarmed_attack":
+            effects["stun_chance"] = 0.25  # 25% 기절 확률
+            
+        # 바드 계열 특성들  
+        if trait_name == "영감 부여" and situation == "party_support":
+            effects["party_buff"] = {"attack": 0.15, "speed": 0.1}  # 파티 버프
+            
+        if trait_name == "다중 주문" and situation == "spell_casting":
+            effects["multi_cast_chance"] = 0.3  # 30% 다중 시전 확률
+            
+        if trait_name == "재생의 노래" and situation == "turn_end":
+            effects["party_healing"] = int(self.max_hp * 0.1)  # 파티 힐링
+            
+        if trait_name == "마법 저항" and situation == "magic_defense":
+            effects["magic_resistance"] = 0.3  # 30% 마법 저항
+            
+        if trait_name == "카리스마" and situation == "social_interaction":
+            effects["negotiation_bonus"] = True
+            effects["shop_discount"] = 0.1  # 10% 상점 할인
             
         return effects
     
@@ -2062,13 +2415,21 @@ class Character(BraveMixin):
         
     @property
     def limited_max_hp(self) -> int:
-        """상처에 의해 제한된 최대 HP"""
-        return self.max_hp - self.wounds
+        """상처에 의해 제한된 최대 HP (장비 보너스 포함)"""
+        try:
+            return self.get_total_max_hp() - self.wounds
+        except (AttributeError, TypeError):
+            # get_total_max_hp 메서드가 없거나 오류 시 기본 max_hp 사용
+            return self.max_hp - self.wounds
         
     @property
     def max_wounds(self) -> int:
-        """최대 상처량 (최대 HP의 75%)"""
-        return int(self.max_hp * 0.75)
+        """최대 상처량 (최대 HP의 75%, 장비 보너스 포함)"""
+        try:
+            return int(self.get_total_max_hp() * 0.75)
+        except (AttributeError, TypeError):
+            # get_total_max_hp 메서드가 없거나 오류 시 기본 max_hp 사용
+            return int(self.max_hp * 0.75)
         
     def add_wounds(self, wound_amount: int):
         """상처 추가 (direct wound damage)"""
@@ -2318,7 +2679,7 @@ class Character(BraveMixin):
         
     def process_status_effects(self) -> List[str]:
         """상태이상 처리 (턴 시작 시)"""
-        return self.status_manager.process_turn_effects()
+        return self.status_manager.process_turn_effects(self)
         
     def equip_item(self, item: Item) -> bool:
         """아이템 장착"""
@@ -2411,7 +2772,7 @@ class Character(BraveMixin):
             "신관": {"hp": 18, "mp": 2, "p_atk": 2, "m_atk": 6, "p_def": 4, "m_def": 8, "speed": 2},
             "마검사": {"hp": 18, "mp": 2, "p_atk": 5, "m_atk": 6, "p_def": 4, "m_def": 4, "speed": 4},
             "차원술사": {"hp": 12, "mp": 3, "p_atk": 2, "m_atk": 8, "p_def": 2, "m_def": 6, "speed": 4},
-            "광전사": {"hp": 26, "mp": 1, "p_atk": 9, "m_atk": 1, "p_def": 2, "m_def": 1, "speed": 5},
+            "광전사": {"hp": 26, "mp": 1, "p_atk": 6, "m_atk": 1, "p_def": 2, "m_def": 1, "speed": 5},
             "마법사": {"hp": 13, "mp": 3, "p_atk": 2, "m_atk": 8, "p_def": 2, "m_def": 6, "speed": 4},
             "성직자": {"hp": 18, "mp": 2, "p_atk": 2, "m_atk": 6, "p_def": 4, "m_def": 8, "speed": 2},
             "Enemy": {"hp": 20, "mp": 1, "p_atk": 4, "m_atk": 4, "p_def": 4, "m_def": 4, "speed": 3}
@@ -2442,7 +2803,7 @@ class Character(BraveMixin):
         self.physical_defense += gains["p_def"]
         self.magic_defense += gains["m_def"]
         self.speed += gains["speed"]
-        self.atb_speed = self.speed
+        self.atb_speed = self.get_total_speed()  # 장비 보너스 포함된 속도로 업데이트
         
         # Brave 능력치도 재계산
         self.update_brave_on_level_up()
@@ -2747,6 +3108,11 @@ class PartyManager:
         self.shared_inventory = Inventory(max_size=100)  # 공용 인벤토리 (확장)
         self.party_gold = 0  # 파티 통합 골드
         self.total_steps = 0  # 총 걸음 수 추적
+        self.game_instance = None  # 게임 인스턴스 참조 (패시브 효과용)
+    
+    def set_game_instance(self, game_instance):
+        """게임 인스턴스 참조 설정"""
+        self.game_instance = game_instance
         
     def get_total_carry_capacity(self) -> float:
         """파티 전체 하중 한계 계산 (전체 순수 공격력 기반) - 더 엄격하게"""
@@ -2786,12 +3152,40 @@ class PartyManager:
         
         # 살아있는 모든 파티 멤버의 장비에서 vision_range 보너스 합산
         for member in self.get_alive_members():
-            if hasattr(member, 'equipment'):
-                for slot, equipment in member.equipment.items():
-                    if equipment and hasattr(equipment, 'stats') and equipment.stats:
-                        vision_bonus += equipment.stats.get('vision_range', 0)
+            # 각 장비 슬롯 확인 (equipped_weapon, equipped_armor, equipped_accessory)
+            equipment_slots = {
+                'weapon': getattr(member, 'equipped_weapon', None),
+                'armor': getattr(member, 'equipped_armor', None),
+                'accessory': getattr(member, 'equipped_accessory', None)
+            }
+            
+            for slot_name, equipment in equipment_slots.items():
+                if equipment and hasattr(equipment, 'stats') and equipment.stats:
+                    equipment_vision = equipment.stats.get('vision_range', 0)
+                    if equipment_vision > 0:
+                        vision_bonus += equipment_vision
         
-        return base_vision + vision_bonus
+        # 패시브 효과에서 시야 보너스 확인
+        passive_vision_bonus = 0
+        if hasattr(self, 'game_instance') and self.game_instance and hasattr(self.game_instance, 'party_passive_effects'):
+            for passive in self.game_instance.party_passive_effects:
+                effect_value = passive.get('effect_value', {})
+                
+                # 탐험가의 제6감 패시브
+                if passive.get('effect_type') == 'explorer_instinct':
+                    passive_vision = effect_value.get('vision_range', 0)
+                    if passive_vision > 0:
+                        passive_vision_bonus += passive_vision
+                
+                # 전술가의 감각 패시브
+                elif passive.get('effect_type') == 'tactician_sense':
+                    passive_vision = effect_value.get('vision_range', 0)
+                    if passive_vision > 0:
+                        passive_vision_bonus += passive_vision
+        
+        vision_bonus += passive_vision_bonus
+        total_vision = base_vision + vision_bonus
+        return total_vision
     
     def add_member(self, character: Character) -> bool:
         """파티 멤버 추가"""
@@ -3069,7 +3463,10 @@ class PartyManager:
         self.equipment_attack_bonus = 0
         self.equipment_defense_bonus = 0
         self.equipment_magic_bonus = 0
+        self.equipment_magic_defense_bonus = 0  # 마법방어 보너스 추가
         self.equipment_speed_bonus = 0
+        self.equipment_hp_bonus = 0
+        self.equipment_mp_bonus = 0
         
         # 착용 중인 장비들의 효과 적용
         equipped_items = [item for item in [self.equipped_weapon, self.equipped_armor, self.equipped_accessory] if item]
@@ -3080,7 +3477,13 @@ class PartyManager:
                 self.equipment_attack_bonus += stats.get('physical_attack', 0)
                 self.equipment_defense_bonus += stats.get('physical_defense', 0)
                 self.equipment_magic_bonus += stats.get('magic_attack', 0)
+                self.equipment_magic_defense_bonus += stats.get('magic_defense', 0)  # 마법방어 적용
                 self.equipment_speed_bonus += stats.get('speed', 0)
+                self.equipment_hp_bonus += stats.get('max_hp', 0)
+                self.equipment_mp_bonus += stats.get('max_mp', 0)
+        
+        # ATB 속도도 장비 보너스 반영
+        self.atb_speed = self.get_total_speed()
     
     def get_total_attack(self) -> int:
         """장비 보너스가 포함된 총 공격력"""
@@ -3100,8 +3503,491 @@ class PartyManager:
         equipment_bonus = getattr(self, 'equipment_magic_bonus', 0)
         return base_magic + equipment_bonus
     
+    def get_total_max_hp(self) -> int:
+        """장비 보너스가 포함된 총 최대 HP"""
+        base_hp = self.max_hp
+        equipment_bonus = getattr(self, 'equipment_hp_bonus', 0)
+        return base_hp + equipment_bonus
+    
+    def get_total_max_mp(self) -> int:
+        """장비 보너스가 포함된 총 최대 MP"""
+        base_mp = self.max_mp
+        equipment_bonus = getattr(self, 'equipment_mp_bonus', 0)
+        return base_mp + equipment_bonus
+    
+    def start_casting(self, skill, targets, current_time, duration):
+        """캐스팅 시작"""
+        self.casting_skill = skill
+        self.casting_targets = targets
+        self.casting_start_time = current_time
+        self.casting_duration = duration
+        self.is_casting = True
+        print(f"🔮 {self.name}이(가) {skill.get('name', '스킬')} 캐스팅을 시작합니다! [{duration}% 소요]")
+    
+    def update_casting(self, current_time):
+        """캐스팅 진행 상황 업데이트"""
+        if not self.is_casting or not self.casting_start_time:
+            return False
+        
+        elapsed_time = current_time - self.casting_start_time
+        if elapsed_time >= self.casting_duration:
+            return True  # 캐스팅 완료
+        return False
+    
+    def complete_casting(self):
+        """캐스팅 완료"""
+        skill = self.casting_skill
+        targets = self.casting_targets
+        
+        # 캐스팅 상태 초기화
+        self.casting_skill = None
+        self.casting_targets = None
+        self.casting_start_time = None
+        self.casting_duration = None
+        self.is_casting = False
+        
+        return skill, targets
+    
+    def cancel_casting(self):
+        """캐스팅 취소"""
+        if self.is_casting:
+            print(f"❌ {self.name}의 캐스팅이 취소되었습니다!")
+            self.casting_skill = None
+            self.casting_targets = None
+            self.casting_start_time = None
+            self.casting_duration = None
+            self.is_casting = False
+    
+    def get_casting_progress(self, current_time):
+        """캐스팅 진행률 반환 (0.0 ~ 1.0)"""
+        if not self.is_casting or not self.casting_start_time:
+            return 0.0
+        
+        elapsed_time = current_time - self.casting_start_time
+        return min(elapsed_time / self.casting_duration, 1.0)
+    
     def get_total_speed(self) -> int:
         """장비 보너스가 포함된 총 속도"""
-        base_speed = self.speed + self.temp_speed_bonus
+        base_speed = self.speed + getattr(self, 'temp_speed_bonus', 0)
         equipment_bonus = getattr(self, 'equipment_speed_bonus', 0)
         return base_speed + equipment_bonus
+    
+    def get_total_attack(self) -> int:
+        """장비 보너스가 포함된 총 공격력"""
+        base_attack = self.physical_attack + getattr(self, 'temp_attack_bonus', 0)
+        equipment_bonus = getattr(self, 'equipment_attack_bonus', 0)
+        return base_attack + equipment_bonus
+    
+    def get_total_defense(self) -> int:
+        """장비 보너스가 포함된 총 방어력"""
+        base_defense = self.physical_defense + getattr(self, 'temp_defense_bonus', 0)
+        equipment_bonus = getattr(self, 'equipment_defense_bonus', 0)
+        return base_defense + equipment_bonus
+    
+    def get_total_magic_attack(self) -> int:
+        """장비 보너스가 포함된 총 마법 공격력"""
+        base_magic = self.magic_attack + getattr(self, 'temp_magic_bonus', 0)
+        equipment_bonus = getattr(self, 'equipment_magic_bonus', 0)
+        return base_magic + equipment_bonus
+    
+    def get_total_magic_defense(self) -> int:
+        """장비 보너스가 포함된 총 마법 방어력"""
+        base_magic_def = self.magic_defense + getattr(self, 'temp_magic_defense_bonus', 0)
+        equipment_bonus = getattr(self, 'equipment_magic_defense_bonus', 0)
+        return base_magic_def + equipment_bonus
+    
+    # ==================== 실제 효과 처리 메서드들 ====================
+    
+    def process_attack_effects(self, target, damage_dealt: int, is_crit: bool = False) -> List[str]:
+        """공격 시 발동되는 모든 효과 처리"""
+        messages = []
+        
+        # 1. 검투사 반격 확률 처리 (공격받을 때)
+        if hasattr(target, 'temp_counter_chance') and target.temp_counter_chance > 0:
+            import random
+            if random.random() < (target.temp_counter_chance / 100):
+                counter_damage = int(target.get_total_attack() * 0.8)
+                self.current_hp = max(1, self.current_hp - counter_damage)
+                messages.append(f"⚔️ {target.name}이(가) 반격하여 {self.name}에게 {counter_damage} 피해!")
+        
+        # 2. 기사 수호 보너스 처리 (파티원 보호)
+        if hasattr(self, 'temp_guard_bonus') and self.temp_guard_bonus > 0:
+            # 파티원이 있을 때 데미지 감소
+            guard_reduction = int(damage_dealt * (self.temp_guard_bonus / 100))
+            if guard_reduction > 0:
+                messages.append(f"🛡️ {self.name}의 수호로 피해 {guard_reduction} 감소!")
+                return messages, max(1, damage_dealt - guard_reduction)
+        
+        # 3. 생명력 흡수 효과
+        if hasattr(self, 'temp_life_steal') and self.temp_life_steal > 0:
+            heal_amount = int(damage_dealt * self.temp_life_steal)
+            if heal_amount > 0:
+                old_hp = self.current_hp
+                self.current_hp = min(self.max_hp, self.current_hp + heal_amount)
+                actual_heal = self.current_hp - old_hp
+                if actual_heal > 0:
+                    messages.append(f"🩸 {self.name}이(가) 생명력을 {actual_heal} 흡수!")
+        
+        # 4. 독 무기 효과 (도적/암살자)
+        if hasattr(self, 'temp_poison_weapon') and self.temp_poison_weapon:
+            if hasattr(target, 'status_manager') and target.status_manager:
+                target.status_manager.add_status("독", 3, 1.0)
+                messages.append(f"☠️ {target.name}이(가) 독에 중독되었습니다!")
+        
+        # 5. 화염 피해 효과 (용기사)
+        if hasattr(self, 'temp_fire_damage') and self.temp_fire_damage:
+            fire_damage = int(damage_dealt * 0.3)
+            if hasattr(target, 'status_manager') and target.status_manager:
+                target.status_manager.add_status("화상", 3, 1.0)
+                messages.append(f"🔥 {target.name}이(가) 화상을 입었습니다!")
+        
+        # 6. 공포 오라 효과 (암흑기사)
+        if hasattr(self, 'temp_fear_aura') and self.temp_fear_aura > 0:
+            if hasattr(target, 'status_manager') and target.status_manager:
+                import random
+                if random.random() < (self.temp_fear_aura / 100):
+                    target.status_manager.add_status("공포", 2, 1.0)
+                    messages.append(f"😰 {target.name}이(가) 공포에 떨고 있습니다!")
+        
+        # 7. MP 회복 효과 (마검사)
+        if hasattr(self, 'temp_attack_mp_gain') and self.temp_attack_mp_gain:
+            mp_gain = min(5, self.max_mp - self.current_mp)
+            if mp_gain > 0:
+                self.current_mp += mp_gain
+                messages.append(f"💙 {self.name}이(가) 공격으로 {mp_gain} MP 회복!")
+        
+        return messages
+    
+    def process_skill_effects(self, skill_name: str, targets: List, skill_data: dict) -> List[str]:
+        """스킬 사용 시 발동되는 효과 처리"""
+        messages = []
+        
+        # 1. 철학자 지혜 효과 - 스킬 비용 감소
+        if hasattr(self, 'temp_skill_cost_reduction') and self.temp_skill_cost_reduction > 0:
+            cost_reduction = int(skill_data.get('mp_cost', 0) * self.temp_skill_cost_reduction)
+            if cost_reduction > 0:
+                self.current_mp += cost_reduction  # MP 일부 반환
+                messages.append(f"🧠 지혜로 인해 MP {cost_reduction} 절약!")
+        
+        # 2. 아크메이지 마나 효율 효과
+        if hasattr(self, 'temp_mana_efficiency') and self.temp_mana_efficiency > 0:
+            if skill_data.get('skill_type') == 'magic':
+                import random
+                if random.random() < self.temp_mana_efficiency:
+                    # MP 소모 없이 시전
+                    mp_cost = skill_data.get('mp_cost', 0)
+                    self.current_mp += mp_cost
+                    messages.append(f"✨ 마나 순환으로 MP 소모 없이 시전!")
+        
+        # 3. 바드 다중 주문 효과
+        if hasattr(self, 'temp_multi_cast') and self.temp_multi_cast:
+            # 추가 시전 기회 (이미 전투 시스템에서 처리됨)
+            messages.append(f"🎵 다중 주문으로 추가 시전!")
+        
+        # 4. 네크로맨서 생명력/마나 동시 흡수
+        if hasattr(self, 'temp_life_mana_drain') and self.temp_life_mana_drain:
+            for target in targets:
+                if hasattr(target, 'current_hp') and target.current_hp > 0:
+                    drain_amount = min(10, target.current_hp - 1)
+                    target.current_hp -= drain_amount
+                    self.current_hp = min(self.max_hp, self.current_hp + drain_amount)
+                    self.current_mp = min(self.max_mp, self.current_mp + drain_amount // 2)
+                    messages.append(f"🧛 {target.name}으로부터 생명력과 마나를 흡수!")
+        
+        # 5. 연금술사 랜덤 속성 효과
+        if hasattr(self, 'temp_random_element') and self.temp_random_element:
+            import random
+            elements = ["화염", "냉기", "번개", "독"]
+            chosen_element = random.choice(elements)
+            messages.append(f"⚗️ 랜덤 속성 발동: {chosen_element} 효과!")
+            
+            # 속성별 추가 효과
+            for target in targets:
+                if hasattr(target, 'status_manager') and target.status_manager:
+                    if chosen_element == "화염":
+                        target.status_manager.add_status("화상", 3, 1.0)
+                    elif chosen_element == "냉기":
+                        target.status_manager.add_status("냉기", 2, 1.0)
+                    elif chosen_element == "번개":
+                        target.status_manager.add_status("감전", 2, 1.0)
+                    elif chosen_element == "독":
+                        target.status_manager.add_status("독", 4, 1.0)
+        
+        return messages
+    
+    def process_defense_effects(self, attacker, incoming_damage: int) -> tuple[int, List[str]]:
+        """방어/피격 시 발동되는 효과 처리"""
+        messages = []
+        final_damage = incoming_damage
+        
+        # 1. 철학자 패턴 분석 효과
+        if hasattr(self, 'temp_pattern_analysis') and self.temp_pattern_analysis:
+            # 동일한 공격자의 연속 공격 시 피해 감소
+            if hasattr(self, 'last_attacker') and self.last_attacker == attacker.name:
+                damage_reduction = int(final_damage * 0.2)  # 20% 감소
+                final_damage -= damage_reduction
+                messages.append(f"🧠 패턴 분석으로 피해 {damage_reduction} 감소!")
+            self.last_attacker = attacker.name
+        
+        # 2. 시간술사 미래 시야 효과
+        if hasattr(self, 'temp_future_sight') and self.temp_future_sight:
+            import random
+            if random.random() < 0.3:  # 30% 확률로 회피
+                final_damage = 0
+                messages.append(f"👁️ 미래 시야로 공격을 완전히 회피!")
+        
+        # 3. 무당 영적 보호 효과
+        if hasattr(self, 'temp_spirit_protection') and self.temp_spirit_protection > 0:
+            spirit_reduction = int(final_damage * (self.temp_spirit_protection / 100))
+            final_damage = max(1, final_damage - spirit_reduction)
+            messages.append(f"👻 영적 보호로 피해 {spirit_reduction} 감소!")
+        
+        # 4. 용기사 비늘 방어 효과
+        if hasattr(self, 'temp_physical_resistance') and self.temp_physical_resistance > 0:
+            resistance_reduction = int(final_damage * self.temp_physical_resistance)
+            final_damage = max(1, final_damage - resistance_reduction)
+            messages.append(f"🐉 비늘 방어로 피해 {resistance_reduction} 감소!")
+        
+        # 5. 차원술사 공간 왜곡 효과
+        if hasattr(self, 'temp_enemy_accuracy_down') and self.temp_enemy_accuracy_down > 0:
+            import random
+            if random.random() < (self.temp_enemy_accuracy_down / 100):
+                final_damage = 0
+                messages.append(f"🌀 공간 왜곡으로 공격이 빗나갔습니다!")
+        
+        # 6. 차원술사 차원 회피 효과
+        if hasattr(self, 'temp_dimension_dodge') and self.temp_dimension_dodge:
+            final_damage = 0
+            messages.append(f"🌌 차원 이동으로 모든 공격 회피!")
+        
+        # 7. 사무라이 생존 의지 효과
+        if hasattr(self, 'temp_survival_bonus') and self.temp_survival_bonus > 0:
+            if self.current_hp <= self.max_hp * 0.3:  # 저체력일 때
+                survival_reduction = int(final_damage * (self.temp_survival_bonus / 100))
+                final_damage = max(1, final_damage - survival_reduction)
+                messages.append(f"⚔️ 생존 의지로 피해 {survival_reduction} 감소!")
+        
+        return final_damage, messages
+    
+    def process_turn_start_effects(self) -> List[str]:
+        """턴 시작 시 발동되는 효과들"""
+        messages = []
+        
+        # 1. 드루이드 자연의 축복 - 턴 시작 시 HP/MP 회복
+        if hasattr(self, 'temp_nature_blessing') and self.temp_nature_blessing:
+            hp_heal = int(self.max_hp * 0.05)
+            mp_heal = int(self.max_mp * 0.05)
+            
+            old_hp = self.current_hp
+            self.current_hp = min(self.max_hp, self.current_hp + hp_heal)
+            actual_hp_heal = self.current_hp - old_hp
+            
+            old_mp = self.current_mp
+            self.current_mp = min(self.max_mp, self.current_mp + mp_heal)
+            actual_mp_heal = self.current_mp - old_mp
+            
+            if actual_hp_heal > 0 or actual_mp_heal > 0:
+                messages.append(f"🌿 자연의 축복: HP +{actual_hp_heal}, MP +{actual_mp_heal}")
+        
+        # 2. 정령술사 자연과의 대화 - MP 회복
+        if hasattr(self, 'temp_nature_communion') and self.temp_nature_communion:
+            mp_gain = int(self.max_mp * 0.08)
+            old_mp = self.current_mp
+            self.current_mp = min(self.max_mp, self.current_mp + mp_gain)
+            actual_mp_gain = self.current_mp - old_mp
+            if actual_mp_gain > 0:
+                messages.append(f"🧚 자연과의 대화로 MP {actual_mp_gain} 회복!")
+        
+        # 3. 사무라이 명상 효과 - MP 재생 증가
+        if hasattr(self, 'temp_mp_regen_boost') and self.temp_mp_regen_boost > 0:
+            meditation_mp = int(self.max_mp * (self.temp_mp_regen_boost / 100))
+            old_mp = self.current_mp
+            self.current_mp = min(self.max_mp, self.current_mp + meditation_mp)
+            actual_mp = self.current_mp - old_mp
+            if actual_mp > 0:
+                messages.append(f"🧘 명상으로 MP {actual_mp} 추가 회복!")
+        
+        # 4. 몽크 참선의 깨달음 - 상태이상 저항
+        if hasattr(self, 'temp_meditation_recovery') and self.temp_meditation_recovery:
+            if hasattr(self, 'status_manager') and self.status_manager:
+                removed_count = 0
+                for status_type in ["독", "화상", "공포", "혼란"]:
+                    if self.status_manager.remove_status(status_type):
+                        removed_count += 1
+                if removed_count > 0:
+                    messages.append(f"🧘‍♂️ 참선으로 {removed_count}개 상태이상 치료!")
+        
+        # 5. 자동 포탑 공격 (기계공학자)
+        if hasattr(self, 'temp_turret_damage') and self.temp_turret_damage > 0:
+            messages.append(f"🔧 자동 포탑이 적에게 {self.temp_turret_damage} 피해!")
+        
+        # 6. 식물 조종 피해 (드루이드)
+        if hasattr(self, 'temp_plant_control_damage') and self.temp_plant_control_damage > 0:
+            messages.append(f"🌿 조종된 식물이 적에게 {self.temp_plant_control_damage} 피해!")
+        
+        return messages
+    
+    def process_kill_effects(self, killed_enemy) -> List[str]:
+        """적 처치 시 발동되는 효과들"""
+        messages = []
+        
+        # 1. 전사 피의 갈증 - 처치 시 다음 공격 강화
+        if hasattr(self, 'temp_kill_bonus') and self.temp_kill_bonus > 0:
+            self.temp_next_attack_bonus = getattr(self, 'temp_next_attack_bonus', 0) + self.temp_kill_bonus
+            messages.append(f"⚔️ 피의 갈증 발동! 다음 공격 +{self.temp_kill_bonus}")
+        
+        # 2. 해적 바다의 분노 - 연속 처치 시 공격력 누적
+        if hasattr(self, 'temp_sea_rage') and self.temp_sea_rage:
+            kill_stack = getattr(self, 'kill_stack_count', 0) + 1
+            self.kill_stack_count = kill_stack
+            rage_bonus = kill_stack * 5  # 처치당 공격력 +5
+            self.temp_attack_bonus = getattr(self, 'temp_attack_bonus', 0) + 5
+            messages.append(f"🏴‍☠️ 바다의 분노 ({kill_stack}스택): 공격력 +{rage_bonus}")
+        
+        # 3. 네크로맨서 영혼 조작 - 처치 시 MP 회복
+        if hasattr(self, 'temp_soul_harvest') and self.temp_soul_harvest:
+            mp_gain = min(15, self.max_mp - self.current_mp)
+            if mp_gain > 0:
+                self.current_mp += mp_gain
+                messages.append(f"💀 영혼을 수확하여 MP {mp_gain} 회복!")
+        
+        return messages
+    
+    def process_critical_hit_effects(self, target, damage: int) -> List[str]:
+        """치명타 발동 시 효과들"""
+        messages = []
+        
+        # 1. 도적 치명적 급소 - 크리티컬 시 출혈
+        if hasattr(self, 'temp_crit_bleed') and self.temp_crit_bleed:
+            if hasattr(target, 'status_manager') and target.status_manager:
+                target.status_manager.add_status("출혈", 4, 1.5)
+                messages.append(f"🩸 치명적 급소 적중! {target.name}이(가) 심한 출혈!")
+        
+        # 2. 아크메이지 마법 연쇄 - 마법 크리티컬 시 추가 피해
+        if hasattr(self, 'temp_magic_chain') and self.temp_magic_chain:
+            chain_damage = int(damage * 0.5)
+            messages.append(f"⚡ 마법 연쇄 발동! 추가 피해 {chain_damage}!")
+        
+        return messages
+    
+    # ==================== 패시브 효과 실제 적용 ====================
+    
+    def apply_all_passive_effects(self):
+        """모든 패시브 효과 적용 (턴 시작/전투 시작 시 호출)"""
+        # 기존 임시 효과 초기화
+        self.reset_temp_bonuses()
+        
+        # 활성화된 특성들의 패시브 효과 적용
+        for trait in self.active_traits:
+            trait.apply_passive_effect(self)
+        
+        # 장비 패시브 효과 적용
+        if hasattr(self, 'equipped_weapon') and self.equipped_weapon:
+            self.equipped_weapon.apply_equipment_effects(self, "passive")
+        if hasattr(self, 'equipped_armor') and self.equipped_armor:
+            self.equipped_armor.apply_equipment_effects(self, "passive")
+        if hasattr(self, 'equipped_accessory') and self.equipped_accessory:
+            self.equipped_accessory.apply_equipment_effects(self, "passive")
+    
+    def reset_temp_bonuses(self):
+        """턴 시작 시 임시 보너스 초기화"""
+        # 기본 임시 보너스들
+        self.temp_attack_bonus = 0
+        self.temp_defense_bonus = 0
+        self.temp_magic_bonus = 0
+        self.temp_speed_bonus = 0
+        self.temp_crit_bonus = 0
+        self.temp_dodge_bonus = 0
+        self.temp_accuracy_bonus = 0
+        
+        # 저항 관련
+        self.temp_magic_resistance = 0
+        self.temp_physical_resistance = 0
+        self.temp_status_resist = 0
+        
+        # 특수 효과들
+        self.temp_life_steal = 0
+        self.temp_penetration = 0
+        self.temp_vision_bonus = 0
+        
+        # 상태 플래그들
+        self.temp_poison_weapon = False
+        self.temp_fire_damage = False
+        self.temp_holy_damage = False
+        self.temp_weapon_immunity = False
+        self.temp_first_strike = False
+        self.temp_ignore_resistance = False
+        self.temp_random_element = False
+    
+    def calculate_final_stats(self) -> dict:
+        """최종 스탯 계산 (모든 보너스 포함)"""
+        final_stats = {
+            'physical_attack': self.physical_attack + getattr(self, 'temp_attack_bonus', 0),
+            'magic_attack': self.magic_attack + getattr(self, 'temp_magic_bonus', 0),
+            'physical_defense': self.physical_defense + getattr(self, 'temp_defense_bonus', 0),
+            'magic_defense': self.magic_defense + getattr(self, 'temp_magic_defense_bonus', 0),
+            'speed': self.speed + getattr(self, 'temp_speed_bonus', 0),
+            'crit_chance': getattr(self, 'base_crit_chance', 5) + getattr(self, 'temp_crit_bonus', 0),
+            'dodge_chance': getattr(self, 'base_dodge_chance', 5) + getattr(self, 'temp_dodge_bonus', 0),
+            'accuracy': getattr(self, 'base_accuracy', 85) + getattr(self, 'temp_accuracy_bonus', 0)
+        }
+        
+        # 장비 보너스 추가
+        final_stats['physical_attack'] += getattr(self, 'equipment_attack_bonus', 0)
+        final_stats['magic_attack'] += getattr(self, 'equipment_magic_bonus', 0)
+        final_stats['physical_defense'] += getattr(self, 'equipment_defense_bonus', 0)
+        final_stats['magic_defense'] += getattr(self, 'equipment_magic_defense_bonus', 0)
+        final_stats['speed'] += getattr(self, 'equipment_speed_bonus', 0)
+        
+        return final_stats
+    
+    def update_duration_effects(self) -> List[str]:
+        """모든 지속시간 효과 업데이트"""
+        messages = []
+        
+        # 버프 지속시간 관리
+        duration_attributes = [
+            ('temp_attack_duration', 'temp_attack_bonus', '공격력 버프'),
+            ('temp_defense_duration', 'temp_defense_bonus', '방어력 버프'),
+            ('temp_magic_duration', 'temp_magic_bonus', '마법력 버프'),
+            ('temp_speed_duration', 'temp_speed_bonus', '속도 버프'),
+            ('temp_weapon_blessing_duration', 'temp_crit_bonus', '무기 축복'),
+            ('temp_armor_blessing_duration', 'temp_defense_bonus', '방어구 축복'),
+            ('temp_immunity_duration', 'temp_status_immunity', '상태이상 면역'),
+            ('temp_overflow_duration', 'temp_mana_overflow', '마나 오버플로우'),
+            ('temp_exp_duration', 'temp_exp_multiplier', '경험치 부스트'),
+            ('temp_gold_duration', 'temp_gold_multiplier', '골드 부스트'),
+            ('temp_transform_duration', 'temp_transformation', '변신 효과')
+        ]
+        
+        for duration_attr, effect_attr, effect_name in duration_attributes:
+            if hasattr(self, duration_attr):
+                duration = getattr(self, duration_attr)
+                if duration > 0:
+                    setattr(self, duration_attr, duration - 1)
+                    if duration - 1 <= 0:
+                        # 효과 종료
+                        if hasattr(self, effect_attr):
+                            setattr(self, effect_attr, False if isinstance(getattr(self, effect_attr), bool) else 0)
+                        messages.append(f"⏰ {effect_name} 효과가 종료되었습니다!")
+        
+        # 특수 지속시간 효과들
+        special_durations = [
+            ('temp_treasure_vision_duration', 'temp_treasure_vision', '보물 탐지'),
+            ('temp_teleport_duration', 'temp_dodge_bonus', '순간이동'),
+            ('temp_ally_duration', 'temp_summoned_ally', '소환수'),
+            ('stealth_turns', 'stealth_turns', '은신'),
+            ('temp_enemy_accuracy_duration', 'temp_enemy_accuracy_down', '연막탄')
+        ]
+        
+        for duration_attr, effect_attr, effect_name in special_durations:
+            if hasattr(self, duration_attr):
+                duration = getattr(self, duration_attr)
+                if duration > 0:
+                    setattr(self, duration_attr, duration - 1)
+                    if duration - 1 <= 0:
+                        if hasattr(self, effect_attr):
+                            setattr(self, effect_attr, False if isinstance(getattr(self, effect_attr), bool) else 0)
+                        messages.append(f"⏰ {effect_name} 효과가 종료되었습니다!")
+        
+        return messages

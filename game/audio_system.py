@@ -136,6 +136,10 @@ class AudioManager:
         self.loaded_bgm = set()
         self.loaded_sfx = set()
         
+        # SFX 쿨다운 시스템 (중복 재생 방지)
+        self.last_sfx_time = {}
+        self.sfx_cooldown = 0.1  # 100ms 쿨다운
+        
         # 🔧 안전한 경로 처리 시스템
         self.sounds_base_path = self._get_sounds_path()
         self.bgm_base_path = os.path.join(self.sounds_base_path, "bgm")
@@ -337,8 +341,10 @@ class AudioManager:
                 "19-Don of the Slums.mp3"            # 월 마켓
             ],
             BGMType.VICTORY: [
-                "12-Fanfare.mp3",                    # 승리의 팡파르
-                "72-The Highwind Takes to the Skies.mp3"           # 하이윈드
+                "12-Fanfare.mp3",                    # 승리의 팡파르 (우선 재생)
+                "12-Fanfare.mp3",                    # 팡파레 확률 증가
+                "12-Fanfare.mp3",                    # 팡파레 확률 더 증가
+                "72-The Highwind Takes to the Skies.mp3"           # 하이윈드 (보조)
             ],
             BGMType.GAME_OVER: [
                 "39-Continue.mp3",                   # 게임 오버
@@ -508,7 +514,19 @@ class AudioManager:
         return bgm_type in field_bgm_types
     
     def play_sfx(self, sfx_type_or_name, volume_multiplier: float = 1.0):
-        """SFX 재생 - SFXType 또는 문자열 모두 지원"""
+        """SFX 재생 - SFXType 또는 문자열 모두 지원 (중복 재생 방지)"""
+        import time
+        
+        # 중복 재생 방지 - 쿨다운 체크
+        current_time = time.time()
+        sfx_key = str(sfx_type_or_name)
+        if sfx_key in self.last_sfx_time:
+            time_diff = current_time - self.last_sfx_time[sfx_key]
+            if time_diff < self.sfx_cooldown:
+                return  # 쿨다운 중이면 재생하지 않음
+        
+        self.last_sfx_time[sfx_key] = current_time
+        
         # 문자열이면 SFXType으로 변환
         if isinstance(sfx_type_or_name, str):
             sfx_mapping = {
@@ -536,6 +554,7 @@ class AudioManager:
                 "save_ready": SFXType.SAVE_READY,  # 001.wav - 로드 성공 (확인음)
                 "victory": SFXType.LEVEL_UP,  # 승리 효과음은 레벨업음 (381.wav)
                 "victory_fanfare": SFXType.LEVEL_UP,  # 승리 팡파르도 레벨업음으로 임시
+                "enemy_defeat": SFXType.DEATH,  # 적 처치 효과음 (021.wav)
                 "level_up": SFXType.LEVEL_UP,  # 레벨업 효과음
                 
                 # 전투/마법
@@ -559,12 +578,36 @@ class AudioManager:
                 "magic_hit": SFXType.MAGIC_HIT,  # 마법 명중
                 "limit_break": SFXType.ULTIMATE,  # 리미트 브레이크
                 "summon": SFXType.SUMMON,  # 소환
-                "fire": SFXType.MAGIC_HIT,  # 화염 마법
-                "fire2": SFXType.MAGIC_HIT,  # 화염 마법 2단계
+                "fire": SFXType.BURN,  # 화염 마법
+                "fire2": SFXType.BURN,  # 화염 마법 2단계
                 "fire3": SFXType.ULTIMATE,  # 화염 마법 3단계
+                "ice": SFXType.FREEZE,  # 얼음 마법
+                "ice2": SFXType.FREEZE,  # 얼음 마법 2단계
                 "ice3": SFXType.ULTIMATE,  # 얼음 마법 3단계
-                "thunder": SFXType.MAGIC_HIT,  # 번개 마법
-                "thunder3": SFXType.ULTIMATE,  # 번개 마법 3단계
+                "lightning": SFXType.SHOCK,  # 번개 마법
+                "lightning2": SFXType.SHOCK,  # 번개 마법 2단계
+                "lightning3": SFXType.ULTIMATE,  # 번개 마법 3단계
+                "thunder": SFXType.SHOCK,  # 번개 마법 (별명)
+                "thunder2": SFXType.SHOCK,  # 번개 마법 2단계 (별명)
+                "thunder3": SFXType.ULTIMATE,  # 번개 마법 3단계 (별명)
+                "earth": SFXType.MAGIC_HIT,  # 대지 마법 (마법 명중음 사용)
+                "earth2": SFXType.MAGIC_HIT,  # 대지 마법 2단계
+                "earth3": SFXType.ULTIMATE,  # 대지 마법 3단계
+                "wind": SFXType.MAGIC_HIT,  # 바람 마법 (마법 명중음 사용)
+                "wind2": SFXType.MAGIC_HIT,  # 바람 마법 2단계
+                "wind3": SFXType.ULTIMATE,  # 바람 마법 3단계
+                "water": SFXType.HEAL,  # 물 마법 (치유음 사용, 물=회복)
+                "water2": SFXType.HEAL,  # 물 마법 2단계
+                "water3": SFXType.ULTIMATE,  # 물 마법 3단계
+                "light": SFXType.HEAL,  # 빛 마법 (치유음 사용, 빛=회복)
+                "light2": SFXType.HEAL,  # 빛 마법 2단계
+                "light3": SFXType.ULTIMATE,  # 빛 마법 3단계
+                "dark": SFXType.POISON,  # 어둠 마법 (독음 사용, 어둠=해로움)
+                "dark2": SFXType.POISON,  # 어둠 마법 2단계
+                "dark3": SFXType.ULTIMATE,  # 어둠 마법 3단계
+                "poison": SFXType.POISON,  # 독 마법
+                "poison2": SFXType.POISON,  # 독 마법 2단계
+                "poison3": SFXType.ULTIMATE,  # 독 마법 3단계
                 "heal2": SFXType.HEAL,  # 2단계 치유
                 "heal3": SFXType.HEAL,  # 3단계 치유
                 "sleep": SFXType.DEBUFF_ON,  # 수면
@@ -831,10 +874,60 @@ class AudioManager:
         """스킬에 따른 적절한 SFX 재생"""
         skill_lower = skill_name.lower()
         
+        # 원소 속성 우선 체크 (9가지 원소 모두 지원)
+        if skill_element:
+            element_lower = skill_element.lower()
+            if "fire" in element_lower or "화염" in element_lower:
+                self.play_sfx(SFXType.BURN)
+                return
+            elif "ice" in element_lower or "빙결" in element_lower or "냉기" in element_lower:
+                self.play_sfx(SFXType.FREEZE)
+                return
+            elif "lightning" in element_lower or "번개" in element_lower:
+                self.play_sfx(SFXType.SHOCK)
+                return
+            elif "earth" in element_lower or "대지" in element_lower:
+                self.play_sfx(SFXType.MAGIC_HIT)
+                return
+            elif "wind" in element_lower or "바람" in element_lower:
+                self.play_sfx(SFXType.MAGIC_HIT)
+                return
+            elif "water" in element_lower or "물" in element_lower:
+                self.play_sfx(SFXType.HEAL)
+                return
+            elif "light" in element_lower or "빛" in element_lower:
+                self.play_sfx(SFXType.HEAL)
+                return
+            elif "dark" in element_lower or "어둠" in element_lower:
+                self.play_sfx(SFXType.POISON)
+                return
+            elif "poison" in element_lower or "독" in element_lower:
+                self.play_sfx(SFXType.POISON)
+                return
+        
+        # 스킬 이름별 특별 처리 (9가지 원소 키워드)
+        if "파이어볼" in skill_name or "화염구" in skill_name or "화염" in skill_lower:
+            self.play_sfx(SFXType.BURN)
+        elif "아이스" in skill_lower or "빙결" in skill_lower or "냉기" in skill_lower:
+            self.play_sfx(SFXType.FREEZE)
+        elif "라이트닝" in skill_lower or "번개" in skill_lower:
+            self.play_sfx(SFXType.SHOCK)
+        elif "대지" in skill_lower or "어스" in skill_lower:
+            self.play_sfx(SFXType.MAGIC_HIT)
+        elif "바람" in skill_lower or "윈드" in skill_lower:
+            self.play_sfx(SFXType.MAGIC_HIT)
+        elif "물" in skill_lower or "워터" in skill_lower:
+            self.play_sfx(SFXType.HEAL)
+        elif "빛" in skill_lower or "라이트" in skill_lower or "홀리" in skill_lower:
+            self.play_sfx(SFXType.HEAL)
+        elif "어둠" in skill_lower or "다크" in skill_lower or "암흑" in skill_lower:
+            self.play_sfx(SFXType.POISON)
+        elif "독" in skill_lower or "포이즌" in skill_lower:
+            self.play_sfx(SFXType.POISON)
         # 스킬 타입별 SFX 매핑
-        if any(word in skill_lower for word in ["검", "베기", "강타", "일격"]):
+        elif any(word in skill_lower for word in ["검", "베기", "강타", "일격"]):
             self.play_sfx(SFXType.SWORD_HIT)
-        elif any(word in skill_lower for word in ["마법", "파이어", "아이스", "라이트닝"]):
+        elif any(word in skill_lower for word in ["마법", "매직", "spell"]):
             self.play_sfx(SFXType.MAGIC_CAST)
         elif any(word in skill_lower for word in ["화살", "사격", "저격"]):
             self.play_sfx(SFXType.ARROW_SHOT)

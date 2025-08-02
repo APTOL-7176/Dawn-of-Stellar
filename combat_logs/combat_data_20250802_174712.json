@@ -1,0 +1,136 @@
+{
+  "session_info": {
+    "start_time": "2025-08-02T17:47:12.637377",
+    "session_id": "20250802_174712"
+  },
+  "battles": [
+    {
+      "battle_id": 1,
+      "start_time": "2025-08-02T17:47:13.043943",
+      "party": [
+        {
+          "name": "알렉시스",
+          "level": 1,
+          "hp": 129,
+          "max_hp": 129,
+          "brv": 1457,
+          "max_brv": 2383,
+          "attack": 48,
+          "defense": 44,
+          "magic_attack": 86,
+          "magic_defense": 77,
+          "speed": 64,
+          "character_class": "무당"
+        },
+        {
+          "name": "자이든",
+          "level": 1,
+          "hp": 249,
+          "max_hp": 249,
+          "brv": 1401,
+          "max_brv": 3192,
+          "attack": 78,
+          "defense": 67,
+          "magic_attack": 62,
+          "magic_defense": 58,
+          "speed": 61,
+          "character_class": "용기사"
+        },
+        {
+          "name": "에밀리",
+          "level": 1,
+          "hp": 206,
+          "max_hp": 206,
+          "brv": 1365,
+          "max_brv": 2261,
+          "attack": 74,
+          "defense": 52,
+          "magic_attack": 34,
+          "magic_defense": 41,
+          "speed": 77,
+          "character_class": "해적"
+        },
+        {
+          "name": "데보라",
+          "level": 1,
+          "hp": 136,
+          "max_hp": 136,
+          "brv": 1493,
+          "max_brv": 2109,
+          "attack": 59,
+          "defense": 44,
+          "magic_attack": 72,
+          "magic_defense": 58,
+          "speed": 54,
+          "character_class": "연금술사"
+        }
+      ],
+      "enemies": [
+        {
+          "name": "스켈레톤",
+          "level": 3,
+          "hp": 327,
+          "max_hp": 327,
+          "brv": 8511,
+          "max_brv": 17284,
+          "attack": 65,
+          "defense": 51,
+          "magic_attack": 41,
+          "magic_defense": 46,
+          "speed": 41,
+          "character_class": "Enemy"
+        }
+      ],
+      "turns": [],
+      "damage_log": [
+        {
+          "timestamp": "2025-08-02T17:47:41.131118",
+          "damage_type": "BRV",
+          "attacker": "에밀리",
+          "target": "스켈레톤",
+          "base_damage": 72,
+          "final_damage": 987,
+          "calculation_details": {
+            "공격자_물리공격력": 74,
+            "대상_물리방어력": 51,
+            "기본_BRV_데미지": 72,
+            "스킬_배율": "50%",
+            "스킬_배율_적용후": 36,
+            "기본_스킬_배율_1.5x": 54,
+            "플레이어_보너스_18.75x": 1012,
+            "랜덤_배율": "0.976",
+            "랜덤_적용후": 987
+          }
+        },
+        {
+          "timestamp": "2025-08-02T17:47:52.559619",
+          "damage_type": "BRV",
+          "attacker": "알렉시스",
+          "target": "스켈레톤",
+          "base_damage": 47,
+          "final_damage": 664,
+          "calculation_details": {
+            "공격자_물리공격력": 48,
+            "대상_물리방어력": 51,
+            "기본_BRV_데미지": 47,
+            "스킬_배율": "50%",
+            "스킬_배율_적용후": 23,
+            "기본_스킬_배율_1.5x": 34,
+            "플레이어_보너스_18.75x": 637,
+            "랜덤_배율": "1.044",
+            "랜덤_적용후": 664
+          }
+        }
+      ],
+      "end_time": "2025-08-02T17:48:46.275099",
+      "winner": "플레이어",
+      "duration_seconds": 93.23115634918213
+    }
+  ],
+  "damage_stats": {
+    "total_player_damage": 1651,
+    "total_enemy_damage": 0,
+    "total_healing": 0,
+    "damage_breakdown": {}
+  }
+}

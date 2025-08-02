@@ -48,6 +48,16 @@ class GameConfig:
         self.DURABILITY_ENABLED = True
         self.DURABILITY_LOSS_RATE_MULTIPLIER = 0.7  # 30% 감소된 내구도 손실률
         
+        # ATB 시스템 설정
+        self.ATB_SETTINGS = {
+            "animation_enabled": True,  # ATB 애니메이션 활성화
+            "animation_fps": 10,        # 10FPS로 업데이트 (0.1초 간격)
+            "update_speed": 1.0,        # ATB 증가 속도 배율 (1.0 = 기본 속도)
+            "show_percentage": True,    # 퍼센트 표시
+            "smooth_animation": True,   # 부드러운 애니메이션
+            "frame_delay": 0.1          # 0.1초 (10FPS)
+        }
+        
         # 메타 진행 시스템 설정
         self.META_PROGRESSION_ENABLED = True
         self.STAR_FRAGMENT_DROP_RATE = 0.3 if self.DEVELOPMENT_MODE else 0.1
@@ -664,6 +674,12 @@ class GameConfig:
         self.save_settings()
         return self.PARTICLE_EFFECTS
     
+    def toggle_development_mode(self):
+        """개발자 모드 토글"""
+        self.DEVELOPMENT_MODE = not self.DEVELOPMENT_MODE
+        self.save_settings()
+        return self.DEVELOPMENT_MODE
+    
     def get_performance_settings(self):
         """성능 설정 반환"""
         return {
@@ -791,6 +807,7 @@ class GameConfig:
                 self.TUTORIAL_ENABLED = gameplay.get('tutorial_enabled', self.TUTORIAL_ENABLED)
                 self.TOOLTIPS_ENABLED = gameplay.get('tooltips_enabled', self.TOOLTIPS_ENABLED)
                 self.CAMERA_SMOOTHING = gameplay.get('camera_smoothing', self.CAMERA_SMOOTHING)
+                self.DEVELOPMENT_MODE = gameplay.get('development_mode', self.DEVELOPMENT_MODE)  # 개발자 모드 추가
                 
                 # 디스플레이 설정 로드
                 display = settings.get('display', {})
@@ -836,6 +853,17 @@ class GameConfig:
                 self.ONLINE_FEATURES = network.get('online_features', self.ONLINE_FEATURES)
                 self.AUTO_UPLOAD_SAVES = network.get('auto_upload_saves', self.AUTO_UPLOAD_SAVES)
                 self.CLOUD_SYNC = network.get('cloud_sync', self.CLOUD_SYNC)
+                
+                # ATB 설정 로드 (새로 추가)
+                atb = settings.get('atb', {})
+                self.ATB_SETTINGS.update({
+                    'animation_enabled': atb.get('animation_enabled', self.ATB_SETTINGS.get('animation_enabled', True)),
+                    'animation_fps': atb.get('animation_fps', self.ATB_SETTINGS.get('animation_fps', 20)),
+                    'update_speed': atb.get('update_speed', self.ATB_SETTINGS.get('update_speed', 1.0)),
+                    'show_percentage': atb.get('show_percentage', self.ATB_SETTINGS.get('show_percentage', True)),
+                    'smooth_animation': atb.get('smooth_animation', self.ATB_SETTINGS.get('smooth_animation', True)),
+                    'frame_delay': atb.get('frame_delay', self.ATB_SETTINGS.get('frame_delay', 0.05))
+                })
                     
         except Exception as e:
             print(f"⚠️ 설정 로드 중 오류: {e}")
@@ -885,7 +913,8 @@ class GameConfig:
                 'confirm_exit': self.CONFIRM_EXIT,
                 'tutorial_enabled': self.TUTORIAL_ENABLED,
                 'tooltips_enabled': self.TOOLTIPS_ENABLED,
-                'camera_smoothing': self.CAMERA_SMOOTHING
+                'camera_smoothing': self.CAMERA_SMOOTHING,
+                'development_mode': self.DEVELOPMENT_MODE  # 개발자 모드 추가
             })
             
             # 디스플레이 설정 업데이트
@@ -939,6 +968,16 @@ class GameConfig:
                 'cloud_sync': self.CLOUD_SYNC
             })
             
+            # ATB 설정 업데이트 (새로 추가)
+            settings['atb'] = {
+                'animation_enabled': self.ATB_SETTINGS.get('animation_enabled', True),
+                'animation_fps': self.ATB_SETTINGS.get('animation_fps', 20),
+                'update_speed': self.ATB_SETTINGS.get('update_speed', 1.0),
+                'show_percentage': self.ATB_SETTINGS.get('show_percentage', True),
+                'smooth_animation': self.ATB_SETTINGS.get('smooth_animation', True),
+                'frame_delay': self.ATB_SETTINGS.get('frame_delay', 0.05)
+            }
+            
             # 파일에 저장
             with open(self.settings_file, 'w', encoding='utf-8') as f:
                 json.dump(settings, f, indent=2, ensure_ascii=False)
@@ -948,6 +987,22 @@ class GameConfig:
         except Exception as e:
             print(f"⚠️ 설정 저장 중 오류: {e}")
             return False
+    
+    def update_atb_setting(self, setting_name: str, value):
+        """ATB 설정 업데이트"""
+        if setting_name in self.ATB_SETTINGS:
+            old_value = self.ATB_SETTINGS[setting_name]
+            self.ATB_SETTINGS[setting_name] = value
+            self.save_settings()  # 즉시 저장
+            print(f"⚙️ ATB 설정 업데이트: {setting_name} {old_value} → {value}")
+            return True
+        else:
+            print(f"⚠️ 알 수 없는 ATB 설정: {setting_name}")
+            return False
+    
+    def get_atb_setting(self, setting_name: str, default=None):
+        """ATB 설정 값 가져오기"""
+        return self.ATB_SETTINGS.get(setting_name, default)
 
 # 전역 설정 인스턴스
 game_config = GameConfig()

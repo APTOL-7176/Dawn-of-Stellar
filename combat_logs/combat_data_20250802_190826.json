@@ -1,0 +1,97 @@
+{
+  "session_info": {
+    "start_time": "2025-08-02T19:08:26.858734",
+    "session_id": "20250802_190826"
+  },
+  "battles": [
+    {
+      "battle_id": 1,
+      "start_time": "2025-08-02T19:08:27.263964",
+      "party": [
+        {
+          "name": "데보라",
+          "level": 2,
+          "hp": 225,
+          "max_hp": 225,
+          "brv": 3160,
+          "max_brv": 3320,
+          "attack": 55,
+          "defense": 51,
+          "magic_attack": 86,
+          "magic_defense": 75,
+          "speed": 63,
+          "character_class": "드루이드"
+        },
+        {
+          "name": "메이슨",
+          "level": 2,
+          "hp": 516,
+          "max_hp": 516,
+          "brv": 6982,
+          "max_brv": 3520,
+          "attack": 70,
+          "defense": 24,
+          "magic_attack": 14,
+          "magic_defense": 22,
+          "speed": 78,
+          "character_class": "광전사"
+        },
+        {
+          "name": "녹티스",
+          "level": 2,
+          "hp": 237,
+          "max_hp": 237,
+          "brv": 0,
+          "max_brv": 3420,
+          "attack": 89,
+          "defense": 55,
+          "magic_attack": 32,
+          "magic_defense": 50,
+          "speed": 74,
+          "character_class": "검성"
+        },
+        {
+          "name": "아만다",
+          "level": 2,
+          "hp": 121,
+          "max_hp": 121,
+          "brv": 0,
+          "max_brv": 3220,
+          "attack": 51,
+          "defense": 43,
+          "magic_attack": 92,
+          "magic_defense": 75,
+          "speed": 63,
+          "character_class": "정령술사"
+        }
+      ],
+      "enemies": [
+        {
+          "name": "고블린",
+          "level": 1,
+          "hp": 156,
+          "max_hp": 156,
+          "brv": 2816,
+          "max_brv": 5632,
+          "attack": 31,
+          "defense": 19,
+          "magic_attack": 14,
+          "magic_defense": 11,
+          "speed": 24,
+          "character_class": "Enemy"
+        }
+      ],
+      "turns": [],
+      "damage_log": [],
+      "end_time": "2025-08-02T19:08:36.077654",
+      "winner": "플레이어",
+      "duration_seconds": 8.813690423965454
+    }
+  ],
+  "damage_stats": {
+    "total_player_damage": 0,
+    "total_enemy_damage": 0,
+    "total_healing": 0,
+    "damage_breakdown": {}
+  }
+}

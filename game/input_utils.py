@@ -80,9 +80,28 @@ class KeyboardInput:
                 
             return result
     
+    def clear_input_buffer(self):
+        """입력 버퍼 클리어 - 선입력 방지"""
+        try:
+            if os.name == 'nt':
+                # Windows
+                import msvcrt
+                while msvcrt.kbhit():
+                    msvcrt.getch()
+            else:
+                # Unix 계열
+                import sys, select
+                while select.select([sys.stdin], [], [], 0.0)[0]:
+                    sys.stdin.read(1)
+        except:
+            pass  # 실패해도 무시
+    
     def wait_for_key(self, message: str = "아무 키나 누르세요...") -> str:
         """메시지와 함께 키 대기"""
         print(message, end='', flush=True)
+        
+        # 먼저 입력 버퍼 클리어
+        self.clear_input_buffer()
         
         # AI 자동 모드 체크
         import sys

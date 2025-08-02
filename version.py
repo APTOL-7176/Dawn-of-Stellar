@@ -1,6 +1,6 @@
 # Dawn Of Stellar - Version Information
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 __title__ = "Dawn Of Stellar - 별빛의 여명"
 __description__ = "차세대 ASCII 기반 전략 로그라이크 RPG"
 __author__ = "APTOL-7176"

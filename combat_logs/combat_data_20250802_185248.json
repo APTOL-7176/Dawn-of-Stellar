@@ -1,0 +1,136 @@
+{
+  "session_info": {
+    "start_time": "2025-08-02T18:52:48.722095",
+    "session_id": "20250802_185248"
+  },
+  "battles": [
+    {
+      "battle_id": 1,
+      "start_time": "2025-08-02T18:52:49.128024",
+      "party": [
+        {
+          "name": "데보라",
+          "level": 1,
+          "hp": 210,
+          "max_hp": 210,
+          "brv": 1535,
+          "max_brv": 2071,
+          "attack": 53,
+          "defense": 48,
+          "magic_attack": 81,
+          "magic_defense": 69,
+          "speed": 59,
+          "character_class": "드루이드"
+        },
+        {
+          "name": "메이슨",
+          "level": 1,
+          "hp": 489,
+          "max_hp": 489,
+          "brv": 1103,
+          "max_brv": 3467,
+          "attack": 64,
+          "defense": 22,
+          "magic_attack": 13,
+          "magic_defense": 21,
+          "speed": 74,
+          "character_class": "광전사"
+        },
+        {
+          "name": "녹티스",
+          "level": 1,
+          "hp": 216,
+          "max_hp": 216,
+          "brv": 1337,
+          "max_brv": 3091,
+          "attack": 83,
+          "defense": 51,
+          "magic_attack": 31,
+          "magic_defense": 47,
+          "speed": 71,
+          "character_class": "검성"
+        },
+        {
+          "name": "아만다",
+          "level": 1,
+          "hp": 108,
+          "max_hp": 108,
+          "brv": 1751,
+          "max_brv": 2183,
+          "attack": 49,
+          "defense": 42,
+          "magic_attack": 85,
+          "magic_defense": 69,
+          "speed": 59,
+          "character_class": "정령술사"
+        }
+      ],
+      "enemies": [
+        {
+          "name": "오크",
+          "level": 1,
+          "hp": 251,
+          "max_hp": 251,
+          "brv": 6336,
+          "max_brv": 12672,
+          "attack": 54,
+          "defense": 38,
+          "magic_attack": 25,
+          "magic_defense": 26,
+          "speed": 25,
+          "character_class": "Enemy"
+        }
+      ],
+      "turns": [],
+      "damage_log": [
+        {
+          "timestamp": "2025-08-02T18:53:05.414083",
+          "damage_type": "BRV",
+          "attacker": "녹티스",
+          "target": "오크",
+          "base_damage": 2621,
+          "final_damage": 2067,
+          "calculation_details": {
+            "공격자_물리공격력": 83,
+            "대상_물리방어력": 38,
+            "기본_BRV_데미지": 2621,
+            "스킬_배율": "50%",
+            "스킬_배율_적용후": 1310,
+            "기본_스킬_배율_1.5x": 1965,
+            "최종_계산값": 1965,
+            "랜덤_배율": "1.052",
+            "랜덤_적용후": 2067
+          }
+        },
+        {
+          "timestamp": "2025-08-02T18:53:07.231637",
+          "damage_type": "BRV",
+          "attacker": "메이슨",
+          "target": "오크",
+          "base_damage": 2021,
+          "final_damage": 3406,
+          "calculation_details": {
+            "공격자_물리공격력": 64,
+            "대상_물리방어력": 38,
+            "기본_BRV_데미지": 2021,
+            "스킬_배율": "120%",
+            "스킬_배율_적용후": 2425,
+            "기본_스킬_배율_1.5x": 3637,
+            "최종_계산값": 3637,
+            "랜덤_배율": "0.937",
+            "랜덤_적용후": 3406
+          }
+        }
+      ],
+      "end_time": "2025-08-02T18:53:51.543337",
+      "winner": "플레이어",
+      "duration_seconds": 62.41531300544739
+    }
+  ],
+  "damage_stats": {
+    "total_player_damage": 5473,
+    "total_enemy_damage": 0,
+    "total_healing": 0,
+    "damage_breakdown": {}
+  }
+}

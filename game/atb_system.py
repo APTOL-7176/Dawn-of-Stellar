@@ -93,6 +93,10 @@ class ATBCharacter:
     
     def update_atb_gauge(self, delta_time: float):
         """ATB 게이지 업데이트"""
+        # 캐스팅 중이면 ATB 게이지 증가 정지
+        if hasattr(self, 'is_casting') and self.is_casting:
+            return
+            
         if self.current_action is None:
             effective_speed = self.get_effective_speed()
             self.atb_gauge += effective_speed * delta_time

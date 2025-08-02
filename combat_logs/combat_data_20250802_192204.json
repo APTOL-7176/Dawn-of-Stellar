@@ -1,0 +1,231 @@
+{
+  "session_info": {
+    "start_time": "2025-08-02T19:22:04.206549",
+    "session_id": "20250802_192204"
+  },
+  "battles": [
+    {
+      "battle_id": 1,
+      "start_time": "2025-08-02T19:22:04.611305",
+      "party": [
+        {
+          "name": "녹티스",
+          "level": 1,
+          "hp": 210,
+          "max_hp": 210,
+          "brv": 1535,
+          "max_brv": 2071,
+          "attack": 53,
+          "defense": 48,
+          "magic_attack": 81,
+          "magic_defense": 69,
+          "speed": 59,
+          "character_class": "드루이드"
+        },
+        {
+          "name": "웨인",
+          "level": 1,
+          "hp": 249,
+          "max_hp": 249,
+          "brv": 1401,
+          "max_brv": 3192,
+          "attack": 78,
+          "defense": 67,
+          "magic_attack": 62,
+          "magic_defense": 58,
+          "speed": 61,
+          "character_class": "용기사"
+        },
+        {
+          "name": "알렉산더",
+          "level": 1,
+          "hp": 128,
+          "max_hp": 128,
+          "brv": 1931,
+          "max_brv": 1989,
+          "attack": 81,
+          "defense": 34,
+          "magic_attack": 28,
+          "magic_defense": 39,
+          "speed": 87,
+          "character_class": "암살자"
+        },
+        {
+          "name": "가브리엘",
+          "level": 1,
+          "hp": 108,
+          "max_hp": 108,
+          "brv": 1751,
+          "max_brv": 2183,
+          "attack": 49,
+          "defense": 42,
+          "magic_attack": 85,
+          "magic_defense": 69,
+          "speed": 59,
+          "character_class": "정령술사"
+        }
+      ],
+      "enemies": [
+        {
+          "name": "고블린",
+          "level": 1,
+          "hp": 188,
+          "max_hp": 188,
+          "brv": 3379,
+          "max_brv": 6758,
+          "attack": 37,
+          "defense": 23,
+          "magic_attack": 17,
+          "magic_defense": 13,
+          "speed": 28,
+          "character_class": "Enemy"
+        }
+      ],
+      "turns": [],
+      "damage_log": [
+        {
+          "timestamp": "2025-08-02T19:22:22.379157",
+          "damage_type": "BRV",
+          "attacker": "알렉산더",
+          "target": "고블린",
+          "base_damage": 4226,
+          "final_damage": 3190,
+          "calculation_details": {
+            "공격자_물리공격력": 81,
+            "대상_물리방어력": 23,
+            "기본_BRV_데미지": 4226,
+            "스킬_배율": "50%",
+            "스킬_배율_적용후": 2113,
+            "기본_스킬_배율_1.5x": 3169,
+            "최종_계산값": 3169,
+            "랜덤_배율": "1.007",
+            "랜덤_적용후": 3190
+          }
+        },
+        {
+          "timestamp": "2025-08-02T19:22:27.188146",
+          "damage_type": "BRV",
+          "attacker": "웨인",
+          "target": "고블린",
+          "base_damage": 4069,
+          "final_damage": 2770,
+          "calculation_details": {
+            "공격자_물리공격력": 78,
+            "대상_물리방어력": 23,
+            "기본_BRV_데미지": 4069,
+            "스킬_배율": "50%",
+            "스킬_배율_적용후": 2034,
+            "기본_스킬_배율_1.5x": 3051,
+            "최종_계산값": 3051,
+            "랜덤_배율": "0.908",
+            "랜덤_적용후": 2770
+          }
+        },
+        {
+          "timestamp": "2025-08-02T19:22:32.028708",
+          "damage_type": "BRV",
+          "attacker": "알렉산더",
+          "target": "고블린",
+          "base_damage": 4226,
+          "final_damage": 2952,
+          "calculation_details": {
+            "공격자_물리공격력": 81,
+            "대상_물리방어력": 23,
+            "기본_BRV_데미지": 4226,
+            "스킬_배율": "50%",
+            "스킬_배율_적용후": 2113,
+            "기본_스킬_배율_1.5x": 3169,
+            "최종_계산값": 3169,
+            "랜덤_배율": "0.932",
+            "랜덤_적용후": 2952
+          }
+        },
+        {
+          "timestamp": "2025-08-02T19:24:01.528484",
+          "damage_type": "BRV",
+          "attacker": "녹티스",
+          "target": "고블린",
+          "base_damage": 2765,
+          "final_damage": 2234,
+          "calculation_details": {
+            "공격자_물리공격력": 53,
+            "대상_물리방어력": 23,
+            "기본_BRV_데미지": 2765,
+            "스킬_배율": "50%",
+            "스킬_배율_적용후": 1382,
+            "기본_스킬_배율_1.5x": 2073,
+            "최종_계산값": 2073,
+            "랜덤_배율": "1.078",
+            "랜덤_적용후": 2234
+          }
+        },
+        {
+          "timestamp": "2025-08-02T19:24:11.270320",
+          "damage_type": "BRV",
+          "attacker": "알렉산더",
+          "target": "고블린",
+          "base_damage": 4226,
+          "final_damage": 3191,
+          "calculation_details": {
+            "공격자_물리공격력": 81,
+            "대상_물리방어력": 23,
+            "기본_BRV_데미지": 4226,
+            "스킬_배율": "50%",
+            "스킬_배율_적용후": 2113,
+            "기본_스킬_배율_1.5x": 3169,
+            "최종_계산값": 3169,
+            "랜덤_배율": "1.007",
+            "랜덤_적용후": 3191
+          }
+        },
+        {
+          "timestamp": "2025-08-02T19:24:30.239101",
+          "damage_type": "BRV",
+          "attacker": "가브리엘",
+          "target": "고블린",
+          "base_damage": 2556,
+          "final_damage": 3607,
+          "calculation_details": {
+            "공격자_물리공격력": 49,
+            "대상_물리방어력": 23,
+            "기본_BRV_데미지": 2556,
+            "스킬_배율": "100%",
+            "스킬_배율_적용후": 2556,
+            "기본_스킬_배율_1.5x": 3834,
+            "최종_계산값": 3834,
+            "랜덤_배율": "0.941",
+            "랜덤_적용후": 3607
+          }
+        },
+        {
+          "timestamp": "2025-08-02T19:24:40.399668",
+          "damage_type": "BRV",
+          "attacker": "웨인",
+          "target": "고블린",
+          "base_damage": 4069,
+          "final_damage": 4557,
+          "calculation_details": {
+            "공격자_물리공격력": 78,
+            "대상_물리방어력": 23,
+            "기본_BRV_데미지": 4069,
+            "스킬_배율": "75%",
+            "스킬_배율_적용후": 3051,
+            "기본_스킬_배율_1.5x": 4576,
+            "최종_계산값": 4576,
+            "랜덤_배율": "0.996",
+            "랜덤_적용후": 4557
+          }
+        }
+      ],
+      "end_time": "2025-08-02T19:24:48.135373",
+      "winner": "플레이어",
+      "duration_seconds": 163.52406787872314
+    }
+  ],
+  "damage_stats": {
+    "total_player_damage": 22501,
+    "total_enemy_damage": 0,
+    "total_healing": 0,
+    "damage_breakdown": {}
+  }
+}

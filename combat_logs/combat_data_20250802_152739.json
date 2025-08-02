@@ -1,0 +1,174 @@
+{
+  "session_info": {
+    "start_time": "2025-08-02T15:27:39.362355",
+    "session_id": "20250802_152739"
+  },
+  "battles": [
+    {
+      "battle_id": 1,
+      "start_time": "2025-08-02T15:27:39.770092",
+      "party": [
+        {
+          "name": "빅토리아",
+          "level": 1,
+          "hp": 96,
+          "max_hp": 96,
+          "brv": 1663,
+          "max_brv": 1989,
+          "attack": 38,
+          "defense": 54,
+          "magic_attack": 76,
+          "magic_defense": 86,
+          "speed": 49,
+          "character_class": "철학자"
+        },
+        {
+          "name": "프랑크",
+          "level": 1,
+          "hp": 236,
+          "max_hp": 236,
+          "brv": 1361,
+          "max_brv": 3158,
+          "attack": 79,
+          "defense": 56,
+          "magic_attack": 41,
+          "magic_defense": 48,
+          "speed": 64,
+          "character_class": "검투사"
+        },
+        {
+          "name": "조나단",
+          "level": 1,
+          "hp": 200,
+          "max_hp": 200,
+          "brv": 1343,
+          "max_brv": 3041,
+          "attack": 74,
+          "defense": 58,
+          "magic_attack": 45,
+          "magic_defense": 53,
+          "speed": 67,
+          "character_class": "사무라이"
+        },
+        {
+          "name": "발키리",
+          "level": 1,
+          "hp": 108,
+          "max_hp": 108,
+          "brv": 1751,
+          "max_brv": 2183,
+          "attack": 49,
+          "defense": 42,
+          "magic_attack": 85,
+          "magic_defense": 69,
+          "speed": 59,
+          "character_class": "정령술사"
+        }
+      ],
+      "enemies": [
+        {
+          "name": "고블린",
+          "level": 1,
+          "hp": 188,
+          "max_hp": 188,
+          "brv": 3379,
+          "max_brv": 6758,
+          "attack": 37,
+          "defense": 23,
+          "magic_attack": 17,
+          "magic_defense": 13,
+          "speed": 28,
+          "character_class": "Enemy"
+        }
+      ],
+      "turns": [],
+      "damage_log": [
+        {
+          "timestamp": "2025-08-02T15:32:41.851947",
+          "damage_type": "BRV",
+          "attacker": "조나단",
+          "target": "고블린",
+          "base_damage": 160,
+          "final_damage": 4111,
+          "calculation_details": {
+            "공격자_물리공격력": 74,
+            "대상_물리방어력": 23,
+            "기본_BRV_데미지": 160,
+            "스킬_배율": "100%",
+            "스킬_배율_적용후": 160,
+            "기본_스킬_배율_1.5x": 240,
+            "플레이어_보너스_18.75x": 4500,
+            "랜덤_배율": "0.914",
+            "랜덤_적용후": 4111
+          }
+        },
+        {
+          "timestamp": "2025-08-02T15:32:54.283414",
+          "damage_type": "BRV",
+          "attacker": "프랑크",
+          "target": "고블린",
+          "base_damage": 171,
+          "final_damage": 4774,
+          "calculation_details": {
+            "공격자_물리공격력": 79,
+            "대상_물리방어력": 23,
+            "기본_BRV_데미지": 171,
+            "스킬_배율": "100%",
+            "스킬_배율_적용후": 171,
+            "기본_스킬_배율_1.5x": 256,
+            "플레이어_보너스_18.75x": 4800,
+            "랜덤_배율": "0.995",
+            "랜덤_적용후": 4774
+          }
+        },
+        {
+          "timestamp": "2025-08-02T15:33:02.036728",
+          "damage_type": "BRV",
+          "attacker": "고블린",
+          "target": "빅토리아",
+          "base_damage": 34,
+          "final_damage": 951,
+          "calculation_details": {
+            "공격자_물리공격력": 37,
+            "대상_물리방어력": 54,
+            "기본_BRV_데미지": 34,
+            "스킬_배율": "100%",
+            "스킬_배율_적용후": 34,
+            "기본_스킬_배율_1.5x": 51,
+            "플레이어_보너스_18.75x": 956,
+            "랜덤_배율": "0.995",
+            "랜덤_적용후": 951
+          }
+        },
+        {
+          "timestamp": "2025-08-02T15:34:15.580241",
+          "damage_type": "BRV",
+          "attacker": "조나단",
+          "target": "고블린",
+          "base_damage": 160,
+          "final_damage": 4937,
+          "calculation_details": {
+            "공격자_물리공격력": 74,
+            "대상_물리방어력": 23,
+            "기본_BRV_데미지": 160,
+            "스킬_배율": "100%",
+            "스킬_배율_적용후": 160,
+            "기본_스킬_배율_1.5x": 240,
+            "플레이어_보너스_18.75x": 4500,
+            "랜덤_배율": "1.097",
+            "랜덤_적용후": 4937
+          }
+        }
+      ],
+      "end_time": "2025-08-02T15:34:23.663497",
+      "winner": "플레이어",
+      "duration_seconds": 403.89340472221375
+    }
+  ],
+  "damage_stats": {
+    "total_player_damage": 14773,
+    "total_enemy_damage": 0,
+    "total_healing": 0,
+    "damage_breakdown": {}
+  }
+}

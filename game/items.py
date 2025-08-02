@@ -454,35 +454,201 @@ class Item:
         return False
         
     def _use_consumable(self, character) -> bool:
-        """소모품 사용"""
+        """소모품 사용 - 완전 구현"""
+        used = False
+        
+        # 1. 기본 회복 효과
         if "heal" in self.effects:
             heal_amount = self.stats.get("heal_amount", 50)
             actual_heal = character.heal(heal_amount)
-            print(f"{character.name}이(가) {self.name}을(를) 사용하여 {actual_heal} HP 회복했습니다!")
-            return True
-        elif "mana_restore" in self.effects:
-            # MP 회복
+            print(f"💊 {character.name}이(가) {self.name}을(를) 사용하여 {actual_heal} HP 회복했습니다!")
+            used = True
+            
+        if "mana_restore" in self.effects:
             mp_amount = self.stats.get("mp_amount", 30)
             old_mp = character.current_mp
             character.current_mp = min(character.max_mp, character.current_mp + mp_amount)
             actual_mp = character.current_mp - old_mp
             if actual_mp > 0:
-                print(f"{character.name}이(가) {self.name}을(를) 사용하여 {actual_mp} MP 회복했습니다!")
-                return True
+                print(f"🔵 {character.name}이(가) {actual_mp} MP 회복했습니다!")
+                used = True
+        
+        # 2. 완전 회복 효과
+        if "full_heal" in self.effects:
+            old_hp = character.current_hp
+            character.current_hp = character.max_hp
+            heal_amount = character.current_hp - old_hp
+            print(f"✨ {character.name}의 HP가 완전히 회복되었습니다! (+{heal_amount})")
+            used = True
+            
+        if "full_mana" in self.effects:
+            old_mp = character.current_mp
+            character.current_mp = character.max_mp
+            mp_amount = character.current_mp - old_mp
+            print(f"💎 {character.name}의 MP가 완전히 회복되었습니다! (+{mp_amount})")
+            used = True
+        
+        # 3. 상태이상 치료
+        if "cure_poison" in self.effects:
+            if hasattr(character, 'status_manager') and character.status_manager:
+                removed = character.status_manager.remove_status("독")
+                if removed:
+                    print(f"💚 {character.name}의 독이 치료되었습니다!")
+                    used = True
+                    
+        if "cure_burn" in self.effects:
+            if hasattr(character, 'status_manager') and character.status_manager:
+                removed = character.status_manager.remove_status("화상")
+                if removed:
+                    print(f"❄️ {character.name}의 화상이 치료되었습니다!")
+                    used = True
+        
+        if "cure_all" in self.effects:
+            if hasattr(character, 'status_manager') and character.status_manager:
+                character.status_manager.clear_all_negative_effects()
+                print(f"✨ {character.name}의 모든 상태이상이 치료되었습니다!")
+                used = True
+        
+        # 4. 임시 버프 효과
+        if "buff_strength" in self.effects:
+            bonus = self.stats.get("strength_bonus", 10)
+            duration = self.stats.get("buff_duration", 10)
+            character.temp_attack_bonus = getattr(character, 'temp_attack_bonus', 0) + bonus
+            character.temp_buff_duration = getattr(character, 'temp_buff_duration', 0) + duration
+            print(f"💪 {character.name}의 공격력이 {bonus} 증가했습니다! ({duration}턴)")
+            used = True
+            
+        if "buff_defense" in self.effects:
+            bonus = self.stats.get("defense_bonus", 10)
+            duration = self.stats.get("buff_duration", 10)
+            character.temp_defense_bonus = getattr(character, 'temp_defense_bonus', 0) + bonus
+            character.temp_defense_duration = getattr(character, 'temp_defense_duration', 0) + duration
+            print(f"🛡️ {character.name}의 방어력이 {bonus} 증가했습니다! ({duration}턴)")
+            used = True
+            
+        if "buff_speed" in self.effects:
+            bonus = self.stats.get("speed_bonus", 5)
+            duration = self.stats.get("buff_duration", 10)
+            character.temp_speed_bonus = getattr(character, 'temp_speed_bonus', 0) + bonus
+            character.temp_speed_duration = getattr(character, 'temp_speed_duration', 0) + duration
+            print(f"🏃 {character.name}의 속도가 {bonus} 증가했습니다! ({duration}턴)")
+            used = True
+            
+        if "buff_magic" in self.effects:
+            bonus = self.stats.get("magic_bonus", 10)
+            duration = self.stats.get("buff_duration", 10)
+            character.temp_magic_bonus = getattr(character, 'temp_magic_bonus', 0) + bonus
+            character.temp_magic_duration = getattr(character, 'temp_magic_duration', 0) + duration
+            print(f"🔮 {character.name}의 마법력이 {bonus} 증가했습니다! ({duration}턴)")
+            used = True
+        
+        # 5. 영구 스탯 증가
+        if "permanent_hp" in self.effects:
+            bonus = self.stats.get("hp_bonus", 10)
+            character.max_hp += bonus
+            character.current_hp += bonus  # 현재 HP도 같이 증가
+            print(f"❤️ {character.name}의 최대 HP가 영구히 {bonus} 증가했습니다!")
+            used = True
+            
+        if "permanent_mp" in self.effects:
+            bonus = self.stats.get("mp_bonus", 5)
+            character.max_mp += bonus
+            character.current_mp += bonus  # 현재 MP도 같이 증가
+            print(f"💙 {character.name}의 최대 MP가 영구히 {bonus} 증가했습니다!")
+            used = True
+            
+        if "permanent_attack" in self.effects:
+            bonus = self.stats.get("attack_bonus", 2)
+            character.physical_attack += bonus
+            print(f"⚔️ {character.name}의 물리공격력이 영구히 {bonus} 증가했습니다!")
+            used = True
+            
+        if "permanent_magic" in self.effects:
+            bonus = self.stats.get("magic_bonus", 2)
+            character.magic_attack += bonus
+            print(f"🌟 {character.name}의 마법공격력이 영구히 {bonus} 증가했습니다!")
+            used = True
+            
+        if "permanent_defense" in self.effects:
+            bonus = self.stats.get("defense_bonus", 2)
+            character.physical_defense += bonus
+            print(f"🛡️ {character.name}의 물리방어력이 영구히 {bonus} 증가했습니다!")
+            used = True
+            
+        if "permanent_speed" in self.effects:
+            bonus = self.stats.get("speed_bonus", 1)
+            character.speed += bonus
+            print(f"💨 {character.name}의 속도가 영구히 {bonus} 증가했습니다!")
+            used = True
+        
+        # 6. 특수 효과
+        if "revive" in self.effects:
+            if character.current_hp <= 0:
+                revive_hp = self.stats.get("revive_hp", character.max_hp // 2)
+                character.current_hp = min(character.max_hp, revive_hp)
+                character.is_dead = False
+                if hasattr(character, 'status_manager'):
+                    character.status_manager.clear_all_negative_effects()
+                print(f"🕊️ {character.name}이(가) 부활했습니다! (HP: {character.current_hp})")
+                used = True
             else:
-                print(f"{character.name}의 MP가 이미 가득 차있습니다!")
+                print(f"❌ {character.name}은(는) 이미 살아있습니다!")
                 return False
-        elif "field_rest" in self.effects:
-            # 텐트 사용 - 필드에서 휴식
+        
+        if "berserk" in self.effects:
+            attack_boost = self.stats.get("attack_boost", 25)
+            defense_penalty = self.stats.get("defense_penalty", 10)
+            duration = self.stats.get("duration", 3)
+            character.temp_attack_bonus = getattr(character, 'temp_attack_bonus', 0) + attack_boost
+            character.temp_defense_bonus = getattr(character, 'temp_defense_bonus', 0) - defense_penalty
+            character.temp_berserk_duration = duration
+            print(f"😤 {character.name}이(가) 광폭화 상태에 돌입! 공격+{attack_boost}, 방어-{defense_penalty} ({duration}턴)")
+            used = True
+            
+        if "invisibility" in self.effects:
+            duration = self.stats.get("duration", 5)
+            character.stealth_turns = duration
+            character.temp_invisibility = True
+            print(f"👻 {character.name}이(가) 투명해졌습니다! ({duration}턴)")
+            used = True
+            
+        if "time_stop" in self.effects:
+            character.temp_extra_turn = True
+            print(f"⏰ {character.name}이(가) 시간을 정지시켰습니다! 다음 턴에 2번 행동 가능!")
+            used = True
+            
+        if "teleport" in self.effects:
+            character.temp_dodge_bonus = getattr(character, 'temp_dodge_bonus', 0) + 100  # 100% 회피
+            character.temp_teleport_duration = 1
+            print(f"🌀 {character.name}이(가) 순간이동으로 다음 공격을 회피합니다!")
+            used = True
+            
+        if "explosion" in self.effects:
+            damage = self.stats.get("explosion_damage", 100)
+            character.temp_explosion_damage = damage
+            character.temp_explosion_ready = True
+            print(f"💥 {character.name}이(가) 폭발 공격을 준비했습니다! (피해: {damage})")
+            used = True
+            
+        if "summon_ally" in self.effects:
+            ally_type = self.stats.get("ally_type", "골렘")
+            ally_duration = self.stats.get("ally_duration", 10)
+            character.temp_summoned_ally = ally_type
+            character.temp_ally_duration = ally_duration
+            print(f"🤖 {character.name}이(가) {ally_type}을(를) 소환했습니다! ({ally_duration}턴)")
+            used = True
+        
+        # 7. 휴식 관련 효과
+        if "field_rest" in self.effects:
             heal_amount = self.stats.get("heal_amount", 50)
             mp_amount = self.stats.get("mp_amount", 20)
             actual_heal = character.heal(heal_amount)
             character.recover_mp(mp_amount)
-            print(f"{character.name}이(가) {self.name}을(를) 설치하여 휴식을 취했습니다!")
+            print(f"🏕️ {character.name}이(가) {self.name}을(를) 설치하여 휴식을 취했습니다!")
             print(f"HP {actual_heal} 회복, MP {mp_amount} 회복!")
-            return True
-        elif "full_rest" in self.effects:
-            # 별장 사용 - 완전 휴식
+            used = True
+            
+        if "full_rest" in self.effects:
             heal_amount = self.stats.get("heal_amount", 9999)
             mp_amount = self.stats.get("mp_amount", 9999)
             actual_heal = character.heal(heal_amount)
@@ -490,13 +656,14 @@ class Item:
             if "cure_all" in self.effects:
                 if hasattr(character, 'cure_all_status_effects'):
                     character.cure_all_status_effects()
-                print(f"{character.name}이(가) {self.name}에서 완전한 휴식을 취했습니다!")
+                print(f"🏰 {character.name}이(가) {self.name}에서 완전한 휴식을 취했습니다!")
                 print(f"HP 완전 회복, MP 완전 회복, 모든 상태이상 치료!")
             else:
-                print(f"{character.name}이(가) {self.name}에서 완전한 휴식을 취했습니다!")
+                print(f"🏰 {character.name}이(가) {self.name}에서 완전한 휴식을 취했습니다!")
                 print(f"HP 완전 회복, MP 완전 회복!")
-            return True
-        elif "teleport_town" in self.effects:
+            used = True
+            
+        if "teleport_town" in self.effects:
             # 마을로 귀환
             print(f"{character.name}이(가) {self.name}을(를) 사용하여 마을로 돌아갑니다!")
             return True
@@ -541,7 +708,44 @@ class Item:
                 character.cure_all_status_effects()
             print(f"{character.name}의 모든 상태이상이 치료되었습니다!")
             return True
-        return False
+        
+        # 추가 효과들
+        elif "weapon_blessing" in self.effects:
+            # 무기 축복 - 일정 턴간 크리티컬 확률 증가
+            duration = self.stats.get("duration", 10)
+            crit_bonus = self.stats.get("crit_bonus", 20)
+            character.temp_crit_bonus = getattr(character, 'temp_crit_bonus', 0) + crit_bonus
+            character.temp_weapon_blessing_duration = duration
+            print(f"⚔️✨ {character.name}의 무기가 축복받았습니다! 크리티컬 +{crit_bonus}% ({duration}턴)")
+            return True
+            
+        elif "armor_blessing" in self.effects:
+            # 방어구 축복 - 일정 턴간 방어력 증가
+            duration = self.stats.get("duration", 10)
+            def_bonus = self.stats.get("defense_bonus", 20)
+            character.temp_defense_bonus = getattr(character, 'temp_defense_bonus', 0) + def_bonus
+            character.temp_armor_blessing_duration = duration
+            print(f"🛡️✨ {character.name}의 방어구가 축복받았습니다! 방어력 +{def_bonus} ({duration}턴)")
+            return True
+            
+        elif "transformation" in self.effects:
+            # 변신 효과
+            transform_type = self.stats.get("transform_type", "드래곤")
+            duration = self.stats.get("duration", 8)
+            stat_bonus = self.stats.get("stat_bonus", 30)
+            
+            character.temp_transformation = transform_type
+            character.temp_transform_duration = duration
+            character.temp_attack_bonus = getattr(character, 'temp_attack_bonus', 0) + stat_bonus
+            character.temp_defense_bonus = getattr(character, 'temp_defense_bonus', 0) + stat_bonus
+            character.temp_magic_bonus = getattr(character, 'temp_magic_bonus', 0) + stat_bonus
+            character.temp_speed_bonus = getattr(character, 'temp_speed_bonus', 0) + stat_bonus
+            
+            print(f"🐉 {character.name}이(가) {transform_type}으로 변신했습니다!")
+            print(f"   모든 능력치 +{stat_bonus} ({duration}턴)")
+            return True
+        
+        return used if 'used' in locals() else False
 
 
 class ItemDatabase:

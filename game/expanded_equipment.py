@@ -153,6 +153,152 @@ class Equipment:
             'effectiveness': effectiveness,
             'stat_multiplier': effectiveness
         }
+    
+    def apply_equipment_effects(self, character, action_type: str = "passive", **kwargs) -> List[str]:
+        """장비 특수 효과 적용"""
+        messages = []
+        
+        for effect in self.special_effects:
+            # 발동 확률 체크
+            import random
+            if random.random() > effect.proc_chance:
+                continue
+                
+            effect_type = effect.effect_type
+            value = effect.value
+            
+            # 패시브 효과들
+            if action_type == "passive":
+                if effect_type == SpecialEffect.VISION_RANGE:
+                    character.temp_vision_bonus = getattr(character, 'temp_vision_bonus', 0) + int(value)
+                    
+                elif effect_type == SpecialEffect.SPEED_BOOST:
+                    character.temp_speed_bonus = getattr(character, 'temp_speed_bonus', 0) + int(value)
+                    
+                elif effect_type == SpecialEffect.CRIT_CHANCE:
+                    character.temp_crit_bonus = getattr(character, 'temp_crit_bonus', 0) + value
+                    
+                elif effect_type == SpecialEffect.MAGIC_RESIST:
+                    character.temp_magic_resistance = getattr(character, 'temp_magic_resistance', 0) + value
+            
+            # 공격 시 효과들
+            elif action_type == "attack":
+                target = kwargs.get('target')
+                damage = kwargs.get('damage', 0)
+                
+                if effect_type == SpecialEffect.LIFE_STEAL:
+                    heal_amount = int(damage * value)
+                    old_hp = character.current_hp
+                    character.current_hp = min(character.max_hp, character.current_hp + heal_amount)
+                    actual_heal = character.current_hp - old_hp
+                    if actual_heal > 0:
+                        messages.append(f"🩸 {self.name} 효과: 생명력 {actual_heal} 흡수!")
+                
+                elif effect_type == SpecialEffect.MANA_BURN and target:
+                    mp_burn = min(int(value * 10), getattr(target, 'current_mp', 0))
+                    if mp_burn > 0:
+                        target.current_mp -= mp_burn
+                        messages.append(f"💙 {self.name} 효과: {target.name}의 MP {mp_burn} 소모!")
+                
+                elif effect_type == SpecialEffect.POISON_CHANCE and target:
+                    if hasattr(target, 'status_manager') and target.status_manager:
+                        target.status_manager.add_status("독", 3, 1.0)
+                        messages.append(f"☠️ {self.name} 효과: {target.name} 중독!")
+                
+                elif effect_type == SpecialEffect.FIRE_DAMAGE and target:
+                    fire_damage = int(damage * value)
+                    if hasattr(target, 'status_manager') and target.status_manager:
+                        target.status_manager.add_status("화상", 3, 1.0)
+                        messages.append(f"🔥 {self.name} 효과: {target.name} 화상!")
+                
+                elif effect_type == SpecialEffect.ICE_SLOW and target:
+                    if hasattr(target, 'status_manager') and target.status_manager:
+                        target.status_manager.add_status("냉기", 2, 1.0)
+                        messages.append(f"🧊 {self.name} 효과: {target.name} 감속!")
+                
+                elif effect_type == SpecialEffect.LIGHTNING_CHAIN and target:
+                    chain_damage = int(damage * 0.5)
+                    messages.append(f"⚡ {self.name} 효과: 연쇄 번개 {chain_damage} 피해!")
+            
+            # 방어 시 효과들
+            elif action_type == "defend":
+                attacker = kwargs.get('attacker')
+                incoming_damage = kwargs.get('damage', 0)
+                
+                if effect_type == SpecialEffect.DAMAGE_REFLECT and attacker:
+                    reflect_damage = int(incoming_damage * value)
+                    if hasattr(attacker, 'current_hp'):
+                        attacker.current_hp = max(1, attacker.current_hp - reflect_damage)
+                        messages.append(f"🛡️ {self.name} 효과: {reflect_damage} 피해 반사!")
+                
+                elif effect_type == SpecialEffect.SHIELD_CHANCE:
+                    import random
+                    if random.random() < value:
+                        messages.append(f"🛡️ {self.name} 효과: 공격 완전 차단!")
+                        return messages, 0  # 피해 무효화
+                
+                elif effect_type == SpecialEffect.HP_REGEN:
+                    regen_amount = int(character.max_hp * value)
+                    old_hp = character.current_hp
+                    character.current_hp = min(character.max_hp, character.current_hp + regen_amount)
+                    actual_regen = character.current_hp - old_hp
+                    if actual_regen > 0:
+                        messages.append(f"💚 {self.name} 효과: HP {actual_regen} 재생!")
+            
+            # 스킬 사용 시 효과들
+            elif action_type == "skill":
+                skill_data = kwargs.get('skill_data', {})
+                
+                if effect_type == SpecialEffect.MP_REDUCTION:
+                    mp_save = int(skill_data.get('mp_cost', 0) * value)
+                    character.current_mp += mp_save
+                    messages.append(f"💎 {self.name} 효과: MP {mp_save} 절약!")
+                
+                elif effect_type == SpecialEffect.COOLDOWN_REDUCTION:
+                    messages.append(f"⏱️ {self.name} 효과: 쿨다운 {int(value*100)}% 감소!")
+                
+                elif effect_type == SpecialEffect.ELEMENT_CHANGE:
+                    new_element = kwargs.get('new_element', '화염')
+                    messages.append(f"🌟 {self.name} 효과: 속성이 {new_element}로 변경!")
+            
+            # 특수 효과들
+            elif action_type == "special":
+                if effect_type == SpecialEffect.TELEPORT_CHANCE:
+                    character.temp_dodge_bonus = getattr(character, 'temp_dodge_bonus', 0) + 50
+                    messages.append(f"🌀 {self.name} 효과: 순간이동으로 회피율 증가!")
+                
+                elif effect_type == SpecialEffect.TIME_SLOW:
+                    character.temp_enemy_speed_down = getattr(character, 'temp_enemy_speed_down', 0) + int(value)
+                    messages.append(f"⏰ {self.name} 효과: 적의 시간 지연!")
+                
+                elif effect_type == SpecialEffect.LUCK_BOOST:
+                    character.temp_luck_bonus = getattr(character, 'temp_luck_bonus', 0) + value
+                    messages.append(f"🍀 {self.name} 효과: 행운 증가!")
+        
+        return messages
+    
+    def enhance_equipment(self) -> bool:
+        """장비 강화"""
+        if self.enhancement_level >= self.max_enhancement:
+            return False
+        
+        import random
+        success_rate = max(0.1, 1.0 - (self.enhancement_level * 0.05))
+        
+        if random.random() < success_rate:
+            self.enhancement_level += 1
+            return True
+        return False
+    
+    def repair_equipment(self, repair_amount: int = None):
+        """장비 수리"""
+        if repair_amount is None:
+            self.current_durability = self.max_durability
+        else:
+            self.current_durability = min(self.max_durability, self.current_durability + repair_amount)
+        
+        self.is_broken = False
+        self.protection_turns = 0
 
 class EquipmentGenerator:
     """장비 생성기"""

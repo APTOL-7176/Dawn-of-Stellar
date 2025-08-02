@@ -1,0 +1,150 @@
+{
+  "session_info": {
+    "start_time": "2025-08-02T16:16:46.568953",
+    "session_id": "20250802_161646"
+  },
+  "battles": [
+    {
+      "battle_id": 1,
+      "start_time": "2025-08-02T16:16:46.976837",
+      "party": [
+        {
+          "name": "셀레스트",
+          "level": 1,
+          "hp": 108,
+          "max_hp": 108,
+          "brv": 1457,
+          "max_brv": 2383,
+          "attack": 48,
+          "defense": 44,
+          "magic_attack": 86,
+          "magic_defense": 77,
+          "speed": 64,
+          "character_class": "무당"
+        },
+        {
+          "name": "라파엘라",
+          "level": 1,
+          "hp": 408,
+          "max_hp": 408,
+          "brv": 1103,
+          "max_brv": 3467,
+          "attack": 64,
+          "defense": 22,
+          "magic_attack": 13,
+          "magic_defense": 21,
+          "speed": 74,
+          "character_class": "광전사"
+        },
+        {
+          "name": "캐밀라",
+          "level": 1,
+          "hp": 180,
+          "max_hp": 180,
+          "brv": 1337,
+          "max_brv": 3091,
+          "attack": 83,
+          "defense": 51,
+          "magic_attack": 31,
+          "magic_defense": 47,
+          "speed": 71,
+          "character_class": "검성"
+        },
+        {
+          "name": "벤자민",
+          "level": 1,
+          "hp": 107,
+          "max_hp": 107,
+          "brv": 1623,
+          "max_brv": 2031,
+          "attack": 44,
+          "defense": 39,
+          "magic_attack": 84,
+          "magic_defense": 74,
+          "speed": 48,
+          "character_class": "네크로맨서"
+        }
+      ],
+      "enemies": [
+        {
+          "name": "스켈레톤",
+          "level": 1,
+          "hp": 201,
+          "max_hp": 201,
+          "brv": 5491,
+          "max_brv": 11151,
+          "attack": 42,
+          "defense": 34,
+          "magic_attack": 28,
+          "magic_defense": 32,
+          "speed": 28,
+          "character_class": "Enemy"
+        }
+      ],
+      "turns": [],
+      "damage_log": [
+        {
+          "timestamp": "2025-08-02T16:16:56.046054",
+          "damage_type": "BRV",
+          "attacker": "캐밀라",
+          "target": "스켈레톤",
+          "base_damage": 122,
+          "final_damage": 1556,
+          "calculation_details": {
+            "공격자_물리공격력": 83,
+            "대상_물리방어력": 34,
+            "기본_BRV_데미지": 122,
+            "스킬_배율": "50%",
+            "스킬_배율_적용후": 61,
+            "기본_스킬_배율_1.5x": 91,
+            "플레이어_보너스_18.75x": 1706,
+            "랜덤_배율": "0.912",
+            "랜덤_적용후": 1556
+          }
+        },
+        {
+          "timestamp": "2025-08-02T16:19:14.530234",
+          "damage_type": "BRV",
+          "attacker": "벤자민",
+          "target": "스켈레톤",
+          "base_damage": 64,
+          "final_damage": 2171,
+          "calculation_details": {
+            "공격자_물리공격력": 44,
+            "대상_물리방어력": 34,
+            "기본_BRV_데미지": 64,
+            "스킬_배율": "120%",
+            "스킬_배율_적용후": 76,
+            "기본_스킬_배율_1.5x": 114,
+            "플레이어_보너스_18.75x": 2137,
+            "랜덤_배율": "1.016",
+            "랜덤_적용후": 2171
+          }
+        },
+        {
+          "timestamp": "2025-08-02T16:19:14.532233",
+          "damage_type": "HP",
+          "attacker": "벤자민",
+          "target": "스켈레톤",
+          "base_damage": 1623,
+          "final_damage": 162,
+          "calculation_details": {
+            "공격자_BRV_포인트": 1623,
+            "HP_스킬_배율": "100%",
+            "기본_계산": "1623 × 100% × 0.10 = 162",
+            "플레이어_배율_1.0x": 162
+          }
+        }
+      ],
+      "end_time": "2025-08-02T16:19:20.133687",
+      "winner": "플레이어",
+      "duration_seconds": 153.15685033798218
+    }
+  ],
+  "damage_stats": {
+    "total_player_damage": 3889,
+    "total_enemy_damage": 0,
+    "total_healing": 0,
+    "damage_breakdown": {}
+  }
+}

@@ -18,8 +18,20 @@ class ShopItem:
         self.stock = stock
         
     def get_display_name(self) -> str:
-        """표시용 이름 (재고 포함)"""
-        return f"{self.item.name} (x{self.stock}) - {self.price}G"
+        """표시용 이름 (재고 및 내구도 포함)"""
+        # 내구도 정보 추가
+        durability_info = ""
+        if hasattr(self.item, 'get_durability_percentage'):
+            durability_pct = self.item.get_durability_percentage()
+            if durability_pct < 100:
+                durability_color = "🟢" if durability_pct > 80 else "🟡" if durability_pct > 50 else "🟠" if durability_pct > 20 else "🔴"
+                durability_info = f" {durability_color}{durability_pct:.0f}%"
+        elif hasattr(self.item, 'current_durability') and hasattr(self.item, 'max_durability'):
+            durability_pct = (self.item.current_durability / self.item.max_durability * 100) if self.item.max_durability > 0 else 0
+            durability_color = "🟢" if durability_pct > 80 else "🟡" if durability_pct > 50 else "🟠" if durability_pct > 20 else "🔴"
+            durability_info = f" {durability_color}{durability_pct:.0f}%"
+        
+        return f"{self.item.name} (x{self.stock}){durability_info} - {self.price}G"
 
 
 class Merchant:
@@ -512,6 +524,12 @@ class MerchantManager:
         
     def get_spawn_chance(self, floor: int) -> float:
         """층수에 따른 상인 생성 확률 계산"""
+        # 안전한 타입 체크
+        if floor is None or not isinstance(floor, int):
+            floor = 1
+        if self.last_merchant_floor is None:
+            self.last_merchant_floor = -1
+            
         # 연속으로 상인이 없었다면 확률 증가
         floors_without_merchant = floor - self.last_merchant_floor - 1
         bonus_chance = min(0.3, floors_without_merchant * 0.1)  # 최대 30% 보너스
@@ -528,6 +546,10 @@ class MerchantManager:
     
     def try_spawn_merchant(self, floor: int) -> Optional[Merchant]:
         """상인 생성 시도 - 층별 관리"""
+        # 안전한 타입 체크
+        if floor is None or not isinstance(floor, int):
+            floor = 1
+            
         # 이미 이 층에 상인 정보가 있다면 그대로 반환
         if floor in self.merchants:
             return self.merchants[floor]

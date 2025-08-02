@@ -1,0 +1,208 @@
+{
+  "session_info": {
+    "start_time": "2025-08-02T14:37:55.178226",
+    "session_id": "20250802_143755"
+  },
+  "battles": [
+    {
+      "battle_id": 1,
+      "start_time": "2025-08-02T14:37:55.582800",
+      "party": [
+        {
+          "name": "칼렙",
+          "level": 1,
+          "hp": 80,
+          "max_hp": 80,
+          "brv": 1663,
+          "max_brv": 1989,
+          "attack": 38,
+          "defense": 54,
+          "magic_attack": 76,
+          "magic_defense": 86,
+          "speed": 49,
+          "character_class": "철학자"
+        },
+        {
+          "name": "오웬",
+          "level": 1,
+          "hp": 408,
+          "max_hp": 408,
+          "brv": 0,
+          "max_brv": 3467,
+          "attack": 97,
+          "defense": 22,
+          "magic_attack": 13,
+          "magic_defense": 21,
+          "speed": 74,
+          "character_class": "광전사"
+        },
+        {
+          "name": "이사벨라",
+          "level": 1,
+          "hp": 167,
+          "max_hp": 167,
+          "brv": 1343,
+          "max_brv": 3041,
+          "attack": 74,
+          "defense": 58,
+          "magic_attack": 45,
+          "magic_defense": 53,
+          "speed": 67,
+          "character_class": "사무라이"
+        },
+        {
+          "name": "잭",
+          "level": 1,
+          "hp": 90,
+          "max_hp": 90,
+          "brv": 1751,
+          "max_brv": 2183,
+          "attack": 49,
+          "defense": 42,
+          "magic_attack": 85,
+          "magic_defense": 69,
+          "speed": 59,
+          "character_class": "정령술사"
+        }
+      ],
+      "enemies": [
+        {
+          "name": "고블린",
+          "level": 2,
+          "hp": 270,
+          "max_hp": 270,
+          "brv": 559,
+          "max_brv": 1119,
+          "attack": 52,
+          "defense": 31,
+          "magic_attack": 23,
+          "magic_defense": 18,
+          "speed": 38,
+          "character_class": "Enemy"
+        }
+      ],
+      "turns": [],
+      "damage_log": [
+        {
+          "timestamp": "2025-08-02T14:38:02.120711",
+          "damage_type": "BRV",
+          "attacker": "오웬",
+          "target": "고블린",
+          "base_damage": 156,
+          "final_damage": 1476,
+          "calculation_details": {
+            "공격자_물리공격력": 97,
+            "대상_물리방어력": 31,
+            "기본_BRV_데미지": 156,
+            "스킬_배율": "33%",
+            "스킬_배율_적용후": 51,
+            "기본_스킬_배율_1.5x": 76,
+            "플레이어_보너스_18.75x": 1425,
+            "랜덤_배율": "1.036",
+            "랜덤_적용후": 1476
+          }
+        },
+        {
+          "timestamp": "2025-08-02T14:39:02.300213",
+          "damage_type": "BRV",
+          "attacker": "이사벨라",
+          "target": "고블린",
+          "base_damage": 119,
+          "final_damage": 4185,
+          "calculation_details": {
+            "공격자_물리공격력": 74,
+            "대상_물리방어력": 31,
+            "기본_BRV_데미지": 119,
+            "스킬_배율": "125%",
+            "스킬_배율_적용후": 148,
+            "기본_스킬_배율_1.5x": 222,
+            "플레이어_보너스_18.75x": 4162,
+            "랜덤_배율": "1.006",
+            "랜덤_적용후": 4185
+          }
+        },
+        {
+          "timestamp": "2025-08-02T14:39:35.084665",
+          "damage_type": "BRV",
+          "attacker": "잭",
+          "target": "고블린",
+          "base_damage": 79,
+          "final_damage": 704,
+          "calculation_details": {
+            "공격자_물리공격력": 49,
+            "대상_물리방어력": 31,
+            "기본_BRV_데미지": 79,
+            "스킬_배율": "33%",
+            "스킬_배율_적용후": 26,
+            "기본_스킬_배율_1.5x": 39,
+            "플레이어_보너스_18.75x": 731,
+            "랜덤_배율": "0.963",
+            "랜덤_적용후": 704
+          }
+        },
+        {
+          "timestamp": "2025-08-02T14:46:23.716806",
+          "damage_type": "BRV",
+          "attacker": "이사벨라",
+          "target": "고블린",
+          "base_damage": 119,
+          "final_damage": 4271,
+          "calculation_details": {
+            "공격자_물리공격력": 74,
+            "대상_물리방어력": 31,
+            "기본_BRV_데미지": 119,
+            "스킬_배율": "125%",
+            "스킬_배율_적용후": 148,
+            "기본_스킬_배율_1.5x": 222,
+            "플레이어_보너스_18.75x": 4162,
+            "랜덤_배율": "1.026",
+            "랜덤_적용후": 4271
+          }
+        },
+        {
+          "timestamp": "2025-08-02T14:46:25.684210",
+          "damage_type": "BRV",
+          "attacker": "오웬",
+          "target": "고블린",
+          "base_damage": 156,
+          "final_damage": 3556,
+          "calculation_details": {
+            "공격자_물리공격력": 97,
+            "대상_물리방어력": 31,
+            "기본_BRV_데미지": 156,
+            "스킬_배율": "85%",
+            "스킬_배율_적용후": 132,
+            "기본_스킬_배율_1.5x": 198,
+            "플레이어_보너스_18.75x": 3712,
+            "랜덤_배율": "0.958",
+            "랜덤_적용후": 3556
+          }
+        },
+        {
+          "timestamp": "2025-08-02T14:46:25.687720",
+          "damage_type": "HP",
+          "attacker": "오웬",
+          "target": "고블린",
+          "base_damage": 2283,
+          "final_damage": 222,
+          "calculation_details": {
+            "공격자_BRV_포인트": 2283,
+            "HP_스킬_배율": "65%",
+            "기본_계산": "2283 × 65% × 0.10 = 148",
+            "플레이어_배율_1.0x": 148,
+            "Break_보너스_1.5x": 222
+          }
+        }
+      ],
+      "end_time": "2025-08-02T14:46:25.687720",
+      "winner": "플레이어",
+      "duration_seconds": 510.1049201488495
+    }
+  ],
+  "damage_stats": {
+    "total_player_damage": 14414,
+    "total_enemy_damage": 0,
+    "total_healing": 0,
+    "damage_breakdown": {}
+  }
+}
