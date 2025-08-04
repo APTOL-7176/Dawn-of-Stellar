@@ -6,6 +6,18 @@ from typing import List, Optional, Dict, Any, TYPE_CHECKING
 import random
 from .new_skill_system import StatusType, get_status_icon
 
+# 전역 전투 상태 변수
+_combat_active = False
+
+def set_combat_active(active: bool):
+    """전투 상태 설정"""
+    global _combat_active
+    _combat_active = active
+
+def is_combat_active() -> bool:
+    """전투 상태 확인"""
+    return _combat_active
+
 class StatusEffect:
     """상태이상 효과"""
     def __init__(self, status_type: StatusType, duration: int, intensity: float = 1.0):
@@ -19,6 +31,7 @@ class StatusManager:
     def __init__(self):
         self.status_effects: List[StatusEffect] = []
         self.effects = self.status_effects  # 호환성을 위한 별칭
+        self.name = "StatusManager"  # name 속성 추가
         
     def add_status(self, status_effect: StatusEffect) -> bool:
         """상태이상 추가"""
@@ -39,7 +52,7 @@ class StatusManager:
         return None
     
     def process_turn_effects(self, character=None) -> List[str]:
-        """턴 처리 - 상태이상 효과 적용 (확장)"""
+        """턴 처리 - 상태이상 효과 적용 (자동 애니메이션)"""
         messages = []
         
         # 캐릭터 객체가 제공되지 않으면 빈 메시지 리스트 반환
@@ -312,6 +325,11 @@ class StatusManager:
     def add_effect(self, effect: StatusEffect):
         """상태이상 효과 추가 (호환성)"""
         self.add_status(effect)
+        self.effects = self.status_effects  # 별칭 업데이트
+    
+    def clear_all_effects(self):
+        """모든 상태이상 효과 제거"""
+        self.status_effects.clear()
         self.effects = self.status_effects  # 별칭 업데이트
     
     def get_active_effects(self) -> List[str]:
@@ -1480,28 +1498,88 @@ class CharacterClassManager:
 
 
 class Character(BraveMixin):
-    """게임 캐릭터 클래스 (Brave 시스템 포함)"""
+    """게임 캐릭터 클래스 (Brave 시스템 포함) - 자동 애니메이션 지원"""
     
-    def __init__(self, name: str, character_class: str, max_hp: int, 
-                 physical_attack: int, magic_attack: int, 
-                 physical_defense: int, magic_defense: int, speed: int):
+    def __init__(self, name: str, character_class: str, max_hp: int = None, 
+                 physical_attack: int = None, magic_attack: int = None, 
+                 physical_defense: int = None, magic_defense: int = None, speed: int = None,
+                 skip_class_modifiers: bool = False):
         # Brave 시스템 초기화
         super().__init__()
         
         self.name = name
         self.character_class = character_class
         
-        # 클래스 특화 적용
-        specialization = CharacterClassManager.get_class_specialization(character_class)
-        hp_modifier = specialization.get("hp_bonus", 1.0)
-        mp_modifier = specialization.get("mp_efficiency", 1.0)
+        # 🎯 기본 스탯값 설정 (1레벨 캐릭터용)
+        if max_hp is None:
+            # 클래스별 기본 스탯 설정 (클래스 보너스 적용 안 함)
+            class_defaults = {
+                "전사": {"hp": 216, "p_atk": 75, "m_atk": 43, "p_def": 63, "m_def": 48, "speed": 56},
+                "아크메이지": {"hp": 121, "p_atk": 43, "m_atk": 78, "p_def": 33, "m_def": 67, "speed": 58},
+                "궁수": {"hp": 164, "p_atk": 74, "m_atk": 33, "p_def": 44, "m_def": 43, "speed": 68},
+                "도적": {"hp": 150, "p_atk": 64, "m_atk": 38, "p_def": 43, "m_def": 49, "speed": 93},
+                "성기사": {"hp": 197, "p_atk": 67, "m_atk": 38, "p_def": 76, "m_def": 62, "speed": 43},
+                "암흑기사": {"hp": 189, "p_atk": 71, "m_atk": 54, "p_def": 58, "m_def": 51, "speed": 52},
+                "몽크": {"hp": 172, "p_atk": 82, "m_atk": 51, "p_def": 59, "m_def": 64, "speed": 76},
+                "바드": {"hp": 107, "p_atk": 43, "m_atk": 66, "p_def": 38, "m_def": 58, "speed": 69},
+                "네크로맨서": {"hp": 134, "p_atk": 44, "m_atk": 84, "p_def": 39, "m_def": 74, "speed": 48},
+                "용기사": {"hp": 181, "p_atk": 78, "m_atk": 62, "p_def": 67, "m_def": 58, "speed": 61},
+                "검성": {"hp": 164, "p_atk": 83, "m_atk": 31, "p_def": 51, "m_def": 47, "speed": 71},
+                "정령술사": {"hp": 107, "p_atk": 49, "m_atk": 85, "p_def": 42, "m_def": 69, "speed": 59},
+                "암살자": {"hp": 134, "p_atk": 81, "m_atk": 28, "p_def": 34, "m_def": 39, "speed": 87},
+                "기계공학자": {"hp": 156, "p_atk": 63, "m_atk": 59, "p_def": 54, "m_def": 48, "speed": 53},
+                "무당": {"hp": 121, "p_atk": 48, "m_atk": 86, "p_def": 44, "m_def": 77, "speed": 64},
+                "해적": {"hp": 164, "p_atk": 74, "m_atk": 34, "p_def": 52, "m_def": 41, "speed": 77},
+                "사무라이": {"hp": 167, "p_atk": 74, "m_atk": 45, "p_def": 58, "m_def": 53, "speed": 67},
+                "드루이드": {"hp": 175, "p_atk": 53, "m_atk": 81, "p_def": 48, "m_def": 69, "speed": 59},
+                "철학자": {"hp": 107, "p_atk": 38, "m_atk": 76, "p_def": 54, "m_def": 86, "speed": 49},
+                "시간술사": {"hp": 121, "p_atk": 54, "m_atk": 77, "p_def": 49, "m_def": 64, "speed": 57},
+                "연금술사": {"hp": 135, "p_atk": 59, "m_atk": 72, "p_def": 44, "m_def": 58, "speed": 54},
+                "검투사": {"hp": 172, "p_atk": 79, "m_atk": 41, "p_def": 56, "m_def": 48, "speed": 64},
+                "기사": {"hp": 216, "p_atk": 79, "m_atk": 46, "p_def": 72, "m_def": 54, "speed": 48},
+                "신관": {"hp": 143, "p_atk": 42, "m_atk": 79, "p_def": 57, "m_def": 89, "speed": 52},
+                "마검사": {"hp": 164, "p_atk": 67, "m_atk": 70, "p_def": 54, "m_def": 61, "speed": 58},
+                "차원술사": {"hp": 84, "p_atk": 33, "m_atk": 88, "p_def": 28, "m_def": 72, "speed": 47},
+                "광전사": {"hp": 327, "p_atk": 64, "m_atk": 13, "p_def": 22, "m_def": 21, "speed": 74},
+                "마법사": {"hp": 121, "p_atk": 43, "m_atk": 78, "p_def": 33, "m_def": 67, "speed": 58},  # 아크메이지와 동일
+                "성직자": {"hp": 143, "p_atk": 42, "m_atk": 79, "p_def": 57, "m_def": 89, "speed": 52},  # 신관과 동일
+            }
+            
+            defaults = class_defaults.get(character_class, class_defaults["전사"])  # 기본값은 전사
+            max_hp = defaults["hp"]
+            physical_attack = defaults["p_atk"]
+            magic_attack = defaults["m_atk"]
+            physical_defense = defaults["p_def"]
+            magic_defense = defaults["m_def"]
+            speed = defaults["speed"]
         
-        self.max_hp = int(max_hp * hp_modifier)
-        self.current_hp = self.max_hp
+        # 클래스 특화 정보 항상 가져오기 (스킵 여부와 상관없이)
+        specialization = CharacterClassManager.get_class_specialization(character_class)
+        
+        if skip_class_modifiers:
+            # 🔧 로딩 모드: 클래스 보정 건너뛰기 (이미 보정된 값들)
+            hp_modifier = 1.0
+            mp_modifier = 1.0
+            self.max_hp = max_hp  # 보정 없이 원본값 사용
+            self._current_hp = max_hp  # 나중에 save_system에서 정확한 값으로 덮어씀
+        else:
+            # 클래스 특화 적용
+            hp_modifier = specialization.get("hp_bonus", 1.0)
+            mp_modifier = specialization.get("mp_efficiency", 1.0)
+            self.max_hp = int(max_hp * hp_modifier)
+            self._current_hp = self.max_hp  # 내부 저장용
         self.wounds = 0  # 상처 누적량
-        self.max_mp = self._get_class_base_mp(character_class)  # 클래스별 고정 MP
-        self.current_mp = self.max_mp  # 현재 MP
+        
+        if skip_class_modifiers:
+            # 로딩 모드에서는 클래스별 MP도 원본값 유지
+            self.max_mp = self._get_class_base_mp(character_class)  # 클래스별 정확한 MP (나중에 저장된 값으로 덮어쓸 예정)
+        else:
+            self.max_mp = self._get_class_base_mp(character_class)  # 클래스별 고정 MP
+        self._current_mp = self.max_mp  # 내부 저장용
         self.steps_taken = 0  # 걸음 수 (상처 회복용)
+        
+        # 애니메이션 비활성화 플래그 (초기화 중에는 애니메이션 안 함)
+        self._animation_enabled = False
         self.physical_attack = physical_attack
         self.magic_attack = magic_attack
         self.physical_defense = physical_defense
@@ -1510,7 +1588,7 @@ class Character(BraveMixin):
         self.level = 1
         self.experience = 0
         self.experience_to_next = 30  # 다음 레벨까지 필요한 경험치
-        self.atb_gauge = 0  # ATB 게이지 (0-100)
+        self.atb_gauge = 0  # ATB 게이지 (0-1000) - 전투 시스템과 스케일 일치
         self.atb_speed = speed  # ATB 충전 속도는 스피드 수치 기반 (나중에 장비 적용 시 업데이트됨)
         self.is_alive = True
         
@@ -1519,6 +1597,7 @@ class Character(BraveMixin):
         self.casting_targets = None    # 캐스팅 대상들
         self.casting_start_time = None # 캐스팅 시작 시간
         self.casting_duration = None   # 캐스팅 지속 시간
+        self.casting_start_atb = 0     # 캐스팅 시작 ATB 값
         self.is_casting = False        # 캐스팅 상태 플래그
         
         # 속성 시스템 추가
@@ -1575,62 +1654,29 @@ class Character(BraveMixin):
         # Brave 시스템 스킬 초기화
         self.brave_skills = BraveSkillDatabase.get_character_skills(character_class)
         
-        # 추가 Brave 스탯들 (직업별 기초값 적용)
-        # 직업별 기초 BRV 설정
-        job_base_brv = {
-            # 물리 딜러 - 높은 기본 MAX BRV
-            "전사": {"int_brv": 1283, "max_brv": 2847},
-            "검성": {"int_brv": 1337, "max_brv": 3091},
-            "용기사": {"int_brv": 1401, "max_brv": 3192},
-            "암흑기사": {"int_brv": 1297, "max_brv": 2983},
-            "검투사": {"int_brv": 1361, "max_brv": 3158},
-            "광전사": {"int_brv": 1103, "max_brv": 3467},  # 극단적 - 낮은 INT, 높은 MAX
-            "사무라이": {"int_brv": 1343, "max_brv": 3041},
-            
-            # 마법사 - 높은 기본 INT BRV
-            "아크메이지": {"int_brv": 1687, "max_brv": 2223},
-            "네크로맨서": {"int_brv": 1623, "max_brv": 2031},
-            "정령술사": {"int_brv": 1751, "max_brv": 2183},
-            "시간술사": {"int_brv": 1827, "max_brv": 1914},  # 최고 INT, 낮은 MAX
-            "차원술사": {"int_brv": 1797, "max_brv": 2067},
-            "마법사": {"int_brv": 1567, "max_brv": 2149},
-            "연금술사": {"int_brv": 1493, "max_brv": 2109},
-            "철학자": {"int_brv": 1663, "max_brv": 1989},
-            
-            # 균형형 - 중간 기초값
-            "성기사": {"int_brv": 1371, "max_brv": 2614},
-            "기사": {"int_brv": 1233, "max_brv": 2691},
-            "성직자": {"int_brv": 1429, "max_brv": 2458},
-            "신관": {"int_brv": 1413, "max_brv": 2501},
-            "마검사": {"int_brv": 1303, "max_brv": 2651},
-            "기계공학자": {"int_brv": 1273, "max_brv": 2573},
-            "무당": {"int_brv": 1457, "max_brv": 2383},
-            
-            # 민첩형 - 높은 INT BRV, 낮은 MAX BRV
-            "도적": {"int_brv": 1561, "max_brv": 2031},
-            "암살자": {"int_brv": 1631, "max_brv": 1989},
-            "궁수": {"int_brv": 1507, "max_brv": 2109},
-            "몽크": {"int_brv": 1439, "max_brv": 2223},
-            "해적": {"int_brv": 1365, "max_brv": 2261},
-            "드루이드": {"int_brv": 1535, "max_brv": 2071},
-            
-            # 지원형 - 안정적 기초값
-            "바드": {"int_brv": 1587, "max_brv": 2301},
-        }
-        
-        # 직업별 기초값 적용 (기본값 포함)
-        base_stats = job_base_brv.get(character_class, {"int_brv": 1200, "max_brv": 2400})
-        
-        self.int_brv = base_stats["int_brv"]  # 고정값으로 변경
-        self.max_brv = base_stats["max_brv"]  # 고정값으로 변경
+        # 추가 Brave 스탯들 - GameBalance 시스템 사용
+        # GameBalance에서 직업별 BRV 값 가져오기
+        from .balance import GameBalance
+        try:
+            brave_stats = GameBalance.get_character_brave_stats(character_class, level=1)
+            self.int_brv = brave_stats["int_brv"]
+            self.max_brv = brave_stats["max_brv"]
+            self.brv_efficiency = brave_stats["brv_efficiency"]
+            self.brv_loss_resistance = brave_stats["brv_loss_resistance"]
+        except Exception as e:
+            # 기본값 사용
+            self.int_brv = 350
+            self.max_brv = 2800
+            self.brv_efficiency = 1.0
+            self.brv_loss_resistance = 1.0
         self.brv_regen = speed // 10  # Brave 자동 회복량
         self.brave_bonus_rate = 1.0  # Brave 획득 배율
         self.brv_efficiency = 1.0  # Brave 효율성
         
-        # 저장 시스템 호환을 위한 Brave 속성들
-        self.current_brave = 400  # 현재 Brave 포인트
-        self.max_brave = 99999     # 최대 Brave 포인트
-        self.initial_brave = 400 # 초기 Brave 포인트
+        # 저장 시스템 호환을 위한 Brave 속성들 - 밸런스 조정됨
+        self.current_brave = 40  # 현재 Brave 포인트 (1/10)
+        self.max_brave = 9999     # 최대 Brave 포인트
+        self.initial_brave = 40 # 초기 Brave 포인트 (1/10)
         self.is_broken = False   # Break 상태 여부
         
         # AI 시스템 (적 캐릭터를 위한)
@@ -1712,6 +1758,141 @@ class Character(BraveMixin):
         self.equipment_defense_bonus = 0
         self.equipment_magic_bonus = 0
         self.equipment_speed_bonus = 0
+        
+        # 초기화 완료 후 애니메이션 활성화
+        self._animation_enabled = True
+    
+    # HP/MP/BRV 자동 애니메이션 프로퍼티들
+    @property
+    def current_hp(self):
+        """현재 HP 프로퍼티"""
+        return self._current_hp
+    
+    @current_hp.setter
+    def current_hp(self, value):
+        """HP 변경 시 자동 애니메이션 (전투 중에만)"""
+        if not hasattr(self, '_current_hp'):
+            self._current_hp = value
+            return
+            
+        old_value = self._current_hp
+        # safe guard for get_total_max_hp method
+        try:
+            max_hp_limit = self.get_total_max_hp()
+        except (AttributeError, TypeError):
+            # fallback to max_hp property or basic value
+            try:
+                max_hp_limit = self.max_hp
+            except (AttributeError, TypeError):
+                max_hp_limit = getattr(self, '_max_hp', getattr(self, '_base_max_hp', 150))
+        
+        self._current_hp = max(0, min(value, max_hp_limit))
+        
+        # 전투 중이고 초기화 완료 후에만 애니메이션 실행
+        if (hasattr(self, '_animation_enabled') and self._animation_enabled and 
+            is_combat_active() and old_value != self._current_hp):
+            try:
+                from .ui_animations import animate_hp_change
+                animate_hp_change(self, old_value, self._current_hp)
+            except ImportError:
+                pass  # 애니메이션 모듈이 없으면 무시
+    
+    @property
+    def current_mp(self):
+        """현재 MP 프로퍼티"""
+        return self._current_mp
+    
+    @current_mp.setter
+    def current_mp(self, value):
+        """MP 변경 시 자동 애니메이션 (전투 중에만)"""
+        if not hasattr(self, '_current_mp'):
+            self._current_mp = value
+            return
+            
+        old_value = self._current_mp
+        # safe guard for get_total_max_mp method
+        try:
+            max_mp_limit = self.get_total_max_mp()
+        except (AttributeError, TypeError):
+            # fallback to max_mp property or basic value
+            try:
+                max_mp_limit = self.max_mp
+            except (AttributeError, TypeError):
+                max_mp_limit = getattr(self, '_max_mp', getattr(self, '_base_max_mp', 20))
+        
+        self._current_mp = max(0, min(value, max_mp_limit))
+        
+        # 전투 중이고 초기화 완료 후에만 애니메이션 실행
+        if (hasattr(self, '_animation_enabled') and self._animation_enabled and 
+            is_combat_active() and old_value != self._current_mp):
+            try:
+                from .ui_animations import animate_mp_change
+                animate_mp_change(self, old_value, self._current_mp)
+            except ImportError:
+                pass  # 애니메이션 모듈이 없으면 무시
+    
+    @property 
+    def brave_points(self):
+        """현재 BRV 프로퍼티"""
+        return getattr(self, '_brave_points', self.current_brave)
+    
+    @brave_points.setter
+    def brave_points(self, value):
+        """BRV 변경 시 자동 애니메이션"""
+        if not hasattr(self, '_brave_points'):
+            self._brave_points = value
+            return
+            
+        old_value = self._brave_points
+        self._brave_points = max(0, value)
+        
+        # 전투 중이고 초기화 완료 후에만 애니메이션 실행
+        if (hasattr(self, '_animation_enabled') and self._animation_enabled and 
+            is_combat_active() and old_value != self._brave_points):
+            try:
+                from .ui_animations import animate_brv_change
+                animate_brv_change(self, old_value, self._brave_points)
+            except ImportError:
+                pass  # 애니메이션 모듈이 없으면 무시
+        
+        # current_brave와 동기화 유지
+        self.current_brave = self._brave_points
+    
+    @property
+    def max_hp(self):
+        """장비 보너스가 포함된 최대 HP"""
+        base_hp = getattr(self, '_base_max_hp', getattr(self, '_max_hp', 150))
+        equipment_bonus = getattr(self, 'equipment_hp_bonus', 0)
+        return base_hp + equipment_bonus
+    
+    @max_hp.setter 
+    def max_hp(self, value):
+        """기본 최대 HP 설정"""
+        self._base_max_hp = value
+        # 기존 _max_hp와 호환성 유지
+        self._max_hp = value
+    
+    @property
+    def max_mp(self):
+        """장비 보너스가 포함된 최대 MP"""
+        base_mp = getattr(self, '_base_max_mp', getattr(self, '_max_mp', 20))
+        equipment_bonus = getattr(self, 'equipment_mp_bonus', 0)
+        return base_mp + equipment_bonus
+    
+    @max_mp.setter
+    def max_mp(self, value):
+        """기본 최대 MP 설정"""
+        self._base_max_mp = value
+        # 기존 _max_mp와 호환성 유지
+        self._max_mp = value
+    
+    def disable_animations(self):
+        """애니메이션 비활성화 (대량 처리 시 사용)"""
+        self._animation_enabled = False
+    
+    def enable_animations(self):
+        """애니메이션 활성화"""
+        self._animation_enabled = True
     
     def _get_class_element_affinity(self, character_class: str) -> str:
         """클래스별 기본 속성 친화도 반환 (모든 직업은 기본적으로 무속성)"""
@@ -1876,9 +2057,9 @@ class Character(BraveMixin):
                 
             if effect_type == "passive":
                 effects.update(self._apply_passive_trait(trait, situation, **kwargs))
-            elif trait.effect_type == "trigger" and situation in ["combat_start", "on_attack", "on_kill", "on_damage"]:
+            elif effect_type == "trigger" and situation in ["combat_start", "on_attack", "on_kill", "on_damage"]:
                 effects.update(self._apply_trigger_trait(trait, situation, **kwargs))
-            elif trait.effect_type == "active" and situation == "active_use":
+            elif effect_type == "active" and situation == "active_use":
                 effects.update(self._apply_active_trait(trait, **kwargs))
                 
         return effects
@@ -2333,7 +2514,7 @@ class Character(BraveMixin):
             if effect_type == "passive":
                 effects = self._apply_passive_trait(trait, situation, **kwargs)
                 all_effects.update(effects)
-            elif trait.effect_type == "trigger":
+            elif effect_type == "trigger":
                 effects = self._apply_trigger_trait(trait, situation, **kwargs)
                 all_effects.update(effects)
                 
@@ -2560,7 +2741,8 @@ class Character(BraveMixin):
     def update_atb(self):
         """ATB 게이지 업데이트"""
         if self.is_alive:
-            self.atb_gauge = min(100, self.atb_gauge + self.atb_speed)
+            # ATB 업데이트 속도를 1/5로 느리게 조정
+            self.atb_gauge = min(1000, self.atb_gauge + (self.atb_speed / 5.0))
             
     def reset_atb(self):
         """ATB 게이지 리셋"""
@@ -2568,7 +2750,7 @@ class Character(BraveMixin):
         
     def can_act(self) -> bool:
         """행동 가능한지 확인"""
-        return self.is_alive and self.atb_gauge >= 100 and self.status_manager.can_act()
+        return self.is_alive and self.atb_gauge >= 1000 and self.status_manager.can_act()
         
     def get_effective_stats(self) -> dict:
         """상태이상과 장비를 고려한 실제 능력치"""
@@ -2740,6 +2922,14 @@ class Character(BraveMixin):
             print(f"🎉 {self.name}이(가) 레벨 {old_level} → {self.level}로 상승!")
             self.show_stat_gains(stat_gains)
             
+            # 레벨업 자동 저장 트리거
+            try:
+                from game.auto_save_system import on_level_up
+                on_level_up(self.name, self.level)
+            except Exception as e:
+                # 자동 저장 실패해도 게임 진행에는 영향 없음
+                pass
+            
         return leveled_up
     
     def calculate_level_up_gains(self) -> dict:
@@ -2812,6 +3002,11 @@ class Character(BraveMixin):
         """레벨업 시 Brave 능력치 업데이트"""
         try:
             from .balance import GameBalance
+            
+            # 이전 값 저장 (디버그용)
+            old_int_brv = self.int_brv
+            old_max_brv = self.max_brv
+            
             balance_stats = GameBalance.get_character_brave_stats(self.character_class, self.level)
             
             # 기존 Brave 비율 유지하면서 업데이트
@@ -2822,63 +3017,14 @@ class Character(BraveMixin):
             self.current_brave = int(self.int_brv * old_brave_ratio)
             self.brave_bonus_rate = balance_stats.get('brv_efficiency', 1.0)
             self.brv_loss_resistance = balance_stats.get('brv_loss_resistance', 1.0)
-        except:
-            # 기본값으로 증가 (대폭 강화)
-            # 레벨당 더 큰 폭으로 증가하도록 수정
-            level_multiplier = 1 + (self.level - 1) * 0.15  # 레벨당 15% 증가
-            base_int_brv = 1000 + (self.speed * 10)
-            base_max_brv = 99999 + (self.physical_attack * 50)
+        except Exception as e:
+            # GameBalance 실패 시 간단한 백업 성장
+            level_multiplier = 1 + (self.level - 1) * 0.12  # 레벨당 12% 증가
+            base_int_brv = 350  # 적정 기본값
+            base_max_brv = 2800  # 적정 기본값
             
             self.int_brv = int(base_int_brv * level_multiplier)
             self.max_brv = int(base_max_brv * level_multiplier)
-            
-            # 직업별 BRV 성장 특성 (레벨당 고정 증가량)
-            job_brv_growth = {
-                # 물리 딜러 - 높은 MAX BRV
-                "전사": {"int_brv": 40, "max_brv": 7.5},
-                "검성": {"int_brv": 45, "max_brv": 8.0},
-                "용기사": {"int_brv": 50, "max_brv": 8.75},
-                "암흑기사": {"int_brv": 42, "max_brv": 7.75},
-                "검투사": {"int_brv": 48, "max_brv": 8.5},
-                "광전사": {"int_brv": 35, "max_brv": 10.0},  # 극단적 MAX BRV
-                "사무라이": {"int_brv": 45, "max_brv": 8.125},
-                
-                # 마법사 - 높은 INT BRV
-                "아크메이지": {"int_brv": 80, "max_brv": 5.0},
-                "네크로맨서": {"int_brv": 75, "max_brv": 4.5},
-                "정령술사": {"int_brv": 85, "max_brv": 4.75},
-                "시간술사": {"int_brv": 90, "max_brv": 4.25},  # 최고 INT BRV
-                "차원술사": {"int_brv": 88, "max_brv": 4.375},
-                "마법사": {"int_brv": 70, "max_brv": 4.625},
-                "연금술사": {"int_brv": 65, "max_brv": 4.875},
-                "철학자": {"int_brv": 78, "max_brv": 4.7},
-                
-                # 균형형 - 중간 성장
-                "성기사": {"int_brv": 55, "max_brv": 6.25},
-                "기사": {"int_brv": 50, "max_brv": 6.5},
-                "성직자": {"int_brv": 60, "max_brv": 5.75},
-                "신관": {"int_brv": 58, "max_brv": 5.875},
-                "마검사": {"int_brv": 52, "max_brv": 6.125},
-                "기계공학자": {"int_brv": 48, "max_brv": 6.0},
-                "무당": {"int_brv": 62, "max_brv": 5.5},
-                
-                # 민첩형 - 빠른 BRV 회복
-                "도적": {"int_brv": 65, "max_brv": 4.5},
-                "암살자": {"int_brv": 70, "max_brv": 4.25},
-                "궁수": {"int_brv": 60, "max_brv": 4.75},
-                "몽크": {"int_brv": 58, "max_brv": 4.875},
-                "해적": {"int_brv": 55, "max_brv": 5.0},
-                "드루이드": {"int_brv": 62, "max_brv": 4.625},
-                
-                # 지원형 - 안정적 성장
-                "바드": {"int_brv": 68, "max_brv": 5.25},
-            }
-            
-            # 직업별 성장 적용 (기본값 포함)
-            growth = job_brv_growth.get(self.character_class, {"int_brv": 50, "max_brv": 200})
-            
-            self.int_brv += self.level * growth["int_brv"]
-            self.max_brv += self.level * growth["max_brv"]
     
     def show_stat_gains(self, gains: dict):
         """능력치 증가 표시"""
@@ -3521,6 +3667,7 @@ class PartyManager:
         self.casting_targets = targets
         self.casting_start_time = current_time
         self.casting_duration = duration
+        self.casting_start_atb = self.atb_gauge  # 캐스팅 시작 ATB 기록
         self.is_casting = True
         print(f"🔮 {self.name}이(가) {skill.get('name', '스킬')} 캐스팅을 시작합니다! [{duration}% 소요]")
     
@@ -3544,6 +3691,7 @@ class PartyManager:
         self.casting_targets = None
         self.casting_start_time = None
         self.casting_duration = None
+        self.casting_start_atb = 0  # 캐스팅 시작 ATB 초기화
         self.is_casting = False
         
         return skill, targets
@@ -3556,6 +3704,7 @@ class PartyManager:
             self.casting_targets = None
             self.casting_start_time = None
             self.casting_duration = None
+            self.casting_start_atb = 0  # 캐스팅 시작 ATB 초기화
             self.is_casting = False
     
     def get_casting_progress(self, current_time):
@@ -3991,3 +4140,98 @@ class PartyManager:
                         messages.append(f"⏰ {effect_name} 효과가 종료되었습니다!")
         
         return messages
+    
+    def create_copy(self):
+        """캐릭터의 완전한 복사본 생성 (트레이닝 룸용)"""
+        import copy
+        
+        # 완전한 딥카피 생성
+        copied_char = copy.deepcopy(self)
+        
+        # 객체 ID가 다른지 확인하기 위해 별도의 인스턴스로 처리
+        copied_char.name = f"{self.name} (복사본)"
+        
+        return copied_char
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'Character':
+        """딕셔너리에서 Character 객체 생성"""
+        try:
+            # 기본 정보 추출
+            name = data.get('name', 'Unknown')
+            character_class = data.get('character_class', '전사')
+            max_hp = data.get('max_hp', 100)
+            physical_attack = data.get('physical_attack', 10)
+            magic_attack = data.get('magic_attack', 10)
+            physical_defense = data.get('physical_defense', 10)
+            magic_defense = data.get('magic_defense', 10)
+            speed = data.get('speed', 10)
+            
+            # Character 인스턴스 생성 (클래스 수정자 스킵)
+            character = cls(name, character_class, max_hp, 
+                          physical_attack, magic_attack,
+                          physical_defense, magic_defense, speed,
+                          skip_class_modifiers=True)
+            
+            # 추가 속성들 복원
+            character.current_hp = data.get('current_hp', character.max_hp)
+            character.current_mp = data.get('current_mp', character.max_mp)
+            character.level = data.get('level', 1)
+            character.experience = data.get('experience', 0)
+            character.experience_to_next = data.get('experience_to_next', 30)
+            character.atb_gauge = data.get('atb_gauge', 0)
+            character.brave_points = data.get('brave_points', 0)
+            character.wounds = data.get('wounds', 0)
+            
+            # 인벤토리 복원
+            if 'inventory' in data:
+                from .items import Inventory
+                if isinstance(data['inventory'], dict):
+                    # 새로운 Inventory 인스턴스 생성 후 데이터 복원
+                    character.inventory = Inventory()
+                    character.inventory.items = data['inventory'].get('items', {})
+                    character.inventory.money = data['inventory'].get('money', 0)
+                elif hasattr(data['inventory'], 'items'):
+                    character.inventory = data['inventory']
+                else:
+                    from .items import Inventory
+                    character.inventory = Inventory()
+            
+            # 장비 복원
+            if 'equipped_weapon' in data and data['equipped_weapon']:
+                from .items import ItemDatabase
+                item_db = ItemDatabase()
+                weapon_data = data['equipped_weapon']
+                if isinstance(weapon_data, dict):
+                    weapon_name = weapon_data.get('name', '')
+                    weapon_item = item_db.get_item(weapon_name)
+                    if weapon_item:
+                        character.equipped_weapon = weapon_item
+                        
+            if 'equipped_armor' in data and data['equipped_armor']:
+                from .items import ItemDatabase
+                item_db = ItemDatabase()
+                armor_data = data['equipped_armor']
+                if isinstance(armor_data, dict):
+                    armor_name = armor_data.get('name', '')
+                    armor_item = item_db.get_item(armor_name)
+                    if armor_item:
+                        character.equipped_armor = armor_item
+            
+            # 특성 복원
+            if 'active_traits' in data:
+                character.active_traits = data['active_traits']
+            
+            # 상태 효과 복원
+            if 'status_manager' in data:
+                character.status_manager = data['status_manager']
+            
+            # 기타 속성들
+            character.is_alive = data.get('is_alive', True)
+            
+            return character
+            
+        except Exception as e:
+            print(f"❌ Character.from_dict 오류: {e}")
+            # 기본 캐릭터 반환
+            return cls("Unknown", "전사", 100, 10, 10, 10, 10, 10)

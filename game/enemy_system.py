@@ -277,19 +277,25 @@ class Enemy(Character):
         enemy_hp_multiplier = game_config.get_difficulty_setting('enemy_hp_multiplier')
         enemy_damage_multiplier = game_config.get_difficulty_setting('enemy_damage_multiplier')
         
-        # 합리적 난이도 증가
-        if self.floor <= 5:
-            floor_multiplier = 1.0 + (self.floor - 1) * 0.2  # 1-5층: 20% 증가 (1.0~1.8)
-        elif self.floor <= 10:
-            floor_multiplier = 1.8 + (self.floor - 6) * 0.15  # 6-10층: 15% 증가 (1.8~2.55)
+        # 🎯 개선된 적 밸런싱: 완만한 층수 배율 (2.0~3.0)
+        # 1층부터 50층 수준의 기본 능력치로 시작하여 완만한 성장
+        
+        # 완만한 floor_multiplier 계산 (2.0 ~ 3.0 범위)
+        if self.floor <= 10:
+            base_floor_multiplier = 2.0 + (self.floor - 1) * 0.05  # 1-10층: 5% 증가 (2.0~2.45)
         elif self.floor <= 20:
-            floor_multiplier = 2.55 + (self.floor - 11) * 0.1  # 11-20층: 10% 증가 (2.55~3.45)
+            base_floor_multiplier = 2.45 + (self.floor - 11) * 0.03  # 11-20층: 3% 증가 (2.45~2.75)
         elif self.floor <= 30:
-            floor_multiplier = 3.45 + (self.floor - 21) * 0.08  # 21-30층: 8% 증가 (3.45~4.17)
+            base_floor_multiplier = 2.75 + (self.floor - 21) * 0.015  # 21-30층: 1.5% 증가 (2.75~2.90)
+        elif self.floor <= 40:
+            base_floor_multiplier = 2.90 + (self.floor - 31) * 0.008  # 31-40층: 0.8% 증가 (2.90~2.98)
         elif self.floor <= 50:
-            floor_multiplier = 4.17 + (self.floor - 31) * 0.05  # 31-50층: 5% 증가 (4.17~5.12)
+            base_floor_multiplier = 2.98 + (self.floor - 41) * 0.002  # 41-50층: 0.2% 증가 (2.98~3.00)
         else:
-            floor_multiplier = 5.12 + (self.floor - 51) * 0.03  # 51층+: 3% 증가
+            base_floor_multiplier = 3.0 + (self.floor - 51) * 0.001  # 51층+: 0.1% 증가
+        
+        # 기본 층수 배율 사용 (2배 강화 제거)
+        floor_multiplier = base_floor_multiplier
         
         # 적응형 밸런스 시스템 적용
         try:
@@ -302,7 +308,7 @@ class Enemy(Character):
             adaptive_damage_multiplier = 1.0
         
         rank_multiplier = self._get_rank_multiplier()
-        level_multiplier = 1 + (self.level - 1) * 0.08  # 레벨당 8% 증가 (15%에서 감소)
+        level_multiplier = 1 + (self.level - 1) * 0.05  # 레벨당 5% 증가 (8%에서 감소)
         
         # 최종 스탯 계산 (스탯별 다른 배율 적용)
         for stat_name, base_value in base_stats.items():
@@ -312,32 +318,27 @@ class Enemy(Character):
                 continue
             
             # 스탯별 성장률 조정 (플레이어 성장 패턴과 유사하게)
-            # 난이도별 적 스탯 배율 적용
+            # 난이도별 적 스탯 배율 적용 - 대폭 완화
             if stat_name in ["max_hp"]:
-                # HP는 가장 많이 성장 (플레이어와 유사) + 난이도 배율
-                # 플레이어 HP 강화 요소: 장비 +50%, 패시브 +30% 고려
-                stat_floor_multiplier = floor_multiplier * 1.4 * enemy_hp_multiplier  # 40% 추가 성장 (1.2→1.4) + 난이도
-                stat_level_multiplier = 1 + (self.level - 1) * 0.15  # 레벨당 15% (12%→15%)
+                # HP는 1/4로 감소 - 플레이어 성장 대비 약화
+                stat_floor_multiplier = floor_multiplier * 0.3 * enemy_hp_multiplier  # 30% 성장 (1.2→0.3) - 1/4로 감소 + 난이도
+                stat_level_multiplier = 1 + (self.level - 1) * 0.04  # 레벨당 4% (8%→4%) - 절반으로 감소
             elif stat_name in ["attack", "magic_power"]:
-                # 공격력은 중간 성장 + 난이도 배율
-                # 플레이어 공격력 강화: 무기 +80%, 패시브 +50%, 버프 +30% 고려
-                stat_floor_multiplier = floor_multiplier * 1.3 * enemy_damage_multiplier  # 30% 추가 성장 (1.0→1.3) + 난이도
-                stat_level_multiplier = 1 + (self.level - 1) * 0.12  # 레벨당 12% (8%→12%)
+                # 공격력은 절반으로 감소
+                stat_floor_multiplier = floor_multiplier * 0.55 * enemy_damage_multiplier  # 55% 성장 (1.1→0.55) - 절반으로 감소 + 난이도
+                stat_level_multiplier = 1 + (self.level - 1) * 0.035  # 레벨당 3.5% (7%→3.5%) - 절반으로 감소
             elif stat_name in ["defense", "magic_defense"]:
-                # 방어력은 중간 성장
-                # 플레이어 방어력 강화: 방어구 +60%, 패시브 +30%, 버프 +20% 고려
-                stat_floor_multiplier = floor_multiplier * 1.2  # 20% 추가 성장 (0.95→1.2)
-                stat_level_multiplier = 1 + (self.level - 1) * 0.10  # 레벨당 10% (7%→10%)
+                # 방어력도 절반으로 감소
+                stat_floor_multiplier = floor_multiplier * 0.55  # 55% 성장 (1.1→0.55) - 절반으로 감소
+                stat_level_multiplier = 1 + (self.level - 1) * 0.03  # 레벨당 3% (6%→3%) - 절반으로 감소
             elif stat_name == "speed":
-                # 속도는 가장 적게 성장
-                # 플레이어 속도 강화: 장비 +40%, 패시브 +25%, 버프 +25% 고려
-                stat_floor_multiplier = floor_multiplier * 1.0   # 기본 성장 (0.8→1.0)
-                stat_level_multiplier = 1 + (self.level - 1) * 0.08  # 레벨당 8% (5%→8%)
+                # 속도도 절반으로 감소
+                stat_floor_multiplier = floor_multiplier * 0.5   # 50% 성장 (1.0→0.5) - 절반으로 감소
+                stat_level_multiplier = 1 + (self.level - 1) * 0.02  # 레벨당 2% (4%→2%) - 절반으로 감소
             elif stat_name == "max_mp":
-                # MP는 적게 성장
-                # 플레이어 MP 강화: 장비 +30%, 패시브 +20% 고려
-                stat_floor_multiplier = floor_multiplier * 0.8   # 낮은 성장 (0.7→0.8)
-                stat_level_multiplier = 1 + (self.level - 1) * 0.05  # 레벨당 5% (3%→5%)
+                # MP도 절반으로 감소
+                stat_floor_multiplier = floor_multiplier * 0.4   # 40% 성장 (0.8→0.4) - 절반으로 감소
+                stat_level_multiplier = 1 + (self.level - 1) * 0.015  # 레벨당 1.5% (3%→1.5%) - 절반으로 감소
             else:
                 # 기타 스탯 (BRV 등)
                 stat_floor_multiplier = floor_multiplier
@@ -346,9 +347,9 @@ class Enemy(Character):
             # 스탯별 배율 적용
             adjusted_value = base_value * stat_floor_multiplier * rank_multiplier * stat_level_multiplier
             
-            # 적응형 배율 적용 (HP, 물리공격력, 마법공격력에 적용) - 난이도는 이미 적용됨
+            # 적응형 배율 적용 (HP 2배, 물리공격력, 마법공격력에 적용)
             if stat_name in ["max_hp"]:
-                final_value = int(adjusted_value * adaptive_hp_multiplier)
+                final_value = int(adjusted_value * adaptive_hp_multiplier * 2.0)  # HP 2배 증가
             elif stat_name in ["attack"]:
                 final_value = int(adjusted_value * adaptive_damage_multiplier)
             else:
@@ -357,17 +358,17 @@ class Enemy(Character):
             # Character 클래스의 속성명에 맞게 매핑
             if stat_name == "attack":
                 self.physical_attack = final_value
-                # 마법공격력에도 스탯별 배율과 적응형 배율 적용
+                # 마법공격력에도 스탯별 배율과 적응형 배율 적용 - 절반으로 감소
                 magic_base = base_stats.get("magic_power", base_value * 0.8)
-                magic_stat_floor = floor_multiplier * 1.0  # 공격력과 동일
-                magic_stat_level = 1 + (self.level - 1) * 0.08
+                magic_stat_floor = floor_multiplier * 0.5  # 공격력과 동일하게 절반으로 감소 (1.0→0.5)
+                magic_stat_level = 1 + (self.level - 1) * 0.04  # 레벨당 4% (8%→4%) - 절반으로 감소
                 self.magic_attack = int(magic_base * magic_stat_floor * rank_multiplier * magic_stat_level * adaptive_damage_multiplier)
             elif stat_name == "defense":
                 self.physical_defense = final_value
-                # 마법방어력도 스탯별 배율 적용
+                # 마법방어력도 스탯별 배율 적용 - 절반으로 감소
                 magic_def_base = base_stats.get("magic_defense", base_value * 0.8)
-                magic_def_floor = floor_multiplier * 0.95  # 방어력과 동일
-                magic_def_level = 1 + (self.level - 1) * 0.07
+                magic_def_floor = floor_multiplier * 0.475  # 방어력과 동일하게 절반으로 감소 (0.95→0.475)
+                magic_def_level = 1 + (self.level - 1) * 0.035  # 레벨당 3.5% (7%→3.5%) - 절반으로 감소
                 self.magic_defense = int(magic_def_base * magic_def_floor * rank_multiplier * magic_def_level)
             elif stat_name == "max_hp":
                 self.max_hp = final_value
@@ -376,10 +377,10 @@ class Enemy(Character):
             elif stat_name == "speed":
                 self.speed = final_value
             elif stat_name in ["init_brv", "max_brv"]:
-                # BRV 값들도 스탯별 성장 적용 (속도와 비슷한 패턴) - 성장률 2배 증가, 총 4배 강화
-                brv_floor_multiplier = floor_multiplier * 1.1  # BRV 성장 (속도보다 약간 높음)
-                brv_level_multiplier = 1 + (self.level - 1) * 0.12  # 레벨당 12% (6%에서 2배 증가)
-                brv_final_value = int(base_value * brv_floor_multiplier * rank_multiplier * brv_level_multiplier * 4.0)  # 총 4배 강화
+                # BRV 값들 대폭 상향 조정 - 초반 적들 3배 강화
+                brv_floor_multiplier = floor_multiplier * 1.8   # BRV 성장 대폭 증가 (0.6→1.8, 3배)
+                brv_level_multiplier = 1 + (self.level - 1) * 0.08  # 레벨당 8% (5%→8% 증가)
+                brv_final_value = int(base_value * brv_floor_multiplier * rank_multiplier * brv_level_multiplier * 3.0)  # 3배 (1.5→3.0) - 추가 배율
                 
                 if stat_name == "init_brv":
                     self.current_brv = brv_final_value
@@ -407,14 +408,14 @@ class Enemy(Character):
                 # 층수와 레벨에 맞게 초기 BRV 조정 + 3배 강화 + 성장률 2배 증가 (2배에서 1.5배 증가)
                 brv_floor_multiplier = floor_multiplier * 1.1
                 brv_level_multiplier = 1 + (self.level - 1) * 0.12  # 레벨당 12% (6%에서 2배 증가)
-                self.current_brv = int(init_brv * brv_floor_multiplier * rank_multiplier * brv_level_multiplier * 3.0)  # 2배에서 3배로 증가
+                self.current_brv = int(init_brv * brv_floor_multiplier * rank_multiplier * brv_level_multiplier * 0.1)  # 0.3에서 0.1로 더욱 감소
             if not hasattr(self, 'max_brv'):
-                # max_brv가 계산되지 않은 경우에만 기본값 적용 + 3배 강화 (2배에서 1.5배 증가)
-                max_brv = base_stats.get("max_brv", 2500)
-                # 층수와 레벨에 맞게 최대 BRV 조정 + 3배 강화 + 성장률 2배 증가 (2배에서 1.5배 증가)
+                # max_brv가 계산되지 않은 경우에만 기본값 적용 - 밸런스 조정됨
+                max_brv = base_stats.get("max_brv", 83)  # 250에서 83으로 1/3 감소
+                # 층수와 레벨에 맞게 최대 BRV 조정 - 밸런스 조정됨
                 brv_floor_multiplier = floor_multiplier * 1.1
                 brv_level_multiplier = 1 + (self.level - 1) * 0.12  # 레벨당 12% (6%에서 2배 증가)
-                self.max_brv = int(max_brv * brv_floor_multiplier * rank_multiplier * brv_level_multiplier * 3.0)  # 2배에서 3배로 증가
+                self.max_brv = int(max_brv * brv_floor_multiplier * rank_multiplier * brv_level_multiplier * 0.1)  # 0.3에서 0.1로 더욱 감소
             
             # 추가 BRV 관련 속성들 (플레이어와 호환)
             self.int_brv = self.current_brv  # 초기 BRV = 현재 BRV
@@ -430,132 +431,132 @@ class Enemy(Character):
             pass
     
     def _get_base_stats_by_type(self) -> Dict[str, int]:
-        """적 타입별 기본 스탯 (명확한 원소 속성 포함)"""
+        """적 타입별 기본 스탯 (1층=50층의 절반, 완만한 성장 곡선)"""
         stats_table = {
-            # 일반 몬스터 (1-10층) - 1층부터 위협적이게 조정 + BRV 2배 증가
+            # 일반 몬스터 (1-10층) - 50층 적의 절반 수준으로 조정
             EnemyType.GOBLIN: {
-                "max_hp": 140, "max_mp": 35, "attack": 30, "defense": 20,
-                "magic_power": 18, "magic_defense": 15, "speed": 30,
-                "init_brv": 800, "max_brv": 1600, "element": ElementType.NEUTRAL
+                "max_hp": 200, "max_mp": 80, "attack": 40, "defense": 30,
+                "magic_power": 35, "magic_defense": 28, "speed": 35,
+                "init_brv": 60, "max_brv": 150, "element": ElementType.NEUTRAL  # 50층의 절반
             },
             EnemyType.ORC: {
-                "max_hp": 180, "max_mp": 55, "attack": 42, "defense": 32,
-                "magic_power": 25, "magic_defense": 28, "speed": 25,
-                "init_brv": 1440, "max_brv": 2880, "element": ElementType.NEUTRAL
+                "max_hp": 225, "max_mp": 90, "attack": 45, "defense": 38,
+                "magic_power": 33, "magic_defense": 35, "speed": 30,
+                "init_brv": 68, "max_brv": 170, "element": ElementType.NEUTRAL  # 50층의 절반
             },
             EnemyType.SKELETON: {
-                "max_hp": 150, "max_mp": 65, "attack": 34, "defense": 30,
-                "magic_power": 30, "magic_defense": 36, "speed": 30,
-                "init_brv": 1300, "max_brv": 2640, "element": ElementType.DARK  # 언데드
+                "max_hp": 210, "max_mp": 100, "attack": 43, "defense": 35,
+                "magic_power": 40, "magic_defense": 38, "speed": 33,
+                "init_brv": 64, "max_brv": 160, "element": ElementType.DARK  # 언데드, 50층의 절반
             },
             EnemyType.ZOMBIE: {
-                "max_hp": 200, "max_mp": 35, "attack": 38, "defense": 28,
-                "magic_power": 16, "magic_defense": 24, "speed": 15,
-                "init_brv": 1360, "max_brv": 2700, "element": ElementType.DARK  # 언데드
+                "max_hp": 250, "max_mp": 60, "attack": 48, "defense": 33,
+                "magic_power": 25, "magic_defense": 30, "speed": 20,
+                "init_brv": 75, "max_brv": 190, "element": ElementType.DARK  # 언데드, 50층의 절반
             },
             EnemyType.SPIDER: {
-                "max_hp": 120, "max_mp": 50, "attack": 36, "defense": 22,
-                "magic_power": 26, "magic_defense": 24, "speed": 45,
-                "init_brv": 1080, "max_brv": 2160, "element": ElementType.POISON  # 독거미
+                "max_hp": 190, "max_mp": 80, "attack": 44, "defense": 29,
+                "magic_power": 38, "magic_defense": 31, "speed": 45,
+                "init_brv": 66, "max_brv": 165, "element": ElementType.POISON  # 독거미, 50층의 절반
             },
             EnemyType.RAT: {
-                "max_hp": 100, "max_mp": 40, "attack": 30, "defense": 20,
-                "magic_power": 18, "magic_defense": 16, "speed": 50,
-                "init_brv": 960, "max_brv": 1680, "element": ElementType.NEUTRAL
+                "max_hp": 175, "max_mp": 70, "attack": 38, "defense": 28,
+                "magic_power": 30, "magic_defense": 25, "speed": 50,
+                "init_brv": 58, "max_brv": 145, "element": ElementType.NEUTRAL  # 50층의 절반
             },
             EnemyType.BAT: {
-                "max_hp": 110, "max_mp": 55, "attack": 32, "defense": 18,
-                "magic_power": 22, "magic_defense": 20, "speed": 55,
-                "init_brv": 1040, "max_brv": 1960, "element": ElementType.DARK  # 어둠 속성
+                "max_hp": 185, "max_mp": 85, "attack": 41, "defense": 25,
+                "magic_power": 39, "magic_defense": 29, "speed": 55,
+                "init_brv": 63, "max_brv": 158, "element": ElementType.DARK  # 어둠 속성, 50층의 절반
             },
             EnemyType.WOLF: {
-                "max_hp": 160, "max_mp": 50, "attack": 40, "defense": 26,
-                "magic_power": 20, "magic_defense": 22, "speed": 40,
-                "init_brv": 1280, "max_brv": 2520, "element": ElementType.NEUTRAL
+                "max_hp": 215, "max_mp": 75, "attack": 46, "defense": 34,
+                "magic_power": 28, "magic_defense": 30, "speed": 43,
+                "init_brv": 70, "max_brv": 175, "element": ElementType.NEUTRAL  # 50층의 절반
             },
             EnemyType.SLIME: {
-                "max_hp": 170, "max_mp": 60, "attack": 28, "defense": 36,
-                "magic_power": 32, "magic_defense": 32, "speed": 20,
-                "init_brv": 1160, "max_brv": 2360, "element": ElementType.POISON  # 독성 슬라임
+                "max_hp": 240, "max_mp": 95, "attack": 35, "defense": 43,
+                "magic_power": 43, "magic_defense": 40, "speed": 23,
+                "init_brv": 73, "max_brv": 183, "element": ElementType.POISON  # 독성 슬라임, 50층의 절반
             },
             EnemyType.IMP: {
-                "max_hp": 135, "max_mp": 75, "attack": 34, "defense": 24,
-                "magic_power": 38, "magic_defense": 28, "speed": 38,
-                "init_brv": 1120, "max_brv": 2280, "element": ElementType.FIRE  # 화염 임프
+                "max_hp": 205, "max_mp": 105, "attack": 44, "defense": 31,
+                "magic_power": 48, "magic_defense": 36, "speed": 39,
+                "init_brv": 69, "max_brv": 173, "element": ElementType.FIRE  # 화염 임프, 50층의 절반
             },
             
-            # 중급 몬스터 (11-20층) - BRV 2배 증가
+            # 중급 몬스터 (11-20층) - 50층의 60-70% 수준
             EnemyType.DARK_ELF: {
-                "max_hp": 120, "max_mp": 80, "attack": 35, "defense": 20,
-                "magic_power": 30, "magic_defense": 25, "speed": 48,
-                "init_brv": 1360, "max_brv": 2640, "element": ElementType.DARK  # 어둠 암살자
+                "max_hp": 240, "max_mp": 120, "attack": 52, "defense": 35,
+                "magic_power": 50, "magic_defense": 42, "speed": 58,
+                "init_brv": 85, "max_brv": 210, "element": ElementType.DARK  # 어둠 암살자
             },
             EnemyType.TROLL: {
                 "max_hp": 200, "max_mp": 40, "attack": 40, "defense": 35,
                 "magic_power": 15, "magic_defense": 25, "speed": 20,
-                "init_brv": 1600, "max_brv": 3600, "element": ElementType.EARTH  # 대지 트롤
+                "init_brv": 160, "max_brv": 360, "element": ElementType.EARTH  # 대지 트롤, 1/10 스케일
             },
             EnemyType.OGRE: {
-                "max_hp": 250, "max_mp": 35, "attack": 45, "defense": 30,
-                "magic_power": 12, "magic_defense": 20, "speed": 18,
-                "init_brv": 1800, "max_brv": 4200, "element": ElementType.NEUTRAL
+                "max_hp": 320, "max_mp": 90, "attack": 62, "defense": 48,
+                "magic_power": 35, "magic_defense": 42, "speed": 28,
+                "init_brv": 100, "max_brv": 255, "element": ElementType.NEUTRAL  # 50층의 70%
             },
             EnemyType.HOBGOBLIN: {
-                "max_hp": 140, "max_mp": 80, "attack": 32, "defense": 25,
-                "magic_power": 35, "magic_defense": 30, "speed": 35,
-                "init_brv": 1440, "max_brv": 3000, "element": ElementType.LIGHTNING  # 번개술사
+                "max_hp": 280, "max_mp": 125, "attack": 52, "defense": 42,
+                "magic_power": 65, "magic_defense": 52, "speed": 48,
+                "init_brv": 92, "max_brv": 235, "element": ElementType.LIGHTNING  # 번개술사, 50층의 70%
             },
             EnemyType.WIGHT: {
-                "max_hp": 160, "max_mp": 90, "attack": 35, "defense": 28,
-                "magic_power": 40, "magic_defense": 35, "speed": 25,
-                "init_brv": 1520, "max_brv": 3360, "element": ElementType.DARK  # 강력한 언데드
+                "max_hp": 300, "max_mp": 140, "attack": 58, "defense": 45,
+                "magic_power": 72, "magic_defense": 62, "speed": 38,
+                "init_brv": 95, "max_brv": 245, "element": ElementType.DARK  # 강력한 언데드, 50층의 70%
             },
             EnemyType.WRAITH: {
-                "max_hp": 120, "max_mp": 100, "attack": 30, "defense": 20,
-                "magic_power": 45, "magic_defense": 40, "speed": 45,
-                "init_brv": 1440, "max_brv": 2880, "element": ElementType.DARK  # 영체
+                "max_hp": 260, "max_mp": 155, "attack": 48, "defense": 35,
+                "magic_power": 78, "magic_defense": 68, "speed": 58,
+                "init_brv": 88, "max_brv": 225, "element": ElementType.DARK  # 영체, 50층의 70%
             },
             EnemyType.GARGOYLE: {
-                "max_hp": 180, "max_mp": 60, "attack": 38, "defense": 40,
-                "magic_power": 25, "magic_defense": 35, "speed": 30,
-                "init_brv": 1560, "max_brv": 3480, "element": ElementType.EARTH  # 석상
+                "max_hp": 340, "max_mp": 105, "attack": 62, "defense": 72,
+                "magic_power": 48, "magic_defense": 65, "speed": 42,
+                "init_brv": 102, "max_brv": 260, "element": ElementType.EARTH  # 석상, 50층의 75%
             },
             EnemyType.MINOTAUR: {
-                "max_hp": 220, "max_mp": 50, "attack": 48, "defense": 35,
-                "magic_power": 20, "magic_defense": 25, "speed": 28,
-                "init_brv": 1680, "max_brv": 3840, "element": ElementType.NEUTRAL
+                "max_hp": 380, "max_mp": 95, "attack": 72, "defense": 58,
+                "magic_power": 42, "magic_defense": 52, "speed": 38,
+                "init_brv": 108, "max_brv": 275, "element": ElementType.NEUTRAL  # 50층의 75%
             },
             EnemyType.CENTAUR: {
-                "max_hp": 170, "max_mp": 70, "attack": 42, "defense": 32,
-                "magic_power": 30, "magic_defense": 28, "speed": 42,
-                "init_brv": 1520, "max_brv": 3360, "element": ElementType.WIND  # 바람의 궁수
+                "max_hp": 330, "max_mp": 125, "attack": 68, "defense": 52,
+                "magic_power": 58, "magic_defense": 55, "speed": 62,
+                "init_brv": 100, "max_brv": 255, "element": ElementType.WIND  # 바람의 궁수, 50층의 75%
             },
             EnemyType.HARPY: {
-                "max_hp": 130, "max_mp": 85, "attack": 36, "defense": 22,
-                "magic_power": 38, "magic_defense": 30, "speed": 50,
-                "init_brv": 1440, "max_brv": 2880, "element": ElementType.WIND  # 바람 하피
+                "max_hp": 290, "max_mp": 145, "attack": 62, "defense": 40,
+                "magic_power": 68, "magic_defense": 58, "speed": 75,
+                "init_brv": 95, "max_brv": 240, "element": ElementType.WIND  # 바람 하피, 50층의 75%
             },
             EnemyType.BASILISK: {
-                "max_hp": 190, "max_mp": 95, "attack": 40, "defense": 38,
-                "magic_power": 42, "magic_defense": 40, "speed": 32,
-                "init_brv": 1600, "max_brv": 3600, "element": ElementType.POISON  # 독 바실리스크
+                "max_hp": 350, "max_mp": 155, "attack": 65, "defense": 62,
+                "magic_power": 72, "magic_defense": 65, "speed": 45,
+                "init_brv": 105, "max_brv": 270, "element": ElementType.POISON  # 독 바실리스크, 50층의 75%
             },
             EnemyType.FIRE_SALAMANDER: {
-                "max_hp": 160, "max_mp": 80, "attack": 38, "defense": 30,
-                "magic_power": 45, "magic_defense": 35, "speed": 35,
-                "init_brv": 1480, "max_brv": 3120, "element": ElementType.FIRE  # 화염 도롱뇽
+                "max_hp": 320, "max_mp": 135, "attack": 65, "defense": 52,
+                "magic_power": 78, "magic_defense": 62, "speed": 48,
+                "init_brv": 98, "max_brv": 250, "element": ElementType.FIRE  # 화염 도롱뇽, 50층의 75%
             },
             EnemyType.ICE_GOLEM: {
-                "max_hp": 200, "max_mp": 60, "attack": 35, "defense": 50,
-                "magic_power": 30, "magic_defense": 45, "speed": 20,
-                "init_brv": 1600, "max_brv": 3600, "element": ElementType.ICE  # 얼음 골렘
+                "max_hp": 360, "max_mp": 115, "attack": 58, "defense": 82,
+                "magic_power": 65, "magic_defense": 78, "speed": 32,
+                "init_brv": 105, "max_brv": 270, "element": ElementType.ICE  # 얼음 골렘, 50층의 80%
             },
             
-            # 고급 몬스터 (21-30층)
+            # 고급 몬스터 (21-30층) - 50층의 80-85% 수준
             EnemyType.DRAKE: {
-                "max_hp": 350, "max_mp": 120, "attack": 60, "defense": 50,
-                "magic_power": 55, "magic_defense": 45, "speed": 40,
-                "init_brv": 1200, "max_brv": 3000, "element": ElementType.FIRE  # 화염 드레이크
+                "max_hp": 400, "max_mp": 160, "attack": 75, "defense": 65,
+                "magic_power": 82, "magic_defense": 68, "speed": 50,
+                "init_brv": 120, "max_brv": 310, "element": ElementType.FIRE  # 화염 드레이크, 50층의 80%
             },
             EnemyType.CHIMERA: {
                 "max_hp": 320, "max_mp": 140, "attack": 58, "defense": 45,
@@ -1686,6 +1687,17 @@ class Enemy(Character):
                 }
         
         return {"action": "attack", "target": target}
+    
+    def get_total_max_hp(self) -> int:
+        """장비 보너스가 포함된 총 최대 HP (Enemy용 호환성 메서드)"""
+        # Enemy는 장비가 없으므로 기본 max_hp 반환
+        return getattr(self, 'max_hp', getattr(self, '_max_hp', getattr(self, '_base_max_hp', 150)))
+    
+    def get_total_max_mp(self) -> int:
+        """장비 보너스가 포함된 총 최대 MP (Enemy용 호환성 메서드)"""
+        # Enemy는 장비가 없으므로 기본 max_mp 반환
+        return getattr(self, 'max_mp', getattr(self, '_max_mp', getattr(self, '_base_max_mp', 20)))
+
 class EnemyManager:
     """적 관리자"""
     
@@ -1764,18 +1776,18 @@ def get_enemy_brave_stats_dict():
             base_stats = temp_enemy._get_base_stats_by_type()
             
             enemy_stats[enemy_type] = {
-                "int_brv": base_stats.get("init_brv", 300),
-                "max_brv": base_stats.get("max_brv", 1500),
-                "brv_efficiency": 0.8,
-                "brv_loss_resistance": 0.9
+                "int_brv": int(base_stats.get("init_brv", 150) * 0.5),  # 기본값 150으로 감소 + 0.5배
+                "max_brv": int(base_stats.get("init_brv", 150) * 0.5 * 2.5),  # INT BRV의 2.5배 (2.8→2.5)
+                "brv_efficiency": 0.7,  # 효율 감소 (0.8→0.7)
+                "brv_loss_resistance": 0.8  # 저항 감소 (0.9→0.8)
             }
         except:
-            # 기본값 사용 - BRV 2배 증가
+            # 기본값 사용 - BRV 대폭 감소
             enemy_stats[enemy_type] = {
-                "int_brv": 600,
-                "max_brv": 3000,
-                "brv_efficiency": 0.8,
-                "brv_loss_resistance": 0.9
+                "int_brv": 200,    # 기본값 대폭 감소 (600→200)
+                "max_brv": 500,    # MAX BRV 대폭 감소 (1680→500)
+                "brv_efficiency": 0.7,  # 효율 감소 (0.8→0.7)
+                "brv_loss_resistance": 0.8  # 저항 감소 (0.9→0.8)
             }
     
     return enemy_stats

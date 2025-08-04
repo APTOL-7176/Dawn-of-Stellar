@@ -1,8 +1,34 @@
 @echo off
 chcp 65001 >nul
 setlocal EnableDelayedExpansion
+::    └── 📂 Dawn-Of-Stellar/
+echo        ├── 📂 python/     (Python 실행환경)
+echo        ├── 📂 game/       (게임 소스코드)
+echo        └── 🎮 게임시작.bat (게임 실행 파일)
+echo.
 
-:: ===================================================================
+:: 기존 설치 확인
+if exist "%GAME_DIR%" (
+    echo 🔄 기존 게임 설치 발견됨!
+    echo    📂 기존 위치: %GAME_DIR%
+    echo.
+    echo 🎯 최신 버전으로 업데이트하시겠습니까?
+    echo    Y: 기존 설치를 최신 버전으로 업데이트
+    echo    N: 완전히 새로 설치 (기존 파일 삭제 후 설치)
+    echo    C: 설치 취소
+    echo.
+    set /p update_choice="선택 (Y/N/C): "
+    if /i "!update_choice!"=="C" (
+        echo 설치가 취소되었습니다.
+        pause
+        exit /b 0
+    )
+    if /i "!update_choice!"=="N" (
+        echo 🗑️ 기존 설치 완전 삭제 중...
+        rmdir /s /q "%INSTALL_DIR%" >nul 2>&1
+        echo ✅ 기존 설치 삭제 완료
+    )
+)==================================================================
 :: Dawn Of Stellar v2.0.0 - 완전 자동 설치 스크립트
 :: ===================================================================
 :: 이 스크립트는 Python, Git, 게임 소스코드를 모두 자동으로 설치합니다.
@@ -10,16 +36,17 @@ setlocal EnableDelayedExpansion
 :: ===================================================================
 
 echo.
-echo ⭐ Dawn Of Stellar v2.0.0 자동 설치 스크립트 ⭐
-echo ================================================
+echo ⭐ Dawn Of Stellar v2.2.0 자동 설치/업데이트 스크립트 ⭐
+echo ====================================================
 echo.
 echo 🎮 친구와 함께 즐기는 로그라이크 RPG 게임
-echo 🚀 Python, Git, 게임을 모두 자동으로 설치합니다
+echo 🚀 Python, Git, 게임을 모두 자동으로 설치/업데이트합니다
+echo 🔄 기존 설치가 있으면 자동으로 최신 버전으로 업데이트됩니다
 echo.
 echo ⚠️  주의사항:
 echo    - 관리자 권한으로 실행해주세요
 echo    - 인터넷 연결이 필요합니다
-echo    - 설치 중 약 5-10분 소요됩니다
+echo    - 설치/업데이트 중 약 5-10분 소요됩니다
 echo.
 
 :: 관리자 권한 확인
@@ -36,15 +63,19 @@ echo ✅ 관리자 권한 확인됨
 echo.
 
 :: 설치 시작 확인
-set /p confirm="🎯 설치를 시작하시겠습니까? (Y/N): "
-if /i not "%confirm%"=="Y" (
-    echo 설치가 취소되었습니다.
-    pause
-    exit /b 0
+if not exist "%GAME_DIR%" (
+    set /p confirm="🎯 새로 설치하시겠습니까? (Y/N): "
+    if /i not "!confirm!"=="Y" (
+        echo 설치가 취소되었습니다.
+        pause
+        exit /b 0
+    )
+    echo.
+    echo 🚀 새로운 설치를 시작합니다...
+) else (
+    echo.
+    echo 🔄 최신 버전으로 업데이트를 시작합니다...
 )
-
-echo.
-echo 🚀 설치를 시작합니다...
 echo.
 
 :: 설치 디렉토리 설정
@@ -187,18 +218,11 @@ if %errorLevel% equ 0 (
 )
 
 :: =================================================================
-:: 3. 게임 소스코드 다운로드
+:: 3. 게임 소스코드 다운로드/업데이트
 :: =================================================================
 echo.
-echo 🎮 3단계: 게임 소스코드 다운로드 중...
-echo ========================================
-
-if exist "%GAME_DIR%" (
-    echo 🔄 기존 게임 디렉토리 정리 중...
-    rmdir /s /q "%GAME_DIR%" >nul 2>&1
-)
-
-echo 📡 GitHub에서 최신 소스코드 다운로드 중...
+echo 🎮 3단계: 게임 소스코드 다운로드/업데이트 중...
+echo ===============================================
 
 :: Git 경로 확인
 set "GIT_EXE=git"
@@ -206,34 +230,79 @@ if exist "C:\Program Files\Git\bin\git.exe" (
     set "GIT_EXE=C:\Program Files\Git\bin\git.exe"
 )
 
-"%GIT_EXE%" clone https://github.com/APTOL-7176/Dawn-of-Stellar.git "%GAME_DIR%"
-
-if %errorLevel% equ 0 (
-    echo ✅ 게임 소스코드 다운로드 완료
-) else (
-    echo ❌ 게임 소스코드 다운로드 실패
-    echo 📥 ZIP 파일로 대체 다운로드 시도 중...
+:: 기존 설치가 있는 경우 업데이트 시도
+if exist "%GAME_DIR%\.git" (
+    echo 🔄 기존 Git 저장소 발견됨 - 최신 버전으로 업데이트 중...
+    cd /d "%GAME_DIR%"
     
-    :: ZIP 파일로 대체 다운로드
-    set "GAME_ZIP_URL=https://github.com/APTOL-7176/Dawn-of-Stellar/archive/refs/heads/master.zip"
-    set "GAME_ZIP=%TEMP%\Dawn-of-Stellar.zip"
+    :: 로컬 변경사항 임시 저장 (사용자 데이터 보호)
+    "%GIT_EXE%" stash push -m "Auto-backup before update" >nul 2>&1
     
-    powershell -Command "& {Invoke-WebRequest -Uri '%GAME_ZIP_URL%' -OutFile '%GAME_ZIP%' -UseBasicParsing}"
+    :: 최신 버전 가져오기
+    "%GIT_EXE%" fetch origin master
+    "%GIT_EXE%" reset --hard origin/master
     
-    if exist "%GAME_ZIP%" (
-        echo ✅ ZIP 파일 다운로드 완료
-        powershell -Command "& {Expand-Archive -Path '%GAME_ZIP%' -DestinationPath '%INSTALL_DIR%' -Force}"
+    if %errorLevel% equ 0 (
+        echo ✅ 게임 업데이트 완료 - 최신 버전 적용됨
         
-        :: 압축 해제된 디렉토리 이름 변경
-        if exist "%INSTALL_DIR%\Dawn-of-Stellar-master" (
-            move "%INSTALL_DIR%\Dawn-of-Stellar-master" "%GAME_DIR%"
-            echo ✅ 게임 파일 압축 해제 완료
+        :: 저장된 변경사항이 있으면 복원 시도
+        "%GIT_EXE%" stash list | findstr "Auto-backup" >nul 2>&1
+        if %errorLevel% equ 0 (
+            echo 🔄 사용자 데이터 복원 시도 중...
+            "%GIT_EXE%" stash pop >nul 2>&1
+            if %errorLevel% equ 0 (
+                echo ✅ 사용자 데이터 복원 완료
+            ) else (
+                echo ⚠️ 일부 파일 충돌로 인해 백업을 수동으로 확인해주세요
+                echo    git stash show 명령어로 백업 내용을 확인할 수 있습니다
+            )
         )
-        
-        del "%GAME_ZIP%" >nul 2>&1
     ) else (
-        echo ❌ 게임 다운로드 완전 실패
-        goto :error
+        echo ❌ Git 업데이트 실패 - 새로 다운로드 시도
+        cd /d "%INSTALL_DIR%"
+        rmdir /s /q "%GAME_DIR%" >nul 2>&1
+        goto :fresh_download
+    )
+) else (
+    :: 새로운 다운로드
+    :fresh_download
+    if exist "%GAME_DIR%" (
+        echo 🔄 기존 게임 디렉토리 정리 중...
+        rmdir /s /q "%GAME_DIR%" >nul 2>&1
+    )
+
+    echo 📡 GitHub에서 최신 소스코드 다운로드 중...
+    
+    "%GIT_EXE%" clone https://github.com/APTOL-7176/Dawn-of-Stellar.git "%GAME_DIR%"
+
+    if %errorLevel% equ 0 (
+        echo ✅ 게임 소스코드 다운로드 완료
+    ) else (
+        echo ❌ Git 다운로드 실패
+        echo 📥 ZIP 파일로 대체 다운로드 시도 중...
+        
+        :: ZIP 파일로 대체 다운로드 (항상 최신 마스터 브랜치)
+        set "GAME_ZIP_URL=https://github.com/APTOL-7176/Dawn-of-Stellar/archive/refs/heads/master.zip"
+        set "GAME_ZIP=%TEMP%\Dawn-of-Stellar-latest.zip"
+        
+        echo 📥 최신 ZIP 파일 다운로드 중...
+        powershell -Command "& {Invoke-WebRequest -Uri '%GAME_ZIP_URL%' -OutFile '%GAME_ZIP%' -UseBasicParsing}"
+        
+        if exist "%GAME_ZIP%" (
+            echo ✅ ZIP 파일 다운로드 완료
+            powershell -Command "& {Expand-Archive -Path '%GAME_ZIP%' -DestinationPath '%INSTALL_DIR%' -Force}"
+            
+            :: 압축 해제된 디렉토리 이름 변경
+            if exist "%INSTALL_DIR%\Dawn-of-Stellar-master" (
+                move "%INSTALL_DIR%\Dawn-of-Stellar-master" "%GAME_DIR%"
+                echo ✅ 최신 게임 파일 압축 해제 완료
+            )
+            
+            del "%GAME_ZIP%" >nul 2>&1
+        ) else (
+            echo ❌ 게임 다운로드 완전 실패
+            goto :error
+        )
     )
 )
 
@@ -255,18 +324,19 @@ if exist "%PYTHON_DIR%\python.exe" (
     set "PIP_EXE=pip"
 )
 
-echo 🔧 필수 라이브러리 설치 중...
+echo 🔧 필수 라이브러리 설치/업데이트 중...
 
 if exist "requirements.txt" (
-    "%PIP_EXE%" install -r requirements.txt --no-warn-script-location
+    echo 📦 requirements.txt에서 의존성 설치/업데이트 중...
+    "%PIP_EXE%" install -r requirements.txt --upgrade --no-warn-script-location
     if %errorLevel% equ 0 (
-        echo ✅ 의존성 설치 완료
+        echo ✅ 의존성 설치/업데이트 완료
     ) else (
         echo ⚠️ 일부 의존성 설치 실패 - 게임은 기본 기능으로 실행됩니다
     )
 ) else (
-    echo 📦 수동으로 핵심 라이브러리 설치 중...
-    "%PIP_EXE%" install pygame>=2.0.0 numpy>=1.20.0 colorama>=0.4.0 --no-warn-script-location
+    echo 📦 수동으로 핵심 라이브러리 설치/업데이트 중...
+    "%PIP_EXE%" install pygame>=2.0.0 numpy>=1.20.0 colorama>=0.4.0 --upgrade --no-warn-script-location
 )
 
 :: =================================================================
@@ -282,9 +352,9 @@ set "START_BATCH=%GAME_DIR%\start_game.bat"
 echo @echo off
 echo chcp 65001 ^>nul
 echo cd /d "%GAME_DIR%"
-echo title Dawn Of Stellar - 별빛의 여명 v2.0.0
+echo title Dawn Of Stellar - 별빛의 여명 v2.2.0
 echo echo.
-echo echo ⭐ Dawn Of Stellar - 별빛의 여명 v2.0.0 ⭐
+echo echo ⭐ Dawn Of Stellar - 별빛의 여명 v2.2.0 ⭐
 echo echo ==========================================
 echo echo.
 if exist "%PYTHON_DIR%\python.exe" (
@@ -304,7 +374,7 @@ if exist "%START_BATCH%" (
     set "DESKTOP=%USERPROFILE%\Desktop"
     set "SHORTCUT=%DESKTOP%\Dawn Of Stellar.lnk"
     
-    powershell -Command "& {$WshShell = New-Object -comObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut('%SHORTCUT%'); $Shortcut.TargetPath = '%START_BATCH%'; $Shortcut.WorkingDirectory = '%GAME_DIR%'; $Shortcut.Description = 'Dawn Of Stellar - 별빛의 여명 v2.0.0'; $Shortcut.Save()}"
+    powershell -Command "& {$WshShell = New-Object -comObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut('%SHORTCUT%'); $Shortcut.TargetPath = '%START_BATCH%'; $Shortcut.WorkingDirectory = '%GAME_DIR%'; $Shortcut.Description = 'Dawn Of Stellar - 별빛의 여명 v2.2.0'; $Shortcut.Save()}"
     
     if exist "%SHORTCUT%" (
         echo ✅ 바탕화면 바로가기 생성 완료
@@ -316,13 +386,14 @@ if exist "%START_BATCH%" (
 )
 
 :: =================================================================
-:: 6. 설치 완료
+:: 6. 설치/업데이트 완료
 :: =================================================================
 echo.
-echo 🎉🎉🎉 설치 완료! 🎉🎉🎉
-echo ========================
+echo 🎉🎉🎉 설치/업데이트 완료! 🎉🎉🎉
+echo ================================
 echo.
-echo ✅ 모든 구성요소가 성공적으로 설치되었습니다!
+echo ✅ 모든 구성요소가 성공적으로 설치/업데이트되었습니다!
+echo 🔄 항상 최신 버전이 다운로드되어 최고의 게임 경험을 제공합니다!
 echo.
 echo 📁 게임이 설치된 위치:
 echo    📂 %INSTALL_DIR%
@@ -335,24 +406,25 @@ echo        ├── 📂 game/          (게임 소스코드)
 echo        ├── 🎮 게임시작.bat   (게임 실행파일)
 echo        └── 📄 README.md      (게임 설명서)
 echo.
-echo ✅ 설치된 구성요소:
+echo ✅ 설치/업데이트된 구성요소:
 if exist "%PYTHON_DIR%\python.exe" (
     echo    🐍 Python 3.11 (포터블 버전)
 ) else (
     echo    🐍 Python (시스템 설치 버전)
 )
 echo    📡 Git for Windows
-echo    🎮 Dawn Of Stellar v2.0.0
+echo    🎮 Dawn Of Stellar v2.2.0 (최신 버전)
 echo    📦 모든 필수 라이브러리 (pygame, numpy, colorama 등)
 echo    🖥️ 바탕화면 바로가기
 echo.
-echo  게임 실행 방법:
+echo 🎮 게임 실행 방법:
 echo    1. 🖱️  바탕화면의 "Dawn Of Stellar" 아이콘 더블클릭
 echo    2. 📁 또는 폴더로 이동: %GAME_DIR%
 echo    3. 🎮 게임시작.bat 파일 실행
 echo.
 echo 🔄 게임 업데이트 방법:
-echo    게임 폴더에서 Git Bash 열기 → 'git pull' 명령어 실행
+echo    1. 📁 이 설치 스크립트를 다시 실행 (자동 업데이트)
+echo    2. 🖥️ 또는 게임 폴더에서 Git Bash → 'git pull' 명령어
 echo.
 echo 📖 게임 가이드:
 echo    게임 폴더의 README.md 파일에서 자세한 플레이 가이드 확인 가능
@@ -395,7 +467,7 @@ echo    3. 바이러스 백신 프로그램이 차단하지 않는지 확인
 echo.
 echo 💬 지원이 필요하시면:
 echo    GitHub: https://github.com/APTOL-7176/Dawn-of-Stellar/issues
-echo    Email: aptol.7176@gmail.com
+echo    Email: iamckck49@gmail.com
 echo.
 pause
 exit /b 1

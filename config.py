@@ -48,14 +48,14 @@ class GameConfig:
         self.DURABILITY_ENABLED = True
         self.DURABILITY_LOSS_RATE_MULTIPLIER = 0.7  # 30% 감소된 내구도 손실률
         
-        # ATB 시스템 설정
+        # ATB 시스템 설정 - 더 부드럽고 빠르게
         self.ATB_SETTINGS = {
             "animation_enabled": True,  # ATB 애니메이션 활성화
-            "animation_fps": 10,        # 10FPS로 업데이트 (0.1초 간격)
+            "animation_fps": 60,        # 60FPS로 업데이트 (10→60 FPS)
             "update_speed": 1.0,        # ATB 증가 속도 배율 (1.0 = 기본 속도)
             "show_percentage": True,    # 퍼센트 표시
             "smooth_animation": True,   # 부드러운 애니메이션
-            "frame_delay": 0.1          # 0.1초 (10FPS)
+            "frame_delay": 0.016        # ~60FPS (0.1→0.016초)
         }
         
         # 메타 진행 시스템 설정
@@ -272,11 +272,11 @@ class GameConfig:
             }
         }
         
-        # 디스플레이 설정
+        # 디스플레이 설정 - 더 높은 FPS
         self.FULLSCREEN_MODE = True  # 터미널 창 최대화 기본 활성화
         self.WINDOW_WIDTH = 1200 if not self.FULLSCREEN_MODE else None
         self.WINDOW_HEIGHT = 800 if not self.FULLSCREEN_MODE else None
-        self.FPS_LIMIT = 60
+        self.FPS_LIMIT = 120  # 120 FPS로 증가 (60→120)
         self.VSYNC_ENABLED = True
         self.UI_SCALE = 1.0  # UI 크기 배율
         

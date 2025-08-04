@@ -1,4 +1,4 @@
-# ⭐ Dawn Of Stellar - 별빛의 여명 v2.1.0
+# ⭐ Dawn Of Ste[🚀 자동 설치](#-원클릭-자동-설치) • [🎮 플레이 가이드](#-게임-시스템) • [📋 v2.2.0 주요 변경사항](#-v220-주요-변경사항) • [🤝 기여하기](#-기여하기)lar - 별빛의 여명 v2.2.0
 
 <div align="center">
 
@@ -6,7 +6,7 @@
 ![Platform](https://img.shields.io/badge/platform-windows%20%7C%20linux%20%7C%20macos-lightgrey.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Game](https://img.shields.io/badge/genre-roguelike%20%7C%20rpg-orange.svg)
-![Version](https://img.shields.io/badge/version-2.1.0-brightgreen.svg)
+![Version](https://img.shields.io/badge/version-2.2.0-brightgreen.svg)
 
 **차세대 ASCII 기반 전략 로그라이크 RPG**
 
@@ -133,9 +133,35 @@ python main.py
 | `python launcher.py` | 고급 런처 (설정 옵션) |
 | `게임시작_간편.bat` | Windows 배치 파일 실행 |
 
-## 📋 v2.1.0 주요 변경사항
+## 📋 v2.2.0 주요 변경사항 - "Cursor Revolution"
 
-### 🆕 전투 시스템 대규모 개선
+### 🎮 사용자 인터페이스 혁신
+
+#### 🖱️ FFVII 스타일 커서 메뉴 시스템 도입
+- **직관적 조작**: 방향키와 Enter키로 모든 메뉴 조작
+- **시각적 피드백**: 선택된 항목 강조 표시 및 색상 구분
+- **오디오 피드백**: 메뉴 조작 시 사운드 효과 지원
+- **상세 설명**: 각 옵션에 대한 자세한 설명 제공
+
+#### 🤖 AI 게임모드 인터페이스 대폭 개선
+- **AI 모드 선택**: 텍스트 입력 → 커서 메뉴 변경
+- **파티 구성 선택**: 추천 조합별 상세 정보 제공
+- **캐릭터 선택**: 실시간 스탯과 경험치 정보 표시
+- **AI 설정 메뉴**: 모든 AI 관련 설정을 직관적으로 관리
+
+### 🗺️ 게임 내 도움말 시스템 혁신
+- **항상 표시**: H키를 누르지 않아도 AI 컨트롤 확인 가능
+- **동적 표시**: AI 모드 활성화 여부에 따른 실시간 조작법 변경
+- **퀵 가이드**: 게임 하단에 주요 조작법 상시 표시
+
+### 🔧 시스템 개선사항
+- **폴백 메커니즘**: 커서 메뉴 오류 시 기존 텍스트 메뉴로 자동 전환
+- **에러 처리**: 향상된 예외 처리 및 사용자 친화적 에러 메시지
+- **코드 최적화**: 모듈화된 커서 메뉴 시스템으로 유지보수성 향상
+
+---
+
+### 🆕 v2.1.0 이전 전투 시스템 개선사항
 
 #### ⚔️ ATB 시스템 시각적 개선
 - **ATB 게이지 시각화**: 삼각형 화살표(▶) 표시로 준비 상태 명확화
