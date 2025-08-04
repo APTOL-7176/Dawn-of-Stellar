@@ -251,7 +251,7 @@ class UnifiedDamageSystem:
         if self.debug_mode:
             self._print_damage_calculation("BRV 데미지", result)
             
-            # 10초 대기 (아무 키나 눌러서 스킵 가능) - 윈도우 호환 버전
+            # 1초 대기 (아무 키나 눌러서 스킵 가능) - 윈도우 호환 버전
             import time
             import threading
             import msvcrt
@@ -260,15 +260,13 @@ class UnifiedDamageSystem:
                 """키 입력을 대기하는 함수"""
                 msvcrt.getch()
             
-            print(f"\n⏰ 10초 후 계속됩니다... (아무 키나 누르면 즉시 계속)")
-            
             # 키 입력을 기다리는 스레드 시작
             key_thread = threading.Thread(target=wait_for_key)
             key_thread.daemon = True
             key_thread.start()
             
-            # 10초 대기하거나 키 입력까지 대기
-            for i in range(100):  # 10초 = 100 × 0.1초
+            # 1초 대기하거나 키 입력까지 대기
+            for i in range(10):  # 1초 = 10 × 0.1초
                 if not key_thread.is_alive():
                     break
                 time.sleep(0.1)
@@ -347,24 +345,22 @@ class UnifiedDamageSystem:
         if self.debug_mode:
             self._print_damage_calculation("HP 데미지", result)
             
-            # 10초 대기 (엔터키로 스킵 가능) - 윈도우 호환 버전
+            # 1초 대기 (아무 키나 눌러서 스킵 가능) - 윈도우 호환 버전
             import time
             import threading
             import msvcrt
             
             def wait_for_enter():
-                """엔터키 입력을 대기하는 함수"""
+                """키 입력을 대기하는 함수"""
                 msvcrt.getch()
-            
-            print(f"\n⏰ 10초 후 계속됩니다... (아무 키나 누르면 즉시 계속)")
             
             # 키 입력을 기다리는 스레드 시작
             key_thread = threading.Thread(target=wait_for_enter)
             key_thread.daemon = True
             key_thread.start()
             
-            # 10초 대기하거나 키 입력까지 대기
-            for i in range(100):  # 10초 = 100 × 0.1초
+            # 1초 대기하거나 키 입력까지 대기
+            for i in range(10):  # 1초 = 10 × 0.1초
                 if not key_thread.is_alive():
                     break
                 time.sleep(0.1)

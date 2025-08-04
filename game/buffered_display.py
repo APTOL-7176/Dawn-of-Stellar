@@ -143,6 +143,10 @@ class BufferedDisplay:
             
             if not changes_detected:
                 return  # 변경사항이 없으면 출력하지 않음
+            
+            # 화면 번쩍임 방지를 위한 미세한 딜레이
+            import time
+            time.sleep(0.01)  # 10ms 대기로 화면 안정화
         else:
             # 전체 화면 업데이트
             self.move_cursor(1, 1)
@@ -154,6 +158,10 @@ class BufferedDisplay:
             for i in range(len(display_buffer), self.height):
                 self.move_cursor(i + 1, 1)
                 print('\033[K', end='', flush=True)
+            
+            # 전체 화면 업데이트 후 약간 더 긴 안정화 딜레이
+            import time
+            time.sleep(0.02)  # 20ms 대기로 화면 안정화
         
         # 현재 버퍼를 이전 버퍼로 저장
         self.previous_buffer = display_buffer.copy()

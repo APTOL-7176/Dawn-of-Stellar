@@ -560,7 +560,7 @@ class BraveCombatSystem:
                 if action_order:
                     break
                 attempts += 1
-                time_module.sleep(0.04)  # ATB 업데이트 간 딜레이 단축 (120ms→40ms)
+                time_module.sleep(0.06)  # ATB 업데이트 간 딜레이 증가 (40ms→60ms, 화면 번쩍임 감소)
             
             if not action_order:
                 # ATB 강제 증가로 교착 상태 해결
@@ -833,13 +833,13 @@ class BraveCombatSystem:
                     "무당": "⚡ 영혼 타격: 방어력 무시 피해",
                     "해적": "⚡ 이도류 난타: 30% 확률로 2회 공격",
                     "사무라이": "⚡ 거합 베기: HP 낮을수록 강화",
-                    "드루이드": "⚡ 야생의 격노: 공격 후 HP 회복",
+                    "드루이드": "⚡ 자연의 분노: 공격 후 HP 회복",
                     "철학자": "⚡ 논리적 반박: 다음 턴 회피율 증가",
                     "시간술사": "⚡ 시간 조작: 적의 행동 지연",
                     "연금술사": "⚡ 화학 폭발: 주변 적에게 연쇄 피해",
                     "검투사": "⚡ 투기장 기술: 반격 확률 증가",
-                    "기사": "⚡ 신성한 돌격: 관통 피해",
-                    "신관": "⚡ 인과응보: 아군에게 축복 버프",
+                    "기사": "⚡ 창 돌격: 관통 피해",
+                    "신관": "⚡ 축복의 빛: 아군에게 축복 버프",
                     "마검사": "⚡ 마법검기: 물리+마법 피해",
                     "차원술사": "⚡ 차원 균열: 적의 정확도 감소",
                     "광전사": "⚡ 광폭화 난타: HP 낮을수록 강화"
@@ -864,13 +864,13 @@ class BraveCombatSystem:
                 "무당": "💀 영혼 분리: 방어력 완전 무시",
                 "해적": "💀 해적의 보물: 4가지 무기 연속 공격",
                 "사무라이": "💀 무사도 비의: 필사의 일격",
-                "드루이드": "💀 자연의 응징: 아군 회복+자연 축복",
+                "드루이드": "💀 자연의 심판: 아군 회복+자연 축복",
                 "철학자": "💀 진리의 깨달음: 약점 공격+버프 해제",
                 "시간술사": "💀 시간 정지: 4연속 공격",
                 "연금술사": "💀 대폭발 반응: 광역 폭발 피해",
                 "검투사": "💀 검투장의 피날레: 4연속 콤보",
-                "기사": "💀 신성한 돌격: 성스러운 관통 공격",
-                "신관": "💀 인과응보: 아군 전체 대량 회복",
+                "기사": "💀 성스러운 돌격: 성스러운 관통 공격",
+                "신관": "💀 신의 심판: 아군 전체 대량 회복",
                 "마검사": "💀 마검 오의: 물리+마법 융합 공격",
                 "차원술사": "💀 차원 붕괴: 공간 자체로 공격",
                 "광전사": "💀 최후의 광기: 광폭화로 최강 일격"
@@ -1209,7 +1209,7 @@ class BraveCombatSystem:
         # 지원형 스킬 우선 선택
         support_skills = [skill for skill in skills 
                          if skill.get("mp_cost", 0) <= character.current_mp
-                         and skill.get("name") in ["치유", "인과응보", "영혼의 노래", "회복", "축복"]]
+                         and skill.get("name") in ["치유", "신의 심판", "영혼의 노래", "회복", "축복"]]
         
         if support_skills:
             best_skill = support_skills[0]  # 첫 번째 사용 가능한 지원 스킬
@@ -1983,7 +1983,7 @@ class BraveCombatSystem:
                 for enemy in alive_enemies:
                     status = f" (HP: {enemy.current_hp}/{enemy.max_hp}"
                     if hasattr(enemy, 'is_broken') and enemy.is_broken:
-                        status += f", {Color.BRIGHT_RED}BREAK{Color.RESET}"
+                        status += ", BREAK"
                     status += ")"
                     
                     option_text = f"{enemy.name}{status}"
@@ -2339,11 +2339,7 @@ class BraveCombatSystem:
             descriptions = []
             
             for enemy in alive_enemies:
-                break_status = ""
-                if hasattr(enemy, 'is_broken') and enemy.is_broken:
-                    break_status = f" {Color.BRIGHT_RED}[BREAK]{Color.RESET}"
-                
-                option_text = f"{enemy.name} (HP: {enemy.current_hp}/{enemy.max_hp}, Brave: {enemy.brave_points}){break_status}"
+                option_text = f"{enemy.name} (HP: {enemy.current_hp}/{enemy.max_hp}, Brave: {enemy.brave_points})"
                 desc = f"대상: {enemy.name} | 상태: {'브레이크' if hasattr(enemy, 'is_broken') and enemy.is_broken else '정상'}"
                 
                 options.append(option_text)
@@ -2419,11 +2415,8 @@ class BraveCombatSystem:
             for enemy in alive_enemies:
                 # HP 게이지 색깔 생성
                 hp_gauge = self._create_colored_hp_gauge(enemy.current_hp, enemy.max_hp)
-                # BREAK 상태 표시
-                break_status = ""
-                if hasattr(enemy, 'is_broken') and enemy.is_broken:
-                    break_status = f" {Color.BRIGHT_RED}[BREAK]{Color.RESET}"
-                
+                # BREAK 상태는 상태 이펙트에서만 표시 (중복 제거)
+                break_status = ""  # 이름에는 BREAK 표시 안함
                 option_text = f"{enemy.name} {hp_gauge}{break_status}"
                 desc = f"대상: {enemy.name} | HP: {enemy.current_hp}/{enemy.max_hp} | 상태: {'브레이크' if hasattr(enemy, 'is_broken') and enemy.is_broken else '정상'}"
                 
@@ -2642,7 +2635,7 @@ class BraveCombatSystem:
             "무당": BraveSkill("영혼 타격", BraveAttackType.BRAVE, 0.25, description="영혼을 직접 타격하여 방어력 무시"),
             "해적": BraveSkill("이도류 난타", BraveAttackType.BRAVE, 0.2, description="양손 무기로 연속 공격"),
             "사무라이": BraveSkill("거합 베기", BraveAttackType.BRAVE, 0.55, description="단숨에 베는 강력한 일격, 낮은 HP일수록 강화"),
-            "드루이드": BraveSkill("야생의 격노", BraveAttackType.BRAVE, 0.3, description="자연의 힘으로 공격하며 턴마다 HP 회복"),
+            "드루이드": BraveSkill("자연의 분노", BraveAttackType.BRAVE, 0.3, description="자연의 힘으로 공격하며 턴마다 HP 회복"),
             "철학자": BraveSkill("논리적 반박", BraveAttackType.BRAVE, 0.15, description="적의 행동을 예측하여 반격, 높은 회피율"),
             "시간술사": BraveSkill("시간 조작", BraveAttackType.BRAVE, 0.25, description="시간을 조작하여 적의 행동 지연"),
             "연금술사": BraveSkill("화학 폭발", BraveAttackType.BRAVE, 0.35, description="화학 반응으로 폭발 피해, 주변 적에게도 영향"),
@@ -2717,17 +2710,11 @@ class BraveCombatSystem:
                 print(f"💚 {target.name}이(가) 독에 중독되었습니다!")
             
         elif character_class == "성기사" and skill.name == "성스러운 타격":
-            # 공격하면서 아군 중 HP가 가장 낮은 대상 회복 (플레이어 파티만)
-            attacker_is_player = hasattr(attacker, 'character_class') and attacker.character_class != "Enemy"
-            
-            if attacker_is_player and hasattr(self, '_current_party') and self._current_party:
-                # 플레이어 파티 중 HP가 가장 낮은 플레이어만 회복
-                player_allies = [ally for ally in self._current_party 
-                               if ally.current_hp > 0 and hasattr(ally, 'character_class') 
-                               and ally.character_class != "Enemy"]
-                
-                if player_allies:
-                    lowest_hp_ally = min(player_allies, key=lambda x: x.current_hp / x.max_hp)
+            # 공격하면서 아군 중 HP가 가장 낮은 대상 회복
+            if hasattr(self, '_current_party') and self._current_party:
+                lowest_hp_ally = min([ally for ally in self._current_party if ally.current_hp > 0], 
+                                   key=lambda x: x.current_hp / x.max_hp, default=None)
+                if lowest_hp_ally:
                     heal_amount = int(damage * 0.3)
                     lowest_hp_ally.heal(heal_amount)
                     print(f"✨ {lowest_hp_ally.name}이(가) {heal_amount} HP 회복!")
@@ -2862,7 +2849,7 @@ class BraveCombatSystem:
                 target.brave_points -= bonus_damage
                 print(f"⚔️ 각오의 일격! HP가 낮아 추가 {bonus_damage} BRV 피해!")
                 
-        elif character_class == "드루이드" and skill.name == "야생의 격노":
+        elif character_class == "드루이드" and skill.name == "자연의 분노":
             # 공격 후 자신 HP 회복
             heal_amount = int(damage * 0.2)
             attacker.heal(heal_amount)
@@ -2969,13 +2956,13 @@ class BraveCombatSystem:
             "무당": BraveSkill("영혼 분리", BraveAttackType.HP, 0.0, 1.0, description="적의 영혼을 직접 공격하여 방어력 완전 무시"),
             "해적": BraveSkill("해적의 보물", BraveAttackType.HP, 0.0, 1.1, description="숨겨진 보물 무기로 연속 공격"),
             "사무라이": BraveSkill("무사도 비의", BraveAttackType.HP, 0.0, 1.5, description="HP가 낮을수록 강해지는 필사의 일격"),
-            "드루이드": BraveSkill("자연의 응징", BraveAttackType.HP, 0.0, 1.0, description="자연의 힘으로 적을 심판하며 아군 전체 회복"),
+            "드루이드": BraveSkill("자연의 심판", BraveAttackType.HP, 0.0, 1.0, description="자연의 힘으로 적을 심판하며 아군 전체 회복"),
             "철학자": BraveSkill("진리의 깨달음", BraveAttackType.HP, 0.0, 0.8, description="논리적 공격으로 적의 약점을 정확히 타격"),
             "시간술사": BraveSkill("시간 정지", BraveAttackType.HP, 0.0, 1.1, description="시간을 정지시켜 연속 공격"),
             "연금술사": BraveSkill("대폭발 반응", BraveAttackType.HP, 0.0, 1.3, description="화학 반응으로 거대한 폭발 생성"),
             "검투사": BraveSkill("검투장의 피날레", BraveAttackType.HP, 0.0, 1.2, description="관중들의 환호 속에서 화려한 마무리"),
-            "기사": BraveSkill("신성한 돌격", BraveAttackType.HP, 0.0, 1.15, description="신성한 힘이 깃든 창으로 돌격"),
-            "신관": BraveSkill("인과응보", BraveAttackType.HP, 0.0, 0.9, description="적을 심판하면서 아군 전체 HP 회복"),
+            "기사": BraveSkill("성스러운 돌격", BraveAttackType.HP, 0.0, 1.15, description="신성한 힘이 깃든 창으로 돌격"),
+            "신관": BraveSkill("신의 심판", BraveAttackType.HP, 0.0, 0.9, description="적을 심판하면서 아군 전체 HP 회복"),
             "마검사": BraveSkill("마검 오의", BraveAttackType.HP, 0.0, 1.25, description="물리와 마법의 완벽한 융합 기술"),
             "차원술사": BraveSkill("차원 붕괴", BraveAttackType.HP, 0.0, 1.2, description="차원을 붕괴시켜 공간 자체로 공격"),
             "광전사": BraveSkill("최후의 광기", BraveAttackType.HP, 0.0, 1.6, description="모든 것을 내던진 광폭한 최후의 일격"),
@@ -3031,6 +3018,32 @@ class BraveCombatSystem:
                 extra_damage = int(hp_damage * crit_multiplier)
                 target.take_damage(extra_damage)
                 print(f"🗡️ 치명상! 추가 {extra_damage} 피해!")
+                
+        elif character_class == "성기사" and skill.name == "심판의 빛":
+            # 아군 전체 상태이상 해제 및 회복
+            # 공격자가 플레이어 파티에 속해있는지 정확히 확인
+            is_player_party_member = False
+            if hasattr(self, '_current_party') and self._current_party:
+                is_player_party_member = attacker in self._current_party
+            
+            if is_player_party_member:
+                # 플레이어 성기사 - 플레이어 파티만 회복
+                target_party = self._current_party
+            else:
+                # 적군 성기사 - 회복 효과 없음 (적은 이 기술 사용 불가)
+                target_party = None
+                
+            if target_party:
+                for ally in target_party:
+                    if ally.current_hp > 0:
+                        # 상태이상 해제
+                        setattr(ally, 'is_poisoned', False)
+                        setattr(ally, 'is_burning', False)
+                        setattr(ally, 'is_stunned', False)
+                        # 소량 회복
+                        heal_amount = int(ally.max_hp * 0.1)
+                        ally.heal(heal_amount)
+                print(f"✨ 성스러운 빛으로 아군 전체 정화 및 회복!")
                         
         elif character_class == "암흑기사" and skill.name == "흡혈 강타":
             # 가한 피해의 60% HP 회복
@@ -3052,25 +3065,32 @@ class BraveCombatSystem:
                 print(f"💥 표식 폭발! {marks}개 표식으로 {explosion_damage} 추가 피해!")
                 
         elif character_class == "바드" and skill.name == "영혼의 노래":
-            # 적에게 피해 + 아군 전체 회복 및 버프 (플레이어 파티만)
+            # 적에게 피해 + 아군 전체 회복 및 버프
+            # 공격자가 아군인지 적군인지 구분하여 해당 편만 회복
             
-            # 시전자가 플레이어인지 확인하여 플레이어 파티만 회복
-            attacker_is_player = hasattr(attacker, 'character_class') and attacker.character_class != "Enemy"
+            # 파티 멤버 확인을 통해 정확한 아군 구분
+            is_player_party_member = False
+            if hasattr(self, '_current_party') and self._current_party:
+                is_player_party_member = attacker in self._current_party
             
-            if attacker_is_player and hasattr(self, '_current_party') and self._current_party:
-                # 시전자의 마법력 기반 회복량 계산
-                caster_magic_attack = getattr(attacker, 'magic_attack', 50)
-                heal_amount = int(caster_magic_attack * 0.25)  # 마법력의 25%
+            if is_player_party_member:
+                # 플레이어 파티의 바드 - 플레이어 파티만 회복
+                target_party = self._current_party
+                party_name = "아군"
+            else:
+                # 적군 바드 - 적군만 회복
+                target_party = self._current_enemies if hasattr(self, '_current_enemies') else []
+                party_name = "적군"
                 
+            if target_party:
                 healed_count = 0
-                for ally in self._current_party:
-                    # 플레이어 파티 멤버만 회복 (적이 아닌지 확인)
-                    ally_is_player = hasattr(ally, 'character_class') and ally.character_class != "Enemy"
-                    if ally and ally.current_hp > 0 and ally_is_player:
+                for ally in target_party:
+                    if ally and ally.current_hp > 0:
+                        heal_amount = int(ally.max_hp * 0.12)  # 12% 회복
                         ally.heal(heal_amount)
                         setattr(ally, 'temp_attack_bonus', getattr(ally, 'temp_attack_bonus', 0) + 10)
                         healed_count += 1
-                print(f"🎵 영혼의 노래로 아군 {healed_count}명 회복({heal_amount}) 및 공격력 증가!")
+                print(f"🎵 영혼의 노래로 {party_name} {healed_count}명 회복 및 공격력 증가!")
             # 적에게도 정상적으로 피해를 줌
                 
         elif character_class == "네크로맨서" and skill.name == "영혼 흡수":
@@ -3210,26 +3230,29 @@ class BraveCombatSystem:
             # 반격 확률 증가
             setattr(attacker, 'temp_counter_rate', 0.5)
             
-        elif character_class == "드루이드" and skill.name == "자연의 응징":
-            # 자연의 힘으로 적을 심판하면서 아군 전체 회복 (플레이어 파티만)
-            attacker_is_player = hasattr(attacker, 'character_class') and attacker.character_class != "Enemy"
+        elif character_class == "드루이드" and skill.name == "자연의 심판":
+            # 자연의 힘으로 심판하며 아군 회복
+            # 공격자가 플레이어 파티에 속해있는지 정확히 확인
+            is_player_party_member = False
+            if hasattr(self, '_current_party') and self._current_party:
+                is_player_party_member = attacker in self._current_party
             
-            if attacker_is_player and hasattr(self, '_current_party') and self._current_party:
-                # 시전자의 마법력 기반 회복량 계산
-                caster_magic_attack = getattr(attacker, 'magic_attack', 50)
-                nature_heal = int(caster_magic_attack * 0.35)  # 마법력의 35%
+            if is_player_party_member:
+                # 플레이어 드루이드 - 플레이어 파티만 회복
+                target_party = self._current_party
+            else:
+                # 적군 드루이드 - 회복 효과 없음 (적은 이 기술 사용 불가)
+                target_party = None
                 
-                healed_count = 0
-                for ally in self._current_party:
-                    # 플레이어 파티 멤버만 회복 (적이 아닌지 확인)
-                    ally_is_player = hasattr(ally, 'character_class') and ally.character_class != "Enemy"
-                    if ally.current_hp > 0 and ally_is_player:
+            if target_party:
+                for ally in target_party:
+                    if ally.current_hp > 0:
+                        nature_heal = int(ally.max_hp * 0.2)
                         ally.heal(nature_heal)
                         # 자연의 축복 (독/화상 저항)
                         setattr(ally, 'nature_blessing', True)
                         setattr(ally, 'nature_blessing_turns', 3)
-                        healed_count += 1
-                print(f"🌿 치유의 심판! 아군 {healed_count}명 회복({nature_heal}) 및 자연의 축복!")
+                print(f"🌿 자연의 심판! 아군 전체 회복 및 자연의 축복!")
                 
         elif character_class == "철학자" and skill.name == "진리의 깨달음":
             # 논리적 약점 공격으로 정확한 피해 (현재 HP 비율 기반)
@@ -3295,7 +3318,7 @@ class BraveCombatSystem:
                     setattr(ally, 'temp_attack_bonus', getattr(ally, 'temp_attack_bonus', 0) + 15)
                 print(f"👏 관중의 환호로 아군 전체 공격력 증가!")
                 
-        elif character_class == "기사" and skill.name == "신성한 돌격":
+        elif character_class == "기사" and skill.name == "성스러운 돌격":
             # 신성한 힘의 창 돌격
             holy_damage = int(hp_damage * 0.5)  # 추가 성스러운 피해
             target.take_damage(holy_damage)
@@ -3308,31 +3331,33 @@ class BraveCombatSystem:
                     other_enemy.take_damage(pierce_damage)
                     print(f"🛡️ 성스러운 돌격 관통! {other_enemy.name}이(가) {pierce_damage} 피해!")
                     
-        elif character_class == "신관" and skill.name == "인과응보":
-            # 신의 심판: 적에게 피해 + 아군 전체 회복 (플레이어 파티만)
-            # 플레이어 파티인지 확인 (적이 아닌지)
+        elif character_class == "신관" and skill.name == "신의 심판":
+            # 신의 심판: 적에게 피해 + 아군 전체 회복 (회복량 감소)
+            # 공격자가 플레이어 파티에 속해있는지 정확히 확인
+            is_player_party_member = False
             if hasattr(self, '_current_party') and self._current_party:
-                # 시전자가 플레이어 파티 소속인지 확인
-                attacker_is_player = hasattr(attacker, 'character_class') and attacker.character_class != "Enemy"
+                is_player_party_member = attacker in self._current_party
+            
+            if is_player_party_member:
+                # 플레이어 신관 - 플레이어 파티만 회복
+                target_party = self._current_party
+            else:
+                # 적군 신관 - 회복 효과 없음 (적은 이 기술 사용 불가)
+                target_party = None
                 
-                if attacker_is_player:
-                    healed_allies = []
-                    # 시전자의 마법력 기반 회복량 계산
-                    caster_magic_attack = getattr(attacker, 'magic_attack', 50)
-                    divine_heal = int(caster_magic_attack * 0.3)  # 마법력의 30%
-                    
-                    for ally in self._current_party:
-                        # 플레이어 파티 멤버만 회복 (적이 아닌지 다시 확인)
-                        ally_is_player = hasattr(ally, 'character_class') and ally.character_class != "Enemy"
-                        if ally.current_hp > 0 and ally_is_player:
-                            ally.heal(divine_heal)
-                            healed_allies.append(f"{ally.name}({divine_heal})")
-                            # 신의 가호 (모든 저항 증가)
-                            setattr(ally, 'divine_protection', True)
-                            setattr(ally, 'divine_protection_turns', 4)
-                    if healed_allies:
-                        print(f"✨ 치유의 심판! 아군 회복: {', '.join(healed_allies)}")
-                        print(f"🛡️ 아군 전체에게 신의 가호 부여!")
+            if target_party:
+                healed_allies = []
+                for ally in target_party:
+                    if ally.current_hp > 0:
+                        divine_heal = int(ally.max_hp * 0.15)  # 30% -> 15%로 감소
+                        ally.heal(divine_heal)
+                        healed_allies.append(f"{ally.name}({divine_heal})")
+                        # 신의 가호 (모든 저항 증가)
+                        setattr(ally, 'divine_protection', True)
+                        setattr(ally, 'divine_protection_turns', 4)
+                if healed_allies:
+                    print(f"✨ 신의 심판! 아군 회복: {', '.join(healed_allies)}")
+                    print(f"🛡️ 아군 전체에게 신의 가호 부여!")
             # 적에게는 정상적으로 피해를 줌 (return 제거)
                 
         elif character_class == "마검사" and skill.name == "마검 오의":
@@ -3393,29 +3418,31 @@ class BraveCombatSystem:
                 print(f"🗡️ 치명타 추가 피해: {crit_bonus} HP!")
                 
         elif character_class == "성기사" and skill.name == "심판의 빛":
-            # 아군 전체 상태이상 해제 및 소량 회복 (플레이어 파티만)
-            attacker_is_player = hasattr(attacker, 'character_class') and attacker.character_class != "Enemy"
+            # 아군 전체 상태이상 해제 및 소량 회복
+            # 공격자가 플레이어 파티에 속해있는지 정확히 확인
+            is_player_party_member = False
+            if hasattr(self, '_current_party') and self._current_party:
+                is_player_party_member = attacker in self._current_party
             
-            if attacker_is_player and hasattr(self, '_current_party') and self._current_party:
-                # 플레이어 성기사만 플레이어 파티 회복
-                # 시전자의 마법력 기반 회복량 계산
-                caster_magic_attack = getattr(attacker, 'magic_attack', 50)
-                heal_amount = int(caster_magic_attack * 0.2)  # 마법력의 20%
+            if is_player_party_member:
+                # 플레이어 성기사 - 플레이어 파티만 회복
+                target_party = self._current_party
+            else:
+                # 적군 성기사 - 회복 효과 없음
+                target_party = None
                 
-                healed_count = 0
-                for ally in self._current_party:
-                    # 플레이어 파티 멤버만 회복 (적이 아닌지 확인)
-                    ally_is_player = hasattr(ally, 'character_class') and ally.character_class != "Enemy"
-                    if ally.current_hp > 0 and ally_is_player:
+            if target_party:
+                for ally in target_party:
+                    if ally.current_hp > 0:
                         # 상태이상 해제
                         debuffs = ['is_poisoned', 'is_burning', 'is_frozen', 'is_stunned']
                         for debuff in debuffs:
                             if hasattr(ally, debuff):
                                 setattr(ally, debuff, False)
-                        # 마법력 기반 회복
+                        # 소량 회복
+                        heal_amount = int(hp_damage * 0.15)
                         ally.heal(heal_amount)
-                        healed_count += 1
-                print(f"✨ 심판의 빛! 아군 {healed_count}명 상태이상 해제 & {heal_amount} HP 회복!")
+                        print(f"✨ {ally.name} 상태이상 해제 & {heal_amount} HP 회복!")
                         
         elif character_class == "검사" and skill.name == "일섬":
             # 완벽한 베기로 방어력 무시 + 출혈 효과
@@ -3425,22 +3452,25 @@ class BraveCombatSystem:
             setattr(target, 'bleeding_damage', int(hp_damage * 0.1))
             
         elif character_class == "성직자" and skill.name == "신성한 심판":
-            # 아군 전체 HP 회복 (플레이어 파티만)
-            attacker_is_player = hasattr(attacker, 'character_class') and attacker.character_class != "Enemy"
+            # 아군 전체 HP 회복
+            # 공격자가 플레이어 파티에 속해있는지 정확히 확인
+            is_player_party_member = False
+            if hasattr(self, '_current_party') and self._current_party:
+                is_player_party_member = attacker in self._current_party
             
-            if attacker_is_player and hasattr(self, '_current_party') and self._current_party:
-                # 시전자의 마법력 기반 회복량 계산
-                caster_magic_attack = getattr(attacker, 'magic_attack', 50)
-                heal_amount = int(caster_magic_attack * 0.4)  # 마법력의 40%
+            if is_player_party_member:
+                # 플레이어 성직자 - 플레이어 파티만 회복
+                target_party = self._current_party
+            else:
+                # 적군 성직자 - 회복 효과 없음
+                target_party = None
                 
-                healed_count = 0
-                for ally in self._current_party:
-                    # 플레이어 파티 멤버만 회복 (적이 아닌지 확인)
-                    ally_is_player = hasattr(ally, 'character_class') and ally.character_class != "Enemy"
-                    if ally.current_hp > 0 and ally_is_player:
+            if target_party:
+                heal_amount = int(hp_damage * 0.4)
+                for ally in target_party:
+                    if ally.current_hp > 0:
                         ally.heal(heal_amount)
-                        healed_count += 1
-                print(f"🌟 신성한 심판! 아군 {healed_count}명이 {heal_amount} HP 회복!")
+                        print(f"🌟 신성한 빛이 {ally.name}을(를) {heal_amount} HP 회복!")
                         
         elif character_class == "암흑기사" and skill.name == "흡혈 강타":
             # 가한 피해의 60% HP 회복
@@ -3457,22 +3487,25 @@ class BraveCombatSystem:
                 setattr(target, 'strike_marks', 0)  # 표식 제거
                 print(f"💥 타격 표식 {strike_marks}중첩 폭발! 추가 {explosion_damage} HP 피해!")
                 
-                # 표식 폭발로 아군 회복 (플레이어 파티만)
-                attacker_is_player = hasattr(attacker, 'character_class') and attacker.character_class != "Enemy"
+                # 표식 폭발로 아군 회복
+                # 공격자가 플레이어 파티에 속해있는지 정확히 확인
+                is_player_party_member = False
+                if hasattr(self, '_current_party') and self._current_party:
+                    is_player_party_member = attacker in self._current_party
                 
-                if attacker_is_player and hasattr(self, '_current_party') and self._current_party:
-                    # 시전자의 마법력 기반 회복량 계산
-                    caster_magic_attack = getattr(attacker, 'magic_attack', 50)
-                    heal_amount = int(caster_magic_attack * 0.15)  # 마법력의 15%
+                if is_player_party_member:
+                    # 플레이어 몽크 - 플레이어 파티만 회복
+                    target_party = self._current_party
+                else:
+                    # 적군 몽크 - 회복 효과 없음
+                    target_party = None
                     
-                    healed_count = 0
-                    for ally in self._current_party:
-                        # 플레이어 파티 멤버만 회복 (적이 아닌지 확인)
-                        ally_is_player = hasattr(ally, 'character_class') and ally.character_class != "Enemy"
-                        if ally.current_hp > 0 and ally_is_player:
+                if target_party:
+                    heal_amount = int(explosion_damage * 0.3)
+                    for ally in target_party:
+                        if ally.current_hp > 0:
                             ally.heal(heal_amount)
-                            healed_count += 1
-                    print(f"✨ 표식 폭발 에너지가 아군 {healed_count}명을 {heal_amount} HP 회복!")
+                    print(f"✨ 표식 폭발 에너지가 아군들을 {heal_amount} HP 회복!")
         
         # 기본 공격 후 딜레이 추가
         attack_name = getattr(skill, 'name', '기본 공격') if skill else '기본 공격'
@@ -5271,12 +5304,12 @@ class BraveCombatSystem:
         # 화면 갱신은 모든 ATB 업데이트가 완료된 후에만 실행
         # 빈번한 갱신을 방지하기 위해 조건을 더 엄격하게 설정
         if atb_updates and hasattr(self, '_current_party') and hasattr(self, '_current_enemies'):
-            # 10% 이상의 ATB 변화가 있을 때만 화면 갱신
+            # 2% 이상의 ATB 변화가 있을 때만 화면 갱신
             significant_changes = False
             for combatant, new_atb in atb_updates.items():
                 old_atb = getattr(combatant, '_last_display_atb', 0)
                 atb_change_percent = abs(new_atb - old_atb) / self.ATB_MAX * 100
-                if atb_change_percent >= 5:  # 5% 이상 변화시에만 갱신
+                if atb_change_percent >= 2:  # 2% 이상 변화시에만 갱신
                     significant_changes = True
                     combatant._last_display_atb = new_atb
                     break
@@ -5284,7 +5317,7 @@ class BraveCombatSystem:
             if significant_changes:
                 # 잠시 대기 후 안정적인 상태에서 화면 갱신 - 더 빠르게
                 import time
-                time_module.sleep(0.03)  # 30ms 대기로 안정화 (100ms→30ms)
+                time_module.sleep(0.05)  # 50ms 대기로 안정화 (30ms→50ms, 화면 번쩍임 감소)
                 first_character = next((c for c in self._current_party if c.is_alive), None)
                 if first_character:
                     self.show_battle_status(first_character, self._current_party, self._current_enemies)
@@ -5778,13 +5811,18 @@ class BraveCombatSystem:
         return party_alive
     
     def _is_ally(self, caster, target):
-        """시전자와 대상이 같은 편인지 확인 - 하드코딩된 스킬은 플레이어 파티만 치유"""
-        # 하드코딩된 스킬의 경우 무조건 플레이어 파티만 치유하도록 제한
+        """시전자와 대상이 같은 편인지 확인"""
+        # 둘 다 파티원인지 확인
         if (hasattr(self, '_current_party') and 
             caster in self._current_party and target in self._current_party):
             return True
         
-        # 적끼리는 아군으로 판단하지 않음 (하드코딩된 치유 스킬 방지)
+        # 둘 다 적인지 확인
+        if (hasattr(self, '_current_enemies') and 
+            caster in self._current_enemies and target in self._current_enemies):
+            return True
+        
+        # 기본적으로 적이라고 가정
         return False
     
     def _apply_skill_effects(self, skill, caster, targets):
