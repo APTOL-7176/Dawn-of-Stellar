@@ -151,13 +151,13 @@ class StableDisplay:
                 
                 # ATB 상태
                 atb_gauge = getattr(char, 'atb_gauge', 0)
-                if atb_gauge >= 100:
+                if atb_gauge >= 1000:
                     atb_display = f"{Color.BRIGHT_CYAN}⚡READY{Color.RESET}"
                     atb_bar = f"{Color.BRIGHT_CYAN}{'█'*10}{Color.RESET}"
                 else:
-                    atb_percent = int(atb_gauge)
+                    atb_percent = int(atb_gauge / 10)  # 1000 스케일을 100%로 변환
                     atb_display = f"{Color.CYAN}{atb_percent:3}%{Color.RESET}"
-                    filled = int(atb_gauge / 10)
+                    filled = int(atb_gauge / 100)  # 1000 스케일에 맞게 조정
                     atb_bar = f"{Color.CYAN}{'█'*filled}{Color.BRIGHT_BLACK}{'░'*(10-filled)}{Color.RESET}"
                 
                 # 레벨 표시 추가
@@ -207,13 +207,13 @@ class StableDisplay:
                 
                 # ATB 상태
                 atb_gauge = getattr(enemy, 'atb_gauge', 0)
-                if atb_gauge >= 100:
+                if atb_gauge >= 1000:
                     atb_display = f"{Color.BRIGHT_CYAN}⚡READY{Color.RESET}"
                     atb_bar = f"{Color.BRIGHT_CYAN}{'█'*10}{Color.RESET}"
                 else:
-                    atb_percent = int(atb_gauge)
+                    atb_percent = int(atb_gauge / 10)  # 1000 스케일을 100%로 변환
                     atb_display = f"{Color.CYAN}{atb_percent:3}%{Color.RESET}"
-                    filled = int(atb_gauge / 10)
+                    filled = int(atb_gauge / 100)  # 1000 스케일에 맞게 조정
                     atb_bar = f"{Color.CYAN}{'█'*filled}{Color.BRIGHT_BLACK}{'░'*(10-filled)}{Color.RESET}"
                 
                 # 첫 번째 줄: 기본 정보

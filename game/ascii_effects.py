@@ -96,8 +96,9 @@ class ASCIIVisualEffects:
         
     @staticmethod
     def show_skill_activation(skill_name: str, character_name: str):
-        """스킬 발동 이펙트"""
-        print(f"\n✨ {character_name}의 『{skill_name}』! ✨")
+        """스킬 발동 이펙트 - 신버전 통합 데미지 시스템에서 처리하므로 구버전 로그 제거"""
+        # 구버전 로그 제거 - 통합 데미지 시스템에서 이쁜 로그를 출력하므로 중복 제거
+        pass
         
     @staticmethod
     def animate_battle_transition():

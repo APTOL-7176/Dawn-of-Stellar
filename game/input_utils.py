@@ -154,3 +154,18 @@ def wait_for_any_key(message: str = "아무 키나 누르세요...") -> str:
     else:
         keyboard = KeyboardInput()
         return keyboard.wait_for_key(message)
+
+
+class InputManager:
+    """입력 관리자 클래스 - KeyboardInput의 래퍼"""
+    
+    def __init__(self):
+        self.keyboard = KeyboardInput()
+    
+    def get_key(self) -> str:
+        """키 입력 받기 - KeyboardInput과 동일"""
+        return self.keyboard.get_key()
+    
+    def wait_for_key(self, message: str = "아무 키나 누르세요...") -> str:
+        """메시지와 함께 키 대기"""
+        return self.keyboard.wait_for_key(message)

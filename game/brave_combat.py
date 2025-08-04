@@ -1,5 +1,5 @@
 """
-Brave 시스템이 통합된 전투 시스템 - 로깅 시스템 통합
+🔥 Brave 시스템이 통합된 전투 시스템 - 특성 효과 및 밸런스 시스템 통합
 """
 
 from typing import List, Optional, Tuple
@@ -15,6 +15,23 @@ from .combat_visual import get_combat_visualizer
 from .stable_display import get_stable_display
 from .input_utils import KeyboardInput
 from .display import GameDisplay
+from .trait_combat_integration import trait_integrator  # 특성 연동 모듈
+from .optimized_gauge_system import OptimizedGaugeSystem
+from .buffered_display import BufferedDisplay  # 버퍼링 디스플레이 시스템 추가
+from .ui_animations import show_animated_healing, show_status_change_animation
+from .ui_animations import get_gauge_animator  # 게이지 애니메이션 제어용
+
+# time 모듈을 time_module로 별칭 설정 (전역에서 일관되게 사용)
+time_module = time
+
+# 🔥 강화된 시스템들 import
+try:
+    from .trait_integration_system import get_trait_processor, apply_trait_effects_to_damage, apply_trait_effects_to_defense
+    from .relative_balance_system import get_balance_system, calculate_balanced_damage
+    from .unified_damage_system import get_damage_system, set_debug_mode
+    ENHANCED_SYSTEMS_AVAILABLE = True
+except ImportError:
+    ENHANCED_SYSTEMS_AVAILABLE = False
 
 # BGM 타입 import 시도
 try:
@@ -27,47 +44,336 @@ except ImportError:
 class BraveCombatSystem:
     """Brave 기반 전투 시스템"""
     
-    # ATB 시스템 상수 (100배 확장)
-    ATB_MAX = 10000  # 100 → 10000 (100배)
-    ATB_READY_THRESHOLD = 10000  # 100% → 10000
-    ATB_DISPLAY_SCALE = 100  # 표시용 스케일 (10000 → 100으로 변환)
+    # ATB 시스템 상수 (10배 확장)
+    ATB_MAX = 1000  # 100 → 1000 (10배)
+    ATB_READY_THRESHOLD = 1000  # 100% → 1000
+    ATB_DISPLAY_SCALE = 10  # 표시용 스케일 (1000 → 100으로 변환)
     
     def __init__(self, audio_system=None, sound_manager=None):
         self.brave_manager = BraveManager()
         self.visualizer = get_combat_visualizer()
         self.stable_display = get_stable_display()  # 안정적인 출력 시스템 추가
         self.display = GameDisplay()  # GameDisplay 객체 추가
+        self.buffered_display = BufferedDisplay()  # 버퍼링 디스플레이 시스템 초기화
         self.turn_order = []
         self.keyboard = KeyboardInput()  # 키보드 입력 처리
         self.current_turn = 0
+        
+        # 특성 통합 시스템 초기화
+        from .trait_combat_integration import TraitCombatIntegrator
+        self.trait_integrator = TraitCombatIntegrator()
+        
+        # 🔥 강화된 시스템들 초기화
+        if ENHANCED_SYSTEMS_AVAILABLE:
+            self.trait_processor = get_trait_processor()
+            self.balance_system = get_balance_system()
+            print("🔥 전투 시스템: 강화된 특성 및 밸런스 시스템 활성화!")
+        else:
+            self.trait_processor = None
+            self.balance_system = None
+            print("⚠️ 전투 시스템: 기본 모드로 실행 (강화 기능 비활성화)")
         
         # 오디오 시스템
         self.audio_system = audio_system
         self.sound_manager = sound_manager
         
-        # 전투 로깅 시스템 초기화
-        from combat_logger import CombatLogger
-        self.combat_logger = CombatLogger()
+        # 스킬 시스템 초기화 (skill_db 오류 수정)
+        self.skill_db = skill_system
         
-        # 🔊 오디오 시스템 진단
+        # 애니메이션 시스템 - 더 부드럽고 빠르게
+        self.animation_duration = 0.8  # 0.8초 애니메이션 (1.5→0.8초로 단축)
+        self.animation_fps = 120  # 120 FPS로 매우 부드럽게 (60→120 FPS)
+        
+        # 게이지 애니메이터 설정
+        from .ui_animations import get_gauge_animator
+        self.gauge_animator = get_gauge_animator()
+        self.gauge_animator.set_combat_mode(True)  # 전투 시작 시 전투 모드 활성화
+        
+        # 트레이닝 모드 설정
+        self.training_mode = False  # 트레이닝 모드 플래그
+        self.auto_battle_enabled = False  # 자동전투 비활성화
+        self.log_delay = 0.3  # 기본 로그 대기 시간 단축 (1.0→0.3초)
+        self.animation_active = False
+        
+        # 자동 전투 모드
+        self.auto_battle = False
+        self.auto_battle_delay = 1.0  # 자동 전투 시 1.0초 딜레이 (로그 확인 시간 확보)
+        
+        # 전투 로그 시스템
+        self._recent_combat_logs = []
+        self._max_log_entries = 10  # 최대 로그 저장 개수
+        self._turn_count = 0  # 턴 카운터
+        self._last_action_completed = False  # 액션 완료 플래그
+    
+    def add_combat_log(self, message: str):
+        """전투 로그 추가"""
+        self._recent_combat_logs.append(message)
+        if len(self._recent_combat_logs) > self._max_log_entries:
+            self._recent_combat_logs.pop(0)  # 오래된 로그 제거
+    
+    def _wait_for_user_input_or_timeout(self, seconds: float, message: str = None):
+        """사용자 입력 대기 또는 타임아웃 - 개선된 버전"""
+        import sys
+        import select
+        import time as time_module
+        
+        # 입력 버퍼 클리어
+        try:
+            self.keyboard.clear_input_buffer()
+        except:
+            pass
+        
+        if message:
+            print(f"\n{message}")
+        else:
+            print(f"\n⏳ {seconds}초 후 자동으로 계속되거나 Enter를 눌러 즉시 계속...")
+        
+        # Windows에서는 간단한 방법 사용
+        if sys.platform == 'win32':
+            import msvcrt
+            start_time = time_module.time()
+            while time_module.time() - start_time < seconds:
+                if msvcrt.kbhit():
+                    key = msvcrt.getch()
+                    if key in [b'\r', b'\n']:  # Enter 키
+                        # 남은 입력 제거
+                        while msvcrt.kbhit():
+                            msvcrt.getch()
+                        return
+                time_module.sleep(0.1)
+        else:
+            # Unix 계열에서는 select 사용
+            start_time = time_module.time()
+            while time_module.time() - start_time < seconds:
+                if select.select([sys.stdin], [], [], 0.1)[0]:
+                    input()  # Enter 입력 소비
+                    return
+                time_module.sleep(0.1)
+        
+    def _play_menu_sfx(self, sfx_name: str):
+        """메뉴 SFX 재생 함수"""
+        try:
+            if hasattr(self, 'audio_system') and self.audio_system:
+                self.audio_system.play_sfx(sfx_name)
+            elif hasattr(self, 'sound_manager') and self.sound_manager:
+                self.sound_manager.play_sfx(sfx_name)
+            else:
+                # audio_manager 가져오기 시도
+                try:
+                    from .audio_system import get_audio_manager
+                    audio_manager = get_audio_manager()
+                    if audio_manager:
+                        audio_manager.play_sfx(sfx_name)
+                except:
+                    pass  # SFX 재생 실패 시 무시
+        except Exception as e:
+            pass  # SFX 재생 실패 시 무시
+        
+    def add_action_pause(self, message="", pause_duration=2.0):
+        """액션 후 일시 정지 - 액션 결과를 읽을 시간 제공"""
+        if message:
+            print(f"\n{message}")
+        # 액션 결과를 읽을 수 있도록 2초 대기
+        import time
+        time.sleep(pause_duration)
+        
+    def animate_value_change(self, character: Character, stat_type: str, old_value: int, new_value: int, party: List[Character], enemies: List[Character]):
+        """수치 변화 애니메이션 (HP/MP/BRV) - 새로운 애니메이션 시스템 사용"""
+        if old_value == new_value:
+            return
+            
+        self.animation_active = True
+        
+        # 새로운 애니메이션 시스템 사용
+        if stat_type.lower() == 'hp':
+            # HP 값 설정 (자동 애니메이션 트리거)
+            character.current_hp = new_value
+            
+            # 데미지/회복에 따른 효과 표시 - unified_damage_system이 처리함
+            if new_value < old_value:
+                # 구버전 로그 제거 - unified_damage_system이 신버전 로그 출력
+                pass
+            elif new_value > old_value:
+                healing = new_value - old_value
+                show_animated_healing(character.name, healing)
+                
+        elif stat_type.lower() == 'mp':
+            # MP 값 설정 (자동 애니메이션 트리거)
+            character.current_mp = new_value
+            
+        elif stat_type.lower() == 'brv':
+            # BRV 값 설정 (자동 애니메이션 트리거)
+            character.brave_points = new_value
+        
+        # 애니메이션 완료 대기 (게이지 애니메이션이 끝날 때까지)
+        time_module.sleep(0.5)
+        self.animation_active = False
+        
+        # 게이지 애니메이션 완료 후 화면 업데이트
+        self.show_battle_status(character, party, enemies)
+
+    def create_precise_gauge(self, current: int, maximum: int, length: int = 20, empty_char: str = "▱", fill_char: str = "▰") -> str:
+        """정밀한 게이지 생성 (픽셀 단위 정확도)"""
+        if maximum <= 0:
+            return empty_char * length
+            
+        # 정확한 비율 계산
+        ratio = current / maximum
+        
+        # 채워진 블록 수 계산
+        filled_blocks = ratio * length
+        full_blocks = int(filled_blocks)
+        
+        # 부분적으로 채워진 블록 처리
+        partial_block = filled_blocks - full_blocks
+        
+        # 게이지 생성
+        gauge = ""
+        
+        # 완전히 채워진 블록들
+        gauge += fill_char * full_blocks
+        
+        # 부분적으로 채워진 블록 (7단계 그라데이션)
+        if full_blocks < length and partial_block > 0:
+            if partial_block >= 0.875:    # 87.5% 이상
+                gauge += "▉"
+            elif partial_block >= 0.75:   # 75% 이상
+                gauge += "▊"  
+            elif partial_block >= 0.625:  # 62.5% 이상
+                gauge += "▋"
+            elif partial_block >= 0.5:    # 50% 이상
+                gauge += "▌"
+            elif partial_block >= 0.375:  # 37.5% 이상
+                gauge += "▍"
+            elif partial_block >= 0.25:   # 25% 이상
+                gauge += "▎"
+            elif partial_block >= 0.125:  # 12.5% 이상
+                gauge += "▏"
+            else:
+                gauge += empty_char
+            
+            # 나머지는 빈 블록으로 채움
+            gauge += empty_char * (length - full_blocks - 1)
+        else:
+            # 나머지는 빈 블록으로 채움
+            gauge += empty_char * (length - full_blocks)
+            
+        return gauge
+
+    def create_beautiful_hp_gauge(self, current: int, maximum: int, length: int = 18) -> str:
+        """단순한 HP 게이지 생성 (그라데이션 제거)"""
+        if maximum <= 0:
+            return " " * length
+            
+        # 정확한 비율 계산
+        ratio = current / maximum
+        filled_blocks = int(ratio * length)
+        
+        # HP 비율에 따른 단일 색상 결정
+        if ratio >= 0.6:
+            color = Color.BRIGHT_GREEN
+        elif ratio >= 0.3:
+            color = Color.YELLOW
+        else:
+            color = Color.BRIGHT_RED
+        
+        # 게이지 생성 (단순한 형태)
+        gauge = f"{color}{'█' * filled_blocks}{Color.RESET}"
+        gauge += " " * (length - filled_blocks)
+        
+        return gauge
+        
+        return gauge
+
+    def create_beautiful_mp_gauge(self, current: int, maximum: int, length: int = 18) -> str:
+        """단순한 MP 게이지 생성 (그라데이션 제거)"""
+        if maximum <= 0:
+            return " " * length
+            
+        # 정확한 비율 계산
+        ratio = current / maximum
+        filled_blocks = int(ratio * length)
+        
+        # MP는 파란색으로 고정
+        color = Color.BRIGHT_CYAN
+        
+        # 게이지 생성 (단순한 형태)
+        gauge = f"{color}{'█' * filled_blocks}{Color.RESET}"
+        gauge += " " * (length - filled_blocks)
+        
+        return gauge
+
+
+    def create_beautiful_brv_gauge(self, current: int, maximum: int, length: int = 18) -> str:
+        """단순한 BRV 게이지 생성 (그라데이션 제거)"""
+        if maximum <= 0:
+            return " " * length
+            
+        # 정확한 비율 계산
+        ratio = current / maximum
+        filled_blocks = int(ratio * length)
+        
+        # BRV는 노란색으로 고정
+        color = Color.BRIGHT_YELLOW
+        
+        # 게이지 생성 (단순한 형태)
+        gauge = f"{color}{'█' * filled_blocks}{Color.RESET}"
+        gauge += " " * (length - filled_blocks)
+        
+        return gauge
+
+    def create_beautiful_atb_gauge(self, current: int, maximum: int, length: int = 18, is_casting: bool = False) -> str:
+        """단순한 ATB 게이지 생성 (그라데이션 제거)"""
+        if maximum <= 0:
+            return " " * length
+            
+        # 정확한 비율 계산
+        ratio = current / maximum
+        filled_blocks = int(ratio * length)
+        
+        if is_casting:
+            # 캐스팅 중일 때는 마젠타 색상
+            color = Color.BRIGHT_MAGENTA
+        else:
+            # ATB는 시안색으로 고정
+            color = Color.BRIGHT_CYAN
+        
+        # 게이지 생성 (단순한 형태)
+        gauge = f"{color}{'█' * filled_blocks}{Color.RESET}"
+        gauge += " " * (length - filled_blocks)
+        
+        return gauge
+        
+    def __init_audio_diagnostic(self):
+        """오디오 시스템 진단"""
         print(f"🎵 오디오 시스템 진단:")
         print(f"  - audio_system: {type(self.audio_system).__name__ if self.audio_system else 'None'}")
         print(f"  - sound_manager: {type(self.sound_manager).__name__ if self.sound_manager else 'None'}")
-        print(f"📊 전투 로깅 시스템 활성화됨: {self.combat_logger.session_id}")
         
-        # 스킬 시스템 추가
-        self.skill_db = skill_system
+        # 스킬 시스템 이미 __init__에서 초기화됨
     
+    def get_buffered_display(self) -> BufferedDisplay:
+        """버퍼링 디스플레이 시스템 반환"""
+        return self.buffered_display
     
     def get_brave_color_emoji(self, brave_points: int) -> str:
         """Brave 포인트에 따른 통일된 이모지 반환"""
         return "⚡"  # 모든 Brave 포인트에 동일 이모지 사용
         
     def start_battle(self, party: List[Character], enemies: List[Character]):
-        """전투 시작 - 로깅 시스템 통합"""
+        """전투 시작"""
+        # 전투 상태 활성화
+        from .character import set_combat_active
+        set_combat_active(True)
+        
         # 현재 파티와 적군 정보 저장 (스킬 승리 체크용)
         self._current_party = party
         self._current_enemies = enemies
+        
+        # 전투 초기화
+        self._turn_count = 0
+        self._last_action_completed = False
+        self._recent_combat_logs.clear()  # 로그 초기화
         
         # 입력 버퍼 클리어 (전투 시작 전)
         if hasattr(self, 'keyboard') and self.keyboard:
@@ -84,20 +390,49 @@ class BraveCombatSystem:
         except Exception as e:
             print(f"⚠️ 전투 진입 SFX 재생 실패: {e}")
         
-        # 🎵 전투 BGM 재생
+        # 🎵 전투 BGM 재생 (BGMType 사용)
         try:
-            if hasattr(self, 'audio_system') and self.audio_system:
-                self.audio_system.play_bgm("battle", loop=True)
-                print("🎵 전투 BGM 시작!")
-            elif hasattr(self, 'sound_manager') and self.sound_manager:
-                self.sound_manager.play_bgm("battle")
-                print("🎵 전투 BGM 시작!")
+            # 보스 체크
+            is_boss_battle = any(
+                ("보스" in enemy.name or "Boss" in enemy.name or "왕" in enemy.name or 
+                 "용" in enemy.name or "드래곤" in enemy.name or "마왕" in enemy.name or
+                 hasattr(enemy, 'is_boss') and enemy.is_boss or
+                 hasattr(enemy, 'enemy_type') and 'boss' in str(enemy.enemy_type).lower() or
+                 enemy.level >= 10 or enemy.max_hp > 2000)  # 보스 판정 조건들
+                for enemy in enemies
+            )
+            
+            print(f"🎵 BGM 시스템 체크...")
+            print(f"   보스 전투 여부: {is_boss_battle}")
+            
+            if BGMType and get_audio_manager:
+                audio_manager = get_audio_manager()
+                if audio_manager:
+                    if is_boss_battle:
+                        audio_manager.play_bgm(BGMType.BOSS)
+                        print("🎵 보스 전투 BGM 시작! (BGMType.BOSS)")
+                    else:
+                        audio_manager.play_bgm(BGMType.BATTLE)
+                        print("🎵 일반 전투 BGM 시작! (BGMType.BATTLE)")
+                else:
+                    print("⚠️ 오디오 매니저를 찾을 수 없습니다.")
+            else:
+                print("⚠️ BGM 시스템을 사용할 수 없습니다.")
         except Exception as e:
             print(f"⚠️ 전투 BGM 재생 실패: {e}")
+            import traceback
+            print(f"   상세 오류: {traceback.format_exc()}")
         
-        # 📊 전투 로깅 시작
+        # 전투 시작 시간 기록
         self.battle_start_time = time.time()  # 전투 시작 시간 기록
-        self.combat_logger.start_battle(party, enemies)
+        
+        # 💻 버퍼링 디스플레이 시스템 초기화
+        try:
+            self.buffered_display.clear_buffer()
+            self.buffered_display.hide_cursor()
+            print("💻 버퍼링 디스플레이 시스템을 초기화했습니다.")
+        except Exception as e:
+            print(f"⚠️ 버퍼링 디스플레이 초기화 실패: {e}")
         
         print("\n" + "="*80)
         print("🌟 Dawn Of Stellar - Brave Battle! 🌟")
@@ -159,15 +494,38 @@ class BraveCombatSystem:
             except Exception as e:
                 print(f"⚠️ 던전 BGM 복구 실패: {e}")
         
+        # 전투 종료 후 디스플레이 정리
+        try:
+            self.buffered_display.show_cursor()
+            self.buffered_display.clear_buffer()
+            print("\n💻 화면 버퍼를 정리했습니다.")
+        except Exception as e:
+            print(f"⚠️ 디스플레이 정리 실패: {e}")
+        
         return battle_result
         
     def battle_loop(self, party: List[Character], enemies: List[Character]) -> bool:
         """전투 루프 - 개선된 ATB 시스템"""
         turn_count = 0
         
+        # 유효한 캐릭터 객체만 필터링
+        valid_party = []
+        for c in party:
+            if hasattr(c, 'name') and hasattr(c, 'is_alive'):
+                valid_party.append(c)
+            else:
+                print(f"⚠️ 경고: 파티에 잘못된 객체 감지: {type(c).__name__}")
+        
+        valid_enemies = []
+        for c in enemies:
+            if hasattr(c, 'name') and hasattr(c, 'is_alive'):
+                valid_enemies.append(c)
+            else:
+                print(f"⚠️ 경고: 적군에 잘못된 객체 감지: {type(c).__name__}")
+        
         # 파티 정보를 클래스 변수로 저장
-        self._current_party = party
-        self._current_enemies = enemies
+        self._current_party = valid_party
+        self._current_enemies = valid_enemies
         
         while True:
             turn_count += 1
@@ -179,33 +537,42 @@ class BraveCombatSystem:
             while attempts < max_attempts:
                 # ATB 애니메이션과 함께 업데이트 (첫 번째 시도에서만 애니메이션 표시)
                 show_animation = (attempts == 0)
-                self.update_atb_gauges(party + enemies, show_animation)
+                self.update_atb_gauges(valid_party + valid_enemies, show_animation)
+                
+                # ATB 업데이트 후 화면 상태 갱신
+                # 첫 번째 업데이트에서만, 그리고 의미있는 변화가 있을 때만 갱신
+                if attempts == 0:
+                    # 안정화를 위한 짧은 대기 - 더 빠르게
+                    import time as time_module
+                    time_module.sleep(0.03)  # 30ms로 단축 (100ms→30ms)
+                    first_character = next((c for c in valid_party if c.is_alive), None)
+                    if first_character:
+                        self.show_battle_status(first_character, valid_party, valid_enemies)
                 
                 # ATB 업데이트 후 전투 종료 체크
-                if self.check_battle_end(party, enemies):
-                    result = self.determine_winner(party, enemies)
+                if self.check_battle_end(valid_party, valid_enemies):
+                    result = self.determine_winner(valid_party, valid_enemies)
                     print(f"\n{Color.BRIGHT_CYAN}전투가 종료되었습니다!{Color.RESET}")
+                    self._wait_for_user_input_or_timeout(5.0)
                     return result
                 
-                action_order = self.get_action_order(party + enemies)
+                action_order = self.get_action_order(valid_party + valid_enemies)
                 if action_order:
                     break
                 attempts += 1
-                time.sleep(0.1)  # ATB 업데이트 간 딜레이 감소 (더 부드럽게)
+                time_module.sleep(0.04)  # ATB 업데이트 간 딜레이 단축 (120ms→40ms)
             
             if not action_order:
                 # ATB 강제 증가로 교착 상태 해결
                 print("⚠️ ATB 교착 상태 - 모든 캐릭터의 ATB를 증가시킵니다.")
-                for combatant in party + enemies:
+                for combatant in valid_party + valid_enemies:
                     if combatant.is_alive and hasattr(combatant, 'atb_gauge'):
                         combatant.atb_gauge = min(self.ATB_MAX, combatant.atb_gauge + 1000)
                 # 다시 시도
-                action_order = self.get_action_order(party + enemies)
+                action_order = self.get_action_order(valid_party + valid_enemies)
                 if not action_order:
                     print("❌ ATB 시스템 복구 실패 - 전투를 강제 종료합니다.")
                     return "draw"
-            
-            print(f"\n--- 턴 {turn_count} ---")
             
             # 선택된 캐릭터의 턴 처리
             character = action_order[0]
@@ -217,70 +584,204 @@ class BraveCombatSystem:
             if hasattr(character, 'status_manager'):
                 character.status_manager.process_turn_effects(character)
                 
-            if character in party:
-                result = self.player_turn(character, party, enemies)
+            if character in valid_party:
+                # AI 모드 확인
+                try:
+                    from game.ai_game_mode import ai_game_mode_manager
+                    if (hasattr(ai_game_mode_manager, 'is_ai_controlled') and 
+                        ai_game_mode_manager.is_ai_controlled(character)):
+                        # AI 턴 처리
+                        result = self.ai_turn(character, party, enemies)
+                    else:
+                        # 플레이어 턴 처리
+                        result = self.player_turn(character, valid_party, valid_enemies)
+                except ImportError:
+                    # AI 모드가 없으면 플레이어 턴으로 처리
+                    result = self.player_turn(character, valid_party, valid_enemies)
+                    
                 if result is not None:  # 전투 종료 신호
                     print(f"\n{Color.BRIGHT_CYAN}전투가 종료되었습니다!{Color.RESET}")
+                    self._wait_for_user_input_or_timeout(5.0)
                     return result
             else:
-                result = self.enemy_turn(character, party, enemies)
+                result = self.enemy_turn(character, valid_party, valid_enemies)
                 if result is not None:  # 전투 종료 신호
                     print(f"\n{Color.BRIGHT_CYAN}전투가 종료되었습니다!{Color.RESET}")
+                    self._wait_for_user_input_or_timeout(5.0)
                     return result
             
             # 턴 완료 후 ATB 초기화 (중복 초기화 방지)
             if hasattr(character, 'atb_gauge'):
                 character.atb_gauge = 0
-                print(f"🔄 {character.name}의 턴 완료 - ATB 초기화")
                 
             # 상태이상 턴 종료 처리
             if hasattr(character, 'status_manager'):
                 character.status_manager.process_turn_effects(character)
                 
             # 전투 종료 조건 확인
-            if self.check_battle_end(party, enemies):
-                result = self.determine_winner(party, enemies)
+            if self.check_battle_end(valid_party, valid_enemies):
+                result = self.determine_winner(valid_party, valid_enemies)
                 print(f"\n{Color.BRIGHT_CYAN}전투가 종료되었습니다!{Color.RESET}")
                 
                 # 🎵 승리 팡파레 재생 (1회만)
                 try:
                     if result:  # 승리 시
+                        victory_played = False
+                        
+                        # 1순위: audio_system 사용
                         if hasattr(self, 'audio_system') and self.audio_system:
-                            # SFX로 팡파레 1회 재생
-                            self.audio_system.play_sfx("victory")
-                            print("🎵 승리 팡파레 재생!")
-                        elif hasattr(self, 'sound_manager') and self.sound_manager:
-                            # 폴백: SFX 재생 시도
-                            self.sound_manager.play_sfx("victory")
-                            print("🎵 승리 팡파레 재생!")
+                            try:
+                                self.audio_system.play_sfx("victory")
+                                print("🎵 승리 팡파레 재생! (audio_system)")
+                                victory_played = True
+                            except Exception as e:
+                                print(f"⚠️ audio_system 팡파레 실패: {e}")
+                        
+                        # 2순위: sound_manager 사용
+                        if not victory_played and hasattr(self, 'sound_manager') and self.sound_manager:
+                            try:
+                                self.sound_manager.play_sfx("victory")
+                                print("🎵 승리 팡파레 재생! (sound_manager)")
+                                victory_played = True
+                            except Exception as e:
+                                print(f"⚠️ sound_manager 팡파레 실패: {e}")
+                        
+                        # 3순위: 직접 오디오 시스템 접근
+                        if not victory_played:
+                            try:
+                                from .ffvii_sound_system import get_ffvii_sound_system
+                                audio_mgr = get_ffvii_sound_system()
+                                if audio_mgr:
+                                    audio_mgr.play_sfx("victory")
+                                    print("🎵 승리 팡파레 재생! (direct)")
+                                    victory_played = True
+                            except Exception as e:
+                                print(f"⚠️ 직접 오디오 접근 실패: {e}")
+                        
+                        if not victory_played:
+                            print("⚠️ 승리 팡파레를 재생할 수 없습니다.")
+                            
                 except Exception as e:
                     print(f"⚠️ 승리 팡파레 재생 실패: {e}")
                 
                 return result
             
-            # 전투가 계속될 때만 턴 종료 일시정지
-            print(f"\n{Color.BRIGHT_BLACK}=== 턴 종료 - 로그를 확인하세요 ==={Color.RESET}")
-            input(f"{Color.YELLOW}계속하려면 Enter를 누르세요...{Color.RESET}")
+            # 짧은 대기 후 다음 턴으로 - 더 빠르게
+            time_module.sleep(0.03)  # 30ms로 단축 (100ms→30ms)
+    
+    def ai_turn(self, character: Character, party: List[Character], enemies: List[Character]):
+        """AI 턴 처리"""
+        try:
+            from game.ai_game_mode import ai_game_mode_manager
             
-            time.sleep(0.1)  # 짧은 간격
+            # AI 동료 찾기
+            ai_companion = None
+            for companion in ai_game_mode_manager.ai_companions:
+                if companion.character == character:
+                    ai_companion = companion
+                    break
+            
+            if not ai_companion:
+                # AI 동료가 없으면 기본 플레이어 턴으로 처리
+                return self.player_turn(character, party, enemies)
+            
+            # AI 행동 결정
+            action_type, action_data = ai_companion.decide_action(party, enemies)
+            
+            # AI 행동 실행
+            print(f"\n💭 {character.name}이(가) 행동을 결정하고 있습니다...")
+            time_module.sleep(0.5)
+            
+            if action_type == "attack":
+                target = action_data.get("target")
+                if target and target.is_alive:
+                    print(f"⚔️ {character.name}이(가) {target.name}을(를) 공격합니다!")
+                    return self._execute_attack(character, target, party, enemies)
+            
+            elif action_type == "skill":
+                skill = action_data.get("skill")
+                target = action_data.get("target")
+                if skill and target:
+                    print(f"✨ {character.name}이(가) {skill.name}을(를) 사용합니다!")
+                    return self._execute_skill(character, skill, target, party, enemies)
+            
+            elif action_type == "defend":
+                print(f"🛡️ {character.name}이(가) 방어 자세를 취합니다!")
+                character.is_defending = True
+                return None
+            
+            elif action_type == "heal":
+                target = action_data.get("target") or character
+                print(f"💚 {character.name}이(가) {target.name}을(를) 치료합니다!")
+                # 간단한 자가 치료
+                heal_amount = character.max_hp * 0.2
+                target.current_hp = min(target.max_hp, target.current_hp + heal_amount)
+                print(f"   {target.name}이(가) {heal_amount:.0f} HP 회복했습니다!")
+                return None
+            
+            elif action_type == "use_item":
+                item_type = action_data.get("item_type", "healing")
+                print(f"🧪 {character.name}이(가) {item_type} 아이템을 사용합니다!")
+                # 간단한 아이템 효과
+                if item_type == "healing":
+                    heal_amount = character.max_hp * 0.3
+                    character.current_hp = min(character.max_hp, character.current_hp + heal_amount)
+                    print(f"   {character.name}이(가) {heal_amount:.0f} HP 회복했습니다!")
+                return None
+            
+            elif action_type == "request":
+                request_type = action_data.get("type")
+                message = ai_companion.make_request_to_player(request_type)
+                print(f"\n💬 {message}")
+                print("   (AI 요청은 전투 후 처리됩니다)")
+                # 기본 공격으로 대체
+                alive_enemies = [e for e in enemies if e.is_alive]
+                if alive_enemies:
+                    target = alive_enemies[0]
+                    print(f"⚔️ {character.name}이(가) {target.name}을(를) 공격합니다!")
+                    return self._execute_attack(character, target, party, enemies)
+            
+            return None
+            
+        except Exception as e:
+            print(f"⚠️ AI 턴 처리 오류: {e}")
+            # 오류 발생시 기본 플레이어 턴으로 대체
+            return self.player_turn(character, party, enemies)
                 
     def player_turn(self, character: Character, party: List[Character], enemies: List[Character]):
-        """플레이어 턴"""
+        """플레이어 턴 - AI 게임모드 지원"""        
         # 전투 종료 체크 - 턴 시작 시 다시 확인
         if self.check_battle_end(party, enemies):
             return self.determine_winner(party, enemies)
             
+        # 🎯 캐스팅 완료 체크 - 캐스팅 중인 캐릭터는 자동으로 스킬 실행
+        if hasattr(character, 'is_casting') and character.is_casting:
+            print(f"✨ {character.name}의 캐스팅이 완료되어 자동으로 스킬을 시전합니다!")
+            self.complete_casting(character)
+            # 캐스팅 완료 후 효과 확인 시간 제공
+            import time
+            time.sleep(2.0)
+            # 캐스팅 완료 후 턴 종료
+            return None
+            
+        # 턴 시작 시 특성 효과 적용
+        self.trait_integrator.apply_turn_start_trait_effects(character)
+            
         # 턴 시작 시 INT BRV 회복 처리
         if hasattr(character, 'recover_int_brv_on_turn_start'):
+            old_brv = character.brave_points
             recovered = character.recover_int_brv_on_turn_start()
             if recovered > 0:
                 print(f"🔄 {character.name}의 BRV가 INT BRV {recovered}로 회복되었습니다!")
+                
+                # BRV 회복 (자동 애니메이션 트리거)
+                # character.brave_points는 이미 recover_int_brv_on_turn_start()에서 설정됨
+                
                 # BREAK 상태 해제 체크
                 if getattr(character, 'is_broken', False) and character.brave_points > 0:
                     character.is_broken = False
                     print(f"✨ {character.name}의 BREAK 상태가 해제되었습니다!")
             
-        combat_animator.show_turn_indicator(character.name)
         self.show_battle_status(character, party, enemies)
         
         # 캐릭터 특성 쿨다운과 지속효과 업데이트
@@ -292,16 +793,29 @@ class BraveCombatSystem:
                     for effect in effects:
                         print(f"✨ {effect}")
         
-        # 현재 차례 안내 - 간소화
-        print(f"\n{Color.BRIGHT_CYAN}👉 {character.name}의 차례 - 행동을 선택하세요{Color.RESET}")
+        # 자동 전투 모드 체크
+        if self.auto_battle:
+            return self._auto_battle_action(character, party, enemies)
+        
+        # AI 게임모드 체크 - 전체 시스템 연동
+        try:
+            import sys
+            if hasattr(sys.modules.get('__main__'), 'ai_game_mode_enabled'):
+                ai_mode_enabled = getattr(sys.modules['__main__'], 'ai_game_mode_enabled', False)
+                if ai_mode_enabled:
+                    from .ai_game_mode import process_character_turn
+                    action_type, action_data = process_character_turn(character, party, enemies)
+                    return self._execute_ai_action(character, action_type, action_data, party, enemies)
+        except Exception as e:
+            # AI 모드 처리 실패시 기본 플레이어 모드로 진행
+            pass
         
         while True:
-            try:
-                from .cursor_menu_system import create_simple_menu
-                
-                # 직업별 Brave 공격 설명 생성
-                character_class = getattr(character, 'character_class', '전사')
-                class_brave_descriptions = {
+            from .cursor_menu_system import create_simple_menu
+            
+            # 직업별 Brave 공격 설명 생성
+            character_class = getattr(character, 'character_class', '전사')
+            class_brave_descriptions = {
                     "전사": "⚡ 방패 강타: 20% 확률로 적 기절",
                     "아크메이지": "⚡ 마력 파동: 적의 마법방어력 10% 감소",
                     "궁수": "⚡ 삼연사: 빠른 3연속 공격",
@@ -319,154 +833,605 @@ class BraveCombatSystem:
                     "무당": "⚡ 영혼 타격: 방어력 무시 피해",
                     "해적": "⚡ 이도류 난타: 30% 확률로 2회 공격",
                     "사무라이": "⚡ 거합 베기: HP 낮을수록 강화",
-                    "드루이드": "⚡ 자연의 분노: 공격 후 HP 회복",
+                    "드루이드": "⚡ 야생의 격노: 공격 후 HP 회복",
                     "철학자": "⚡ 논리적 반박: 다음 턴 회피율 증가",
                     "시간술사": "⚡ 시간 조작: 적의 행동 지연",
                     "연금술사": "⚡ 화학 폭발: 주변 적에게 연쇄 피해",
                     "검투사": "⚡ 투기장 기술: 반격 확률 증가",
-                    "기사": "⚡ 창 돌격: 관통 피해",
-                    "신관": "⚡ 축복의 빛: 아군에게 축복 버프",
+                    "기사": "⚡ 신성한 돌격: 관통 피해",
+                    "신관": "⚡ 인과응보: 아군에게 축복 버프",
                     "마검사": "⚡ 마법검기: 물리+마법 피해",
                     "차원술사": "⚡ 차원 균열: 적의 정확도 감소",
                     "광전사": "⚡ 광폭화 난타: HP 낮을수록 강화"
                 }
                 
-                # 직업별 HP 공격 설명 생성
-                class_hp_descriptions = {
-                    "전사": "💀 파괴의 일격: 방어구 내구도 대폭 감소",
-                    "아크메이지": "💀 마력 폭발: 주변 적들에게도 피해",
-                    "궁수": "💀 관통사격: 뒤의 적들에게 관통 피해",
-                    "도적": "💀 암살: 저체력 적 즉사 가능 (보스 제외)",
-                    "성기사": "💀 심판의 빛: 아군 전체 상태이상 해제",
-                    "암흑기사": "💀 흡혈 강타: 피해의 60% HP 대량 회복",
-                    "몽크": "💀 폭렬권: 표식 폭발로 추가 피해",
-                    "바드": "💀 영혼의 노래: 아군 전체 회복+버프",
-                    "네크로맨서": "💀 영혼 흡수: MP 탈취 및 회복",
-                    "용기사": "💀 드래곤 브레스: 광역 화염 피해",
-                    "검성": "💀 일섬: 방어력 무시 고정 피해",
-                    "정령술사": "💀 원소 융합: 모든 원소 효과 적용",
-                    "암살자": "💀 그림자 처형: 3연속 공격",
-                    "기계공학자": "💀 메가 레이저: 장비 완전 파괴",
-                    "무당": "💀 영혼 분리: 방어력 완전 무시",
-                    "해적": "💀 해적의 보물: 4가지 무기 연속 공격",
-                    "사무라이": "💀 무사도 비의: 필사의 일격",
-                    "드루이드": "💀 자연의 심판: 아군 회복+자연 축복",
-                    "철학자": "💀 진리의 깨달음: 약점 공격+버프 해제",
-                    "시간술사": "💀 시간 정지: 4연속 공격",
-                    "연금술사": "💀 대폭발 반응: 광역 폭발 피해",
-                    "검투사": "💀 검투장의 피날레: 4연속 콤보",
-                    "기사": "💀 성스러운 돌격: 성스러운 관통 공격",
-                    "신관": "💀 신의 심판: 아군 전체 대량 회복",
-                    "마검사": "💀 마검 오의: 물리+마법 융합 공격",
-                    "차원술사": "💀 차원 붕괴: 공간 자체로 공격",
-                    "광전사": "💀 최후의 광기: 광폭화로 최강 일격"
-                }
+            # 직업별 HP 공격 설명 생성
+            class_hp_descriptions = {
+                "전사": "💀 파괴의 일격: 방어구 내구도 대폭 감소",
+                "아크메이지": "💀 마력 폭발: 주변 적들에게도 피해",
+                "궁수": "💀 관통사격: 뒤의 적들에게 관통 피해",
+                "도적": "💀 암살: 저체력 적 즉사 가능 (보스 제외)",
+                "성기사": "💀 심판의 빛: 아군 전체 상태이상 해제",
+                "암흑기사": "💀 흡혈 강타: 피해의 60% HP 대량 회복",
+                "몽크": "💀 폭렬권: 표식 폭발로 추가 피해",
+                "바드": "💀 영혼의 노래: 아군 전체 회복+버프",
+                "네크로맨서": "💀 영혼 흡수: MP 탈취 및 회복",
+                "용기사": "💀 드래곤 브레스: 광역 화염 피해",
+                "검성": "💀 일섬: 방어력 무시 고정 피해",
+                "정령술사": "💀 원소 융합: 모든 원소 효과 적용",
+                "암살자": "💀 그림자 처형: 3연속 공격",
+                "기계공학자": "💀 메가 레이저: 장비 완전 파괴",
+                "무당": "💀 영혼 분리: 방어력 완전 무시",
+                "해적": "💀 해적의 보물: 4가지 무기 연속 공격",
+                "사무라이": "💀 무사도 비의: 필사의 일격",
+                "드루이드": "💀 자연의 응징: 아군 회복+자연 축복",
+                "철학자": "💀 진리의 깨달음: 약점 공격+버프 해제",
+                "시간술사": "💀 시간 정지: 4연속 공격",
+                "연금술사": "💀 대폭발 반응: 광역 폭발 피해",
+                "검투사": "💀 검투장의 피날레: 4연속 콤보",
+                "기사": "💀 신성한 돌격: 성스러운 관통 공격",
+                "신관": "💀 인과응보: 아군 전체 대량 회복",
+                "마검사": "💀 마검 오의: 물리+마법 융합 공격",
+                "차원술사": "💀 차원 붕괴: 공간 자체로 공격",
+                "광전사": "💀 최후의 광기: 광폭화로 최강 일격"
+            }
+            
+            brave_desc = class_brave_descriptions.get(character_class, "⚡ 기본 공격: Brave 포인트 획득")
+            hp_desc = class_hp_descriptions.get(character_class, "💀 기본 HP 공격: 적에게 HP 피해")
+            
+            # 자동 전투 모드 상태 표시
+            auto_battle_status = "🟢 ON" if self.auto_battle else "🔴 OFF"
+            
+            action_options = ["⚔️ Brave 공격", "💀 HP 공격", "✨ 스킬 사용", "🧪 아이템 사용", "🛡️ 방어", "🌟 특성 활성화", f"⚡ 자동전투 ({auto_battle_status})", "📊 실시간 상태", "❓ 전투 도움말"]
+            action_descriptions = [
+                f"Brave를 높여 강력한 공격을 준비합니다\n{brave_desc}",
+                f"축적된 Brave로 적에게 데미지를 줍니다 (최소 300 BRV 필요)\n{hp_desc}",
+                "캐릭터의 특수 스킬을 사용합니다 (MP 소모)",
+                "회복 아이템이나 버프 아이템을 사용합니다",
+                "방어 태세로 받는 피해를 줄입니다",
+                "액티브 특성을 활성화합니다",
+                f"자동 전투 모드를 {'끄기' if self.auto_battle else '켜기'} (현재: {auto_battle_status})",
+                "현재 전투 상황을 자세히 확인합니다",
+                "전투 시스템에 대한 도움말을 봅니다"
+            ]
+            
+            # 전투 메뉴 전용 표시 시스템 (중복 방지)
+            current_selection = 0
+            while True:
+                # 전체 화면을 한 번만 표시
+                self.buffered_display.clear_buffer()
                 
-                brave_desc = class_brave_descriptions.get(character_class, "⚡ 기본 공격: Brave 포인트 획득")
-                hp_desc = class_hp_descriptions.get(character_class, "💀 기본 HP 공격: 적에게 HP 피해")
+                # 상태창 표시 (빈 줄 최소화)
+                gauge_system = OptimizedGaugeSystem()
+                party_status = gauge_system.show_optimized_party_status(party, character)
+                enemy_status = gauge_system.show_optimized_enemy_status(enemies)
+                print(party_status)
+                print(enemy_status)
                 
-                action_options = ["⚔️ Brave 공격", "💀 HP 공격", "✨ 스킬 사용", "🧪 아이템 사용", "🛡️ 방어", "🌟 특성 활성화", "📊 실시간 상태", "❓ 전투 도움말"]
-                action_descriptions = [
-                    f"Brave를 높여 강력한 공격을 준비합니다\n{brave_desc}",
-                    f"축적된 Brave로 적에게 데미지를 줍니다 (최소 300 BRV 필요)\n{hp_desc}",
-                    "캐릭터의 특수 스킬을 사용합니다 (MP 소모)",
-                    "회복 아이템이나 버프 아이템을 사용합니다",
-                    "방어 태세로 받는 피해를 줄입니다",
-                    "액티브 특성을 활성화합니다",
-                    "현재 전투 상황을 자세히 확인합니다",
-                    "전투 시스템에 대한 도움말을 봅니다"
-                ]
+                # 적 상태와 전투 로그 사이에 줄바꿈 추가
+                print()  # 구분선 추가
                 
-                # 파티 상태를 문자열로 생성
-                party_status = self._get_party_status_string(character, party, enemies)
+                # 최근 전투 로그 표시 (더 많은 로그와 더 오래 유지)
+                if hasattr(self, '_recent_combat_logs') and self._recent_combat_logs:
+                    print("📋 최근 전투 로그:")
+                    for log in self._recent_combat_logs[-5:]:  # 최근 5개 로그
+                        print(f"  {log}")
+                    print()
                 
-                # 상태창과 메뉴를 통합하여 표시
-                action_menu = create_simple_menu(
-                    f"⚔️ {character.name}의 차례", 
-                    action_options, 
-                    action_descriptions, 
-                    clear_screen=True,
-                    extra_content=party_status
-                )
-                choice = action_menu.run()
+                # 로그 확인 대기 시간 제거 - 게임 템포 개선
+                if hasattr(self, '_last_action_completed') and self._last_action_completed:
+                    self._last_action_completed = False
                 
-                if choice == 0:  # Brave 공격
-                    if self.brave_attack_menu(character, enemies):
-                        break
-                elif choice == 1:  # HP 공격
-                    if self.hp_attack_menu(character, enemies):
-                        break
-                elif choice == 2:  # 스킬 사용
-                    if self.skill_menu(character, party, enemies):
-                        break
-                elif choice == 3:  # 아이템 사용
-                    if self.item_menu(character, party):
-                        break
-                elif choice == 4:  # 방어
-                    self.defend_action(character)
-                    break
-                elif choice == 5:  # 특성 활성화
-                    if self.trait_activation_menu(character):
-                        break
-                elif choice == 6:  # 실시간 상태
-                    self.show_detailed_combat_status(character, party, enemies)
-                    # ATB 실시간 업데이트 표시
-                    self._show_realtime_atb_status(party, enemies)
-                    # 상태 조회 후 다시 전투 화면 표시
-                    self.show_battle_status(character, party, enemies)
-                    input("\n계속하려면 Enter를 누르세요...")
-                elif choice == 7:  # 전투 도움말
-                    from .tutorial import show_combat_help
-                    show_combat_help()
-                elif choice is None:  # 취소
-                    continue
-                else:
-                    print("잘못된 선택입니다.")
+                # 메뉴 옵션 표시
+                print("────────────────────────────────────────────────────────────")
+                for i, (option, desc) in enumerate(zip(action_options, action_descriptions)):
+                    if i == current_selection:
+                        print(f"👉 [{i+1}] {option} 👈")
+                    else:
+                        print(f"   [{i+1}] {option}")
+                
+                print(f"\n💡 {action_descriptions[current_selection]}")
+                print(f"\n{'─' * 50}")
+                print("W/S: 위/아래 | Enter: 선택 | Q: 취소 | I: 정보")
+                
+                # 입력 버퍼 클리어 (먹통 방지)
+                self.keyboard.clear_input_buffer()
+                
+                # 🎯 메뉴 진입 시 진행 중인 애니메이션만 즉시 완료
+                gauge_animator = get_gauge_animator()
+                gauge_animator.skip_current_animations()  # 진행 중인 애니메이션만 즉시 완료
+                
+                # 키 입력 처리 (안전한 버전)
+                key = None
+                try:
+                    # 키보드 버퍼 클리어 (한 번만)
+                    if hasattr(self.keyboard, 'clear_input_buffer'):
+                        self.keyboard.clear_input_buffer()
                     
-            except ImportError:
-                # 폴백: 기존 방식
-                print("\n행동을 선택하세요:")
-                print("1. Brave 공격")
-                print("2. HP 공격") 
-                print("3. 스킬 사용")
-                print("4. 아이템 사용")
-                print("5. 방어")
-                print("6. 전투 도움말")
+                    # 키 입력 받기
+                    key = self.keyboard.get_key()
+                    if key:
+                        key = key.lower()
+                except Exception as e:
+                    print(f"키 입력 오류: {e}")
+                    # 폴백: 직접 input 사용
+                    try:
+                        key = input("선택하세요: ").strip().lower()
+                    except:
+                        continue
+                    import msvcrt
+                    if hasattr(msvcrt, 'getch'):
+                        try:
+                            key = msvcrt.getch().decode('utf-8', errors='ignore').lower()
+                        except:
+                            key = input().lower()
+                    else:
+                        key = input().lower()
                 
-                choice = self.keyboard.get_key().lower()
-                
-                if choice == "1":
-                    if self.brave_attack_menu(character, enemies):
-                        break
-                elif choice == "2":
-                    if self.hp_attack_menu(character, enemies):
-                        break
-                elif choice == "3":
-                    if self.skill_menu(character, party, enemies):
-                        break
-                elif choice == "4":
-                    if self.item_menu(character, party):
-                        break
-                elif choice == "5":
-                    self.defend_action(character)
+                if key == 'w' and current_selection > 0:
+                    current_selection -= 1
+                    # 커서 이동 SFX 재생
+                    self._play_menu_sfx("menu_select")
+                elif key == 's' and current_selection < len(action_options) - 1:
+                    current_selection += 1
+                    # 커서 이동 SFX 재생
+                    self._play_menu_sfx("menu_select")
+                elif key in ['enter', '\r', '\n', ' ']:
+                    choice = current_selection
+                    # 선택 SFX 재생
+                    self._play_menu_sfx("menu_confirm")
+                    # 🎯 메뉴 종료 시 애니메이션 시스템 리셋
+                    gauge_animator.resume_animations()
                     break
-                elif choice == "6":
-                    from .tutorial import show_combat_help
-                    show_combat_help()
-                else:
-                    print("잘못된 선택입니다.")
+                elif key == 'q':
+                    # 취소 SFX 재생
+                    self._play_menu_sfx("menu_cancel")
+                    # 🎯 메뉴 취소 시도 애니메이션 재개
+                    gauge_animator.resume_animations()
+                    return None
+                elif key == 'i':
+                    print("ℹ️ 전투 도움말...")
+                    # 🎯 도움말 표시 중에도 애니메이션 일시정지 유지
+                    input("계속하려면 Enter를 누르세요...")
+                    # 🎯 도움말 종료 후 다시 일시정지
+                    gauge_animator.pause_animations()
+            
+            
+            if choice == 0:  # Brave 공격
+                if self.brave_attack_menu(character, enemies):
+                    self._last_action_completed = True  # 액션 완료 플래그
+                    break
+            elif choice == 1:  # HP 공격
+                if self.hp_attack_menu(character, enemies):
+                    self._last_action_completed = True  # 액션 완료 플래그
+                    break
+            elif choice == 2:  # 스킬 사용
+                if self.skill_menu(character, party, enemies):
+                    self._last_action_completed = True  # 액션 완료 플래그
+                    break
+            elif choice == 3:  # 아이템 사용
+                if self.item_menu(character, party):
+                    self._last_action_completed = True  # 액션 완료 플래그
+                    break
+            elif choice == 4:  # 방어
+                self.defend_action(character)
+                self._last_action_completed = True  # 액션 완료 플래그
+                break
+            elif choice == 5:  # 특성 활성화
+                if self.trait_activation_menu(character):
+                    # 개별 액션 대기 제거
+                    break
+            elif choice == 6:  # 자동 전투 토글
+                self.auto_battle = not self.auto_battle
+                status = "켜졌습니다" if self.auto_battle else "꺼졌습니다"
+                print(f"\n⚡ 자동 전투 모드가 {status}!")
+                if self.auto_battle:
+                    print("🔸 이제 모든 플레이어 캐릭터가 자동으로 행동합니다")
+                    print("🔸 자동 전투 중에도 메뉴에서 다시 끌 수 있습니다")
+                    time_module.sleep(0.5)  # 자동 전투 안내 시간 단축 (1.5→0.5초)
+                    return self._auto_battle_action(character, party, enemies)
+                time_module.sleep(0.3)  # 기본 대기 시간 단축 (1.0→0.3초)
+            elif choice == 7:  # 실시간 상태
+                self.show_detailed_combat_status(character, party, enemies)
+                # ATB 실시간 업데이트 표시
+                self._show_realtime_atb_status(party, enemies)
+                # 상태 조회 후 다시 전투 화면 표시
+                self.show_battle_status(character, party, enemies)
+                # 🎯 상태 조회 중 애니메이션 일시정지
+                gauge_animator = get_gauge_animator()
+                gauge_animator.pause_animations()
+                input("\n계속하려면 Enter를 누르세요...")
+                gauge_animator.resume_animations()
+                # 상태 조회는 버퍼를 완전히 클리어
+                self.buffered_display.clear_buffer()
+            elif choice == 8:  # 전투 도움말
+                from .tutorial import show_combat_help
+                show_combat_help()
+                # 도움말도 버퍼를 완전히 클리어
+                self.buffered_display.clear_buffer()
+            elif choice is None:  # 취소
+                continue
+            else:
+                print("잘못된 선택입니다.")
                 
         # 턴 종료 후 전투 상태 체크
         if self.check_battle_end(party, enemies):
             return self.determine_winner(party, enemies)
         
-        return None  # 전투 계속
+        # 턴 카운터 증가
+        self._turn_count += 1
+        
+        # 턴 종료 로그 표시
+        print("\n" + "="*70)
+        print(f"📋 전투 로그 (턴 {self._turn_count})")
+        print("="*70)
+        # 여기에 최근 전투 로그들이 표시됩니다
+        if hasattr(self, '_recent_combat_logs') and self._recent_combat_logs:
+            for log in self._recent_combat_logs[-7:]:  # 최근 7개 로그 표시 (더 많이)
+                print(f"• {log}")
+        else:
+            print("• 턴이 완료되었습니다.")
+        print("="*70)
+        
+        # 전투 로그 확인 시간 제공
+        import time
+        print("\n⏰ 전투 로그 확인 중... (2초)")
+        time.sleep(2.0)
+    
+    def _auto_battle_action(self, character: Character, party: List[Character], enemies: List[Character]):
+        """자동 전투 행동 로직"""
+        import time
+        
+        print(f"\n🤖 {character.name} 자동 행동 중...")
+        time_module.sleep(self.auto_battle_delay)
+        
+        # 생존한 적들
+        alive_enemies = [e for e in enemies if e.is_alive]
+        if not alive_enemies:
+            return None
+        
+        # 전략적 상황 분석
+        party_hp_avg = sum(ally.current_hp / ally.max_hp for ally in party if ally.is_alive) / len([ally for ally in party if ally.is_alive])
+        character_hp_ratio = character.current_hp / character.max_hp if character.max_hp > 0 else 0
+        character_class = getattr(character, 'character_class', '전사')
+        
+        # 전투 역할별 우선순위 결정
+        action_priority = self._analyze_tactical_situation(character, party, enemies)
+        
+        for action_type in action_priority:
+            if action_type == "emergency_heal" and character_hp_ratio < 0.2:
+                print(f"💚 응급 치료: HP가 {character_hp_ratio*100:.1f}%로 위험")
+                if self._try_auto_healing(character, party):
+                    # 게이지 변화 확인 시간 제공
+                    import time
+                    time.sleep(2.0)
+                    return None
+                    
+            elif action_type == "support_heal" and character_class in ["신관", "바드"] and party_hp_avg < 0.6:
+                print(f"💚 지원 치료: 파티 평균 HP {party_hp_avg*100:.1f}%")
+                if self._try_auto_support_skills(character, party, enemies):
+                    # 게이지 변화 확인 시간 제공
+                    import time
+                    time.sleep(2.0)
+                    return None
+                    
+            elif action_type == "ultimate_attack" and character.current_mp >= 20:
+                target = self._select_smart_target(alive_enemies, "ultimate")
+                print(f"💫 궁극기 사용: {target.name if target else '대상 없음'}")
+                if self._try_auto_ultimate_skill(character, party, enemies):
+                    # 게이지 변화 확인 시간 제공
+                    import time
+                    time.sleep(2.0)
+                    return None
+                
+                if self._try_auto_ultimate_skill(character, party, enemies):
+                    # 게이지 변화 확인 시간 제공
+                    import time
+                    time.sleep(2.0)
+                    return None
+                    
+            elif action_type == "tactical_skill" and character.current_mp >= 12:
+                print(f"⚡ 전술 스킬 사용: MP {character.current_mp} 활용")
+                if self._try_auto_tactical_skill(character, party, enemies):
+                    # 게이지 변화 확인 시간 제공
+                    import time
+                    time.sleep(2.0)
+                    return None
+                    
+            elif action_type == "hp_attack" and character.brave_points >= 400:
+                target = self._select_smart_target(alive_enemies, "hp_attack")
+                if target:
+                    print(f"💀 HP 공격: {target.name} (BRV: {character.brave_points})")
+                    self.execute_hp_attack(character, target)
+                    # 게이지 변화 확인 시간 제공
+                    import time
+                    time.sleep(2.0)
+                    return None
+                    
+            elif action_type == "brv_attack":
+                target = self._select_smart_target(alive_enemies, "brv_attack")
+                if target:
+                    print(f"⚔️ BRV 공격: {target.name}")
+                    self.execute_brave_attack(character, target)
+                    # 게이지 변화 확인 시간 제공
+                    import time
+                    time.sleep(2.0)
+                    return None
+        
+        # 기본 행동 (모든 우선순위가 실패한 경우)
+        target = self._select_smart_target(alive_enemies, "brv_attack")
+        if target:
+            print(f"⚔️ 기본 Brave 공격: {target.name}")
+            self.execute_brave_attack(character, target)
+        
+        # 게이지 변화 확인 시간 제공
+        import time
+        time.sleep(2.0)
+        return None
+    
+    def _analyze_tactical_situation(self, character: Character, party: List[Character], enemies: List[Character]) -> list:
+        """전술적 상황 분석하여 행동 우선순위 결정"""
+        character_class = getattr(character, 'character_class', '전사')
+        character_hp_ratio = character.current_hp / character.max_hp if character.max_hp > 0 else 0
+        party_critical = len([ally for ally in party if ally.is_alive and (ally.current_hp / ally.max_hp) < 0.3])
+        enemy_count = len([e for e in enemies if e.is_alive])
+        
+        # 직업별 역할 기반 우선순위
+        if character_class in ["신관", "바드"]:  # 지원형
+            if party_critical >= 2:
+                return ["emergency_heal", "support_heal", "tactical_skill", "brv_attack", "hp_attack"]
+            else:
+                return ["support_heal", "tactical_skill", "ultimate_attack", "hp_attack", "brv_attack"]
+                
+        elif character_class in ["아크메이지", "정령술사", "네크로맨서"]:  # 마법사형
+            if enemy_count >= 3:
+                return ["ultimate_attack", "tactical_skill", "hp_attack", "emergency_heal", "brv_attack"]
+            else:
+                return ["tactical_skill", "ultimate_attack", "hp_attack", "emergency_heal", "brv_attack"]
+                
+        elif character_class in ["전사", "성기사", "용기사"]:  # 탱커형
+            if character_hp_ratio < 0.4:
+                return ["emergency_heal", "tactical_skill", "hp_attack", "brv_attack", "ultimate_attack"]
+            else:
+                return ["hp_attack", "tactical_skill", "brv_attack", "ultimate_attack", "emergency_heal"]
+                
+        else:  # 딜러형 (궁수, 도적, 암살자 등)
+            return ["ultimate_attack", "hp_attack", "tactical_skill", "emergency_heal", "brv_attack"]
+    
+    def _try_auto_support_skills(self, character: Character, party: List[Character], enemies: List[Character]) -> bool:
+        """지원 스킬 자동 사용 (회복, 버프 스킬)"""
+        character_class = getattr(character, 'character_class', '전사')
+        skills = self.skill_db.get_skills(character_class)
+        
+        if not skills:
+            return False
+            
+        # 지원형 스킬 우선 선택
+        support_skills = [skill for skill in skills 
+                         if skill.get("mp_cost", 0) <= character.current_mp
+                         and skill.get("name") in ["치유", "인과응보", "영혼의 노래", "회복", "축복"]]
+        
+        if support_skills:
+            best_skill = support_skills[0]  # 첫 번째 사용 가능한 지원 스킬
+            targets = self._select_skill_targets(best_skill, character, party, enemies)
+            if targets:
+                print(f"✨ 지원 스킬: {best_skill.get('name', '스킬')}")
+                self._execute_skill_immediately(best_skill, character, targets)
+                return True
+        
+        return False
+    
+    def _try_auto_ultimate_skill(self, character: Character, party: List[Character], enemies: List[Character]) -> bool:
+        """궁극기 자동 사용"""
+        character_class = getattr(character, 'character_class', '전사')
+        skills = self.skill_db.get_skills(character_class)
+        
+        if not skills:
+            return False
+            
+        # 궁극기 우선 선택
+        ultimate_skills = [skill for skill in skills 
+                          if skill.get("mp_cost", 0) <= character.current_mp
+                          and skill.get("type") == "ULTIMATE"]
+        
+        if ultimate_skills:
+            best_skill = max(ultimate_skills, key=lambda s: s.get("hp_power", 0) + s.get("brv_power", 0))
+            
+            targets = self._select_skill_targets(best_skill, character, party, enemies)
+            if targets:
+                print(f"💫 궁극기: {best_skill.get('name', '궁극기')}")
+                self._execute_skill_immediately(best_skill, character, targets)
+                return True
+        
+        return False
+    
+    def _try_auto_tactical_skill(self, character: Character, party: List[Character], enemies: List[Character]) -> bool:
+        """전술적 스킬 자동 사용 (상황에 맞는 스킬)"""
+        character_class = getattr(character, 'character_class', '전사')
+        skills = self.skill_db.get_skills(character_class)
+        
+        if not skills:
+            return False
+            
+        # 전술적 스킬 선택 (HP_ATTACK, BRV_HP_ATTACK)
+        tactical_skills = [skill for skill in skills 
+                          if skill.get("mp_cost", 0) <= character.current_mp
+                          and skill.get("type") in ["HP_ATTACK", "BRV_HP_ATTACK", "BRV_ATTACK"]]
+        
+        if tactical_skills:
+            # 상황에 따른 최적 스킬 선택
+            enemy_count = len([e for e in enemies if e.is_alive])
+            if enemy_count >= 3:
+                # 다수 적 상대: 광역 스킬 우선
+                area_skills = [s for s in tactical_skills if "전체" in s.get("name", "") or "광역" in s.get("name", "")]
+                best_skill = area_skills[0] if area_skills else tactical_skills[0]
+            else:
+                # 소수 적 상대: 단일 대상 고화력 스킬
+                best_skill = max(tactical_skills, key=lambda s: s.get("hp_power", 0))
+                
+            targets = self._select_skill_targets(best_skill, character, party, enemies)
+            if targets:
+                print(f"🎯 전술 스킬: {best_skill.get('name', '스킬')}")
+                self._execute_skill_immediately(best_skill, character, targets)
+                return True
+        
+        return False
+    
+    def _select_smart_target(self, enemies: List[Character], attack_type: str) -> Character:
+        """지능적 타겟 선택"""
+        if not enemies:
+            return None
+        
+        selected_target = None        
+        if attack_type == "hp_attack":
+            # HP 공격: 체력이 낮은 적을 우선 (처치 가능성 높임)
+            selected_target = min(enemies, key=lambda e: e.current_hp)
+            
+        elif attack_type == "brv_attack":
+            # BRV 공격: Brave가 높은 적을 우선 (위험도 감소)
+            selected_target = max(enemies, key=lambda e: getattr(e, 'brave_points', 0))
+            
+        else:
+            # 기본: 체력 비율이 가장 낮은 적
+            selected_target = min(enemies, key=lambda e: e.current_hp / e.max_hp if e.max_hp > 0 else 0)
+        
+        return selected_target
+        
+        # 모든 적의 상태 정보 수집
+        for enemy in enemies:
+            hp_ratio = enemy.current_hp / enemy.max_hp if enemy.max_hp > 0 else 0
+            selection_info["target_scores"][enemy.name] = {
+                "HP": f"{enemy.current_hp}/{enemy.max_hp}",
+                "HP_비율": f"{hp_ratio*100:.1f}%",
+                "BRV": getattr(enemy, 'brave_points', 0),
+                "선택됨": enemy == selected_target
+            }
+            selection_info["threat_assessment"][enemy.name] = {
+                "상태": "위험" if hp_ratio < 0.3 else "보통" if hp_ratio < 0.7 else "건강",
+                "위험도": "높음" if getattr(enemy, 'brave_points', 0) > 300 else "보통"
+            }
+        return selected_target
+    
+    def _try_auto_healing(self, character: Character, party: List[Character]) -> bool:
+        """개선된 자동 회복 시도"""
+        from .items import ItemDatabase, ItemType
+        
+        # 1. 회복 스킬 우선 시도
+        character_class = getattr(character, 'character_class', '전사')
+        if character_class in ["신관", "바드"] and character.current_mp >= 8:
+            skills = self.skill_db.get_skills(character_class)
+            heal_skills = [skill for skill in skills 
+                          if skill.get("mp_cost", 0) <= character.current_mp
+                          and "치유" in skill.get("name", "")]
+            if heal_skills:
+                targets = self._select_skill_targets(heal_skills[0], character, party, [])
+                if targets:
+                    print(f"✨ 자동 치유 스킬: {heal_skills[0].get('name')}")
+                    self._execute_skill_immediately(heal_skills[0], character, targets)
+                    return True
+        
+        # 2. 회복 아이템 사용
+        item_db = ItemDatabase()
+        heal_items = []
+        for item_name, quantity in character.inventory.get_items_list():
+            item = item_db.get_item(item_name)
+            if item and item.item_type == ItemType.CONSUMABLE and "heal" in item.effects:
+                heal_items.append((item, quantity))
+        
+        # 가장 효과적인 회복 아이템 선택
+        if heal_items:
+            best_item = max(heal_items, key=lambda x: x[0].stats.get("healing_power", 0))
+            if self.use_item_on_target(character, best_item[0], character):
+                print(f"🧪 자동 회복: {best_item[0].name} 사용")
+                return True
+        return False
+    
+    def _try_auto_skill(self, character: Character, party: List[Character], enemies: List[Character]) -> bool:
+        """개선된 자동 스킬 사용 시도"""
+        character_class = getattr(character, 'character_class', '전사')
+        skills = self.skill_db.get_skills(character_class)
+        
+        if not skills:
+            return False
+            
+        # 상황별 스킬 우선순위
+        enemy_count = len([e for e in enemies if e.is_alive])
+        party_low_hp = len([ally for ally in party if ally.is_alive and (ally.current_hp / ally.max_hp) < 0.5])
+        
+        # 지원이 필요한 상황
+        if party_low_hp >= 2 and character_class in ["신관", "바드"]:
+            support_skills = [skill for skill in skills 
+                             if skill.get("mp_cost", 0) <= character.current_mp
+                             and any(word in skill.get("name", "") for word in ["치유", "회복", "축복", "노래"])]
+            if support_skills:
+                best_skill = support_skills[0]
+                targets = self._select_skill_targets(best_skill, character, party, enemies)
+                if targets:
+                    print(f"🚑 긴급 지원: {best_skill.get('name', '스킬')}")
+                    self._execute_skill_immediately(best_skill, character, targets)
+                    return True
+        
+        # 공격 스킬 선택
+        attack_skills = [skill for skill in skills 
+                        if skill.get("mp_cost", 0) <= character.current_mp
+                        and skill.get("type") in ["HP_ATTACK", "BRV_HP_ATTACK", "BRV_ATTACK", "ULTIMATE"]]
+        
+        if attack_skills:
+            if enemy_count >= 3:
+                # 다수 적: 광역 스킬 우선
+                area_skills = [s for s in attack_skills if "전체" in s.get("description", "")]
+                best_skill = area_skills[0] if area_skills else max(attack_skills, key=lambda s: s.get("hp_power", 0))
+            else:
+                # 소수 적: 최고 화력 스킬
+                best_skill = max(attack_skills, key=lambda s: s.get("hp_power", 0) + s.get("brv_power", 0))
+                
+            targets = self._select_skill_targets(best_skill, character, party, enemies)
+            if targets:
+                print(f"⚔️ 전략적 스킬: {best_skill.get('name', '스킬')}")
+                self._execute_skill_immediately(best_skill, character, targets)
+                return True
+        
+        return False
+    
+    def _select_auto_target(self, enemies: List[Character]) -> Character:
+        """개선된 자동 타겟 선택 (위험도 기반)"""
+        if not enemies:
+            return None
+            
+        # 타겟 우선순위 점수 계산
+        target_scores = []
+        for enemy in enemies:
+            score = 0
+            hp_ratio = enemy.current_hp / enemy.max_hp if enemy.max_hp > 0 else 0
+            brave_points = getattr(enemy, 'brave_points', 0)
+            
+            # 체력이 낮을수록 높은 점수 (처치 가능성)
+            score += (1 - hp_ratio) * 100
+            
+            # Brave가 높을수록 높은 점수 (위험도)
+            score += min(brave_points / 1000, 50)
+            
+            # 특수 적 타입 보너스
+            if hasattr(enemy, 'character_class'):
+                if enemy.character_class in ["아크메이지", "신관"]:  # 지원형 우선 처치
+                    score += 30
+                elif enemy.character_class in ["궁수", "암살자"]:  # 원거리 딜러 우선
+                    score += 20
+            
+            target_scores.append((enemy, score))
+        
+        # 가장 높은 점수의 적 선택
+        return max(target_scores, key=lambda x: x[1])[0]
                 
     def trait_activation_menu(self, character: Character) -> bool:
         """특성 활성화 메뉴"""
         if not hasattr(character, 'active_traits') or not character.active_traits:
             print(f"\n❌ {character.name}은(는) 활성화할 수 있는 특성이 없습니다.")
+            # 🎯 특성 메뉴 중 애니메이션 일시정지
+            gauge_animator = get_gauge_animator()
+            gauge_animator.pause_animations()
             input("아무 키나 눌러 계속...")
+            gauge_animator.resume_animations()
             return False
         
         # 액티브 타입 특성만 필터링
@@ -480,7 +1445,11 @@ class BraveCombatSystem:
         if not active_traits:
             print(f"\n❌ {character.name}은(는) 활성화할 수 있는 액티브 특성이 없습니다.")
             print(f"💡 패시브 특성은 항상 활성화되어 있습니다.")
+            # 🎯 특성 메뉴 중 애니메이션 일시정지
+            gauge_animator = get_gauge_animator()
+            gauge_animator.pause_animations()
             input("아무 키나 눌러 계속...")
+            gauge_animator.resume_animations()
             return False
         
         try:
@@ -612,17 +1581,24 @@ class BraveCombatSystem:
             available_skills = []
             
             for skill in skills:
-                mp_cost = skill.get("mp_cost", 0)
+                base_mp_cost = skill.get("mp_cost", 0)
+                actual_mp_cost = self.trait_integrator.apply_skill_cost_reduction(character, base_mp_cost)
                 cast_time = skill.get("cast_time", 0)
                 cast_info = f" [캐스트:{cast_time}%]" if cast_time > 0 else ""
                 skill_name = skill.get('name', '스킬')
                 
-                if character.current_mp >= mp_cost:
-                    skill_options.append(f"✨ {skill_name} (MP:{mp_cost}){cast_info}")
+                # MP 비용 표시 (실제 비용과 원래 비용이 다르면 할인 표시)
+                if actual_mp_cost < base_mp_cost:
+                    mp_display = f"MP:{actual_mp_cost} (원래:{base_mp_cost})"
+                else:
+                    mp_display = f"MP:{actual_mp_cost}"
+                
+                if character.current_mp >= actual_mp_cost:
+                    skill_options.append(f"✨ {skill_name} ({mp_display}){cast_info}")
                     skill_descriptions.append(skill.get('description', ''))
                     available_skills.append(skill)
                 else:
-                    skill_options.append(f"🚫 {skill_name} (MP:{mp_cost}){cast_info} [MP 부족]")
+                    skill_options.append(f"🚫 {skill_name} ({mp_display}){cast_info} [MP 부족]")
                     skill_descriptions.append(f"{skill.get('description', '')} - MP 부족")
                     available_skills.append(None)  # 사용 불가능한 스킬
             
@@ -674,11 +1650,17 @@ class BraveCombatSystem:
                     # 캐스트 타임이 있는 스킬 - ATB 시스템 사용
                     print(f"✨ {character.name}이(가) {selected_skill.get('name', '스킬')} 캐스팅을 시작합니다! [캐스트:{cast_time}%]")
                     
-                    # MP 소모는 캐스팅 시작 시
-                    character.current_mp -= selected_skill.get("mp_cost", 0)
+                    # MP 소모는 캐스팅 시작 시 (애니메이션 적용)
+                    old_mp = character.current_mp
+                    base_mp_cost = selected_skill.get("mp_cost", 0)
+                    actual_mp_cost = self.trait_integrator.apply_skill_cost_reduction(character, base_mp_cost)
+                    character.current_mp -= actual_mp_cost
+                    if hasattr(self, '_current_party') and hasattr(self, '_current_enemies'):
+                        self.animate_value_change(character, 'MP', old_mp, character.current_mp, self._current_party, self._current_enemies)
                     
                     # 캐스팅 시작
-                    current_time = getattr(self, 'battle_time', 0)
+                    import time
+                    current_time = getattr(self, 'battle_time', time.time())
                     
                     # 캐스팅 관련 속성이 없으면 초기화
                     if not hasattr(character, 'casting_skill'):
@@ -688,17 +1670,21 @@ class BraveCombatSystem:
                         character.casting_duration = None
                         character.is_casting = False
                     
+                    # cast_time을 1000 스케일로 변환 (퍼센트 → ATB 스케일)
+                    atb_cast_time = cast_time * 10  # 25% → 250 ATB units
+                    
                     if hasattr(character, 'start_casting'):
-                        character.start_casting(selected_skill, targets, current_time, cast_time)
+                        character.start_casting(selected_skill, targets, current_time, atb_cast_time)
                     else:
                         # 폴백: 직접 속성 설정
                         character.casting_skill = selected_skill
                         character.casting_targets = targets
                         character.casting_start_time = current_time
-                        character.casting_duration = cast_time
-                        character.casting_cast_time = cast_time  # ATB 기반 캐스팅용
+                        character.casting_duration = atb_cast_time
+                        character.casting_cast_time = atb_cast_time  # ATB 기반 캐스팅용 (호환성)
                         character.is_casting = True
-                        character.atb_gauge = 0  # 캐스팅 시작 시 ATB 초기화
+                        character.casting_start_atb = character.atb_gauge  # 🎯 현재 ATB에서 시작
+                        # 캐스팅 시작 시 ATB는 그대로 유지 (0으로 리셋하지 않음)
                 else:
                     # 즉시 시전 스킬
                     self._execute_skill_immediately(selected_skill, character, targets)
@@ -716,8 +1702,19 @@ class BraveCombatSystem:
     
     def _execute_skill_immediately(self, skill, character, targets):
         """스킬 즉시 실행 (캐스트 타임 없는 스킬용)"""
-        # MP 소모
-        character.current_mp -= skill.get("mp_cost", 0)
+        # MP 소모 애니메이션 적용
+        old_mp = character.current_mp
+        base_mp_cost = skill.get("mp_cost", 0)
+        actual_mp_cost = self.trait_integrator.apply_skill_cost_reduction(character, base_mp_cost)
+        
+        # MP 감소 처리
+        character.current_mp = max(0, character.current_mp - actual_mp_cost)
+        new_mp = character.current_mp
+        
+        # MP 감소 (자동 애니메이션 트리거)
+        if actual_mp_cost > 0:
+            print(f"🔮 {character.name}이(가) {actual_mp_cost} MP 소모!")
+            # character.current_mp는 이미 위에서 설정됨
         
         # 실제 스킬 효과 적용
         print(f"✨ {character.name}이(가) {skill.get('name', '스킬')}을(를) 사용했습니다!")
@@ -734,23 +1731,59 @@ class BraveCombatSystem:
         
         # 스킬 사용 후 전투 종료 체크 (팡파레 재생 포함)
         if hasattr(self, '_current_party') and hasattr(self, '_current_enemies'):
+            # 🎯 승리 체크 전 애니메이션 완료 대기
+            gauge_animator = get_gauge_animator()
+            if gauge_animator.is_processing:
+                print(f"\n{Color.CYAN}⏳ 스킬 효과 적용 중...{Color.RESET}")
+                while gauge_animator.is_processing:
+                    time_module.sleep(0.1)
+                time_module.sleep(0.5)  # 추가 확인 시간
+            
             if self.check_battle_end(self._current_party, self._current_enemies):
                 winner = self.determine_winner(self._current_party, self._current_enemies)
                 if winner:  # 승리 시 팡파레 재생
                     try:
                         print(f"\n{Color.BRIGHT_CYAN}전투가 종료되었습니다!{Color.RESET}")
-                        # 같은 팡파레 재생 로직 사용
+                        victory_played = False
+                        
+                        # 1순위: audio_system 사용
                         if hasattr(self, 'audio_system') and self.audio_system:
-                            # SFX로 팡파레 1회 재생
-                            self.audio_system.play_sfx("victory")
-                            print("🎵 승리 팡파레 재생!")
-                        elif hasattr(self, 'sound_manager') and self.sound_manager:
-                            # 폴백: SFX 재생 시도
-                            self.sound_manager.play_sfx("victory")
-                            print("🎵 승리 팡파레 재생!")
+                            try:
+                                self.audio_system.play_sfx("victory")
+                                print("🎵 승리 팡파레 재생! (audio_system)")
+                                victory_played = True
+                            except Exception as e:
+                                print(f"⚠️ audio_system 팡파레 실패: {e}")
+                        
+                        # 2순위: sound_manager 사용
+                        if not victory_played and hasattr(self, 'sound_manager') and self.sound_manager:
+                            try:
+                                self.sound_manager.play_sfx("victory")
+                                print("🎵 승리 팡파레 재생! (sound_manager)")
+                                victory_played = True
+                            except Exception as e:
+                                print(f"⚠️ sound_manager 팡파레 실패: {e}")
+                        
+                        # 3순위: 직접 오디오 시스템 접근
+                        if not victory_played:
+                            try:
+                                from .ffvii_sound_system import get_ffvii_sound_system
+                                audio_mgr = get_ffvii_sound_system()
+                                if audio_mgr:
+                                    audio_mgr.play_sfx("victory")
+                                    print("🎵 승리 팡파레 재생! (direct)")
+                                    victory_played = True
+                            except Exception as e:
+                                print(f"⚠️ 직접 오디오 접근 실패: {e}")
+                        
+                        if not victory_played:
+                            print("⚠️ 승리 팡파레를 재생할 수 없습니다.")
                     except Exception as e:
                         print(f"⚠️ 승리 팡파레 재생 실패: {e}")
                 return winner  # 전투 종료 신호 반환
+        
+        # 스킬 사용 후 딜레이 추가
+        self.add_action_pause(f"🎯 스킬 '{skill.get('name', '스킬')}' 효과 적용 완료!")
     
     def complete_casting(self, character):
         """캐스팅 완료 처리 - 게임 종료 시 예외처리 포함"""
@@ -783,6 +1816,20 @@ class BraveCombatSystem:
             
             print(f"✨ {character.name}의 {skill.get('name', '스킬')} 캐스팅이 완료되었습니다!")
             
+            # MP 소모 처리 및 애니메이션
+            old_mp = character.current_mp
+            base_mp_cost = skill.get("mp_cost", 0)
+            actual_mp_cost = self.trait_integrator.apply_skill_cost_reduction(character, base_mp_cost)
+            
+            # MP 감소 처리
+            character.current_mp = max(0, character.current_mp - actual_mp_cost)
+            new_mp = character.current_mp
+            
+            # MP 감소 (자동 애니메이션 트리거)
+            if actual_mp_cost > 0:
+                print(f"🔮 {character.name}이(가) {actual_mp_cost} MP 소모!")
+                # character.current_mp는 이미 위에서 설정됨
+            
             # 🔊 스킬 사용 SFX 재생
             self._play_skill_sfx(skill)
             
@@ -793,17 +1840,38 @@ class BraveCombatSystem:
             # 실제 스킬 효과 적용
             self._apply_skill_effects(skill, character, valid_targets if valid_targets else targets)
             
+            # ⭐ 캐스팅 완료 후 ATB 리셋 (턴 소모)
+            character.atb_gauge = 0
+            
             # 캐스팅 완료 후 전투 종료 체크 (중복 방지)
             if hasattr(self, '_current_party') and hasattr(self, '_current_enemies'):
+                # 🎯 승리 체크 전 애니메이션 완료 대기
+                gauge_animator = get_gauge_animator()
+                if gauge_animator.is_processing:
+                    print(f"\n{Color.CYAN}⏳ 스킬 효과 적용 중...{Color.RESET}")
+                    while gauge_animator.is_processing:
+                        time_module.sleep(0.1)
+                    time_module.sleep(0.5)  # 추가 확인 시간
+                
                 if self.check_battle_end(self._current_party, self._current_enemies):
+                    # 스킬 효과 결과 확인 시간 제공
+                    import time
+                    time.sleep(2.0)
                     # 전투 종료만 체크하고 승리 처리는 다른 곳에서 담당
                     return True  # 전투 종료 신호만 반환
+            
+            # 캐스팅 완료 후 스킬 효과 확인 시간 제공
+            import time
+            time.sleep(2.0)
             
         except Exception as e:
             print(f"❌ 캐스팅 완료 중 오류 발생: {e}")
         finally:
             # 캐스팅 상태 초기화 (항상 실행)
             self._clear_casting_state(character)
+        
+        # 정상 완료 시 None 반환 (턴 종료)
+        return None
     
     def _clear_casting_state(self, character):
         """캐스팅 상태 완전 초기화"""
@@ -815,6 +1883,13 @@ class BraveCombatSystem:
             character.is_casting = False
         except Exception as e:
             print(f"⚠️ 캐스팅 상태 초기화 중 오류: {e}")
+    
+    def _clear_all_casting(self, all_characters):
+        """모든 캐릭터의 캐스팅 상태 중단"""
+        for character in all_characters:
+            if getattr(character, 'is_casting', False):
+                print(f"⚠️ 전투 종료로 인해 {character.name}의 캐스팅이 중단되었습니다.")
+                self._clear_casting_state(character)
     
     def _select_skill_targets(self, skill, caster, party: List[Character], enemies: List[Character]):
         """스킬 대상 선택"""
@@ -908,7 +1983,7 @@ class BraveCombatSystem:
                 for enemy in alive_enemies:
                     status = f" (HP: {enemy.current_hp}/{enemy.max_hp}"
                     if hasattr(enemy, 'is_broken') and enemy.is_broken:
-                        status += ", BREAK"
+                        status += f", {Color.BRIGHT_RED}BREAK{Color.RESET}"
                     status += ")"
                     
                     option_text = f"{enemy.name}{status}"
@@ -1185,6 +2260,10 @@ class BraveCombatSystem:
         # 아이템 사용 이펙트
         self.visualizer.show_skill_effect(user, f"{item.name} 사용", EffectType.HEAL)
         
+        # 사용 전 HP/MP 저장
+        old_hp = target.current_hp
+        old_mp = target.current_mp
+        
         # 실제 아이템 효과 적용
         success = item.use_item(target)
         
@@ -1192,6 +2271,13 @@ class BraveCombatSystem:
             # 아이템 소모
             user.inventory.remove_item(item.name, 1)
             print(f"✨ {item.name}을(를) 사용했습니다.")
+            
+            # HP/MP 변화 애니메이션 적용
+            if target.current_hp != old_hp and hasattr(self, '_current_party') and hasattr(self, '_current_enemies'):
+                self.animate_value_change(target, 'HP', old_hp, target.current_hp, self._current_party, self._current_enemies)
+            
+            if target.current_mp != old_mp and hasattr(self, '_current_party') and hasattr(self, '_current_enemies'):
+                self.animate_value_change(target, 'MP', old_mp, target.current_mp, self._current_party, self._current_enemies)
             
             # 추가 효과들 처리
             for effect in item.effects:
@@ -1253,7 +2339,11 @@ class BraveCombatSystem:
             descriptions = []
             
             for enemy in alive_enemies:
-                option_text = f"{enemy.name} (HP: {enemy.current_hp}/{enemy.max_hp}, Brave: {enemy.brave_points})"
+                break_status = ""
+                if hasattr(enemy, 'is_broken') and enemy.is_broken:
+                    break_status = f" {Color.BRIGHT_RED}[BREAK]{Color.RESET}"
+                
+                option_text = f"{enemy.name} (HP: {enemy.current_hp}/{enemy.max_hp}, Brave: {enemy.brave_points}){break_status}"
                 desc = f"대상: {enemy.name} | 상태: {'브레이크' if hasattr(enemy, 'is_broken') and enemy.is_broken else '정상'}"
                 
                 options.append(option_text)
@@ -1329,7 +2419,11 @@ class BraveCombatSystem:
             for enemy in alive_enemies:
                 # HP 게이지 색깔 생성
                 hp_gauge = self._create_colored_hp_gauge(enemy.current_hp, enemy.max_hp)
-                break_status = f" {Color.BRIGHT_RED}[BREAK]{Color.RESET}" if (hasattr(enemy, 'is_broken') and enemy.is_broken) else ""
+                # BREAK 상태 표시
+                break_status = ""
+                if hasattr(enemy, 'is_broken') and enemy.is_broken:
+                    break_status = f" {Color.BRIGHT_RED}[BREAK]{Color.RESET}"
+                
                 option_text = f"{enemy.name} {hp_gauge}{break_status}"
                 desc = f"대상: {enemy.name} | HP: {enemy.current_hp}/{enemy.max_hp} | 상태: {'브레이크' if hasattr(enemy, 'is_broken') and enemy.is_broken else '정상'}"
                 
@@ -1350,7 +2444,8 @@ class BraveCombatSystem:
             print("\n대상을 선택하세요:")
             for i, enemy in enumerate(alive_enemies, 1):
                 hp_gauge = self._create_colored_hp_gauge(enemy.current_hp, enemy.max_hp)
-                break_status = f" {Color.BRIGHT_RED}[BREAK]{Color.RESET}" if (hasattr(enemy, 'is_broken') and enemy.is_broken) else ""
+                # BREAK 상태는 상태 이펙트에서만 표시 (중복 제거)
+                break_status = ""  # 이름에는 BREAK 표시 안함
                 print(f"{i}. {enemy.name} {hp_gauge}{break_status}")
                 
             try:
@@ -1373,6 +2468,10 @@ class BraveCombatSystem:
             trait_messages = attacker.trigger_trait_effects("attack")
             for msg in trait_messages:
                 print(f"✨ {attacker.name}: {msg}")
+            
+            # ⏳ 특성 효과 확인 위해 2초 대기 (엔터로 스킵 가능)
+            if trait_messages and hasattr(self, 'gauge_animator'):
+                self.gauge_animator._wait_with_skip_option(2.0, "특성 효과 확인")
         
         # 기본 Brave 공격 스킬 사용
         brave_skills = [skill for skill in attacker.brave_skills if skill.attack_type == BraveAttackType.BRAVE]
@@ -1413,33 +2512,24 @@ class BraveCombatSystem:
             enhanced_battle_effect("dodge", character_name=target.name)
             return
         
-        # 데미지 계산 - 강화된 로깅 시스템 사용
-        # 아군과 적군을 구분하여 배율 조정
+        # 🎯 새로운 스킬 배율 시스템 (기본공격 100%, 스킬 170%)
+        is_skill = False
         if hasattr(skill, '__dict__') and skill.__dict__.get('name') != '기본 공격':
-            # 스킬의 경우 - BraveSkill 객체의 brave_multiplier 사용
-            original_power = skill.brave_multiplier  # 배율을 그대로 사용 (1.5 = 150%)
-            if hasattr(attacker, 'character_class'):  # 아군(플레이어 캐릭터)
-                brv_power = int(original_power * 100 * 0.8)  # 아군 스킬 80%로 조정 (기본공격의 1.6배 정도)
-            else:  # 적군
-                brv_power = int(original_power * 100 * 0.8)  # 적군 스킬 80%로 약화
+            is_skill = True
         elif hasattr(skill, 'name') and skill.name != '기본 공격':
-            # 스킬의 경우 - BraveSkill 객체의 brave_multiplier 사용
-            original_power = getattr(skill, 'brave_multiplier', 1.0)  # 배율을 그대로 사용
-            if hasattr(attacker, 'character_class'):  # 아군(플레이어 캐릭터)
-                brv_power = int(original_power * 100 * 0.8)  # 아군 스킬 80%로 조정 (기본공격의 1.6배 정도)
-            else:  # 적군
-                brv_power = int(original_power * 100 * 0.8)  # 적군 스킬 80%로 약화
+            is_skill = True
+        
+        if is_skill:
+            # 스킬의 경우: 기본공격의 1.7배 효과
+            brv_power = 170  # 170%
         else:
-            # 기본 공격의 경우 - 적군을 약화
-            if hasattr(attacker, 'character_class'):  # 아군(플레이어 캐릭터)
-                brv_power = 50  # 아군 기본공격 50% 유지
-            else:  # 적군
-                brv_power = 65  # 적군 기본공격 65%로 약화 (75% → 65%)
+            # 기본 공격의 경우: 100% 기준
+            brv_power = 100  # 100%
             
         brave_damage = self._calculate_brv_damage(skill.__dict__ if hasattr(skill, '__dict__') else {"name": skill.name, "brv_power": brv_power}, attacker, target, brv_power)
         
-        # BRV 피해량 2.5배 증가 (전투 속도 개선) - 이미 combat_logger에서 적용됨
-        # brave_damage = int(brave_damage * 2.5)  # 제거
+        # BRV 데미지는 통합 시스템에서 이미 적절히 계산됨 (추가 배율 제거)
+        # brave_damage = int(brave_damage * 2.5)  # 제거: 중복 배율 적용 방지
         
         # BRV 데미지 최소/최댓값 제한 (1 ~ 999999)
         brave_damage = max(1, min(999999, brave_damage))
@@ -1478,15 +2568,19 @@ class BraveCombatSystem:
         # Brave 포인트 적용 (아군/적군 구분)
         if attacker and hasattr(attacker, 'character_class') and attacker.character_class != "Enemy":
             # 아군 → 적: 33% 획득 (1/3)
-            gained_brave = int(brave_damage * 0.33)
+            gained_brave = int(brave_damage * 1)
         else:
             # 적 → 아군: 300% 획득 (3배)
-            gained_brave = int(brave_damage * 3)
-        
-        attacker.add_brave_points(gained_brave)
+            gained_brave = int(brave_damage * 1)
         
         # BRV 데미지 적용
         target.brave_points -= brave_damage
+        
+        # 공격자 Brave 증가
+        attacker.add_brave_points(gained_brave)
+        
+        print(f"💥 {target.name}에게 {brave_damage} BRV 피해!")
+        # BRV 획득 메시지 제거 - 애니메이션에서 표시됨
         
         # BREAK 체크 - BRV가 0 이하가 되면 BREAK 발생
         if target.brave_points <= 0:
@@ -1497,29 +2591,31 @@ class BraveCombatSystem:
                 
                 # ATB 게이지 초기화 (BREAK 시)
                 target.atb_gauge = 0
-                print(f"🔄 {target.name}의 ATB 게이지가 초기화되었습니다!")
+                # print(f"🔄 {target.name}의 ATB 게이지가 초기화되었습니다!")  # 로그 제거
                 
                 # 캐스팅 중단 (BREAK 시)
                 if hasattr(target, 'is_casting') and target.is_casting:
                     skill_name = getattr(target, 'casting_skill', {}).get('name', '스킬')
-                    print(f"❌ {target.name}의 {skill_name} 캐스팅이 중단되었습니다!")
+                    # print(f"❌ {target.name}의 {skill_name} 캐스팅이 중단되었습니다!")  # 로그 제거
                     self._clear_casting_state(target)
                 
                 self.visualizer.show_status_change(target, "BREAK!", False)
-                print(f"💥 {target.name}이(가) BREAK 상태가 되었습니다!")
+                # print(f"\n{Color.BRIGHT_RED}{'='*50}")  # 로그 제거
+                # print(f"💥 {target.name}이(가) BREAK 상태가 되었습니다! 💥")  # 로그 제거
+                # print(f"{'='*50}{Color.RESET}\n")  # 로그 제거
+                
                 # Break 전용 효과음 재생
                 if hasattr(self, 'sound_system'):
                     self.sound_system.play_sfx("break_sound")
                 enhanced_battle_effect("break")
-        
-        # Brave 변화 비주얼 이펙트
-        self.visualizer.show_brave_change(attacker, gained_brave, attacker.brave_points)
-            
-        enhanced_battle_effect("brave_gain", amount=gained_brave, total=attacker.brave_points)
+                
+                # BREAK 발생 메시지만 표시
         
         # 직업별 특수 효과 적용
         if hasattr(skill, 'name'):
             self._apply_class_specific_brv_effects(attacker, target, skill, brave_damage)
+        
+        # BRV 공격 결과 확인 - 대기 시간 제거 (어차피 턴 정산에서 대기)
     
     def _get_class_specific_basic_attack(self, character: Character):
         """직업별 특화된 기본공격 반환 (28개 직업 완전 지원)"""
@@ -1546,7 +2642,7 @@ class BraveCombatSystem:
             "무당": BraveSkill("영혼 타격", BraveAttackType.BRAVE, 0.25, description="영혼을 직접 타격하여 방어력 무시"),
             "해적": BraveSkill("이도류 난타", BraveAttackType.BRAVE, 0.2, description="양손 무기로 연속 공격"),
             "사무라이": BraveSkill("거합 베기", BraveAttackType.BRAVE, 0.55, description="단숨에 베는 강력한 일격, 낮은 HP일수록 강화"),
-            "드루이드": BraveSkill("자연의 분노", BraveAttackType.BRAVE, 0.3, description="자연의 힘으로 공격하며 턴마다 HP 회복"),
+            "드루이드": BraveSkill("야생의 격노", BraveAttackType.BRAVE, 0.3, description="자연의 힘으로 공격하며 턴마다 HP 회복"),
             "철학자": BraveSkill("논리적 반박", BraveAttackType.BRAVE, 0.15, description="적의 행동을 예측하여 반격, 높은 회피율"),
             "시간술사": BraveSkill("시간 조작", BraveAttackType.BRAVE, 0.25, description="시간을 조작하여 적의 행동 지연"),
             "연금술사": BraveSkill("화학 폭발", BraveAttackType.BRAVE, 0.35, description="화학 반응으로 폭발 피해, 주변 적에게도 영향"),
@@ -1591,7 +2687,7 @@ class BraveCombatSystem:
             if hasattr(attacker, 'atb_gauge'):
                 atb_save = int(attacker.atb_gauge * 0.25)  # 25% 절약
                 attacker.atb_gauge = min(self.ATB_MAX, attacker.atb_gauge + atb_save)
-                print(f"🌟 마법 원거리 공격으로 ATB {atb_save//self.ATB_DISPLAY_SCALE}% 절약!")
+                print(f"🌟 마법 원거리 공격으로 ATB {atb_save * 100 // self.ATB_READY_THRESHOLD}% 절약!")
             
         elif character_class == "궁수" and skill.name == "삼연사":
             # 3연타 추가 공격 (원거리 - ATB 30% 절약)
@@ -1606,7 +2702,7 @@ class BraveCombatSystem:
             if hasattr(attacker, 'atb_gauge'):
                 atb_save = int(attacker.atb_gauge * 0.3)  # 30% 절약
                 attacker.atb_gauge = min(self.ATB_MAX, attacker.atb_gauge + atb_save)
-                print(f"🎯 원거리 공격으로 ATB {atb_save//self.ATB_DISPLAY_SCALE}% 절약!")
+                print(f"🎯 원거리 공격으로 ATB {atb_save * 100 // self.ATB_READY_THRESHOLD}% 절약!")
                 
         elif character_class == "도적" and skill.name == "독침":
             # 독 상태이상 부여 (보스는 저항)
@@ -1621,11 +2717,17 @@ class BraveCombatSystem:
                 print(f"💚 {target.name}이(가) 독에 중독되었습니다!")
             
         elif character_class == "성기사" and skill.name == "성스러운 타격":
-            # 공격하면서 아군 중 HP가 가장 낮은 대상 회복
-            if hasattr(self, '_current_party') and self._current_party:
-                lowest_hp_ally = min([ally for ally in self._current_party if ally.current_hp > 0], 
-                                   key=lambda x: x.current_hp / x.max_hp, default=None)
-                if lowest_hp_ally:
+            # 공격하면서 아군 중 HP가 가장 낮은 대상 회복 (플레이어 파티만)
+            attacker_is_player = hasattr(attacker, 'character_class') and attacker.character_class != "Enemy"
+            
+            if attacker_is_player and hasattr(self, '_current_party') and self._current_party:
+                # 플레이어 파티 중 HP가 가장 낮은 플레이어만 회복
+                player_allies = [ally for ally in self._current_party 
+                               if ally.current_hp > 0 and hasattr(ally, 'character_class') 
+                               and ally.character_class != "Enemy"]
+                
+                if player_allies:
+                    lowest_hp_ally = min(player_allies, key=lambda x: x.current_hp / x.max_hp)
                     heal_amount = int(damage * 0.3)
                     lowest_hp_ally.heal(heal_amount)
                     print(f"✨ {lowest_hp_ally.name}이(가) {heal_amount} HP 회복!")
@@ -1670,6 +2772,9 @@ class BraveCombatSystem:
             if actual_recover > 0:
                 print(f"💀 {attacker.name}이(가) {actual_recover} MP 회복! (제한적 흡수)")
                 
+                # MP 회복 (자동 애니메이션 트리거)
+                # attacker.current_mp는 이미 위에서 설정됨
+                
         elif character_class == "용기사" and skill.name == "화염 강타":
             # 화상 상태이상 부여 (보스는 저항)
             is_boss = getattr(target, 'is_boss', False) or target.max_hp > 2000
@@ -1701,7 +2806,19 @@ class BraveCombatSystem:
             print(f"🌟 {element} 속성 약점! 추가 {bonus_damage} BRV 피해!")
             
         elif character_class == "암살자" and skill.name == "그림자 습격":
-            # 높은 크리티컬 확률로 추가 공격
+            # 1. 즉사 조건 체크 (적 HP가 50% 이하일 때, 보스 제외)
+            is_boss = hasattr(target, 'is_boss') and target.is_boss
+            current_hp_ratio = target.current_hp / target.max_hp if target.max_hp > 0 else 1.0
+            
+            if not is_boss and current_hp_ratio <= 0.5:
+                # 즉사 확률 계산 (HP가 낮을수록 확률 증가)
+                instant_kill_chance = (0.5 - current_hp_ratio) * 0.8  # 최대 40% 확률
+                if random.random() < instant_kill_chance:
+                    target.current_hp = 0
+                    print(f"💀 [즉사] 그림자 암살! {target.name}을(를) 즉시 처치했습니다!")
+                    return damage
+            
+            # 2. 높은 크리티컬 확률로 추가 공격
             if random.random() < 0.4:  # 40% 확률
                 crit_damage = int(damage * 0.8)
                 target.brave_points -= crit_damage
@@ -1720,7 +2837,7 @@ class BraveCombatSystem:
             if hasattr(attacker, 'atb_gauge'):
                 atb_save = int(attacker.atb_gauge * 0.20)  # 20% 절약
                 attacker.atb_gauge = min(self.ATB_MAX, attacker.atb_gauge + atb_save)
-                print(f"⚡ 레이저 원거리 공격으로 ATB {atb_save//self.ATB_DISPLAY_SCALE}% 절약!")
+                print(f"⚡ 레이저 원거리 공격으로 ATB {atb_save * 100 // self.ATB_READY_THRESHOLD}% 절약!")
                     
         elif character_class == "무당" and skill.name == "영혼 타격":
             # 방어력 무시 피해
@@ -1745,7 +2862,7 @@ class BraveCombatSystem:
                 target.brave_points -= bonus_damage
                 print(f"⚔️ 각오의 일격! HP가 낮아 추가 {bonus_damage} BRV 피해!")
                 
-        elif character_class == "드루이드" and skill.name == "자연의 분노":
+        elif character_class == "드루이드" and skill.name == "야생의 격노":
             # 공격 후 자신 HP 회복
             heal_amount = int(damage * 0.2)
             attacker.heal(heal_amount)
@@ -1852,13 +2969,13 @@ class BraveCombatSystem:
             "무당": BraveSkill("영혼 분리", BraveAttackType.HP, 0.0, 1.0, description="적의 영혼을 직접 공격하여 방어력 완전 무시"),
             "해적": BraveSkill("해적의 보물", BraveAttackType.HP, 0.0, 1.1, description="숨겨진 보물 무기로 연속 공격"),
             "사무라이": BraveSkill("무사도 비의", BraveAttackType.HP, 0.0, 1.5, description="HP가 낮을수록 강해지는 필사의 일격"),
-            "드루이드": BraveSkill("자연의 심판", BraveAttackType.HP, 0.0, 1.0, description="자연의 힘으로 적을 심판하며 아군 전체 회복"),
+            "드루이드": BraveSkill("자연의 응징", BraveAttackType.HP, 0.0, 1.0, description="자연의 힘으로 적을 심판하며 아군 전체 회복"),
             "철학자": BraveSkill("진리의 깨달음", BraveAttackType.HP, 0.0, 0.8, description="논리적 공격으로 적의 약점을 정확히 타격"),
             "시간술사": BraveSkill("시간 정지", BraveAttackType.HP, 0.0, 1.1, description="시간을 정지시켜 연속 공격"),
             "연금술사": BraveSkill("대폭발 반응", BraveAttackType.HP, 0.0, 1.3, description="화학 반응으로 거대한 폭발 생성"),
             "검투사": BraveSkill("검투장의 피날레", BraveAttackType.HP, 0.0, 1.2, description="관중들의 환호 속에서 화려한 마무리"),
-            "기사": BraveSkill("성스러운 돌격", BraveAttackType.HP, 0.0, 1.15, description="신성한 힘이 깃든 창으로 돌격"),
-            "신관": BraveSkill("신의 심판", BraveAttackType.HP, 0.0, 0.9, description="적을 심판하면서 아군 전체 HP 회복"),
+            "기사": BraveSkill("신성한 돌격", BraveAttackType.HP, 0.0, 1.15, description="신성한 힘이 깃든 창으로 돌격"),
+            "신관": BraveSkill("인과응보", BraveAttackType.HP, 0.0, 0.9, description="적을 심판하면서 아군 전체 HP 회복"),
             "마검사": BraveSkill("마검 오의", BraveAttackType.HP, 0.0, 1.25, description="물리와 마법의 완벽한 융합 기술"),
             "차원술사": BraveSkill("차원 붕괴", BraveAttackType.HP, 0.0, 1.2, description="차원을 붕괴시켜 공간 자체로 공격"),
             "광전사": BraveSkill("최후의 광기", BraveAttackType.HP, 0.0, 1.6, description="모든 것을 내던진 광폭한 최후의 일격"),
@@ -1900,7 +3017,7 @@ class BraveCombatSystem:
             if hasattr(attacker, 'atb_gauge'):
                 atb_save = int(self.ATB_MAX * 0.25)  # 25% 절약 (HP 공격이므로 고정값)
                 attacker.atb_gauge = min(self.ATB_MAX, attacker.atb_gauge + atb_save)
-                print(f"🎯 원거리 HP 공격으로 ATB {atb_save//self.ATB_DISPLAY_SCALE}% 절약!")
+                print(f"🎯 원거리 HP 공격으로 ATB {atb_save * 100 // self.ATB_READY_THRESHOLD}% 절약!")
                 
         elif character_class == "도적" and skill.name == "암살":
             # 80% 확률로 즉사 효과 (HP 20% 이하 적 대상, 보스급 제외)
@@ -1914,20 +3031,6 @@ class BraveCombatSystem:
                 extra_damage = int(hp_damage * crit_multiplier)
                 target.take_damage(extra_damage)
                 print(f"🗡️ 치명상! 추가 {extra_damage} 피해!")
-                
-        elif character_class == "성기사" and skill.name == "심판의 빛":
-            # 아군 전체 상태이상 해제 및 회복
-            if hasattr(self, '_current_party') and self._current_party:
-                for ally in self._current_party:
-                    if ally.current_hp > 0:
-                        # 상태이상 해제
-                        setattr(ally, 'is_poisoned', False)
-                        setattr(ally, 'is_burning', False)
-                        setattr(ally, 'is_stunned', False)
-                        # 소량 회복
-                        heal_amount = int(ally.max_hp * 0.1)
-                        ally.heal(heal_amount)
-                print(f"✨ 성스러운 빛으로 아군 전체 정화 및 회복!")
                         
         elif character_class == "암흑기사" and skill.name == "흡혈 강타":
             # 가한 피해의 60% HP 회복
@@ -1949,27 +3052,48 @@ class BraveCombatSystem:
                 print(f"💥 표식 폭발! {marks}개 표식으로 {explosion_damage} 추가 피해!")
                 
         elif character_class == "바드" and skill.name == "영혼의 노래":
-            # 아군 전체 회복 및 버프
-            if hasattr(self, '_current_party') and self._current_party:
+            # 적에게 피해 + 아군 전체 회복 및 버프 (플레이어 파티만)
+            
+            # 시전자가 플레이어인지 확인하여 플레이어 파티만 회복
+            attacker_is_player = hasattr(attacker, 'character_class') and attacker.character_class != "Enemy"
+            
+            if attacker_is_player and hasattr(self, '_current_party') and self._current_party:
+                # 시전자의 마법력 기반 회복량 계산
+                caster_magic_attack = getattr(attacker, 'magic_attack', 50)
+                heal_amount = int(caster_magic_attack * 0.25)  # 마법력의 25%
+                
+                healed_count = 0
                 for ally in self._current_party:
-                    if ally.current_hp > 0:
-                        heal_amount = int(ally.max_hp * 0.15)
+                    # 플레이어 파티 멤버만 회복 (적이 아닌지 확인)
+                    ally_is_player = hasattr(ally, 'character_class') and ally.character_class != "Enemy"
+                    if ally and ally.current_hp > 0 and ally_is_player:
                         ally.heal(heal_amount)
                         setattr(ally, 'temp_attack_bonus', getattr(ally, 'temp_attack_bonus', 0) + 10)
-                print(f"🎵 영혼의 노래로 아군 전체 회복 및 공격력 증가!")
+                        healed_count += 1
+                print(f"🎵 영혼의 노래로 아군 {healed_count}명 회복({heal_amount}) 및 공격력 증가!")
+            # 적에게도 정상적으로 피해를 줌
                 
         elif character_class == "네크로맨서" and skill.name == "영혼 흡수":
             # MP 제한적 회복 및 적의 MP 흡수
             mp_drain = int(hp_damage * 0.2)  # 30% → 20%로 감소
             if hasattr(target, 'current_mp'):
+                # 대상의 MP 감소
+                old_target_mp = target.current_mp
                 drained_mp = min(target.current_mp, mp_drain)
                 target.current_mp -= drained_mp
                 
-                # 회복량 제한
+                # MP 탈취 (자동 애니메이션 트리거)
+                # target.current_mp는 이미 위에서 설정됨
+                
+                # 회복량 제한 및 회복
+                old_attacker_mp = attacker.current_mp
                 max_recover = int(attacker.max_mp * 0.2)  # 최대 MP의 20%까지만
                 actual_recover = min(drained_mp, max_recover, attacker.max_mp - attacker.current_mp)
                 attacker.current_mp = min(attacker.max_mp, attacker.current_mp + actual_recover)
                 print(f"💀 영혼 흡수로 {actual_recover} MP 탈취! (제한적 흡수)")
+                
+                # MP 회복 (자동 애니메이션 트리거)
+                # attacker.current_mp는 이미 위에서 설정됨
                 
         elif character_class == "용기사" and skill.name == "드래곤 브레스":
             # 광역 화염 피해 및 화상 (보스는 상태이상 저항)
@@ -2054,7 +3178,7 @@ class BraveCombatSystem:
             if hasattr(attacker, 'atb_gauge'):
                 atb_save = int(self.ATB_MAX * 0.20)  # 20% 절약
                 attacker.atb_gauge = min(self.ATB_MAX, attacker.atb_gauge + atb_save)
-                print(f"⚡ 메가 레이저 원거리 공격으로 ATB {atb_save//self.ATB_DISPLAY_SCALE}% 절약!")
+                print(f"⚡ 메가 레이저 원거리 공격으로 ATB {atb_save * 100 // self.ATB_READY_THRESHOLD}% 절약!")
                             
         elif character_class == "무당" and skill.name == "영혼 분리":
             # 방어력 완전 무시 및 영혼 디버프 (현재 HP 비율 기반)
@@ -2086,17 +3210,26 @@ class BraveCombatSystem:
             # 반격 확률 증가
             setattr(attacker, 'temp_counter_rate', 0.5)
             
-        elif character_class == "드루이드" and skill.name == "자연의 심판":
-            # 자연의 힘으로 심판하며 아군 회복
-            if hasattr(self, '_current_party') and self._current_party:
+        elif character_class == "드루이드" and skill.name == "자연의 응징":
+            # 자연의 힘으로 적을 심판하면서 아군 전체 회복 (플레이어 파티만)
+            attacker_is_player = hasattr(attacker, 'character_class') and attacker.character_class != "Enemy"
+            
+            if attacker_is_player and hasattr(self, '_current_party') and self._current_party:
+                # 시전자의 마법력 기반 회복량 계산
+                caster_magic_attack = getattr(attacker, 'magic_attack', 50)
+                nature_heal = int(caster_magic_attack * 0.35)  # 마법력의 35%
+                
+                healed_count = 0
                 for ally in self._current_party:
-                    if ally.current_hp > 0:
-                        nature_heal = int(ally.max_hp * 0.2)
+                    # 플레이어 파티 멤버만 회복 (적이 아닌지 확인)
+                    ally_is_player = hasattr(ally, 'character_class') and ally.character_class != "Enemy"
+                    if ally.current_hp > 0 and ally_is_player:
                         ally.heal(nature_heal)
                         # 자연의 축복 (독/화상 저항)
                         setattr(ally, 'nature_blessing', True)
                         setattr(ally, 'nature_blessing_turns', 3)
-                print(f"🌿 자연의 심판! 아군 전체 회복 및 자연의 축복!")
+                        healed_count += 1
+                print(f"🌿 치유의 심판! 아군 {healed_count}명 회복({nature_heal}) 및 자연의 축복!")
                 
         elif character_class == "철학자" and skill.name == "진리의 깨달음":
             # 논리적 약점 공격으로 정확한 피해 (현재 HP 비율 기반)
@@ -2162,7 +3295,7 @@ class BraveCombatSystem:
                     setattr(ally, 'temp_attack_bonus', getattr(ally, 'temp_attack_bonus', 0) + 15)
                 print(f"👏 관중의 환호로 아군 전체 공격력 증가!")
                 
-        elif character_class == "기사" and skill.name == "성스러운 돌격":
+        elif character_class == "기사" and skill.name == "신성한 돌격":
             # 신성한 힘의 창 돌격
             holy_damage = int(hp_damage * 0.5)  # 추가 성스러운 피해
             target.take_damage(holy_damage)
@@ -2175,17 +3308,32 @@ class BraveCombatSystem:
                     other_enemy.take_damage(pierce_damage)
                     print(f"🛡️ 성스러운 돌격 관통! {other_enemy.name}이(가) {pierce_damage} 피해!")
                     
-        elif character_class == "신관" and skill.name == "신의 심판":
-            # 적을 심판하면서 아군 전체 대량 회복
+        elif character_class == "신관" and skill.name == "인과응보":
+            # 신의 심판: 적에게 피해 + 아군 전체 회복 (플레이어 파티만)
+            # 플레이어 파티인지 확인 (적이 아닌지)
             if hasattr(self, '_current_party') and self._current_party:
-                for ally in self._current_party:
-                    if ally.current_hp > 0:
-                        divine_heal = int(ally.max_hp * 0.3)  # 30% 회복
-                        ally.heal(divine_heal)
-                        # 신의 가호 (모든 저항 증가)
-                        setattr(ally, 'divine_protection', True)
-                        setattr(ally, 'divine_protection_turns', 4)
-                print(f"✨ 신의 심판! 아군 전체 대량 회복 및 신의 가호!")
+                # 시전자가 플레이어 파티 소속인지 확인
+                attacker_is_player = hasattr(attacker, 'character_class') and attacker.character_class != "Enemy"
+                
+                if attacker_is_player:
+                    healed_allies = []
+                    # 시전자의 마법력 기반 회복량 계산
+                    caster_magic_attack = getattr(attacker, 'magic_attack', 50)
+                    divine_heal = int(caster_magic_attack * 0.3)  # 마법력의 30%
+                    
+                    for ally in self._current_party:
+                        # 플레이어 파티 멤버만 회복 (적이 아닌지 다시 확인)
+                        ally_is_player = hasattr(ally, 'character_class') and ally.character_class != "Enemy"
+                        if ally.current_hp > 0 and ally_is_player:
+                            ally.heal(divine_heal)
+                            healed_allies.append(f"{ally.name}({divine_heal})")
+                            # 신의 가호 (모든 저항 증가)
+                            setattr(ally, 'divine_protection', True)
+                            setattr(ally, 'divine_protection_turns', 4)
+                    if healed_allies:
+                        print(f"✨ 치유의 심판! 아군 회복: {', '.join(healed_allies)}")
+                        print(f"🛡️ 아군 전체에게 신의 가호 부여!")
+            # 적에게는 정상적으로 피해를 줌 (return 제거)
                 
         elif character_class == "마검사" and skill.name == "마검 오의":
             # 물리와 마법의 완벽한 융합
@@ -2245,19 +3393,29 @@ class BraveCombatSystem:
                 print(f"🗡️ 치명타 추가 피해: {crit_bonus} HP!")
                 
         elif character_class == "성기사" and skill.name == "심판의 빛":
-            # 아군 전체 상태이상 해제 및 소량 회복
-            if hasattr(self, 'party') and self.party:
-                for ally in self.party:
-                    if ally.current_hp > 0:
+            # 아군 전체 상태이상 해제 및 소량 회복 (플레이어 파티만)
+            attacker_is_player = hasattr(attacker, 'character_class') and attacker.character_class != "Enemy"
+            
+            if attacker_is_player and hasattr(self, '_current_party') and self._current_party:
+                # 플레이어 성기사만 플레이어 파티 회복
+                # 시전자의 마법력 기반 회복량 계산
+                caster_magic_attack = getattr(attacker, 'magic_attack', 50)
+                heal_amount = int(caster_magic_attack * 0.2)  # 마법력의 20%
+                
+                healed_count = 0
+                for ally in self._current_party:
+                    # 플레이어 파티 멤버만 회복 (적이 아닌지 확인)
+                    ally_is_player = hasattr(ally, 'character_class') and ally.character_class != "Enemy"
+                    if ally.current_hp > 0 and ally_is_player:
                         # 상태이상 해제
                         debuffs = ['is_poisoned', 'is_burning', 'is_frozen', 'is_stunned']
                         for debuff in debuffs:
                             if hasattr(ally, debuff):
                                 setattr(ally, debuff, False)
-                        # 소량 회복
-                        heal_amount = int(hp_damage * 0.15)
+                        # 마법력 기반 회복
                         ally.heal(heal_amount)
-                        print(f"✨ {ally.name} 상태이상 해제 & {heal_amount} HP 회복!")
+                        healed_count += 1
+                print(f"✨ 심판의 빛! 아군 {healed_count}명 상태이상 해제 & {heal_amount} HP 회복!")
                         
         elif character_class == "검사" and skill.name == "일섬":
             # 완벽한 베기로 방어력 무시 + 출혈 효과
@@ -2267,13 +3425,22 @@ class BraveCombatSystem:
             setattr(target, 'bleeding_damage', int(hp_damage * 0.1))
             
         elif character_class == "성직자" and skill.name == "신성한 심판":
-            # 아군 전체 HP 회복
-            if hasattr(self, 'party') and self.party:
-                heal_amount = int(hp_damage * 0.4)
-                for ally in self.party:
-                    if ally.current_hp > 0:
+            # 아군 전체 HP 회복 (플레이어 파티만)
+            attacker_is_player = hasattr(attacker, 'character_class') and attacker.character_class != "Enemy"
+            
+            if attacker_is_player and hasattr(self, '_current_party') and self._current_party:
+                # 시전자의 마법력 기반 회복량 계산
+                caster_magic_attack = getattr(attacker, 'magic_attack', 50)
+                heal_amount = int(caster_magic_attack * 0.4)  # 마법력의 40%
+                
+                healed_count = 0
+                for ally in self._current_party:
+                    # 플레이어 파티 멤버만 회복 (적이 아닌지 확인)
+                    ally_is_player = hasattr(ally, 'character_class') and ally.character_class != "Enemy"
+                    if ally.current_hp > 0 and ally_is_player:
                         ally.heal(heal_amount)
-                        print(f"🌟 신성한 빛이 {ally.name}을(를) {heal_amount} HP 회복!")
+                        healed_count += 1
+                print(f"🌟 신성한 심판! 아군 {healed_count}명이 {heal_amount} HP 회복!")
                         
         elif character_class == "암흑기사" and skill.name == "흡혈 강타":
             # 가한 피해의 60% HP 회복
@@ -2290,23 +3457,34 @@ class BraveCombatSystem:
                 setattr(target, 'strike_marks', 0)  # 표식 제거
                 print(f"💥 타격 표식 {strike_marks}중첩 폭발! 추가 {explosion_damage} HP 피해!")
                 
-                # 표식 폭발로 아군 회복
-                if hasattr(self, 'party') and self.party:
-                    heal_amount = int(explosion_damage * 0.3)
-                    for ally in self.party:
-                        if ally.current_hp > 0:
+                # 표식 폭발로 아군 회복 (플레이어 파티만)
+                attacker_is_player = hasattr(attacker, 'character_class') and attacker.character_class != "Enemy"
+                
+                if attacker_is_player and hasattr(self, '_current_party') and self._current_party:
+                    # 시전자의 마법력 기반 회복량 계산
+                    caster_magic_attack = getattr(attacker, 'magic_attack', 50)
+                    heal_amount = int(caster_magic_attack * 0.15)  # 마법력의 15%
+                    
+                    healed_count = 0
+                    for ally in self._current_party:
+                        # 플레이어 파티 멤버만 회복 (적이 아닌지 확인)
+                        ally_is_player = hasattr(ally, 'character_class') and ally.character_class != "Enemy"
+                        if ally.current_hp > 0 and ally_is_player:
                             ally.heal(heal_amount)
-                    print(f"✨ 표식 폭발 에너지가 아군들을 {heal_amount} HP 회복!")
+                            healed_count += 1
+                    print(f"✨ 표식 폭발 에너지가 아군 {healed_count}명을 {heal_amount} HP 회복!")
+        
+        # 기본 공격 후 딜레이 추가
+        attack_name = getattr(skill, 'name', '기본 공격') if skill else '기본 공격'
+        self.add_action_pause(f"⚔️ '{attack_name}' 공격 완료!")
         
     def execute_hp_attack(self, attacker: Character, target: Character):
-        """HP 공격 실행"""
-        # HP 공격 스킬 사용
-        hp_skills = [skill for skill in attacker.brave_skills if skill.attack_type == BraveAttackType.HP]
-        if hp_skills:
-            skill = hp_skills[0]  # 첫 번째 HP 스킬 사용
-        else:
-            # 직업별 기본 HP 공격
-            skill = self._get_class_specific_hp_attack(attacker)
+        """HP 공격 실행 - Brave 시스템 우선"""
+        # 직업별 기본 Brave HP 공격을 우선 사용
+        skill = self._get_class_specific_hp_attack(attacker)
+        
+        # 스킬 이름과 정보 출력 (디버깅용)
+        print(f"🔍 {attacker.name}({attacker.character_class})의 HP 공격: {skill.name}")
             
         return self._execute_hp_attack_on_target(attacker, target, skill, True)  # BRV 소모 포함
             
@@ -2316,15 +3494,10 @@ class BraveCombatSystem:
             return
             
         if skill is None:
-            # HP 공격 스킬 사용
-            hp_skills = [skill for skill in attacker.brave_skills if skill.attack_type == BraveAttackType.HP]
-            if hp_skills:
-                skill = hp_skills[0]  # 첫 번째 HP 스킬 사용
-            else:
-                # 직업별 기본 HP 공격 (광역용)
-                skill = self._get_class_specific_hp_attack(attacker)
-                # 광역 공격시 위력 조정
-                skill.hp_multiplier *= 0.8  # 80%로 감소
+            # 직업별 기본 Brave HP 공격을 우선 사용 (광역용)
+            skill = self._get_class_specific_hp_attack(attacker)
+            # 광역 공격시 위력 조정
+            skill.hp_multiplier *= 0.8  # 80%로 감소
         
         # BRV 소모를 미리 저장 (모든 대상에게 같은 파워로 공격하기 위해)
         stored_brave = attacker.brave_points
@@ -2345,8 +3518,8 @@ class BraveCombatSystem:
             damage = self._execute_hp_attack_on_target(attacker, target, skill, is_last_target)
             total_damage += damage
             
-            # 연속공격 간 짧은 딜레이
-            time.sleep(0.2)
+            # 연속공격 간 짧은 딜레이 - 더 빠르게
+            time_module.sleep(0.05)  # 50ms로 단축 (200ms→50ms)
             
         print(f"💀 총 {total_damage} 데미지를 가했습니다!")
     
@@ -2390,6 +3563,17 @@ class BraveCombatSystem:
         # 🔥 HP 공격 데미지 배율은 damage_calculator.py에서 통합 처리됨
         # (적군 HP 공격은 이미 0.01125 배율 적용)
         
+        # 특성 효과로 공격력 증가 적용
+        hp_damage = trait_integrator.apply_attack_trait_effects(attacker, target, hp_damage)
+        
+        # 무기 숙련도 효과 적용
+        if hasattr(attacker, 'equipped_weapon') and attacker.equipped_weapon:
+            weapon_type = getattr(attacker.equipped_weapon, 'weapon_type', 'sword')
+            hp_damage = trait_integrator.apply_weapon_mastery_effects(attacker, weapon_type, hp_damage)
+        
+        # 대상 방어 특성 효과 적용
+        hp_damage = trait_integrator.apply_defense_trait_effects(target, hp_damage)
+        
         # 특성 효과 적용
         if hasattr(attacker, 'temp_attack_bonus'):
             hp_damage = int(hp_damage * (1 + attacker.temp_attack_bonus))
@@ -2424,8 +3608,14 @@ class BraveCombatSystem:
         # 기존 이펙트도 유지
         enhanced_battle_effect("damage", damage=hp_damage, critical=(hasattr(target, 'is_broken') and target.is_broken))
         
+        # BRV 소모 먼저 처리 (HP 공격 시작 표시)
+        if consume_brave:
+            consumed_brave = attacker.consume_brave_points()
+        
         # 데미지 적용
         actual_hp_damage = target.take_damage(hp_damage)
+        print(f"💥 {target.name}에게 {actual_hp_damage} HP 데미지!")
+        
         target.add_wounds(wound_damage)
         
         # 생명 흡수 적용
@@ -2440,47 +3630,34 @@ class BraveCombatSystem:
                 trait_messages = attacker.trigger_trait_effects("kill" if target.current_hp <= 0 else "attack")
                 for msg in trait_messages:
                     print(f"✨ {attacker.name}: {msg}")
+                
+                # ⏳ 특성 효과 확인 위해 2초 대기 (엔터로 스킵 가능)
+                if trait_messages and hasattr(self, 'gauge_animator'):
+                    self.gauge_animator._wait_with_skip_option(2.0, "HP 공격 특성 효과 확인")
         
         # 직업별 HP 공격 특수 효과 적용
         if hasattr(skill, 'name'):
             self._apply_class_specific_hp_effects(attacker, target, skill, actual_hp_damage)
         
-        # BRV 소모 (마지막 대상인 경우에만)
-        if consume_brave:
-            old_brave = attacker.brave_points
-            consumed_brave = attacker.consume_brave_points()
-            
-            print(f"💫 {attacker.name}의 Brave 포인트: {old_brave} → 0 (HP 공격으로 소모)")
-            
-            # Brave 변화 비주얼 이펙트 표시
-            self.visualizer.show_brave_change(attacker, old_brave, attacker.brave_points)
-        
         # 대상이 죽었는지 확인
         if target.current_hp <= 0:
             self.visualizer.show_death_effect(target)
             enhanced_battle_effect("death", character_name=target.name)
+        
+        # HP 공격 결과 확인 - 대기 시간 제거 (어차피 턴 정산에서 대기)
             
         return actual_hp_damage
         
-        # 기존 이펙트도 유지
-        enhanced_battle_effect("damage", damage=hp_damage, critical=(hasattr(target, 'is_broken') and target.is_broken))
-        
-        # 데미지 적용
-        actual_hp_damage = target.take_damage(hp_damage)
-        target.add_wounds(wound_damage)
-        
-        # 생명 흡수 적용
-        if life_steal_amount > 0:
-            healed = attacker.heal(life_steal_amount)
-            if healed > 0:
-                print(f"💚 {attacker.name}이(가) {healed} HP 회복 (생명 흡수)")
-        
-        # 특성 트리거 효과 발동
+        # 특성 트리거 효과 발동 (중복 제거된 버전)
         if hasattr(attacker, 'trigger_trait_effects'):
             if actual_hp_damage > 0:
                 trait_messages = attacker.trigger_trait_effects("kill" if target.current_hp <= 0 else "attack")
                 for msg in trait_messages:
                     print(f"✨ {attacker.name}: {msg}")
+                
+                # ⏳ 특성 효과 확인 위해 2초 대기 (엔터로 스킵 가능)
+                if trait_messages and hasattr(self, 'gauge_animator'):
+                    self.gauge_animator._wait_with_skip_option(2.0, "마지막 특성 효과 확인")
         
         # 공격자 Brave 소모 (HP 공격 후)
         old_brave = attacker.brave_points
@@ -2509,11 +3686,19 @@ class BraveCombatSystem:
         if self.check_battle_end(party, enemies):
             return self.determine_winner(party, enemies)
             
+        # 턴 시작 시 특성 효과 적용
+        self.trait_integrator.apply_turn_start_trait_effects(enemy)
+            
         # 턴 시작 시 INT BRV 회복 처리
         if hasattr(enemy, 'recover_int_brv_on_turn_start'):
+            old_brv = enemy.brave_points
             recovered = enemy.recover_int_brv_on_turn_start()
             if recovered > 0:
                 print(f"🔄 {enemy.name}의 BRV가 INT BRV {recovered}로 회복되었습니다!")
+                
+                # BRV 회복 (자동 애니메이션 트리거)
+                # enemy.brave_points는 이미 recover_int_brv_on_turn_start()에서 설정됨
+                
                 # BREAK 상태 해제 체크
                 if getattr(enemy, 'is_broken', False) and enemy.brave_points > 0:
                     enemy.is_broken = False
@@ -2523,7 +3708,7 @@ class BraveCombatSystem:
         if not alive_party:
             return self.determine_winner(party, enemies)
             
-        print(f"\n👹 {enemy.name}의 턴!")
+        print(f"\n{Color.BRIGHT_RED}[{enemy.name} 턴]{Color.RESET}")
         
         # 개선된 AI 로직 (더 빠른 전투)
         if enemy.brave_points >= 400 and random.random() < 0.5:  # 1000 → 400, 40% → 50%
@@ -2559,369 +3744,55 @@ class BraveCombatSystem:
         
         # 방어 상태 변화 표시
         self.visualizer.show_status_change(character, "방어 태세")
-        self.visualizer.show_brave_change(character, old_brave, character.brave_points)
+        
+        # BRV 회복 애니메이션
+        if hasattr(self, '_current_party') and hasattr(self, '_current_enemies'):
+            self.animate_value_change(character, 'BRV', old_brave, character.brave_points, self._current_party, self._current_enemies)
+        else:
+            self.visualizer.show_brave_change(character, old_brave, character.brave_points)
+        
+        # 방어 액션 후 딜레이 추가
+        self.add_action_pause(f"🛡️ {character.name} 방어 완료!")
         
     def show_battle_status(self, current_char: Character, party: List[Character], enemies: List[Character]):
-        """전투 상황 표시 - 더욱 이쁘고 깔끔한 디자인"""
-        # 화면 클리어
-        import os
-        os.system('cls' if os.name == 'nt' else 'clear')
+        """전투 상황 표시 - 버퍼링 기반 깜빡임 방지 버전"""
+        from .buffered_display import get_buffered_display
+        from .ui_animations import get_gauge_animator
+        import time as time_module
         
-        # 모든 캐릭터의 평균 속도 계산
-        all_chars = party + enemies
-        alive_chars = [char for char in all_chars if char.is_alive]
-        if alive_chars:
-            avg_speed = sum(getattr(char, 'speed', 50) for char in alive_chars) / len(alive_chars)
-        else:
-            avg_speed = 50  # 기본값
+        # 🎯 게이지 애니메이션이 진행 중일 때 대기
+        gauge_animator = get_gauge_animator()
+        if gauge_animator.is_processing:
+            # 게이지 애니메이션이 끝날 때까지 최대 3초 대기
+            wait_count = 0
+            while gauge_animator.is_processing and wait_count < 30:
+                time_module.sleep(0.1)
+                wait_count += 1
         
-        print(f"\n{Color.BRIGHT_CYAN}{'─'*78}{Color.RESET}")
-        print(f"{Color.BRIGHT_WHITE}⚔️ DAWN OF STELLAR - BRAVE BATTLE ⚔️{Color.RESET}")
-        print(f"{Color.BRIGHT_CYAN}{'─'*78}{Color.RESET}")
+        # 버퍼링 디스플레이 사용
+        display = get_buffered_display()
+        display.clear_buffer()
         
-        # 파티 상태 표시
-        print(f"\n{Color.BRIGHT_BLUE}{'─'*70}{Color.RESET}")
-        print(f"{Color.BRIGHT_WHITE}🛡️  아군 파티 상태{Color.RESET}")
-        print(f"{Color.BRIGHT_BLUE}{'─'*70}{Color.RESET}")
+        # 최적화된 게이지 시스템으로 파티와 적군 상태 표시
+        gauge_system = OptimizedGaugeSystem()
         
-        for i, member in enumerate(party, 1):
-            if member.is_alive:  # 모든 살아있는 아군 표시
-                # 현재 턴 캐릭터 강조
-                if member == current_char:
-                    name_color = Color.BRIGHT_CYAN
-                    status_icon = "▶"
-                else:
-                    name_color = Color.WHITE
-                    status_icon = " "
-                
-                # HP 상태 색상과 바
-                hp_ratio = member.current_hp / member.max_hp if member.max_hp > 0 else 0
-                if hp_ratio > 0.7:
-                    hp_color = Color.BRIGHT_GREEN
-                    hp_icon = "💚"
-                elif hp_ratio > 0.4:
-                    hp_color = Color.YELLOW
-                    hp_icon = "💛"
-                elif hp_ratio > 0.15:
-                    hp_color = Color.BRIGHT_RED
-                    hp_icon = "🧡"
-                else:
-                    hp_color = Color.RED
-                    hp_icon = "❤️"
-                
-                # MP 상태 색상과 바
-                mp_ratio = member.current_mp / member.max_mp if member.max_mp > 0 else 0
-                if mp_ratio > 0.5:
-                    mp_color = Color.BRIGHT_BLUE
-                    mp_icon = "💙"
-                elif mp_ratio > 0.2:
-                    mp_color = Color.BLUE
-                    mp_icon = "💜"
-                else:
-                    mp_color = Color.BRIGHT_BLACK
-                    mp_icon = "🤍"
-                
-                # ATB 게이지 - 캐스팅 중이면 캐스팅 진행도 표시
-                atb_gauge = getattr(member, 'atb_gauge', 0)
-                
-                # 캐스팅 상태 체크
-                if hasattr(member, 'is_casting') and member.is_casting:
-                    # ATB 기반 캐스팅 진행도 계산 (스케일링된 게이지)
-                    cast_time = getattr(member, 'casting_cast_time', 25)  # 기본 25%
-                    casting_progress = min(1.0, member.atb_gauge / cast_time)  # 실제 진행도 (0.0 ~ 1.0)
-                    casting_percent = int(casting_progress * 100)  # 표시용 퍼센트 (0 ~ 100%)
-                    casting_filled = int(casting_progress * 10)  # 게이지 채움 칸수 (0 ~ 10)
-                    atb_display = f"{Color.BRIGHT_MAGENTA}🔮{casting_percent:3}%{Color.RESET}"
-                    atb_bar = f"{Color.BRIGHT_MAGENTA}{'▰'*casting_filled}{Color.BRIGHT_BLACK}{'▱'*(10-casting_filled)} {Color.RESET}"
-                    atb_icon = "🔮"
-                elif atb_gauge >= self.ATB_READY_THRESHOLD:
-                    atb_display = f"{Color.BRIGHT_YELLOW}READY{Color.RESET}"  # 색상 적용
-                    atb_bar = f"{Color.BRIGHT_YELLOW}{'▰'*10}{Color.RESET}"
-                    atb_icon = "⏳"
-                else:
-                    atb_percent = int(atb_gauge // self.ATB_DISPLAY_SCALE)  # 디스플레이용 스케일 변환
-                    # 진행도에 따른 그라데이션 색상 (푸른색 → 하늘색)
-                    if atb_percent >= 80:
-                        atb_color = Color.BRIGHT_CYAN  # 80% 이상: 밝은 하늘색
-                    elif atb_percent >= 60:
-                        atb_color = Color.CYAN  # 60-80%: 하늘색
-                    elif atb_percent >= 40:
-                        atb_color = Color.BLUE  # 40-60%: 푸른색
-                    else:
-                        atb_color = Color.BRIGHT_BLUE  # 40% 미만: 어두운 파랑
-                    
-                    atb_display = f"{atb_color}{atb_percent}%{Color.RESET}"
-                    filled = int(min(10, max(0, atb_percent // 10)))  # 0-10 범위로 제한
-                    atb_bar = f"{atb_color}{'▰'*filled}{Color.BRIGHT_BLACK}{'▱'*(10-filled)}{Color.RESET}"
-                    atb_icon = "⏳"
-                
-                # 레벨과 클래스 아이콘
-                level_display = f"Lv.{getattr(member, 'level', 1):2}"
-                character_class = getattr(member, 'character_class', '모험가')
-                class_icon = {
-                    # 기본 4개 직업
-                    '전사': '⚔️', '아크메이지': '🔮', '궁수': '🏹', '도적': '🗡️',
-                    # 기본 확장 직업
-                    '성기사': '🛡️', '암흑기사': '💀', '몽크': '👊', '바드': '🎵', '네크로맨서': '💀',
-                    # 중급 직업
-                    '용기사': '🐉', '검성': '⚔️', '정령술사': '🌟', '암살자': '🔪', '기계공학자': '🔧',
-                    # 고급 직업
-                    '무당': '🔯', '해적': '🏴‍☠️', '사무라이': '🗾', '드루이드': '🌿', '철학자': '📘',
-                    # 마스터 직업
-                    '시간술사': '⏰', '연금술사': '⚗️', '검투사': '🏛️', '기사': '🐎', '신관': '✨',
-                    # 전설 직업
-                    '마검사': '⚡', '차원술사': '🌌', '광전사': '💥'
-                }.get(character_class, '🎭')
-                
-                # HP/MP 게이지 바 생성
-                hp_bar_length = 10
-                hp_filled = int((hp_ratio * hp_bar_length))
-                hp_bar = "▰" * hp_filled + "▱" * (hp_bar_length - hp_filled) + " "
-                
-                mp_bar_length = 10
-                mp_filled = int((mp_ratio * mp_bar_length))
-                mp_bar = "▰" * mp_filled + "▱" * (mp_bar_length - mp_filled) + " "
-                
-                # Brave 포인트
-                brave_points = getattr(member, 'brave_points', 0)
-                
-                # 상태이상 아이콘들
-                status_icons = ""
-                if hasattr(member, 'is_casting') and member.is_casting:
-                    status_icons += " 🔮"
-                if hasattr(member, 'is_broken_state') and member.is_broken_state:
-                    status_icons += " 💥"
-                if hasattr(member, 'is_stunned') and member.is_stunned:
-                    status_icons += " 💫"
-                if hasattr(member, 'temp_speed_penalty') and getattr(member, 'temp_speed_penalty', 0) > 0:
-                    status_icons += " 🐢"
-                if hasattr(member, 'is_poisoned') and member.is_poisoned:
-                    status_icons += " 💚"
-                if hasattr(member, 'is_burning') and member.is_burning:
-                    status_icons += " 🔥"
-                if hasattr(member, 'is_frozen') and member.is_frozen:
-                    status_icons += " ❄️"
-                
-                # 캐스팅/브레이크 상태 확인
-                casting_status = ""
-                if hasattr(member, 'is_casting') and member.is_casting:
-                    skill_name = getattr(member, 'casting_skill_name', '알 수 없는 스킬')
-                    casting_status = f" {Color.BRIGHT_MAGENTA}[CASTING: {skill_name}]{Color.RESET}"
-                
-                break_status = ""
-                if hasattr(member, 'is_broken_state') and member.is_broken_state:
-                    break_status = f" {Color.BRIGHT_RED}[BREAK]{Color.RESET}"
-                elif hasattr(member, 'is_broken') and member.is_broken:
-                    break_status = f" {Color.BRIGHT_RED}[BREAK]{Color.RESET}"
-                
-                # ATB 바 생성 (새로운 방식)
-                atb_gauge = getattr(member, 'atb_gauge', 0)
-                atb_bar = self._create_atb_bar(atb_gauge, True, True, member)
-                
-                # 3줄 형식 (턴이 왔을 때)
-                print(f"{status_icon}{class_icon} Lv.{getattr(member, 'level', 1)} {name_color}{member.name}{Color.RESET}{status_icons}")
-                
-                # HP/MP 게이지와 값들
-                hp_value_str = f"{hp_color}{member.current_hp}{Color.RESET} / {Color.WHITE}{member.max_hp}{Color.RESET}"
-                mp_value_str = f"{mp_color}{member.current_mp}{Color.RESET} / {Color.WHITE}{member.max_mp}{Color.RESET}"
-                hp_bar_colored = f"[{hp_color}{hp_bar.replace(' ', '')}{Color.RESET}]"
-                mp_bar_colored = f"[{mp_color}{mp_bar.replace(' ', '')}{Color.RESET}]"
-                
-                # BRV 색상 (0-299면 빨간색, MAX BRV = 현재 BRV일 때 마젠타)
-                if brave_points <= 299:
-                    brv_color = Color.BRIGHT_RED
-                elif brave_points >= member.brave_manager.get_max_brave(member):  # MAX BRV = 현재 BRV일 때 마젠타
-                    brv_color = Color.BRIGHT_MAGENTA
-                else:
-                    brv_color = Color.BRIGHT_YELLOW
-                
-                # SPD 색상 (상대적 속도 - 실제 평균 대비 퍼센트)
-                member_speed = getattr(member, 'speed', 50)
-                speed_ratio = (member_speed / avg_speed) if avg_speed > 0 else 1.0
-                speed_percent_diff = (speed_ratio - 1.0) * 100  # 평균 대비 퍼센트 차이
-                
-                if speed_percent_diff >= 30:  # +30% 이상
-                    spd_color = Color.BRIGHT_GREEN  # 매우 빠름
-                elif speed_percent_diff >= 15:  # +15% 이상
-                    spd_color = Color.GREEN  # 빠름
-                elif speed_percent_diff >= -15:  # ±15% 이내
-                    spd_color = Color.WHITE  # 보통
-                elif speed_percent_diff >= -30:  # -15% ~ -30%
-                    spd_color = Color.YELLOW  # 느림
-                else:  # -30% 미만
-                    spd_color = Color.BRIGHT_RED  # 매우 느림
-                
-                print(f"{hp_icon} HP: {hp_value_str} {hp_bar_colored} | {mp_icon} MP: {mp_value_str} {mp_bar_colored} | {brv_color}⚡ BRV: {brave_points}{Color.RESET}  |")
-                
-                # ATB 라인 - TIME으로 표시 (대괄호는 흰색)
-                atb_bar_display = f"{Color.WHITE}[{atb_bar}]{Color.RESET}"
-                print(f"        ⏳ TIME: {atb_bar_display} {atb_display} | SPD: {spd_color}{member_speed}{Color.RESET}{casting_status}{break_status} |")
-                print()
-                
-            else:
-                # 전투불능 상태 표시 (모든 전투불능 멤버)
-                if member == current_char:
-                    status_icon = "▶"
-                else:
-                    status_icon = " "
-                print(f"{status_icon} 💀 {Color.RED}{member.name} - 전투불능{Color.RESET}")
-                print()
+        # 파티 상태를 버퍼에 추가
+        party_status = gauge_system.show_optimized_party_status(party, current_char)
+        for line in party_status.split('\n'):
+            if line.strip():  # 빈 라인이 아닌 경우만 추가
+                display.add_line(line)
         
-        # 적 상태 표시
-        print(f"\n{Color.BRIGHT_RED}{'─'*70}{Color.RESET}")
-        print(f"{Color.BRIGHT_WHITE}⚔️  적군 상태{Color.RESET}")
-        print(f"{Color.BRIGHT_RED}{'─'*70}{Color.RESET}")
+        # 적군 상태를 버퍼에 추가
+        enemy_status = gauge_system.show_optimized_enemy_status(enemies)
+        for line in enemy_status.split('\n'):
+            if line.strip():  # 빈 라인이 아닌 경우만 추가
+                display.add_line(line)
         
-        alive_enemies = [e for e in enemies if e.is_alive]
-        for i, enemy in enumerate(alive_enemies, 1):
-            # 현재 턴 적 강조
-            if enemy == current_char:
-                name_color = Color.BRIGHT_RED
-                status_icon = "▶"
-            else:
-                name_color = Color.WHITE
-                status_icon = " "
-            
-            # HP 상태 색상과 아이콘
-            hp_ratio = enemy.current_hp / enemy.max_hp if enemy.max_hp > 0 else 0
-            if hp_ratio > 0.7:
-                hp_color = Color.BRIGHT_GREEN
-                hp_icon = "💚"
-            elif hp_ratio > 0.4:
-                hp_color = Color.YELLOW
-                hp_icon = "💛"
-            elif hp_ratio > 0.15:
-                hp_color = Color.BRIGHT_RED
-                hp_icon = "🧡"
-            else:
-                hp_color = Color.RED
-                hp_icon = "❤️"
-            
-            # ATB 게이지 - 캐스팅 중이면 캐스팅 진행도 표시
-            atb_gauge = getattr(enemy, 'atb_gauge', 0)
-            
-            # 캐스팅 상태 체크
-            if hasattr(enemy, 'is_casting') and enemy.is_casting:
-                # ATB 기반 캐스팅 진행도 계산 (스케일링된 게이지)
-                cast_time = getattr(enemy, 'casting_cast_time', 25)  # 기본 25%
-                casting_progress = min(1.0, enemy.atb_gauge / cast_time)  # 실제 진행도 (0.0 ~ 1.0)
-                casting_percent = int(casting_progress * 100)  # 표시용 퍼센트 (0 ~ 100%)
-                casting_filled = int(casting_progress * 10)  # 게이지 채움 칸수 (0 ~ 10)
-                atb_display = f"{Color.BRIGHT_MAGENTA}🔮{casting_percent:3}%{Color.RESET}"
-                atb_bar = f"{Color.BRIGHT_MAGENTA}{'▰'*casting_filled}{Color.BRIGHT_BLACK}{'▱'*(10-casting_filled)} {Color.RESET}"
-                atb_icon = "🔮"
-            elif atb_gauge >= self.ATB_READY_THRESHOLD:
-                atb_display = f"{Color.BRIGHT_YELLOW}READY{Color.RESET}"  # 색상 적용
-                atb_bar = f"{Color.BRIGHT_YELLOW}{'▰'*10}{Color.RESET}"
-                atb_icon = "⚡"
-            else:
-                atb_percent = int(atb_gauge // self.ATB_DISPLAY_SCALE)  # 디스플레이용 스케일 변환
-                # 진행도에 따른 그라데이션 색상 (푸른색 → 하늘색)
-                if atb_percent >= 80:
-                    atb_color = Color.BRIGHT_CYAN  # 80% 이상: 밝은 하늘색
-                elif atb_percent >= 60:
-                    atb_color = Color.CYAN  # 60-80%: 하늘색
-                elif atb_percent >= 40:
-                    atb_color = Color.BLUE  # 40-60%: 푸른색
-                else:
-                    atb_color = Color.BRIGHT_BLUE  # 40% 미만: 어두운 파랑
-                
-                atb_display = f"{atb_color}{atb_percent}%{Color.RESET}"
-                filled = int(min(10, max(0, atb_percent // 10)))  # 0-10 범위로 제한
-                atb_bar = f"{atb_color}{'▰'*filled}{Color.BRIGHT_BLACK}{'▱'*(10-filled)}{Color.RESET}"
-                atb_icon = "⏳" if atb_percent < 50 else "🔶"
-            
-            # 상태이상 아이콘들 (실제 상태이상 시스템 연동)
-            status_icons = ""
-            
-            # 캐스팅 상태
-            if hasattr(enemy, 'is_casting') and enemy.is_casting:
-                status_icons += " 🔮"
-            
-            # BREAK 상태
-            if hasattr(enemy, 'is_broken') and enemy.is_broken:
-                status_icons += " 💥"
-            elif hasattr(enemy, 'is_broken_state') and enemy.is_broken_state:
-                status_icons += " 💥"
-            
-            # 실제 상태이상 시스템에서 상태 확인
-            if hasattr(enemy, 'status_effects') and enemy.status_effects:
-                try:
-                    from .status_effects import StatusType
-                    from .new_skill_system import get_status_icon
-                    
-                    status_types_found = []
-                    for effect in enemy.status_effects:
-                        if effect.status_type not in status_types_found:
-                            status_types_found.append(effect.status_type)
-                            icon = get_status_icon(effect.status_type)
-                            status_icons += f" {icon}"
-                except ImportError:
-                    # 폴백: 구버전 호환
-                    pass
-            
-            # 임시 상태 (구버전 호환)
-            if hasattr(enemy, 'temp_speed_penalty') and getattr(enemy, 'temp_speed_penalty', 0) > 0:
-                status_icons += " 🟦"  # 둔화
-            
-            # 캐스팅/브레이크 상태 확인
-            casting_status = ""
-            if hasattr(enemy, 'is_casting') and enemy.is_casting:
-                skill_name = getattr(enemy, 'casting_skill_name', '알 수 없는 스킬')
-                casting_status = f" {Color.BRIGHT_MAGENTA}[CASTING: {skill_name}]{Color.RESET}"
-            
-            break_status = ""
-            if hasattr(enemy, 'is_broken_state') and enemy.is_broken_state:
-                break_status = f" {Color.BRIGHT_RED}[BREAK]{Color.RESET}"
-            elif hasattr(enemy, 'is_broken') and enemy.is_broken:
-                break_status = f" {Color.BRIGHT_RED}[BREAK]{Color.RESET}"
-            
-            # Brave 포인트
-            brave_points = getattr(enemy, 'brave_points', 0)
-            
-            # ATB 바 생성 (새로운 방식)
-            atb_gauge = getattr(enemy, 'atb_gauge', 0)
-            atb_bar = self._create_atb_bar(atb_gauge, True, False, enemy)
-            
-            # 3줄 형식 (적군 턴이 왔을 때)
-            print(f"{status_icon} ⚔️ {name_color}{enemy.name}{Color.RESET}{status_icons}")
-            
-            # HP 값과 BRV 색상 개선
-            hp_value_str = f"{hp_color}{enemy.current_hp}{Color.RESET} / {Color.WHITE}{enemy.max_hp}{Color.RESET}"
-            
-            # BRV 색상 (0-299면 빨간색, MAX BRV = 현재 BRV일 때 마젠타)
-            if brave_points <= 299:
-                brv_color = Color.BRIGHT_RED
-            elif brave_points >= getattr(enemy, 'brave_manager', type('obj', (), {'get_max_brave': lambda x: 9999})()).get_max_brave(enemy):  # MAX BRV = 현재 BRV일 때 마젠타
-                brv_color = Color.BRIGHT_MAGENTA
-            else:
-                brv_color = Color.BRIGHT_YELLOW
-            
-            # SPD 색상 (상대적 속도 - 실제 평균 대비 퍼센트)
-            enemy_speed = getattr(enemy, 'speed', 50)
-            speed_ratio = (enemy_speed / avg_speed) if avg_speed > 0 else 1.0
-            speed_percent_diff = (speed_ratio - 1.0) * 100  # 평균 대비 퍼센트 차이
-            
-            if speed_percent_diff >= 30:  # +30% 이상
-                spd_color = Color.BRIGHT_GREEN  # 매우 빠름
-            elif speed_percent_diff >= 15:  # +15% 이상
-                spd_color = Color.GREEN  # 빠름
-            elif speed_percent_diff >= -15:  # ±15% 이내
-                spd_color = Color.WHITE  # 보통
-            elif speed_percent_diff >= -30:  # -15% ~ -30%
-                spd_color = Color.YELLOW  # 느림
-            else:  # -30% 미만
-                spd_color = Color.BRIGHT_RED  # 매우 느림
-            
-            print(f"{hp_icon} HP: {hp_value_str} | {brv_color}⚡ BRV: {brave_points}{Color.RESET}  |")
-            
-            # ATB 라인 - TIME으로 표시 (대괄호는 흰색)
-            atb_bar_display = f"{Color.WHITE}[{atb_bar}]{Color.RESET}"
-            print(f"        ⏳ TIME: {atb_bar_display} {atb_display} | SPD: {spd_color}{enemy_speed}{Color.RESET}{casting_status}{break_status} |")
-            print()
+        # 최적화된 렌더링으로 출력 (변경된 부분만 업데이트)
+        display.render_optimized()
 
     def _get_party_status_string(self, current_char: Character, party: List[Character], enemies: List[Character]) -> str:
-        """파티 상태를 문자열로 반환 (메뉴 통합 표시용)"""
+        """파티 상태를 문자열로 반환 (메뉴 통합 표시용) - 새로운 깔끔한 형식"""
         status_lines = []
         
         # 모든 캐릭터의 평균 속도 계산
@@ -2930,21 +3801,21 @@ class BraveCombatSystem:
         if alive_chars:
             avg_speed = sum(getattr(char, 'speed', 50) for char in alive_chars) / len(alive_chars)
         else:
-            avg_speed = 50  # 기본값
+            avg_speed = 50
         
-        # 헤더
-        status_lines.append(f"{Color.BRIGHT_CYAN}{'─'*78}{Color.RESET}")
-        status_lines.append(f"{Color.BRIGHT_WHITE}⚔️ DAWN OF STELLAR - BRAVE BATTLE ⚔️{Color.RESET}")
-        status_lines.append(f"{Color.BRIGHT_YELLOW}현재 차례: {current_char.name}{Color.RESET}")
-        status_lines.append(f"{Color.BRIGHT_CYAN}{'─'*78}{Color.RESET}")
-        
-        # 파티 상태
-        status_lines.append(f"\n{Color.BRIGHT_BLUE}{'─'*70}{Color.RESET}")
+        # 아군 파티 상태
+        status_lines.append(f"{Color.BRIGHT_BLUE}{'─'*70}{Color.RESET}")
         status_lines.append(f"{Color.BRIGHT_WHITE}🛡️  아군 파티 상태{Color.RESET}")
         status_lines.append(f"{Color.BRIGHT_BLUE}{'─'*70}{Color.RESET}")
         
-        for i, member in enumerate(party, 1):
-            if member.is_alive:  # 모든 살아있는 아군 표시
+        for member in party:
+            # 적군 필터링
+            if hasattr(member, 'character_class') and member.character_class == 'Enemy':
+                continue
+            if member in enemies:
+                continue
+                
+            if member.is_alive:
                 # 현재 턴 캐릭터 강조
                 if member == current_char:
                     name_color = Color.BRIGHT_CYAN
@@ -2953,23 +3824,18 @@ class BraveCombatSystem:
                     name_color = Color.WHITE
                     status_icon = " "
                 
-                # 클래스 아이콘과 레벨
+                # 클래스 아이콘
                 character_class = getattr(member, 'character_class', '모험가')
-                class_icon = {
-                    # 기본 4개 직업
+                class_icons = {
                     '전사': '⚔️', '아크메이지': '🔮', '궁수': '🏹', '도적': '🗡️',
-                    # 기본 확장 직업
-                    '성기사': '🛡️', '암흑기사': '💀', '몽크': '👊', '바드': '🎵', '네크로맨서': '💀',
-                    # 중급 직업
-                    '용기사': '🐉', '검성': '⚔️', '정령술사': '🌟', '암살자': '🔪', '기계공학자': '🔧',
-                    # 고급 직업
-                    '무당': '🔯', '해적': '🏴‍☠️', '사무라이': '🗾', '드루이드': '🌿', '철학자': '📘',
-                    # 마스터 직업
-                    '시간술사': '⏰', '연금술사': '⚗️', '검투사': '🏛️', '기사': '🐎', '신관': '✨',
-                    # 전설 직업
+                    '성기사': '🛡️', '암흑기사': '💀', '몽크': '👊', '바드': '🎵', 
+                    '네크로맨서': '💀', '용기사': '🐉', '검성': '⚔️', '정령술사': '🌟', 
+                    '암살자': '🔪', '기계공학자': '🔧', '무당': '🔯', '해적': '🏴‍☠️', 
+                    '사무라이': '🗾', '드루이드': '🌿', '철학자': '📘', '시간술사': '⏰', 
+                    '연금술사': '⚗️', '검투사': '🏛️', '기사': '🐎', '신관': '✨',
                     '마검사': '⚡', '차원술사': '🌌', '광전사': '💥'
-                }.get(character_class, '🎭')
-                level_display = f"Lv.{getattr(member, 'level', 1):2}"
+                }
+                class_icon = class_icons.get(character_class, '🎭')
                 
                 # HP 상태 색상과 아이콘
                 hp_ratio = member.current_hp / member.max_hp if member.max_hp > 0 else 0
@@ -2986,28 +3852,125 @@ class BraveCombatSystem:
                     hp_color = Color.RED
                     hp_icon = "❤️"
                 
-                # MP 게이지 바 생성
-                mp_ratio = member.current_mp / member.max_mp if member.max_mp > 0 else 0
-                mp_bar_length = 10
-                mp_filled = int((mp_ratio * mp_bar_length))
-                mp_bar = "▰" * mp_filled + "▱" * (mp_bar_length - mp_filled) + " "
-                
                 # MP 상태 색상과 아이콘
+                mp_ratio = member.current_mp / member.max_mp if member.max_mp > 0 else 0
                 if mp_ratio > 0.5:
-                    mp_color = Color.BRIGHT_BLUE
+                    mp_color = Color.BRIGHT_GREEN
                     mp_icon = "💙"
                 elif mp_ratio > 0.2:
                     mp_color = Color.BLUE
-                    mp_icon = "💜"
+                    mp_icon = "💙"
                 else:
                     mp_color = Color.BRIGHT_BLACK
-                    mp_icon = "🤍"
+                    mp_icon = "💙"
+                
+                # ATB 게이지 - 아름다운 게이지 사용
+                atb_gauge = getattr(member, 'atb_gauge', 0)
+                
+                # 캐스팅 상태 체크
+                if hasattr(member, 'is_casting') and member.is_casting:
+                    cast_time = getattr(member, 'casting_duration', 250)  # ATB 스케일 기본값
+                    # 🎯 캐스팅 진행도 수정: 게이지가 0%에서 100%까지 채워지도록
+                    # 캐스팅 시작 시점부터 완료까지의 진행률을 100% 게이지로 표시
+                    
+                    # 캐스팅 시작 ATB값 가져오기 (없으면 0으로 가정)
+                    casting_start_atb = getattr(member, 'casting_start_atb', 0)
+                    
+                    # 현재 ATB에서 시작점을 뺀 진행량을 캐스트 타임으로 나누어 비율 계산
+                    if cast_time > 0:
+                        atb_progress = member.atb_gauge - casting_start_atb
+                        casting_progress = min(1.0, max(0.0, atb_progress / cast_time))
+                    else:
+                        casting_progress = 1.0
+                    
+                    casting_percent = int(casting_progress * 100)
+                    atb_display = f"{Color.BRIGHT_MAGENTA}🔮{casting_percent:3}%{Color.RESET}"
+                    
+                    # 캐스팅 게이지는 0%에서 100%까지 채워지는 진행률 표시
+                    atb_bar = self.create_beautiful_atb_gauge(casting_percent, 100, 15, True)
+                elif atb_gauge >= self.ATB_READY_THRESHOLD:
+                    atb_display = f"{Color.BRIGHT_YELLOW}READY{Color.RESET}"
+                    atb_bar = self.create_beautiful_atb_gauge(100, 100, 15, False)
+                else:
+                    atb_percent = min(100, int(atb_gauge / self.ATB_READY_THRESHOLD * 100))
+                    atb_display = f"{Color.BRIGHT_CYAN}{atb_percent}%{Color.RESET}"
+                    atb_bar = self.create_beautiful_atb_gauge(atb_percent, 100, 15, False)
+                
+                # HP/MP 게이지 바 생성 (아름다운 게이지 사용)
+                hp_bar = self.create_beautiful_hp_gauge(member.current_hp, member.max_hp, 15)
+                mp_bar = self.create_beautiful_mp_gauge(member.current_mp, member.max_mp, 15)
+                
+                # Brave 포인트
+                brave_points = getattr(member, 'brave_points', 0)
+                max_brv = member.brave_manager.get_max_brave(member) if hasattr(member, 'brave_manager') else 9999
+                
+                # Brave 포인트 색상
+                if brave_points <= 299:
+                    brv_color = Color.BRIGHT_RED
+                elif brave_points >= max_brv:
+                    brv_color = Color.BRIGHT_MAGENTA
+                else:
+                    brv_color = Color.BRIGHT_YELLOW
+                
+                # SPD 색상 (평균 대비)
+                member_speed = getattr(member, 'speed', 50)
+                speed_ratio = (member_speed / avg_speed) if avg_speed > 0 else 1.0
+                speed_percent_diff = (speed_ratio - 1.0) * 100
+                
+                if speed_percent_diff >= 30:
+                    spd_color = Color.BRIGHT_GREEN
+                elif speed_percent_diff >= 15:
+                    spd_color = Color.GREEN
+                elif speed_percent_diff >= -15:
+                    spd_color = Color.WHITE
+                elif speed_percent_diff >= -30:
+                    spd_color = Color.YELLOW
+                else:
+                    spd_color = Color.BRIGHT_RED
+                
+                # 상태이상 아이콘들
+                status_icons = ""
+                if hasattr(member, 'is_casting') and member.is_casting:
+                    status_icons += " 🔮"
+                if hasattr(member, 'is_broken_state') and member.is_broken_state:
+                    status_icons += " �"
+                
+                # 캐스팅 상태 표시
+                casting_status = ""
+                if hasattr(member, 'is_casting') and member.is_casting:
+                    skill_name = getattr(member, 'casting_skill_name', '알 수 없는 스킬')
+                    casting_status = f" {Color.BRIGHT_MAGENTA}[CASTING: {skill_name}]{Color.RESET}"
+                
+                # BREAK 상태 표시 추가
+                break_status = ""
+                if hasattr(member, 'is_broken') and member.is_broken:
+                    break_status = f" {Color.BRIGHT_RED}[BREAK]{Color.RESET}"
+                
+                # 컴팩트 1줄 형식으로 출력 (빈 줄 없음)
+                compact_line = f"  {status_icon} {class_icon} Lv.{getattr(member, 'level', 1)} {name_color}{member.name}{Color.RESET}"
+                compact_line += f" | 💚 HP: {member.current_hp}/{member.max_hp} {Color.WHITE}{{{hp_bar}}}{Color.RESET}"
+                compact_line += f" | 💙 MP: {member.current_mp}/{member.max_mp} {Color.WHITE}{{{mp_bar}}}{Color.RESET}"
+                compact_line += f" | {brv_color}⚡ BRV: {brave_points}{Color.RESET}"
+                compact_line += f" | ⏳ TIME: {Color.WHITE}{{{atb_bar}}}{Color.RESET} {atb_display} | SPD: {spd_color}{member_speed}{Color.RESET}{casting_status}{break_status}"
+                status_lines.append(compact_line)
+            else:
+                # 전투불능 상태 표시
+                status_lines.append(f"  💀 {Color.RED}{member.name} - 전투불능{Color.RESET}")
                 
                 # ATB 게이지 표시
                 atb_gauge = getattr(member, 'atb_gauge', 0)
                 if hasattr(member, 'is_casting') and member.is_casting:
-                    cast_time = getattr(member, 'casting_cast_time', 25)
-                    casting_progress = min(1.0, member.atb_gauge / cast_time)
+                    cast_time = getattr(member, 'casting_duration', 250)  # ATB 스케일 기본값
+                    # 캐스팅 시작 ATB값 가져오기 (없으면 0으로 가정)
+                    casting_start_atb = getattr(member, 'casting_start_atb', 0)
+                    
+                    # 현재 ATB에서 시작점을 뺀 진행량을 캐스트 타임으로 나누어 비율 계산
+                    if cast_time > 0:
+                        atb_progress = member.atb_gauge - casting_start_atb
+                        casting_progress = min(1.0, max(0.0, atb_progress / cast_time))
+                    else:
+                        casting_progress = 1.0
+                    
                     casting_percent = int(casting_progress * 100)
                     atb_display = f"{Color.BRIGHT_MAGENTA}🔮{casting_percent:3}%{Color.RESET}"
                     atb_icon = "🔮"
@@ -3015,7 +3978,7 @@ class BraveCombatSystem:
                     atb_display = f"{Color.BRIGHT_YELLOW}READY{Color.RESET}"  # 색상 적용
                     atb_icon = "⏳"
                 else:
-                    atb_percent = int(atb_gauge // self.ATB_DISPLAY_SCALE)
+                    atb_percent = min(100, int(atb_gauge / self.ATB_READY_THRESHOLD * 100))
                     # 진행도에 따른 그라데이션 색상 (푸른색 → 하늘색)
                     if atb_percent >= 80:
                         atb_color = Color.BRIGHT_CYAN  # 80% 이상: 밝은 하늘색
@@ -3093,34 +4056,44 @@ class BraveCombatSystem:
                 if hasattr(member, 'temp_speed_penalty') and getattr(member, 'temp_speed_penalty', 0) > 0:
                     status_icons += " 🟦"
                 
-                # HP 게이지 바 생성
-                hp_bar_length = 10
-                hp_filled = int((hp_ratio * hp_bar_length))
-                hp_bar = "▰" * hp_filled + "▱" * (hp_bar_length - hp_filled) + " "
+                # HP/MP 게이지 바 생성 (아름다운 게이지 사용)
+                hp_bar = self.create_beautiful_hp_gauge(member.current_hp, member.max_hp, 12)
+                mp_bar = self.create_beautiful_mp_gauge(member.current_mp, member.max_mp, 12)
                 
-                # ATB 바 생성 - 기본 색상 (상태이상일 때만 색 변경)
-                atb_bar = self._create_atb_bar(atb_gauge, True, True, member)
+                # ATB 바 생성 - 아름다운 ATB 게이지 사용
+                atb_percent = min(100, int(atb_gauge / self.ATB_READY_THRESHOLD * 100)) if atb_gauge < self.ATB_READY_THRESHOLD else 100
+                is_casting = hasattr(member, 'is_casting') and member.is_casting
+                atb_bar = self.create_beautiful_atb_gauge(atb_percent, 100, 12, is_casting)
                 
                 # 2줄 형식 (로딩 중일 때) - 간격 조정
                 status_lines.append(f"        {class_icon} {member.name}{status_icons}")
                 
-                # HP/MP 게이지와 ATB 진행률 표시
-                hp_bar_colored = f"[{hp_color}{hp_bar}{Color.RESET}]"
-                mp_bar_colored = f"[{mp_color}{mp_bar}{Color.RESET}]"
+                # HP/MP 게이지와 ATB 진행률 표시 (하얀 껍데기 추가)
+                hp_bar_colored = f"{Color.WHITE}[{hp_bar}]{Color.RESET}"
+                mp_bar_colored = f"{Color.WHITE}[{mp_bar}]{Color.RESET}"
                 
                 status_lines.append(f"        {hp_icon} HP: {hp_color}{member.current_hp}{Color.RESET} / {Color.WHITE}{member.max_hp}{Color.RESET}  {hp_bar_colored} | {mp_icon} MP: {mp_color}{member.current_mp}{Color.RESET} / {Color.WHITE}{member.max_mp}{Color.RESET}  {mp_bar_colored} | {brv_color}⚡ BRV: {brave_points}{Color.RESET}  |")
                 
                 # ATB 진행률 표시 (대괄호는 흰색)
                 atb_bar_simple = f"{Color.WHITE}[{atb_bar}]{Color.RESET}"
                 if hasattr(member, 'is_casting') and member.is_casting:
-                    cast_time = getattr(member, 'casting_cast_time', 25)
-                    casting_progress = min(1.0, member.atb_gauge / cast_time)
+                    cast_time = getattr(member, 'casting_duration', 250)  # ATB 스케일 기본값
+                    # 캐스팅 시작 ATB값 가져오기 (없으면 0으로 가정)
+                    casting_start_atb = getattr(member, 'casting_start_atb', 0)
+                    
+                    # 현재 ATB에서 시작점을 뺀 진행량을 캐스트 타임으로 나누어 비율 계산
+                    if cast_time > 0:
+                        atb_progress = member.atb_gauge - casting_start_atb
+                        casting_progress = min(1.0, max(0.0, atb_progress / cast_time))
+                    else:
+                        casting_progress = 1.0
+                    
                     casting_percent = int(casting_progress * 100)
                     atb_display_simple = f"{Color.BRIGHT_MAGENTA}{casting_percent}%{Color.RESET}"
                 elif atb_gauge >= self.ATB_READY_THRESHOLD:
                     atb_display_simple = f"{Color.BRIGHT_YELLOW}READY{Color.RESET}"
                 else:
-                    atb_percent = int(atb_gauge // self.ATB_DISPLAY_SCALE)
+                    atb_percent = min(100, int(atb_gauge / self.ATB_READY_THRESHOLD * 100))
                     # 진행도에 따른 그라데이션 색상
                     if atb_percent >= 80:
                         atb_color = Color.BRIGHT_CYAN  
@@ -3131,27 +4104,15 @@ class BraveCombatSystem:
                     else:
                         atb_color = Color.BRIGHT_BLUE 
                     atb_display_simple = f"{atb_color}{atb_percent}%{Color.RESET}"
-                
-                status_lines.append(f"        {atb_icon} TIME: {atb_bar_simple} {atb_display_simple} | SPD: {spd_color}{member_speed}{Color.RESET}{casting_status}{break_status} |")
-                status_lines.append("")  # 빈 줄 추가
-            else:
-                # 전투불능 상태 표시 (모든 전투불능 멤버)
-                if member == current_char:
-                    status_icon = "▶"
-                else:
-                    status_icon = " "
-                status_lines.append(f"{status_icon} 💀 {Color.RED}{member.name} - 전투불능{Color.RESET}")
-                status_lines.append("")
         
-        # 적군 상태 (상세하게)
+        # 적군 상태
         alive_enemies = [e for e in enemies if e.is_alive]
         if alive_enemies:
-            status_lines.append(f"\n{Color.BRIGHT_RED}{'─'*70}{Color.RESET}")
+            status_lines.append(f"{Color.BRIGHT_RED}{'─'*70}{Color.RESET}")
             status_lines.append(f"{Color.BRIGHT_WHITE}⚔️  적군 상태{Color.RESET}")
             status_lines.append(f"{Color.BRIGHT_RED}{'─'*70}{Color.RESET}")
             
-            for i, enemy in enumerate(alive_enemies, 1):
-                # 현재 턴 적 강조
+            for enemy in alive_enemies:
                 if enemy == current_char:
                     name_color = Color.BRIGHT_RED
                     status_icon = "▶"
@@ -3159,173 +4120,30 @@ class BraveCombatSystem:
                     name_color = Color.WHITE
                     status_icon = " "
                 
-                # HP 상태 색상
-                hp_ratio = enemy.current_hp / enemy.max_hp if enemy.max_hp > 0 else 0
-                if hp_ratio > 0.7:
-                    hp_color = Color.BRIGHT_GREEN
-                elif hp_ratio > 0.4:
-                    hp_color = Color.YELLOW
-                else:
-                    hp_color = Color.BRIGHT_RED
-                
-                # ATB 게이지 - 새로운 방식 사용
+                # ATB 게이지
                 atb_gauge = getattr(enemy, 'atb_gauge', 0)
-                atb_bar = self._create_atb_bar(atb_gauge, True, False, enemy)
-                
-                # 캐스팅/브레이크 상태 확인
-                casting_status = ""
-                if hasattr(enemy, 'is_casting') and enemy.is_casting:
-                    skill_name = getattr(enemy, 'casting_skill_name', '알 수 없는 스킬')
-                    casting_status = f" {Color.BRIGHT_MAGENTA}[CASTING: {skill_name}]{Color.RESET}"
-                
-                break_status = ""
-                if hasattr(enemy, 'is_broken_state') and enemy.is_broken_state:
-                    break_status = f" {Color.BRIGHT_RED}[BREAK]{Color.RESET}"
-                elif hasattr(enemy, 'is_broken') and enemy.is_broken:
-                    break_status = f" {Color.BRIGHT_RED}[BREAK]{Color.RESET}"
-                
-                # 상태이상 아이콘들 (실제 상태이상 시스템 연동)
-                status_icons = ""
-                
-                # 캐스팅 상태
-                if hasattr(enemy, 'is_casting') and enemy.is_casting:
-                    status_icons += " 🔮"
-                
-                # BREAK 상태
-                if hasattr(enemy, 'is_broken') and enemy.is_broken:
-                    status_icons += " 💥"
-                elif hasattr(enemy, 'is_broken_state') and enemy.is_broken_state:
-                    status_icons += " 💥"
-                
-                # 실제 상태이상 시스템에서 상태 확인
-                if hasattr(enemy, 'status_effects') and enemy.status_effects:
-                    from .status_effects import StatusType
-                    from .new_skill_system import get_status_icon
-                    
-                    status_types_found = []
-                    for effect in enemy.status_effects:
-                        if effect.status_type not in status_types_found:
-                            status_types_found.append(effect.status_type)
-                            icon = get_status_icon(effect.status_type)
-                            status_icons += f" {icon}"
-                
-                # 임시 상태 (구버전 호환)
-                if hasattr(enemy, 'temp_speed_penalty') and getattr(enemy, 'temp_speed_penalty', 0) > 0:
-                    status_icons += " 🟦"  # 둔화
-                
-                brave_points = getattr(enemy, 'brave_points', 0)
-                
-                # 2줄짜리 ATB 업데이트용 형태 (적군 - 게이지 포함)
-                # HP 상태 색상
-                hp_ratio = enemy.current_hp / enemy.max_hp if enemy.max_hp > 0 else 0
-                if hp_ratio > 0.7:
-                    hp_color = Color.BRIGHT_GREEN
-                elif hp_ratio > 0.4:
-                    hp_color = Color.YELLOW
-                else:
-                    hp_color = Color.BRIGHT_RED
-                    
-                # ATB 게이지와 캐스팅/브레이크 상태
-                atb_gauge = getattr(enemy, 'atb_gauge', 0)
-                if hasattr(enemy, 'is_casting') and enemy.is_casting:
-                    cast_time = getattr(enemy, 'casting_cast_time', 25)
-                    casting_progress = min(1.0, enemy.atb_gauge / cast_time)
-                    casting_percent = int(casting_progress * 100)
-                    atb_display = f"{Color.BRIGHT_MAGENTA}🔮{casting_percent:3}%{Color.RESET}"
-                    atb_icon = "🔮"
-                elif atb_gauge >= self.ATB_READY_THRESHOLD:
-                    atb_display = f"{Color.BRIGHT_YELLOW}READY{Color.RESET}"  # 색상 적용
+                if atb_gauge >= self.ATB_READY_THRESHOLD:
+                    atb_display = f"{Color.BRIGHT_YELLOW}READY{Color.RESET}"
+                    atb_bar = self.create_beautiful_atb_gauge(100, 100, 10, False)
                     atb_icon = "⚡"
                 else:
-                    atb_percent = int(atb_gauge // self.ATB_DISPLAY_SCALE)
-                    # 진행도에 따른 그라데이션 색상 (푸른색 → 하늘색)
-                    if atb_percent >= 80:
-                        atb_color = Color.BRIGHT_CYAN  # 80% 이상: 밝은 하늘색
-                    elif atb_percent >= 60:
-                        atb_color = Color.CYAN  # 60-80%: 하늘색
-                    elif atb_percent >= 40:
-                        atb_color = Color.BLUE  # 40-60%: 푸른색
-                    else:
-                        atb_color = Color.BRIGHT_BLUE  # 40% 미만: 어두운 파랑
-                    
-                    atb_display = f"{atb_color}{atb_percent}%{Color.RESET}"
+                    atb_percent = min(100, int(atb_gauge / self.ATB_READY_THRESHOLD * 100))
+                    atb_display = f"{Color.BRIGHT_CYAN}{atb_percent}%{Color.RESET}"
+                    atb_bar = self.create_beautiful_atb_gauge(atb_percent, 100, 10, False)
                     atb_icon = "⏳"
                 
-                atb_bar = self._create_atb_bar(atb_gauge, True, False, enemy)
+                # HP 게이지
+                hp_bar = self.create_beautiful_hp_gauge(enemy.current_hp, enemy.max_hp, 10)
                 
-                # Brave 포인트
-                brave_points = getattr(enemy, 'brave_points', 0)
-                
-                # 상태이상 아이콘들
-                status_icons = ""
-                if hasattr(enemy, 'is_casting') and enemy.is_casting:
-                    status_icons += " 🔮"
+                # BREAK 상태 표시 추가
+                break_status = ""
                 if hasattr(enemy, 'is_broken') and enemy.is_broken:
-                    status_icons += " 💥"
-                elif hasattr(enemy, 'is_broken_state') and enemy.is_broken_state:
-                    status_icons += " 💥"
-                if hasattr(enemy, 'temp_speed_penalty') and getattr(enemy, 'temp_speed_penalty', 0) > 0:
-                    status_icons += " 🟦"
+                    break_status = f"  {Color.BRIGHT_RED}[BREAK]{Color.RESET}"
                 
-                # 캐스팅/브레이크 상태 확인
-                casting_status = ""
-                if hasattr(enemy, 'is_casting') and enemy.is_casting:
-                    skill_name = getattr(enemy, 'casting_skill_name', '알 수 없는 스킬')
-                    casting_status = f" {Color.BRIGHT_MAGENTA}[CASTING: {skill_name}]{Color.RESET}"
-                
-                # BRV 색상 (0-299면 빨간색, MAX BRV = 현재 BRV일 때 마젠타)
-                if brave_points <= 299:
-                    brv_color = Color.BRIGHT_RED
-                elif brave_points >= getattr(enemy, 'brave_manager', type('obj', (), {'get_max_brave': lambda x: 9999})()).get_max_brave(enemy):  # MAX BRV = 현재 BRV일 때 마젠타
-                    brv_color = Color.BRIGHT_MAGENTA
-                else:
-                    brv_color = Color.BRIGHT_YELLOW
-                
-                # SPD 색상 (상대적 속도 - 실제 평균 대비 퍼센트)
-                enemy_speed = getattr(enemy, 'speed', 50)
-                speed_ratio = (enemy_speed / avg_speed) if avg_speed > 0 else 1.0
-                speed_percent_diff = (speed_ratio - 1.0) * 100  # 평균 대비 퍼센트 차이
-                
-                if speed_percent_diff >= 30:  # +30% 이상
-                    spd_color = Color.BRIGHT_GREEN  # 매우 빠름
-                elif speed_percent_diff >= 15:  # +15% 이상
-                    spd_color = Color.GREEN  # 빠름
-                elif speed_percent_diff >= -15:  # ±15% 이내
-                    spd_color = Color.WHITE  # 보통
-                elif speed_percent_diff >= -30:  # -15% ~ -30%
-                    spd_color = Color.YELLOW  # 느림
-                else:  # -30% 미만
-                    spd_color = Color.BRIGHT_RED  # 매우 느림
-                
-                # HP 값 색상 적용
-                hp_value_str = f"{hp_color}{enemy.current_hp}{Color.RESET}"
-                
-                # HP 게이지 바 생성
-                hp_bar_length = 10
-                hp_filled = int((hp_ratio * hp_bar_length))
-                hp_bar = "▰" * hp_filled + "▱" * (hp_bar_length - hp_filled) + " "
-                hp_bar_colored = f"[{hp_color}{hp_bar}{Color.RESET}]"
-                
-                # 2줄 형식 (적군 로딩 중일 때) - 간격 조정
-                status_lines.append(f"        ⚔️ {enemy.name}{status_icons}")
-                status_lines.append(f"        {hp_icon} HP: {hp_color}{enemy.current_hp}{Color.RESET} / {Color.WHITE}{enemy.max_hp}{Color.RESET}  {hp_bar_colored} | {brv_color}⚡ BRV: {brave_points}{Color.RESET}  |")
-                
-                # ATB 진행률 표시 (대괄호는 흰색)
-                atb_bar_simple = f"{Color.WHITE}[{Color.RESET}{atb_bar}{Color.WHITE} ]{Color.RESET}"
-                if hasattr(enemy, 'is_casting') and enemy.is_casting:
-                    cast_time = getattr(enemy, 'casting_cast_time', 25)
-                    casting_progress = min(1.0, enemy.atb_gauge / cast_time)
-                    casting_percent = int(casting_progress * 100)
-                    atb_display_simple = f"{casting_percent}%"
-                elif atb_gauge >= self.ATB_READY_THRESHOLD:
-                    atb_display_simple = "READY"
-                else:
-                    atb_percent = int(atb_gauge // self.ATB_DISPLAY_SCALE)
-                    atb_display_simple = f"{atb_percent}%"
-                
-                status_lines.append(f"        {atb_icon} TIME: {atb_bar_simple} {atb_display_simple} | SPD: {spd_color}{enemy_speed}{Color.RESET}{casting_status}{break_status} |")
-                status_lines.append("")  # 빈 줄 추가
-        
+                status_lines.append(f"{status_icon} ⚔️ {name_color}{enemy.name}{Color.RESET}")
+                status_lines.append(f"  💚 HP: {enemy.current_hp} / {enemy.max_hp} {Color.WHITE}{{{hp_bar}}}{Color.RESET} | ⚡ BRV: {getattr(enemy, 'brave_points', 0)}")
+                status_lines.append(f"  {atb_icon} {Color.WHITE}{{{atb_bar}}}{Color.RESET} {atb_display} | SPD: {getattr(enemy, 'speed', 50)}{break_status}")
+
         return "\n".join(status_lines)
 
     def _play_skill_sfx(self, skill):
@@ -4093,7 +4911,9 @@ class BraveCombatSystem:
         brave_status = "전투력" if brave_points >= 300 else "축적중"
         brave_color = Color.BRIGHT_YELLOW
         
-        print(f"  BRV: {brave_color}{brave_points}{Color.RESET} ({brave_status})")
+        # 적군인지 확인하여 표시량 조정
+        brave_display = brave_points
+        print(f"  BRV: {brave_color}{brave_display}{Color.RESET} ({brave_status})")
         
         # BREAK 상태
         if hasattr(character, 'is_broken') and character.is_broken:
@@ -4101,8 +4921,8 @@ class BraveCombatSystem:
         
         # ATB 게이지
         atb_gauge = getattr(character, 'atb_gauge', 0)
-        # 디스플레이용으로 100 스케일로 변환
-        display_atb = atb_gauge // self.ATB_DISPLAY_SCALE
+        # 디스플레이용으로 정확한 백분율 계산
+        display_atb = min(100, int(atb_gauge / self.ATB_READY_THRESHOLD * 100))
         atb_bar = "█" * int(display_atb/5) + "░" * (20-int(display_atb/5))
         atb_color = Color.BRIGHT_CYAN if atb_gauge >= self.ATB_READY_THRESHOLD else Color.CYAN if display_atb >= 75 else Color.BLUE
         print(f"\n⏱️ ATB (액션 타임 배틀):")
@@ -4168,6 +4988,10 @@ class BraveCombatSystem:
                 effect_name = effect.name if hasattr(effect, 'name') else str(effect)
                 duration = effect.duration if hasattr(effect, 'duration') else "?"
                 print(f"  {effect_name} ({duration}턴 남음)")
+            
+            # ⏳ 상태 효과 확인 위해 2초 대기 (엔터로 스킵 가능)
+            if hasattr(self, 'gauge_animator'):
+                self.gauge_animator._wait_with_skip_option(2.0, "상태 효과 확인")
         
         input(f"\n{Color.YELLOW}계속하려면 Enter를 누르세요...{Color.RESET}")
     
@@ -4237,17 +5061,50 @@ class BraveCombatSystem:
         print(f"\n🎯 현재 ATB 순서:")
         for i, combatant in enumerate(sorted_by_atb[:8], 1):  # 상위 8명만
             atb_gauge = getattr(combatant, 'atb_gauge', 0)
-            is_ally = combatant in [c for c in all_combatants if hasattr(c, 'character_class')]
+            is_ally = combatant in [c for c in all_combatants if hasattr(c, 'character_class') and c.character_class != 'Enemy']
+            
+            # ATB 백분율 계산 (정상적인 0-100% 범위로)
+            atb_percent = min(100, int((atb_gauge / self.ATB_READY_THRESHOLD) * 100))
             
             if atb_gauge >= self.ATB_READY_THRESHOLD:
-                status = f"{Color.BRIGHT_CYAN}⚡준비완료{Color.RESET}"
-            elif atb_gauge >= 75:
+                status = f"{Color.BRIGHT_YELLOW}⚡준비완료{Color.RESET}"
+            elif atb_percent >= 75:
                 status = f"{Color.CYAN}🔶거의 준비{Color.RESET}"
             else:
                 status = f"{Color.BLUE}⏳대기중{Color.RESET}"
             
-            side_indicator = "🛡️" if is_ally else "⚔️"
-            print(f"  {i}. {side_indicator} {combatant.name}: {status} ({int(atb_gauge)}%)")
+            # 직업별 아이콘 또는 적 아이콘
+            if is_ally:
+                character_class = getattr(combatant, 'character_class', '모험가')
+                class_icons = {
+                    '전사': '⚔️', '아크메이지': '🔮', '궁수': '🏹', '도적': '🗡️',
+                    '성기사': '🛡️', '암흑기사': '💀', '몽크': '👊', '바드': '🎵', 
+                    '네크로맨서': '💀', '용기사': '🐉', '검성': '⚔️', '정령술사': '🌟', 
+                    '암살자': '🔪', '기계공학자': '🔧', '무당': '🔯', '해적': '🏴‍☠️', 
+                    '사무라이': '🗾', '드루이드': '🌿', '철학자': '📘', '시간술사': '⏰', 
+                    '연금술사': '⚗️', '검투사': '🏛️', '기사': '🐎', '신관': '✨',
+                    '마검사': '⚡', '차원술사': '🌌', '광전사': '💥'
+                }
+                side_icon = class_icons.get(character_class, '🎭')
+            else:
+                # 적 아이콘 (적 종류별로 다르게)
+                enemy_name = combatant.name.lower()
+                if '고블린' in enemy_name:
+                    side_icon = '�'
+                elif '슬라임' in enemy_name:
+                    side_icon = '🟢'
+                elif '쥐' in enemy_name:
+                    side_icon = '🐭'
+                elif '오크' in enemy_name:
+                    side_icon = '👺'
+                elif '스켈레톤' in enemy_name:
+                    side_icon = '💀'
+                elif '드래곤' in enemy_name:
+                    side_icon = '🐲'
+                else:
+                    side_icon = '👾'
+            
+            print(f"  {i}. {side_icon} {combatant.name}: {status} ({atb_percent}%)")
         
         # 다음 턴 예측
         print(f"\n🔮 다음 5턴 예측:")
@@ -4258,17 +5115,46 @@ class BraveCombatSystem:
             for i, (combatant, atb) in enumerate(prediction_combatants):
                 speed = getattr(combatant, 'speed', 50)
                 atb_increment = (speed / 50.0) * 8
-                prediction_combatants[i] = (combatant, min(100, atb + atb_increment))
+                prediction_combatants[i] = (combatant, min(self.ATB_READY_THRESHOLD, atb + atb_increment))
             
-            # 100% 도달한 캐릭터 찾기
-            ready_combatants = [(c, atb) for c, atb in prediction_combatants if atb >= 100]
+            # ATB_READY_THRESHOLD 도달한 캐릭터 찾기
+            ready_combatants = [(c, atb) for c, atb in prediction_combatants if atb >= self.ATB_READY_THRESHOLD]
             if ready_combatants:
                 # 가장 높은 ATB의 캐릭터
                 next_combatant = max(ready_combatants, key=lambda x: x[1])[0]
-                is_ally = next_combatant in [c for c in all_combatants if hasattr(c, 'character_class')]
-                side_indicator = "🛡️" if is_ally else "⚔️"
+                is_ally = next_combatant in [c for c in all_combatants if hasattr(c, 'character_class') and c.character_class != 'Enemy']
                 
-                print(f"  턴 {turn}: {side_indicator} {next_combatant.name}")
+                # 아이콘 설정
+                if is_ally:
+                    character_class = getattr(next_combatant, 'character_class', '모험가')
+                    class_icons = {
+                        '전사': '⚔️', '아크메이지': '🔮', '궁수': '🏹', '도적': '🗡️',
+                        '성기사': '🛡️', '암흑기사': '💀', '몽크': '👊', '바드': '🎵', 
+                        '네크로맨서': '💀', '용기사': '🐉', '검성': '⚔️', '정령술사': '🌟', 
+                        '암살자': '🔪', '기계공학자': '🔧', '무당': '🔯', '해적': '🏴‍☠️', 
+                        '사무라이': '🗾', '드루이드': '🌿', '철학자': '📘', '시간술사': '⏰', 
+                        '연금술사': '⚗️', '검투사': '🏛️', '기사': '🐎', '신관': '✨',
+                        '마검사': '⚡', '차원술사': '🌌', '광전사': '💥'
+                    }
+                    side_icon = class_icons.get(character_class, '🎭')
+                else:
+                    enemy_name = next_combatant.name.lower()
+                    if '고블린' in enemy_name:
+                        side_icon = '�'
+                    elif '슬라임' in enemy_name:
+                        side_icon = '🟢'
+                    elif '쥐' in enemy_name:
+                        side_icon = '🐭'
+                    elif '오크' in enemy_name:
+                        side_icon = '👺'
+                    elif '스켈레톤' in enemy_name:
+                        side_icon = '💀'
+                    elif '드래곤' in enemy_name:
+                        side_icon = '🐲'
+                    else:
+                        side_icon = '👾'
+                
+                print(f"  턴 {turn}: {side_icon} {next_combatant.name}")
                 
                 # 해당 캐릭터의 ATB를 0으로 리셋
                 for i, (c, atb) in enumerate(prediction_combatants):
@@ -4280,8 +5166,14 @@ class BraveCombatSystem:
             
     def update_atb_gauges(self, all_combatants: List[Character], show_animation: bool = False):
         """ATB 게이지 업데이트 - 상대적 속도 기반 차등 업데이트 및 캐스팅 체크 (애니메이션 지원)"""
+        # 유효한 캐릭터 객체만 필터링
+        valid_combatants = []
+        for c in all_combatants:
+            if hasattr(c, 'name') and hasattr(c, 'is_alive') and hasattr(c, 'atb_gauge'):
+                valid_combatants.append(c)
+        
         # 파티 정보 저장 (애니메이션에서 사용)
-        party = [c for c in all_combatants if hasattr(c, 'character_class')]  # 아군 구분 (임시)
+        party = [c for c in valid_combatants if hasattr(c, 'character_class')]  # 아군 구분 (임시)
         self._current_party = party
         
         # 설정 로드
@@ -4293,11 +5185,11 @@ class BraveCombatSystem:
             # 기본 설정
             atb_settings = {
                 "animation_enabled": True,
-                "animation_fps": 10,  # 0.1초 간격으로 조정
+                "animation_fps": 60,  # 60 FPS로 부드럽게
                 "update_speed": 1.0,
                 "show_percentage": True,
                 "smooth_animation": True,
-                "frame_delay": 0.1  # 0.1초로 변경
+                "frame_delay": 1.0/60  # 60 FPS = 1/60초 간격
             }
         
         current_time = getattr(self, 'battle_time', 0)
@@ -4305,12 +5197,12 @@ class BraveCombatSystem:
         
         # 애니메이션이 활성화되고 요청된 경우
         if show_animation and atb_settings.get("animation_enabled", True):
-            self._update_atb_with_animation(all_combatants, atb_settings)
+            self._update_atb_with_animation(valid_combatants, atb_settings)
         else:
-            self._update_atb_instant(all_combatants, atb_settings)
+            self._update_atb_instant(valid_combatants, atb_settings)
     
     def _update_atb_instant(self, all_combatants: List[Character], atb_settings: dict):
-        """ATB 즉시 업데이트 (애니메이션 없음) - 상대적 속도 기반"""
+        """ATB 즉시 업데이트 (애니메이션 없음) - 상대적 속도 기반 동시 업데이트"""
         speed_multiplier = atb_settings.get("update_speed", 1.0)
         
         # 상대적 속도 계산을 위한 평균 속도
@@ -4321,8 +5213,12 @@ class BraveCombatSystem:
         total_speed = sum(getattr(c, 'speed', 100) for c in alive_combatants)
         avg_speed = total_speed / len(alive_combatants)
         
-        # 5초 내에 게이지 충전 목표로 기본 증가량 조정 (10 프레임 * 5초 = 50프레임)
-        base_increase = self.ATB_MAX // 50
+        # ATB 게이지 충전 속도 - 속도 기반으로 개별 계산 (부드러운 증가) - 1/5로 느리게 조정
+        base_increase = 50  # 빠른 전투를 유지하되 부드럽게 (250 → 50, 1/5로 감소)
+        
+        # 모든 캐릭터의 ATB를 동시에 계산 후 동시에 업데이트
+        atb_updates = {}
+        casting_completions = []
         
         for combatant in all_combatants:
             # dict 객체 체크
@@ -4331,39 +5227,85 @@ class BraveCombatSystem:
                 continue
                 
             if combatant.is_alive and hasattr(combatant, 'atb_gauge'):
-                # 상대적 속도 계산
-                speed = getattr(combatant, 'speed', 100)
-                relative_speed = speed / avg_speed
+                # 개별 속도 기반 ATB 증가 계산
+                speed = getattr(combatant, 'speed', 50)
+                # 속도에 비례한 ATB 증가 (speed 50 = 기본, speed 100 = 2배)
+                speed_multiplier = speed / 50.0
                 
-                # 캐스팅 중인 경우 ATB 기반 캐스팅 처리
+                # 캐스팅 중인 경우 ATB 기반 캐스팅 처리 - 값 안정화
                 if hasattr(combatant, 'is_casting') and combatant.is_casting:
-                    atb_increase = max(base_increase, int(base_increase * relative_speed * speed_multiplier))
-                    combatant.atb_gauge = min(self.ATB_MAX, combatant.atb_gauge + atb_increase)
+                    atb_increase = int(base_increase * speed_multiplier * speed_multiplier)
+                    new_atb = combatant.atb_gauge + atb_increase
                     
-                    # 캐스팅 완료 체크 - ATB 기반
-                    cast_time = getattr(combatant, 'casting_cast_time', 2500)  # 기본 25% → 2500
-                    required_atb = cast_time  # 캐스팅이면 ATB cast_time에서 완료
+                    # ATB 값 범위 보정 및 반올림으로 안정화
+                    new_atb = max(0, min(self.ATB_MAX, int(round(new_atb))))
+                    atb_updates[combatant] = new_atb
                     
-                    if combatant.atb_gauge >= required_atb:
-                        # 캐스팅 완료
-                        display_atb = combatant.atb_gauge // self.ATB_DISPLAY_SCALE
-                        display_required = required_atb // self.ATB_DISPLAY_SCALE
-                        print(f"✨ {combatant.name}의 캐스팅이 완료되었습니다! (ATB: {display_atb}% >= {display_required}%)")
-                        self.complete_casting(combatant)
-                        combatant.atb_gauge = 0  # ATB 초기화
+                    # 캐스팅 완료 체크 - ATB 기반 (항상 100% ATB에서 완료)
+                    cast_time = getattr(combatant, 'casting_cast_time', 250)  # 기본 25% → 250 ATB units
+                    required_atb = self.ATB_MAX  # 캐스팅은 항상 ATB 100%(10000)에서 완료
+                    
+                    # 캐스팅 속도 조정: cast_time이 낮을수록 더 빠르게 ATB 증가
+                    cast_speed_multiplier = 1000 / max(cast_time, 100)  # cast_time이 낮을수록 빠름
+                    atb_increase = int(atb_increase * cast_speed_multiplier)
+                    new_atb = combatant.atb_gauge + atb_increase
+                    
+                    if new_atb >= required_atb:
+                        # 캐스팅 완료 예약
+                        casting_completions.append(combatant)
                     continue
                 
-                # 일반적인 ATB 게이지 증가 (상대적 속도 기반)
-                atb_increase = max(base_increase, int(base_increase * relative_speed * speed_multiplier))
-                combatant.atb_gauge = min(self.ATB_MAX, combatant.atb_gauge + atb_increase)
+                # 일반적인 ATB 게이지 증가 (속도 기반) - 값 안정화
+                atb_increase = int(base_increase * speed_multiplier)
+                new_atb = combatant.atb_gauge + atb_increase
+                
+                # ATB 값 범위 보정 및 반올림으로 안정화
+                new_atb = max(0, min(self.ATB_MAX, int(round(new_atb))))
+                atb_updates[combatant] = new_atb
+        
+        # 모든 ATB 값을 동시에 업데이트
+        for combatant, new_atb in atb_updates.items():
+            combatant.atb_gauge = new_atb
+        
+        # ATB 업데이트 후 화면 상태 갱신 (즉시 업데이트 모드에서도)
+        # 화면 갱신은 모든 ATB 업데이트가 완료된 후에만 실행
+        # 빈번한 갱신을 방지하기 위해 조건을 더 엄격하게 설정
+        if atb_updates and hasattr(self, '_current_party') and hasattr(self, '_current_enemies'):
+            # 10% 이상의 ATB 변화가 있을 때만 화면 갱신
+            significant_changes = False
+            for combatant, new_atb in atb_updates.items():
+                old_atb = getattr(combatant, '_last_display_atb', 0)
+                atb_change_percent = abs(new_atb - old_atb) / self.ATB_MAX * 100
+                if atb_change_percent >= 5:  # 5% 이상 변화시에만 갱신
+                    significant_changes = True
+                    combatant._last_display_atb = new_atb
+                    break
+            
+            if significant_changes:
+                # 잠시 대기 후 안정적인 상태에서 화면 갱신 - 더 빠르게
+                import time
+                time_module.sleep(0.03)  # 30ms 대기로 안정화 (100ms→30ms)
+                first_character = next((c for c in self._current_party if c.is_alive), None)
+                if first_character:
+                    self.show_battle_status(first_character, self._current_party, self._current_enemies)
+        
+        # 캐스팅 완료 처리
+        for combatant in casting_completions:
+            display_atb = min(100, int(combatant.atb_gauge / self.ATB_READY_THRESHOLD * 100))
+            cast_time = getattr(combatant, 'casting_cast_time', 250)
+            display_required = min(100, int(cast_time / self.ATB_READY_THRESHOLD * 100))
+            print(f"✨ {combatant.name}의 캐스팅이 완료되었습니다! (ATB: {display_atb}% >= {display_required}%)")
+            self.complete_casting(combatant)
+            # 🎯 캐스팅 소모된 ATB만 차감 (캐스팅 시간만큼만 소모)
+            combatant.atb_gauge = max(0, combatant.atb_gauge - cast_time)
     
     def _update_atb_with_animation(self, all_combatants: List[Character], atb_settings: dict):
-        """ATB 애니메이션과 함께 업데이트 - 상대적 속도 기반"""
+        """ATB 애니메이션과 함께 업데이트 - 144FPS로 매우 부드럽게"""
         import time
         import os
         
         speed_multiplier = atb_settings.get("update_speed", 1.0)
-        frame_delay = atb_settings.get("frame_delay", 0.1)  # 0.1초로 변경
+        frame_delay = 1.0/144  # 144 FPS로 매우 부드럽게 (1/144초, 120→144 FPS)
         show_percentage = atb_settings.get("show_percentage", True)
         
         # 상대적 속도 계산을 위한 평균 속도
@@ -4374,8 +5316,8 @@ class BraveCombatSystem:
         total_speed = sum(getattr(c, 'speed', 100) for c in alive_combatants)
         avg_speed = total_speed / len(alive_combatants)
         
-        # 5초 내에 게이지 충전 목표로 기본 증가량 조정 (10 프레임 * 5초 = 50프레임)
-        base_increase = self.ATB_MAX // 50
+        # ATB 게이지 충전 속도 - 속도에 완전 정비례 (단순하고 명확하게) - 1/5로 느리게 조정
+        base_increase = 1  # 기본 증가량을 더욱 낮게 설정 (5 → 1, 1/5로 감소)
         
         # 이전 ATB 값들 저장
         previous_atb = {}
@@ -4389,13 +5331,14 @@ class BraveCombatSystem:
                 continue
                 
             if combatant.is_alive and hasattr(combatant, 'atb_gauge'):
-                # 상대적 속도 계산
-                speed = getattr(combatant, 'speed', 100)
-                relative_speed = speed / avg_speed
+                # 개별 속도 기반 ATB 증가 계산 (속도에 완전 정비례)
+                speed = getattr(combatant, 'speed', 50)
+                # 속도가 50인 캐릭터를 기준으로 완전 정비례 (speed 50 = 1.0배, speed 100 = 2.0배)
+                speed_multiplier = speed / 50.0
                 
                 # 캐스팅 중인 경우 ATB 기반 캐스팅 처리
                 if hasattr(combatant, 'is_casting') and combatant.is_casting:
-                    atb_increase = max(base_increase, int(base_increase * relative_speed * speed_multiplier))
+                    atb_increase = int(base_increase * speed_multiplier)  # 캐스팅 시에도 속도에 정비례
                     new_atb = min(self.ATB_MAX, combatant.atb_gauge + atb_increase)
                     
                     # 아군/적군 구분 확인  
@@ -4404,18 +5347,17 @@ class BraveCombatSystem:
                     self._animate_atb_change(combatant, combatant.atb_gauge, new_atb, frame_delay, show_percentage, is_ally)
                     combatant.atb_gauge = new_atb
                     
-                    # 캐스팅 완료 체크
-                    cast_time = getattr(combatant, 'casting_cast_time', 2500)
-                    if combatant.atb_gauge >= cast_time:
-                        display_atb = combatant.atb_gauge // self.ATB_DISPLAY_SCALE
-                        display_required = cast_time // self.ATB_DISPLAY_SCALE
-                        print(f"✨ {combatant.name}의 캐스팅이 완료되었습니다! (ATB: {display_atb}% >= {display_required}%)")
+                    # 캐스팅 완료 체크 - ATB 게이지가 100%에 도달해야 완료
+                    cast_time = getattr(combatant, 'casting_cast_time', 250)
+                    if combatant.atb_gauge >= self.ATB_READY_THRESHOLD:  # 100% ATB에 도달해야 캐스팅 완료
+                        display_atb = min(100, int(combatant.atb_gauge / self.ATB_READY_THRESHOLD * 100))
+                        print(f"✨ {combatant.name}의 캐스팅이 완료되었습니다! (ATB: {display_atb}% = 100%)")
                         self.complete_casting(combatant)
                         combatant.atb_gauge = 0
                     continue
                 
-                # 일반적인 ATB 게이지 증가 (상대적 속도 기반)
-                atb_increase = max(base_increase, int(base_increase * relative_speed * speed_multiplier))
+                # 일반적인 ATB 게이지 증가 (속도 기반)
+                atb_increase = int(base_increase * speed_multiplier)
                 new_atb = min(self.ATB_MAX, combatant.atb_gauge + atb_increase)
                 
                 # 애니메이션으로 ATB 증가 표시
@@ -4427,46 +5369,120 @@ class BraveCombatSystem:
                 combatant.atb_gauge = new_atb
     
     def _animate_atb_change(self, character: Character, old_atb: int, new_atb: int, frame_delay: float, show_percentage: bool, is_ally: bool = None):
-        """ATB 변화를 애니메이션으로 표시"""
+        """ATB 변화를 애니메이션으로 표시 - 딜레이 최소화"""
         import time
-        import os
+        from .buffered_display import get_buffered_display
         
         if old_atb == new_atb:
             return
         
-        # 애니메이션 프레임 수 계산 (최대 10프레임)
-        total_change = new_atb - old_atb
-        frames = min(10, max(1, abs(total_change) // 100))  # ATB 변화량에 따라 프레임 수 조정
+        # 애니메이션 프레임 수를 1로 줄여서 딜레이 제거
+        frames = 1
         
-        change_per_frame = total_change / frames
-        current_atb = old_atb
+        current_atb = new_atb
         
-        for frame in range(frames):
-            current_atb += change_per_frame
+        display = get_buffered_display()
+        
+        # 임시로 캐릭터의 ATB 값을 업데이트하여 전체 화면에 반영
+        character.atb_gauge = int(current_atb)
+        
+        # 전체 전투 상태를 버퍼링 시스템으로 업데이트 (딜레이 제거)
+        if hasattr(self, '_current_party') and hasattr(self, '_current_enemies'):
+            current_char = getattr(self, '_current_character', character)
             
-            # 현재 위치에서만 ATB 바 표시 - 화살표 추가
-            display_atb = int(current_atb // self.ATB_DISPLAY_SCALE)
-            atb_bar = self._create_atb_bar(current_atb, show_percentage, is_ally, character)
+            # 버퍼 기반 업데이트 (깜빡임 최소화)
+            display.clear_buffer()
             
-            # 화살표 표시 (진행 방향)
-            if display_atb >= 99:
-                arrow = "→ READY!"
-            elif display_atb >= 80:
-                arrow = "→→→"
-            elif display_atb >= 50:
-                arrow = "→→"
-            else:
-                arrow = "→"
+            # 파티와 적군 상태를 버퍼에 추가 (ATB 강조 표시 제거)
+            gauge_system = OptimizedGaugeSystem()
+            party_status = gauge_system.show_optimized_party_status(self._current_party, current_char)
+            enemy_status = gauge_system.show_optimized_enemy_status(self._current_enemies)
             
-            # 아군/적군 구분 아이콘
-            side_icon = "🛡️" if is_ally else "⚔️" if is_ally is False else "⏳"
+            for line in party_status.split('\n'):
+                if line.strip():
+                    display.add_line(line)
             
-            # 캐릭터 정보 표시 (HP/MP/BRV 포함)
-            if is_ally:
-                # 아군은 HP, MP, BRV 모두 표시
-                hp_ratio = character.current_hp / character.max_hp if character.max_hp > 0 else 0
-                mp_ratio = character.current_mp / max(1, character.max_mp) if character.max_mp > 0 else 0
-                brave = getattr(character, 'brave_points', 0)
+            for line in enemy_status.split('\n'):
+                if line.strip():
+                    display.add_line(line)
+            
+            # 최적화된 렌더링 (딜레이 없음)
+            display.render_optimized()
+        
+        # 딜레이 완전 제거 - 즉시 완료
+    def _create_atb_bar(self, atb_gauge: int, show_percentage: bool = True, is_ally: bool = None, character: Character = None) -> str:
+        """ATB 게이지 바 생성 (아군/적군 구분 지원) - 아름다운 게이지 사용"""
+        
+        # 정확한 백분율 계산
+        display_atb = min(100, int(atb_gauge / self.ATB_READY_THRESHOLD * 100))
+        
+        # 캐릭터 상태에 따른 캐스팅 여부 확인
+        is_casting = False
+        if character and hasattr(character, 'is_casting') and character.is_casting:
+            is_casting = True
+        
+        # 아름다운 ATB 게이지 생성 (길이 15로 조정)
+        atb_bar = self.create_beautiful_atb_gauge(display_atb, 100, 15, is_casting)
+        
+        return atb_bar
+    
+    def _show_realtime_atb_status(self, party: List[Character], enemies: List[Character]):
+        """실시간 ATB 상태 표시 (3초간) - 화면 겹침 방지 및 깜빡임 개선"""
+        import time
+        import os
+        
+        all_combatants = party + enemies
+        start_time = time.time()
+        last_update_time = 0
+        update_interval = 0.2  # 200ms마다 업데이트 (깜빡임 줄이기)
+        
+        try:
+            # 설정 로드
+            from ..config import GameConfig
+            config = GameConfig()
+            atb_settings = config.ATB_SETTINGS
+        except ImportError:
+            atb_settings = {
+                "animation_enabled": True,
+                "show_percentage": True,
+                "frame_delay": 0.2  # 더 긴 딜레이로 깜빡임 줄이기
+            }
+        
+        # 초기 화면 클리어 (한 번만)
+        os.system('cls' if os.name == 'nt' else 'clear')
+        
+        while time.time() - start_time < 3.0:  # 3초간 실행
+            current_time = time.time()
+            
+            # 업데이트 간격 체크 (깜빡임 줄이기) - 더 빠른 업데이트
+            if current_time - last_update_time < update_interval:
+                time_module.sleep(0.01)  # 10ms로 단축 (50ms→10ms)
+                continue
+                
+            last_update_time = current_time
+            
+            # 커서를 맨 위로 이동 (화면 클리어 대신 사용)
+            print('\033[H', end='', flush=True)
+            
+            # 헤더 출력
+            print(f"\n{Color.BRIGHT_CYAN}{'='*80}{Color.RESET}")
+            print(f"{Color.BRIGHT_WHITE}⏳ 실시간 ATB 상태 - Dawn of Stellar{Color.RESET}")
+            print(f"{Color.BRIGHT_CYAN}{'='*80}{Color.RESET}")
+            
+            # 아군 표시
+            print(f"{Color.BRIGHT_BLUE}� 아군{Color.RESET}")
+            print(f"{Color.BLUE}{'─'*80}{Color.RESET}")
+            for combatant in party:
+                if not combatant.is_alive:
+                    continue
+                    
+                atb_gauge = getattr(combatant, 'atb_gauge', 0)
+                atb_bar = self._create_atb_bar(atb_gauge, atb_settings.get("show_percentage", True), is_ally=True, character=combatant)
+                
+                # HP/MP/BRV 정보
+                hp_ratio = combatant.current_hp / combatant.max_hp if combatant.max_hp > 0 else 0
+                mp_ratio = combatant.current_mp / max(1, combatant.max_mp) if combatant.max_mp > 0 else 0
+                brave = getattr(combatant, 'brave_points', 0)
                 
                 # HP 색상
                 if hp_ratio > 0.7:
@@ -4486,45 +5502,40 @@ class BraveCombatSystem:
                 else:
                     mp_color = Color.BLUE
                 
-                # 상태이상 아이콘들 (실제 상태이상 시스템 연동)
-                status_icons = ""
+                # 상태 정보
+                casting_status = ""
+                if hasattr(combatant, 'is_casting') and combatant.is_casting:
+                    skill_name = getattr(combatant, 'casting_skill_name', '알 수 없는 스킬')
+                    casting_status = f" {Color.BRIGHT_MAGENTA}[CASTING: {skill_name}]{Color.RESET}"
                 
-                # 캐스팅 상태
-                if hasattr(character, 'is_casting') and character.is_casting:
-                    status_icons += " 🔮"
+                break_status = ""
+                if hasattr(combatant, 'is_broken_state') and combatant.is_broken_state:
+                    break_status = f" {Color.BRIGHT_RED}[BREAK]{Color.RESET}"
                 
-                # BREAK 상태
-                if hasattr(character, 'is_broken_state') and character.is_broken_state:
-                    status_icons += " 💥"
-                elif hasattr(character, 'is_broken') and character.is_broken:
-                    status_icons += " 💥"
+                status_effects = ""
+                if hasattr(combatant, 'is_stunned') and combatant.is_stunned:
+                    status_effects += f" {Color.BRIGHT_BLACK}[기절]{Color.RESET}"
+                if hasattr(combatant, 'temp_speed_penalty') and getattr(combatant, 'temp_speed_penalty', 0) > 0:
+                    status_effects += f" {Color.BLUE}[둔화]{Color.RESET}"
                 
-                # 실제 상태이상 시스템에서 상태 확인
-                if hasattr(character, 'status_effects') and character.status_effects:
-                    try:
-                        from .status_effects import StatusType
-                        from .new_skill_system import get_status_icon
-                        
-                        status_types_found = []
-                        for effect in character.status_effects:
-                            if effect.status_type not in status_types_found:
-                                status_types_found.append(effect.status_type)
-                                icon = get_status_icon(effect.status_type)
-                                status_icons += f" {icon}"
-                    except ImportError:
-                        # 폴백: 구버전 호환
-                        pass
+                print(f"  {Color.BRIGHT_CYAN}{combatant.name:12}{Color.RESET}: HP: {hp_color}{combatant.current_hp:4}{Color.RESET} | MP: {mp_color}{combatant.current_mp:3}{Color.RESET} | BRV: {brave:4}")
+                print(f"    ⏳ {atb_bar} | SPD: {getattr(combatant, 'speed', 100):3}{casting_status}{break_status}{status_effects}")
+            
+            print(f"{Color.GREEN}{'─'*80}{Color.RESET}")
+            
+            # 적군 표시
+            print(f"{Color.BRIGHT_RED}⚔️ 적군{Color.RESET}")
+            print(f"{Color.RED}{'─'*80}{Color.RESET}")
+            for combatant in enemies:
+                if not combatant.is_alive:
+                    continue
+                    
+                atb_gauge = getattr(combatant, 'atb_gauge', 0)
+                atb_bar = self._create_atb_bar(atb_gauge, atb_settings.get("show_percentage", True), is_ally=False, character=combatant)
                 
-                # 임시 상태 (구버전 호환)
-                if hasattr(character, 'temp_speed_penalty') and getattr(character, 'temp_speed_penalty', 0) > 0:
-                    status_icons += " 🟦"  # 둔화
-                
-                print(f"\r{side_icon} {Color.BRIGHT_CYAN}{character.name}{Color.RESET}: HP: {hp_color}{character.current_hp}{Color.RESET} | MP: {mp_color}{character.current_mp}{Color.RESET} | BRV: {brave}{status_icons}", end="", flush=True)
-                print(f"\r⏳ {atb_bar} | SPD: {getattr(character, 'speed', 100)}", end="", flush=True)
-            else:
-                # 적군은 HP, BRV만 표시
-                hp_ratio = character.current_hp / character.max_hp if character.max_hp > 0 else 0
-                brave = getattr(character, 'brave_points', 0)
+                # HP/BRV 정보
+                hp_ratio = combatant.current_hp / combatant.max_hp if combatant.max_hp > 0 else 0
+                brave = getattr(combatant, 'brave_points', 0)
                 
                 # HP 색상
                 if hp_ratio > 0.7:
@@ -4536,383 +5547,24 @@ class BraveCombatSystem:
                 else:
                     hp_color = Color.RED
                 
-                # 상태이상 아이콘들 (실제 상태이상 시스템 연동)
-                status_icons = ""
+                # 상태 정보
+                casting_status = ""
+                if hasattr(combatant, 'is_casting') and combatant.is_casting:
+                    skill_name = getattr(combatant, 'casting_skill_name', '알 수 없는 스킬')
+                    casting_status = f" {Color.BRIGHT_MAGENTA}[CASTING: {skill_name}]{Color.RESET}"
                 
-                # 캐스팅 상태
-                if hasattr(character, 'is_casting') and character.is_casting:
-                    status_icons += " 🔮"
+                break_status = ""
+                if hasattr(combatant, 'is_broken') and combatant.is_broken:
+                    break_status = f" {Color.BRIGHT_RED}[BREAK]{Color.RESET}"
                 
-                # BREAK 상태
-                if hasattr(character, 'is_broken') and character.is_broken:
-                    status_icons += " 💥"
-                elif hasattr(character, 'is_broken_state') and character.is_broken_state:
-                    status_icons += " 💥"
+                status_effects = ""
+                if hasattr(combatant, 'is_stunned') and combatant.is_stunned:
+                    status_effects += f" {Color.BRIGHT_BLACK}[기절]{Color.RESET}"
+                if hasattr(combatant, 'temp_speed_penalty') and getattr(combatant, 'temp_speed_penalty', 0) > 0:
+                    status_effects += f" {Color.BLUE}[둔화]{Color.RESET}"
                 
-                # 실제 상태이상 시스템에서 상태 확인
-                if hasattr(character, 'status_effects') and character.status_effects:
-                    try:
-                        from .status_effects import StatusType
-                        from .new_skill_system import get_status_icon
-                        
-                        status_types_found = []
-                        for effect in character.status_effects:
-                            if effect.status_type not in status_types_found:
-                                status_types_found.append(effect.status_type)
-                                icon = get_status_icon(effect.status_type)
-                                status_icons += f" {icon}"
-                    except ImportError:
-                        # 폴백: 구버전 호환
-                        pass
-                
-                # 임시 상태 (구버전 호환)
-                if hasattr(character, 'temp_speed_penalty') and getattr(character, 'temp_speed_penalty', 0) > 0:
-                    status_icons += " 🟦"  # 둔화
-                
-                print(f"\r{side_icon} {Color.BRIGHT_RED}{character.name}{Color.RESET}: HP: {hp_color}{character.current_hp}{Color.RESET} | BRV: {brave}{status_icons}", end="", flush=True)
-                print(f"\r⏳ {atb_bar} {arrow} | SPD: {getattr(character, 'speed', 100)}", end="", flush=True)
-            
-            time.sleep(frame_delay)
-        
-        # 최종 값으로 설정
-        final_display_atb = int(new_atb // self.ATB_DISPLAY_SCALE)
-        final_atb_bar = self._create_atb_bar(new_atb, show_percentage, is_ally, character)
-        side_icon = "🛡️" if is_ally else "⚔️" if is_ally is False else "⏳"
-        
-        # 캐스팅/브레이크 상태 확인
-        casting_status = ""
-        if hasattr(character, 'is_casting') and character.is_casting:
-            skill_name = getattr(character, 'casting_skill_name', '알 수 없는 스킬')
-            casting_status = f" {Color.BRIGHT_MAGENTA}[CASTING: {skill_name}]{Color.RESET}"
-        
-        break_status = ""
-        if hasattr(character, 'is_broken_state') and character.is_broken_state:
-            break_status = f" {Color.BRIGHT_RED}[BREAK]{Color.RESET}"
-        elif hasattr(character, 'is_broken') and character.is_broken:
-            break_status = f" {Color.BRIGHT_RED}[BREAK]{Color.RESET}"
-        
-        # 최종 상태 출력 (2줄 형식)
-        if is_ally:
-            # 아군은 HP, MP, BRV 모두 표시
-            hp_ratio = character.current_hp / character.max_hp if character.max_hp > 0 else 0
-            mp_ratio = character.current_mp / max(1, character.max_mp) if character.max_mp > 0 else 0
-            brave = getattr(character, 'brave_points', 0)
-            
-            # HP 색상
-            if hp_ratio > 0.7:
-                hp_color = Color.BRIGHT_GREEN
-            elif hp_ratio > 0.4:
-                hp_color = Color.YELLOW
-            elif hp_ratio > 0.15:
-                hp_color = Color.BRIGHT_RED
-            else:
-                hp_color = Color.RED
-            
-            # MP 색상
-            if mp_ratio > 0.7:
-                mp_color = Color.BRIGHT_CYAN
-            elif mp_ratio > 0.3:
-                mp_color = Color.CYAN
-            else:
-                mp_color = Color.BLUE
-            
-            # 상태이상 아이콘들 (실제 상태이상 시스템 연동)
-            status_icons = ""
-            
-            # 캐스팅 상태
-            if hasattr(character, 'is_casting') and character.is_casting:
-                status_icons += " 🔮"
-            
-            # BREAK 상태
-            if hasattr(character, 'is_broken_state') and character.is_broken_state:
-                status_icons += " �"
-            elif hasattr(character, 'is_broken') and character.is_broken:
-                status_icons += " �"
-            
-            # 실제 상태이상 시스템에서 상태 확인
-            if hasattr(character, 'status_effects') and character.status_effects:
-                try:
-                    from .status_effects import StatusType
-                    from .new_skill_system import get_status_icon
-                    
-                    status_types_found = []
-                    for effect in character.status_effects:
-                        if effect.status_type not in status_types_found:
-                            status_types_found.append(effect.status_type)
-                            icon = get_status_icon(effect.status_type)
-                            status_icons += f" {icon}"
-                except ImportError:
-                    # 폴백: 구버전 호환
-                    pass
-            
-            # 임시 상태 (구버전 호환)
-            if hasattr(character, 'temp_speed_penalty') and getattr(character, 'temp_speed_penalty', 0) > 0:
-                status_icons += " 🟦"  # 둔화
-            
-            print(f"\r{side_icon} {Color.BRIGHT_CYAN}{character.name}{Color.RESET}: HP: {hp_color}{character.current_hp}{Color.RESET} | MP: {mp_color}{character.current_mp}{Color.RESET} | BRV: {brave}{status_icons}")
-            print(f"⏳ {final_atb_bar} | SPD: {getattr(character, 'speed', 100)}{casting_status}{break_status}")
-            print()  # 아군 간 줄바꿈
-        else:
-            # 적군은 HP, BRV만 표시
-            hp_ratio = character.current_hp / character.max_hp if character.max_hp > 0 else 0
-            brave = getattr(character, 'brave_points', 0)
-            
-            # HP 색상
-            if hp_ratio > 0.7:
-                hp_color = Color.BRIGHT_GREEN
-            elif hp_ratio > 0.4:
-                hp_color = Color.YELLOW
-            elif hp_ratio > 0.15:
-                hp_color = Color.BRIGHT_RED
-            else:
-                hp_color = Color.RED
-            
-            # 상태이상 아이콘들 (실제 상태이상 시스템 연동)
-            status_icons = ""
-            
-            # 캐스팅 상태
-            if hasattr(character, 'is_casting') and character.is_casting:
-                status_icons += " 🔮"
-            
-            # BREAK 상태
-            if hasattr(character, 'is_broken') and character.is_broken:
-                status_icons += " �"
-            elif hasattr(character, 'is_broken_state') and character.is_broken_state:
-                status_icons += " �"
-            
-            # 실제 상태이상 시스템에서 상태 확인
-            if hasattr(character, 'status_effects') and character.status_effects:
-                try:
-                    from .status_effects import StatusType
-                    from .new_skill_system import get_status_icon
-                    
-                    status_types_found = []
-                    for effect in character.status_effects:
-                        if effect.status_type not in status_types_found:
-                            status_types_found.append(effect.status_type)
-                            icon = get_status_icon(effect.status_type)
-                            status_icons += f" {icon}"
-                except ImportError:
-                    # 폴백: 구버전 호환
-                    pass
-            
-            # 임시 상태 (구버전 호환)
-            if hasattr(character, 'temp_speed_penalty') and getattr(character, 'temp_speed_penalty', 0) > 0:
-                status_icons += " 🟦"  # 둔화
-            
-            print(f"\r{side_icon} {Color.BRIGHT_RED}{character.name}{Color.RESET}: HP: {hp_color}{character.current_hp}{Color.RESET} | BRV: {brave}{status_icons}")
-            print(f"⏳ {final_atb_bar} | SPD: {getattr(character, 'speed', 100)}{casting_status}{break_status}")
-            print()  # 적군 간 줄바꿈
-    
-    def _create_atb_bar(self, atb_gauge: int, show_percentage: bool = True, is_ally: bool = None, character: Character = None) -> str:
-        """ATB 게이지 바 생성 (아군/적군 구분 지원) - 향상된 포맷 및 상태별 색상"""
-        # Color 클래스는 이미 파일 상단에서 import됨
-        
-        display_atb = atb_gauge // self.ATB_DISPLAY_SCALE
-        filled = int(min(10, max(0, display_atb // 10)))  # int로 변환
-        empty = int(10 - filled)  # int로 변환
-        
-        # 캐릭터 상태에 따른 색상 결정
-        if character:
-            # 캐스팅 중인 경우 - 보라색
-            if hasattr(character, 'is_casting') and character.is_casting:
-                bar_color = Color.BRIGHT_MAGENTA
-            # 기절 등으로 움직일 수 없는 경우 - 회색
-            elif hasattr(character, 'is_stunned') and character.is_stunned:
-                bar_color = Color.BRIGHT_BLACK
-            elif hasattr(character, 'is_paralyzed') and character.is_paralyzed:
-                bar_color = Color.BRIGHT_BLACK
-            # 느려진 상태 - 파란색
-            elif hasattr(character, 'temp_speed_penalty') and getattr(character, 'temp_speed_penalty', 0) > 0:
-                bar_color = Color.BLUE
-            # 아군/적군 구분 (기본 색상)
-            elif is_ally == True or (hasattr(character, 'character_class') and character.character_class != "Enemy"):
-                bar_color = Color.BRIGHT_CYAN  # 아군: 밝은 청록색
-            else:
-                bar_color = Color.BRIGHT_RED  # 적군: 밝은 빨간색
-        else:
-            # 캐릭터 정보가 없으면 기본 청록색
-            bar_color = Color.CYAN
-        
-        # READY 상태인 경우 더 밝은 색상으로 전체 바 표시
-        if atb_gauge >= self.ATB_READY_THRESHOLD:
-            if character and hasattr(character, 'is_casting') and character.is_casting:
-                ready_bar = f"{Color.BRIGHT_MAGENTA}{'▰'*10}{Color.RESET}"
-            elif character and (hasattr(character, 'is_stunned') and character.is_stunned):
-                ready_bar = f"{Color.BRIGHT_BLACK}{'▰'*10}{Color.RESET}"
-            else:
-                # READY 상태는 주황색으로 표시
-                ready_bar = f"{Color.BRIGHT_YELLOW}{'▰'*10}{Color.RESET}"
-                
-            # 아군인 경우 READY 바에도 공백 추가
-            if is_ally == True or (character and hasattr(character, 'character_class') and character.character_class != "Enemy"):
-                bar = f"{ready_bar} "  # 아군용 공백 추가
-            else:
-                bar = ready_bar  # 적군은 공백 없음
-        else:
-            # 진행도에 따른 그라데이션 색상 (푸른색 → 하늘색)
-            if display_atb >= 80:
-                progress_color = Color.BRIGHT_CYAN  # 80% 이상: 밝은 하늘색
-            elif display_atb >= 60:
-                progress_color = Color.CYAN  # 60-80%: 하늘색
-            elif display_atb >= 40:
-                progress_color = Color.BLUE  # 40-60%: 푸른색
-            else:
-                progress_color = Color.BRIGHT_BLUE  # 40% 미만: 어두운 파랑
-                
-            # 부분적으로 채워진 바 (그라데이션 색상 적용) - 아군에게 공백 추가
-            filled_part = f"{progress_color}{'▰'*filled}{Color.RESET}"
-            empty_part = f"{Color.BRIGHT_BLACK}{'▱'*empty}{Color.RESET}"
-            
-            # 아군인 경우 뒤에 공백 추가
-            if is_ally == True or (character and hasattr(character, 'character_class') and character.character_class != "Enemy"):
-                bar = f"{filled_part}{empty_part} "  # 아군용 공백 추가
-            else:
-                bar = f"{filled_part}{empty_part}"  # 적군은 공백 없음
-        
-        # 기본적으로 바만 반환 (색상 별도 적용)
-        return bar
-    
-    def _show_realtime_atb_status(self, party: List[Character], enemies: List[Character]):
-        """실시간 ATB 상태 표시 (3초간)"""
-        import time
-        import os
-        
-        print(f"\n{Color.BRIGHT_CYAN}{'='*80}{Color.RESET}")
-        print(f"{Color.BRIGHT_WHITE}⏳ 실시간 ATB 상태 - Dawn of Stellar{Color.RESET}")
-        print(f"{Color.BRIGHT_CYAN}{'='*80}{Color.RESET}")
-        
-        all_combatants = party + enemies
-        start_time = time.time()
-        
-        try:
-            # 설정 로드
-            from ..config import GameConfig
-            config = GameConfig()
-            atb_settings = config.ATB_SETTINGS
-        except ImportError:
-            atb_settings = {
-                "animation_enabled": True,
-                "show_percentage": True,
-                "frame_delay": 0.05
-            }
-        
-        while time.time() - start_time < 3.0:  # 3초간 표시
-            # 화면 클리어 (커서를 맨 위로)
-            print(f"\033[{len(all_combatants) + 10}A", end="")  # 위로 이동
-            
-            print(f"{Color.BRIGHT_CYAN}⏳ 실시간 ATB 상태{Color.RESET}")
-            print(f"{Color.BRIGHT_CYAN}{'═'*80}{Color.RESET}")
-            
-            # 아군 파티 표시
-            print(f"{Color.BRIGHT_GREEN}🛡️ 아군 파티{Color.RESET}")
-            print(f"{Color.GREEN}{'─'*80}{Color.RESET}")
-            for combatant in all_combatants:
-                if isinstance(combatant, dict) or not combatant.is_alive:
-                    continue
-                if combatant in party:
-                    atb_gauge = getattr(combatant, 'atb_gauge', 0)
-                    atb_bar = self._create_atb_bar(atb_gauge, atb_settings.get("show_percentage", True), is_ally=True, character=combatant)
-                    
-                    # HP/MP/BRV 정보 추가
-                    hp_ratio = combatant.current_hp / combatant.max_hp if combatant.max_hp > 0 else 0
-                    mp_ratio = combatant.current_mp / max(1, combatant.max_mp) if combatant.max_mp > 0 else 0
-                    brave = getattr(combatant, 'brave_points', 0)
-                    
-                    # HP 색상 (상태에 따라)
-                    if hp_ratio > 0.7:
-                        hp_color = Color.BRIGHT_GREEN
-                    elif hp_ratio > 0.4:
-                        hp_color = Color.YELLOW
-                    elif hp_ratio > 0.15:
-                        hp_color = Color.BRIGHT_RED
-                    else:
-                        hp_color = Color.RED
-                    
-                    # MP 색상 (상태에 따라)
-                    if mp_ratio > 0.7:
-                        mp_color = Color.BRIGHT_CYAN
-                    elif mp_ratio > 0.3:
-                        mp_color = Color.CYAN
-                    else:
-                        mp_color = Color.BLUE
-                    
-                    # ATB 표시 정보
-                    display_atb = int(atb_gauge // self.ATB_DISPLAY_SCALE)
-                    
-                    # 캐스팅 상태 확인
-                    casting_status = ""
-                    if hasattr(combatant, 'is_casting') and combatant.is_casting:
-                        skill_name = getattr(combatant, 'casting_skill_name', '알 수 없는 스킬')
-                        casting_status = f" {Color.BRIGHT_MAGENTA}[CASTING: {skill_name}]{Color.RESET}"
-                    
-                    # BREAK 상태 확인
-                    break_status = ""
-                    if hasattr(combatant, 'is_broken_state') and combatant.is_broken_state:
-                        break_status = f" {Color.BRIGHT_RED}[BREAK]{Color.RESET}"
-                    
-                    # 상태이상 확인
-                    status_effects = ""
-                    if hasattr(combatant, 'is_stunned') and combatant.is_stunned:
-                        status_effects += f" {Color.BRIGHT_BLACK}[기절]{Color.RESET}"
-                    if hasattr(combatant, 'temp_speed_penalty') and getattr(combatant, 'temp_speed_penalty', 0) > 0:
-                        status_effects += f" {Color.BLUE}[둔화]{Color.RESET}"
-                    
-                    print(f"  {Color.BRIGHT_CYAN}{combatant.name:12}{Color.RESET}: HP: {hp_color}{combatant.current_hp:4}{Color.RESET} | MP: {mp_color}{combatant.current_mp:3}{Color.RESET} | BRV: {brave:4}")
-                    print(f"    ⏳ {atb_bar} | SPD: {getattr(combatant, 'speed', 100):3}{casting_status}{break_status}{status_effects}")
-                    print()  # 아군 간 줄바꿈
-            
-            print(f"{Color.GREEN}{'─'*80}{Color.RESET}")
-            
-            # 적군 표시
-            print(f"{Color.BRIGHT_RED}⚔️ 적군{Color.RESET}")
-            print(f"{Color.RED}{'─'*80}{Color.RESET}")
-            for combatant in all_combatants:
-                if isinstance(combatant, dict) or not combatant.is_alive:
-                    continue
-                if combatant not in party:
-                    atb_gauge = getattr(combatant, 'atb_gauge', 0)
-                    atb_bar = self._create_atb_bar(atb_gauge, atb_settings.get("show_percentage", True), is_ally=False, character=combatant)
-                    
-                    # HP/BRV 정보 추가 (적군은 MP 정보 없음)
-                    hp_ratio = combatant.current_hp / combatant.max_hp if combatant.max_hp > 0 else 0
-                    brave = getattr(combatant, 'brave_points', 0)
-                    
-                    # HP 색상 (상태에 따라)
-                    if hp_ratio > 0.7:
-                        hp_color = Color.BRIGHT_GREEN
-                    elif hp_ratio > 0.4:
-                        hp_color = Color.YELLOW
-                    elif hp_ratio > 0.15:
-                        hp_color = Color.BRIGHT_RED
-                    else:
-                        hp_color = Color.RED
-                    
-                    # ATB 표시 정보
-                    display_atb = int(atb_gauge // self.ATB_DISPLAY_SCALE)
-                    
-                    # 캐스팅 상태 확인
-                    casting_status = ""
-                    if hasattr(combatant, 'is_casting') and combatant.is_casting:
-                        skill_name = getattr(combatant, 'casting_skill_name', '알 수 없는 스킬')
-                        casting_status = f" {Color.BRIGHT_MAGENTA}[CASTING: {skill_name}]{Color.RESET}"
-                    
-                    # BREAK 상태 확인
-                    break_status = ""
-                    if hasattr(combatant, 'is_broken') and combatant.is_broken:
-                        break_status = f" {Color.BRIGHT_RED}[BREAK]{Color.RESET}"
-                    
-                    # 상태이상 확인
-                    status_effects = ""
-                    if hasattr(combatant, 'is_stunned') and combatant.is_stunned:
-                        status_effects += f" {Color.BRIGHT_BLACK}[기절]{Color.RESET}"
-                    if hasattr(combatant, 'temp_speed_penalty') and getattr(combatant, 'temp_speed_penalty', 0) > 0:
-                        status_effects += f" {Color.BLUE}[둔화]{Color.RESET}"
-                    
-                    print(f"  {Color.BRIGHT_RED}{combatant.name:12}{Color.RESET}: HP: {hp_color}{combatant.current_hp:4}{Color.RESET} | BRV: {brave:4}")
-                    print(f"    ⏳ {atb_bar} | SPD: {getattr(combatant, 'speed', 100):3}{casting_status}{break_status}{status_effects}")
-                    print()  # 적군 간 줄바꿈
-                
+                print(f"  {Color.BRIGHT_RED}{combatant.name:12}{Color.RESET}: HP: {hp_color}{combatant.current_hp:4}{Color.RESET} | BRV: {brave:4}")
+                print(f"    ⏳ {atb_bar} | SPD: {getattr(combatant, 'speed', 100):3}{casting_status}{break_status}{status_effects}")
                 
             print(f"{Color.BRIGHT_CYAN}{'═'*80}{Color.RESET}")
             print(f"{Color.YELLOW}ESC를 눌러 종료...{Color.RESET}")
@@ -4933,16 +5585,21 @@ class BraveCombatSystem:
                     if key == '\x1b':  # ESC 키
                         break
             
-            # ATB 업데이트
-            self.update_atb_gauges(all_combatants, show_animation=False)
+            # ATB 업데이트 제거 (실시간 상태에서는 현재 상태만 표시)
+            # self.update_atb_gauges(all_combatants, show_animation=False)  # 제거됨
             
-            time.sleep(atb_settings.get("frame_delay", 0.05))
+            time_module.sleep(atb_settings.get("frame_delay", 0.2))  # 200ms 딜레이로 변경
         
         print(f"\n{Color.BRIGHT_GREEN}실시간 ATB 상태 표시 종료{Color.RESET}")
         input("계속하려면 Enter를 누르세요...")
         
-        # 화면 클리어
-        os.system('cls' if os.name == 'nt' else 'clear')
+        # 강력한 화면 클리어 (여러 번 수행)
+        for _ in range(2):
+            os.system('cls' if os.name == 'nt' else 'clear')
+            time_module.sleep(0.1)
+        
+        # 커서 위치 리셋
+        print('\033[H\033[2J', end='', flush=True)  # 화면 클리어와 커서 홈으로 이동
                 
     def show_atb_status(self, all_combatants: List[Character]):
         """현재 ATB 상태 표시"""
@@ -4979,15 +5636,15 @@ class BraveCombatSystem:
                 casting_info = f" 🔮 {skill_name}: [{progress*100:.0f}%]"
                 
             atb_gauge = int(getattr(combatant, 'atb_gauge', 0))
-            # 디스플레이용으로 100 스케일로 변환
-            display_atb = atb_gauge // self.ATB_DISPLAY_SCALE
+            # 디스플레이용으로 100 스케일로 변환 (정확한 백분율 계산)
+            display_atb = min(100, int(atb_gauge / self.ATB_READY_THRESHOLD * 100))
             if atb_gauge >= self.ATB_READY_THRESHOLD:
                 bar = f"{Color.BRIGHT_CYAN}{'█'*10}{Color.RESET}"
                 status = f"{Color.BRIGHT_CYAN}⚡READY{Color.RESET}"
             else:
-                filled = int(min(10, max(0, display_atb // 10)))  # 0-10 범위로 제한
+                filled = int(min(10, max(0, display_atb / 10)))  # 0-10 범위로 제한
                 bar = f"{Color.CYAN}{'█'*filled}{Color.BRIGHT_BLACK}{'░'*(10-filled)}{Color.RESET}"
-                status = f"{Color.CYAN}{display_atb:3}%{Color.RESET}"  # 디스플레이 ATB 값 사용
+                status = f"{Color.CYAN}{display_atb:3}%{Color.RESET}"  # 정확한 디스플레이 ATB 값 사용
             
             rank = f"{i+1}."
             print(f"  {rank:3} {name_color}{combatant.name:12}{Color.RESET} [{bar}]   {status}{casting_info}")
@@ -4996,7 +5653,17 @@ class BraveCombatSystem:
                 
     def get_action_order(self, all_combatants: List[Character]) -> List[Character]:
         """행동 순서 결정 - 공정한 우선순위 기반 단일 선택"""
-        ready_combatants = [c for c in all_combatants if c.is_alive and c.atb_gauge >= self.ATB_READY_THRESHOLD]
+        # 유효한 캐릭터 객체만 필터링
+        valid_combatants = []
+        for c in all_combatants:
+            # 캐릭터 객체 검증: name 속성과 is_alive 속성이 있어야 함
+            if hasattr(c, 'name') and hasattr(c, 'is_alive') and hasattr(c, 'atb_gauge'):
+                valid_combatants.append(c)
+            else:
+                # StatusManager 같은 잘못된 객체 감지
+                print(f"⚠️ 경고: 잘못된 객체가 전투 리스트에 포함됨: {type(c).__name__}")
+        
+        ready_combatants = [c for c in valid_combatants if c.is_alive and c.atb_gauge >= self.ATB_READY_THRESHOLD]
         
         if not ready_combatants:
             return []
@@ -5016,15 +5683,7 @@ class BraveCombatSystem:
         # 가장 높은 우선순위 캐릭터 선택
         fastest = max(ready_combatants, key=priority_key)
         
-        # 디버그 정보 출력 (턴 순서 문제 해결 확인용)
-        party_ready = [c for c in ready_combatants if c in getattr(self, '_current_party', [])]
-        enemy_ready = [c for c in ready_combatants if c in getattr(self, '_current_enemies', [])]
-        
-        if len(party_ready) > 0 and len(enemy_ready) > 0:
-            selected_type = "아군" if fastest in getattr(self, '_current_party', []) else "적군"
-            print(f"🎯 턴 선택: {selected_type} {fastest.name} (ATB:{fastest.atb_gauge:.1f}, SPD:{getattr(fastest, 'speed', 50)})")
-            print(f"   준비된 아군: {len(party_ready)}명, 적군: {len(enemy_ready)}명")
-        
+        # 선택된 캐릭터 반환 (디버그 출력 제거로 화면 안정성 향상)
         return [fastest]
         
     def check_battle_end(self, party: List[Character], enemies: List[Character]) -> bool:
@@ -5032,31 +5691,49 @@ class BraveCombatSystem:
         party_alive = any(p.is_alive for p in party)
         enemies_alive = any(e.is_alive for e in enemies)
         
-        return not party_alive or not enemies_alive
+        battle_ended = not party_alive or not enemies_alive
+        
+        # 전투가 종료되면 모든 캐릭터의 캐스팅 중단
+        if battle_ended:
+            self._clear_all_casting(party + enemies)
+        
+        return battle_ended
         
     def determine_winner(self, party: List[Character], enemies: List[Character]) -> bool:
         """승부 결정 - 비주얼 이펙트 포함"""
         party_alive = any(p.is_alive for p in party)
         
-        # 전투 종료 로깅
-        winner = "플레이어" if party_alive else "적"
-        battle_duration = time.time() - getattr(self, 'battle_start_time', time.time())
-        self.combat_logger.log_battle_end(winner, battle_duration)
+        # 전투 종료 처리 - 전투 상태 비활성화
+        from .character import set_combat_active
+        set_combat_active(False)
+        
+        # 게이지 애니메이터 전투 모드 해제
+        if hasattr(self, 'gauge_animator'):
+            self.gauge_animator.set_combat_mode(False)
         
         if party_alive:
-            # 🎵 승리 BGM 재생
+            # 🎵 승리 BGM 재생 (조용히)
             try:
                 if BGMType and get_audio_manager:
                     audio_mgr = get_audio_manager()
                     if audio_mgr:
                         audio_mgr.play_bgm(BGMType.VICTORY)
-                        print(f"🎵 승리 BGM 재생!")
-                    else:
-                        print(f"⚠️ 오디오 매니저를 가져올 수 없습니다")
-                else:
-                    print(f"⚠️ 오디오 시스템을 임포트할 수 없습니다")
+                        # 승리 BGM 재생 메시지 제거 (깔끔한 출력을 위해)
+                    # else: 조용히 실패 처리
             except Exception as e:
-                print(f"⚠️ 승리 BGM 재생 실패: {e}")
+                # 오디오 오류는 조용히 처리
+                pass
+            
+            # 🎯 승리 처리 전 모든 애니메이션 완료 대기
+            gauge_animator = get_gauge_animator()
+            print(f"\n{Color.CYAN}⏳ 전투 결과 정산 중...{Color.RESET}")
+            
+            # 진행 중인 애니메이션이 있다면 완료까지 대기
+            while gauge_animator.is_processing:
+                time_module.sleep(0.1)
+            
+            # 추가 대기 시간 (사용자가 최종 결과를 확인할 수 있도록)
+            time_module.sleep(1.0)
             
             # 승리 이펙트
             print(f"\n{Color.BRIGHT_GREEN}{'='*50}")
@@ -5066,14 +5743,6 @@ class BraveCombatSystem:
             # 승리 후 일시정지 - 사용자가 결과를 확인할 시간
             print(f"\n{Color.BRIGHT_YELLOW}전투에서 승리했습니다!{Color.RESET}")
             
-            # 전투 통계 출력
-            summary = self.combat_logger.get_session_summary()
-            print(f"\n📊 전투 통계:")
-            print(f"  플레이어 총 데미지: {summary['total_player_damage']}")
-            print(f"  적 총 데미지: {summary['total_enemy_damage']}")
-            print(f"  총 치유량: {summary['total_healing']}")
-            print(f"  로그 파일: {summary['log_file']}")
-            
             input(f"{Color.YELLOW}계속하려면 Enter를 누르세요...{Color.RESET}")
             
             # 승리 후 입력 버퍼 클리어
@@ -5081,6 +5750,17 @@ class BraveCombatSystem:
                 self.keyboard.clear_input_buffer()
             
         else:
+            # 🎯 패배 처리 전 모든 애니메이션 완료 대기
+            gauge_animator = get_gauge_animator()
+            print(f"\n{Color.CYAN}⏳ 전투 결과 정산 중...{Color.RESET}")
+            
+            # 진행 중인 애니메이션이 있다면 완료까지 대기
+            while gauge_animator.is_processing:
+                time_module.sleep(0.1)
+            
+            # 추가 대기 시간 (사용자가 최종 결과를 확인할 수 있도록)
+            time_module.sleep(1.0)
+            
             # 패배 이펙트  
             print(f"\n{Color.BRIGHT_RED}{'='*50}")
             print(f"💀 패배... 💀")
@@ -5089,14 +5769,6 @@ class BraveCombatSystem:
             # 패배 후 일시정지 - 사용자가 결과를 확인할 시간
             print(f"\n{Color.BRIGHT_RED}전투에서 패배했습니다...{Color.RESET}")
             
-            # 전투 통계 출력
-            summary = self.combat_logger.get_session_summary()
-            print(f"\n📊 전투 통계:")
-            print(f"  플레이어 총 데미지: {summary['total_player_damage']}")
-            print(f"  적 총 데미지: {summary['total_enemy_damage']}")
-            print(f"  총 치유량: {summary['total_healing']}")
-            print(f"  로그 파일: {summary['log_file']}")
-            
             input(f"{Color.RED}계속하려면 Enter를 누르세요...{Color.RESET}")
             
             # 패배 후 입력 버퍼 클리어
@@ -5104,6 +5776,16 @@ class BraveCombatSystem:
                 self.keyboard.clear_input_buffer()
             
         return party_alive
+    
+    def _is_ally(self, caster, target):
+        """시전자와 대상이 같은 편인지 확인 - 하드코딩된 스킬은 플레이어 파티만 치유"""
+        # 하드코딩된 스킬의 경우 무조건 플레이어 파티만 치유하도록 제한
+        if (hasattr(self, '_current_party') and 
+            caster in self._current_party and target in self._current_party):
+            return True
+        
+        # 적끼리는 아군으로 판단하지 않음 (하드코딩된 치유 스킬 방지)
+        return False
     
     def _apply_skill_effects(self, skill, caster, targets):
         """스킬 효과 적용 - New Skill System 호환"""
@@ -5124,15 +5806,28 @@ class BraveCombatSystem:
                 old_brv = target.brave_points
                 target.brave_points -= damage
                 target.brave_points = max(0, target.brave_points)
+
+                # 적군인지 확인하여 표시량 조정
+                target_is_enemy = hasattr(target, 'character_class') and target.character_class == 'Enemy'
+                target_brv_display = target.brave_points
+                old_brv_display = old_brv
+                damage_display = damage
                 
-                print(f"⚡ {target.name}의 BRV: {old_brv} → {target.brave_points} (-{damage})")
+                print(f"⚡ {target.name}의 BRV: {old_brv_display} → {target_brv_display} (-{damage_display})")
                 
                 # 무모한 돌격의 특수 효과: 시전자 BRV 증가
                 if "무모한 돌격" in skill_name:
                     brv_gain = int(damage * 0.5)  # 가한 데미지의 50%만큼 BRV 증가
                     old_caster_brv = caster.brave_points
                     caster.brave_points += brv_gain
-                    print(f"💪 {caster.name}의 BRV: {old_caster_brv} → {caster.brave_points} (+{brv_gain}) [무모한 돌격 효과]")
+                    
+                    # 시전자가 적군인지 확인하여 표시량 조정
+                    caster_is_enemy = hasattr(caster, 'character_class') and caster.character_class == 'Enemy'
+                    caster_brv_display = caster.brave_points
+                    old_caster_brv_display = old_caster_brv
+                    brv_gain_display = brv_gain // 90 if caster_is_enemy else brv_gain // 10
+                    
+                    print(f"💪 {caster.name}의 BRV: {old_caster_brv_display} → {caster_brv_display} (+{brv_gain_display}) [무모한 돌격 효과]")
                             
                 # BREAK 체크
                 if target.brave_points <= 0 and hasattr(target, 'apply_break_if_needed'):
@@ -5144,7 +5839,6 @@ class BraveCombatSystem:
                 hp_power = skill.get("hp_power", 120)
                 damage = self._calculate_hp_damage_from_skill(skill, caster, target, hp_power)
                 actual_damage = target.take_damage(damage)
-                print(f"💥 {target.name}에게 {actual_damage} HP 데미지!")
                 
             elif skill_type == SkillType.BRV_HP_ATTACK:
                 # BRV + HP 복합 공격
@@ -5161,35 +5855,194 @@ class BraveCombatSystem:
                 # HP 데미지
                 hp_damage = self._calculate_hp_damage_from_skill(skill, caster, target, hp_power)
                 actual_damage = target.take_damage(hp_damage)
-                print(f"💥 {target.name}에게 {actual_damage} HP 데미지!")
                 
             elif skill_type == SkillType.HEAL:
-                # 치유
-                heal_amount = self._calculate_heal_amount(skill, caster)
-                actual_heal = target.heal(heal_amount)
-                print(f"💚 {target.name}이(가) {actual_heal} HP 회복!")
+                # 치유 - 아군만 대상으로 함
+                if self._is_ally(caster, target):
+                    heal_amount = self._calculate_heal_amount(skill, caster)
+                    actual_heal = target.heal(heal_amount)
+                    print(f"💚 {target.name}이(가) {actual_heal} HP 회복!")
+                else:
+                    # 적에게는 치유 효과 적용하지 않음
+                    print(f"🚫 {target.name}은(는) 적이므로 치유되지 않습니다.")
                 
             elif skill_type == SkillType.BUFF:
                 # 버프 적용
                 self._apply_skill_buff(skill, target)
                 print(f"✨ {target.name}에게 버프 적용!")
                 
+                # ⏳ 버프 효과 확인 위해 2초 대기 (엔터로 스킵 가능)
+                if hasattr(self, 'gauge_animator'):
+                    self.gauge_animator._wait_with_skip_option(2.0, "버프 효과 확인")
+                
             elif skill_type == SkillType.DEBUFF:
                 # 디버프 적용
                 self._apply_skill_debuff(skill, target)
                 print(f"💀 {target.name}에게 디버프 적용!")
+                
+                # ⏳ 디버프 효과 확인 위해 2초 대기 (엔터로 스킵 가능)
+                if hasattr(self, 'gauge_animator'):
+                    self.gauge_animator._wait_with_skip_option(2.0, "디버프 효과 확인")
             
             elif skill_type == SkillType.SPECIAL or skill_type == SkillType.ULTIMATE:
                 # 특수/궁극기 스킬
                 self._apply_special_skill(skill, caster, target)
                 
     def _calculate_brv_damage(self, skill, caster, target, brv_power):
-        """BRV 데미지 계산 - 로깅 시스템 통합"""
-        return self.combat_logger.calculate_brv_damage_with_log(skill, caster, target, brv_power)
+        """🔥 BRV 데미지 계산 - 통합 데미지 시스템 사용"""
+        
+        # 회피 체크 먼저 수행
+        dodge_result = self._check_dodge_attempt(caster, target)
+        if dodge_result.get("is_dodged", False):
+            return 0
+        
+        try:
+            # 🎯 통합 데미지 시스템 우선 사용 (기존 시스템보다 우선)
+            from .unified_damage_system import calculate_brv_damage
+            
+            # 스킬 정보 변환 (CharacterTrait 객체 처리)
+            if hasattr(skill, '__dict__'):
+                # CharacterTrait 등의 객체인 경우
+                skill_name = getattr(skill, 'name', "기본 공격")
+                damage_type = getattr(skill, 'damage_type', "physical")
+                element = getattr(skill, 'element', "none")
+            elif isinstance(skill, dict):
+                # 딕셔너리인 경우
+                skill_name = skill.get("name", "기본 공격")
+                damage_type = skill.get("damage_type", "physical")
+                element = skill.get("element", "none")
+            else:
+                # 기타 경우
+                skill_name = "기본 공격"
+                damage_type = "physical"
+                element = "none"
+            
+            unified_skill = {
+                "name": skill_name,
+                "brv_power": brv_power,
+                "damage_type": damage_type,
+                "element": element
+            }
+            
+            # 통합 시스템으로 데미지 계산 (우선 사용)
+            result = calculate_brv_damage(caster, target, unified_skill)
+            final_damage = result.final_damage
+            
+            # 구버전 로그 제거 - 통합 데미지 시스템에서 이쁜 로그 출력
+            return final_damage
+            
+        except Exception as e:
+            print(f"⚠️ 통합 데미지 시스템 오류, 기존 시스템 사용: {e}")
+            # 폴백: 기존 계산 시스템
+            caster_attack = getattr(caster, 'physical_attack', 50)
+            target_defense = getattr(target, 'physical_defense', 50)
+            simple_damage = max(1, int((caster_attack - target_defense * 0.5) * (brv_power / 100.0) * 0.1))
+            print(f"⚠️ 폴백 계산 사용: {simple_damage}")
+            return simple_damage
+    
+    def _check_dodge_attempt(self, attacker, target):
+        """회피 시도 체크 및 결과 반환"""
+        attacker_speed = getattr(attacker, 'speed', 100)
+        target_speed = getattr(target, 'speed', 100)
+        
+        # 회피 확률 계산
+        dodge_chance = max(0, min(0.3, (target_speed - attacker_speed) / attacker_speed * 0.2))
+        
+        import random
+        is_dodged = random.random() < dodge_chance
+        
+        return {
+            "is_dodged": is_dodged,
+            "dodge_chance": dodge_chance,
+            "attacker_speed": attacker_speed,
+            "target_speed": target_speed
+        }
     
     def _calculate_hp_damage_from_skill(self, skill, caster, target, hp_power):
-        """스킬의 HP 데미지 계산 - 로깅 시스템 통합"""
-        final_damage = self.combat_logger.calculate_hp_damage_with_log(skill, caster, target, hp_power)
+        """🔥 스킬의 HP 데미지 계산 - 통합 데미지 시스템 사용"""
+        
+        try:
+            # 통합 데미지 시스템 사용
+            from .unified_damage_system import calculate_hp_damage
+            
+            # 스킬 정보 변환 (CharacterTrait 객체 처리)
+            if hasattr(skill, '__dict__'):
+                # CharacterTrait 등의 객체인 경우
+                skill_name = getattr(skill, 'name', "HP 공격")
+                damage_type = getattr(skill, 'damage_type', "physical")
+                element = getattr(skill, 'element', "none")
+            elif isinstance(skill, dict):
+                # 딕셔너리인 경우
+                skill_name = skill.get("name", "HP 공격")
+                damage_type = skill.get("damage_type", "physical")
+                element = skill.get("element", "none")
+            else:
+                # 기타 경우
+                skill_name = "HP 공격"
+                damage_type = "physical"
+                element = "none"
+            
+            unified_skill = {
+                "name": skill_name,
+                "hp_power": hp_power / 100.0,  # 100 기준을 1.0 기준으로 변환
+                "damage_type": damage_type,
+                "element": element
+            }
+            
+            # 통합 시스템으로 HP 데미지 계산 (hp_power 인수 제거)
+            result, wound_damage = calculate_hp_damage(caster, target, unified_skill)
+            
+            return result.final_damage
+            
+        except Exception as e:
+            print(f"❌ HP 데미지 계산 오류: {e}")
+            # 폴백: 간단한 계산
+            brv_points = getattr(caster, 'brave_points', 0)
+            hp_power_normalized = hp_power / 100.0
+            return max(1, int(brv_points * hp_power_normalized * 0.115))
+        
+        # 아군/적군 구분하여 배율 적용
+        is_enemy = hasattr(caster, 'character_class') and caster.character_class == "Enemy"
+        if is_enemy:
+            # 적군: 원래 배율 유지
+            base_damage = int(caster_attack * hp_power_normalized * 0.8 * (100 / (100 + target_defense)))
+        else:
+            # 아군: 1.75배 증가 (0.8 → 1.4)
+            base_damage = int(caster_attack * hp_power_normalized * 1.4 * (100 / (100 + target_defense)))
+        
+        # 🔥 강화된 시스템 사용 가능한 경우
+        if ENHANCED_SYSTEMS_AVAILABLE and self.trait_processor:
+            # 스킬 타입에 따른 데미지 타입 결정
+            skill_name = skill.get("name", "") if isinstance(skill, dict) else getattr(skill, 'name', "")
+            damage_type = "magic" if any(word in skill_name.lower() for word in ["마법", "magic", "spell"]) else "physical"
+            
+            # 특성 효과로 데미지 증폭
+            enhanced_damage = apply_trait_effects_to_damage(caster, target, base_damage, damage_type)
+            
+            # 방어 특성 효과 적용
+            final_damage = apply_trait_effects_to_defense(target, enhanced_damage, damage_type)
+            
+            # 상대적 밸런스 적용
+            if self.balance_system:
+                attacker_stat = caster.magic_attack if damage_type == "magic" else caster.physical_attack
+                defender_stat = target.magic_defense if damage_type == "magic" else target.physical_defense
+                
+                balanced_damage = calculate_balanced_damage(
+                    attacker_stat,
+                    defender_stat,
+                    final_damage / base_damage if base_damage > 0 else 1.0
+                )
+                final_damage = balanced_damage
+            
+            # 특수 능력 발동
+            from .trait_integration_system import trigger_special_abilities
+            special_effects = trigger_special_abilities(caster, target)
+            if special_effects:
+                for effect_msg in special_effects[:1]:  # HP 공격에서는 1개만
+                    print(f"  {effect_msg}")
+        else:
+            # 기존 시스템 (폴백)
+            final_damage = base_damage
         
         # HP 공격 후 BRV 소모 (오페라 옴니아 방식)
         if hasattr(caster, 'consume_brave_points'):
@@ -5200,7 +6053,7 @@ class BraveCombatSystem:
             caster.brave_points = 0
             print(f"  {caster.name}의 BRV가 0이 되었습니다")
         
-        return final_damage
+        return max(1, int(final_damage))  # 최소 1 데미지
     
     def _apply_skill_buff(self, skill, target):
         """스킬 버프 적용"""
@@ -5300,8 +6153,8 @@ class BraveCombatSystem:
                     
                     break
                     
-                # 연속공격 간 짧은 딜레이
-                time.sleep(0.3)
+                # 연속공격 간 짧은 딜레이 - 더 빠르게
+                time_module.sleep(0.08)  # 80ms로 단축 (300ms→80ms)
             
             print(f"💀 총 {total_damage} 데미지 가함!")
             
@@ -5321,15 +6174,13 @@ class BraveCombatSystem:
                 heal_amount = int(actual_damage * drain_rate)
                 actual_heal = caster.heal(heal_amount)
                 
-                print(f"💥 {target.name}에게 {actual_damage} HP 데미지!")
-                print(f"💚 {caster.name}이(가) {actual_heal} HP 흡혈 회복!")
+                print(f" {caster.name}이(가) {actual_heal} HP 흡혈 회복!")
         
         # 무모한 돌격 효과
         elif "무모한 돌격" in skill_name:
             # 무모한 돌격: 강력한 HP 공격 + 자신도 데미지
             damage_to_target = self._calculate_hp_damage_from_skill(skill, caster, target, 150)
             actual_damage = target.take_damage(damage_to_target)
-            print(f"💥 {target.name}에게 {actual_damage} 데미지! (무모한 돌격)")
             
             # 자신에게도 반동 데미지
             self_damage = int(damage_to_target * 0.3)
@@ -5360,7 +6211,6 @@ class BraveCombatSystem:
             # 정신 데미지 (작은 HP 데미지)
             soul_damage = int(getattr(caster, 'magic_attack', 100) * 0.5)  # 마법공격력의 50%
             actual_damage = target.take_damage(soul_damage)
-            print(f"🧠 정신 공격으로 {actual_damage} 데미지!")
         
         # 진실 간파 효과
         elif "진실 간파" in skill_name:
@@ -5410,7 +6260,6 @@ class BraveCombatSystem:
             # 정신적 충격 데미지 (진실을 마주한 충격)
             psychic_damage = int(getattr(caster, 'magic_attack', 100) * 0.8)  # 철학자의 정신력 기반
             actual_damage = target.take_damage(psychic_damage)
-            print(f"🧠 진실의 충격! {target.name}에게 {actual_damage} 정신 데미지!")
         
         # 기본적인 단일 공격 (특수 효과 없음)
         else:
@@ -5429,4 +6278,224 @@ class BraveCombatSystem:
             if skill.get("hp_power", 0) > 0:
                 hp_damage = self._calculate_hp_damage_from_skill(skill, caster, target, skill.get("hp_power"))
                 actual_damage = target.take_damage(hp_damage)
-                print(f"💥 {target.name}에게 {actual_damage} HP 데미지!")
+    
+    # ==================== AI 게임모드 지원 메서드들 ====================
+    
+    def _execute_ai_action(self, character: Character, action_type: str, action_data: dict, party: List[Character], enemies: List[Character]):
+        """AI가 결정한 액션 실행"""
+        try:
+            if action_type == "attack":
+                # 기본 공격
+                target = action_data.get("target")
+                if not target:
+                    # 대상이 없으면 첫 번째 살아있는 적 선택
+                    alive_enemies = [e for e in enemies if e.is_alive]
+                    target = alive_enemies[0] if alive_enemies else None
+                
+                if target:
+                    print(f"🤖 {character.name}이(가) {target.name}을(를) 공격합니다!")
+                    return self.brave_attack(character, target)
+                else:
+                    return self.defend_action(character)
+            
+            elif action_type == "skill":
+                # 스킬 사용
+                skill = action_data.get("skill")
+                target = action_data.get("target")
+                
+                if skill and target:
+                    print(f"🤖 {character.name}이(가) {skill.name}을(를) 사용합니다!")
+                    return self._apply_skill_effect(character, skill, target, party, enemies)
+                else:
+                    # 스킬이나 대상이 없으면 기본 공격
+                    return self._execute_ai_action(character, "attack", {}, party, enemies)
+            
+            elif action_type == "use_item":
+                # 아이템 사용
+                item = action_data.get("item")
+                target = action_data.get("target", character)
+                
+                if item:
+                    print(f"🤖 {character.name}이(가) {item.name}을(를) 사용합니다!")
+                    return self._apply_item_effect(character, item, target)
+                else:
+                    return self.defend_action(character)
+            
+            elif action_type == "defend":
+                # 방어
+                print(f"🤖 {character.name}이(가) 방어 자세를 취합니다!")
+                return self.defend_action(character)
+            
+            elif action_type == "coordinated_attack":
+                # 협동 공격
+                partner = action_data.get("partner")
+                target = action_data.get("target")
+                
+                if not target:
+                    alive_enemies = [e for e in enemies if e.is_alive]
+                    target = alive_enemies[0] if alive_enemies else None
+                
+                if target and partner:
+                    print(f"🤖 {character.name}과(와) {partner.name}의 협동 공격!")
+                    # 협동 공격은 일반 공격보다 1.5배 강함
+                    result = self.brave_attack(character, target)
+                    if result and hasattr(result, 'damage'):
+                        result.damage = int(result.damage * 1.5)
+                    
+                    # AI 게임 모드에서 협동공격 성공 대사 출력
+                    if hasattr(self, 'ai_game_mode') and self.ai_game_mode:
+                        self.ai_game_mode.show_coordination_success_dialogue(character, partner)
+                    
+                    return result
+                else:
+                    return self._execute_ai_action(character, "attack", {}, party, enemies)
+            
+            else:
+                # 기본 행동: 방어
+                return self.defend_action(character)
+                
+        except Exception as e:
+            print(f"❌ AI 액션 실행 오류: {e}")
+            # 오류 발생시 방어로 대체
+            return self.defend_action(character)
+    
+    def _apply_skill_effect(self, character: Character, skill, target: Character, party: List[Character], enemies: List[Character]):
+        """스킬 효과 적용 - 실제 스킬 시스템 사용"""
+        try:
+            if hasattr(skill, 'type') and hasattr(skill, 'hp_power'):
+                # 실제 스킬 객체인 경우
+                if skill.type in ['HP_ATTACK', 'BRV_HP_ATTACK']:
+                    # HP 공격 스킬
+                    hp_damage = self._calculate_hp_damage_from_skill(skill, character, target, skill.hp_power)
+                    actual_damage = target.take_damage(hp_damage)
+                    return "skill_attack", {"damage": actual_damage}
+                
+                elif skill.type == 'BRV_ATTACK':
+                    # BRV 공격 스킬
+                    brv_damage = self._calculate_brv_damage(skill, character, target, skill.brv_power)
+                    old_brv = target.brave_points
+                    target.brave_points = max(0, target.brave_points - brv_damage)
+                    print(f"⚡ {target.name}의 BRV: {old_brv} → {target.brave_points} (-{brv_damage})")
+                    return "skill_brv", {"brv_damage": brv_damage}
+                
+                elif skill.type == 'HEAL':
+                    # 회복 스킬
+                    heal_amount = character.level * 15 + 50
+                    target.current_hp = min(target.max_hp, target.current_hp + heal_amount)
+                    print(f"💚 {target.name}이(가) {heal_amount} HP 회복했습니다!")
+                    return "heal", {"amount": heal_amount}
+                
+                elif skill.type == 'BUFF':
+                    # 버프 스킬
+                    print(f"✨ {target.name}에게 버프를 적용합니다!")
+                    return "buff", {"target": target.name}
+            
+            else:
+                # 단순한 스킬 이름인 경우 (호환성)
+                skill_name = skill if isinstance(skill, str) else getattr(skill, 'name', '기본 공격')
+                return self._apply_simple_skill_effect(character, skill_name, target, party, enemies)
+                
+        except Exception as e:
+            print(f"❌ 스킬 효과 적용 오류: {e}")
+            return self.brave_attack(character, target)
+    
+    def _apply_simple_skill_effect(self, character: Character, skill_name: str, target: Character, party: List[Character], enemies: List[Character]):
+        """간단한 스킬 효과 적용 (호환성)"""
+        if skill_name == "강공격":
+            # 강화된 공격
+            result = self.brave_attack(character, target)
+            if result and hasattr(result, 'damage'):
+                result.damage = int(result.damage * 1.3)
+            return result
+        
+        elif skill_name in ["힐", "응급처치", "치유"]:
+            # 회복 스킬
+            heal_amount = character.level * 15 + 50
+            target.current_hp = min(target.max_hp, target.current_hp + heal_amount)
+            print(f"💚 {target.name}이(가) {heal_amount} HP 회복했습니다!")
+            return "heal", {"amount": heal_amount}
+        
+        elif skill_name == "방어술":
+            # 방어력 증가
+            return self.defend_action(character)
+        
+        elif skill_name in ["파이어볼", "썬더볼트", "메테오"]:
+            # 마법 공격
+            magic_damage = character.level * 20 + 80
+            actual_damage = target.take_damage(magic_damage)
+            print(f"✨ {target.name}이(가) {actual_damage} 마법 피해를 받았습니다!")
+            return "magic_attack", {"damage": actual_damage}
+        
+        else:
+            # 기본 스킬은 일반 공격으로 처리
+            return self.brave_attack(character, target)
+    
+    def _apply_item_effect(self, character: Character, item, target: Character):
+        """아이템 효과 적용 - 실제 아이템 시스템 사용"""
+        try:
+            if hasattr(item, 'effects') and item.effects:
+                # 실제 아이템 객체인 경우
+                total_heal = 0
+                total_mp = 0
+                
+                for effect_type, value in item.effects.items():
+                    if effect_type == "heal":
+                        target.current_hp = min(target.max_hp, target.current_hp + value)
+                        total_heal += value
+                    elif effect_type == "restore_mp":
+                        target.current_mp = min(target.max_mp, target.current_mp + value)
+                        total_mp += value
+                    elif effect_type == "cure_poison":
+                        # 독 치료 (간단 구현)
+                        print(f"✨ {target.name}의 독이 치료되었습니다!")
+                    elif effect_type == "cure_all":
+                        # 모든 상태이상 치료 (간단 구현)
+                        print(f"✨ {target.name}의 모든 상태이상이 치료되었습니다!")
+                
+                if total_heal > 0:
+                    print(f"💚 {target.name}이(가) {total_heal} HP 회복했습니다!")
+                if total_mp > 0:
+                    print(f"💙 {target.name}이(가) {total_mp} MP 회복했습니다!")
+                
+                return "item_use", {"heal": total_heal, "mp": total_mp}
+            
+            else:
+                # 아이템 이름만 있는 경우 (호환성)
+                item_name = item if isinstance(item, str) else getattr(item, 'name', '체력 포션')
+                return self._apply_simple_item_effect(character, item_name, target)
+                
+        except Exception as e:
+            print(f"❌ 아이템 효과 적용 오류: {e}")
+            return "defend", {}
+    
+    def _apply_simple_item_effect(self, character: Character, item_name: str, target: Character):
+        """간단한 아이템 효과 적용 (호환성)"""
+        if "체력" in item_name or "포션" in item_name:
+            # 체력 회복 아이템
+            heal_amount = 100 if "고급" not in item_name else 200
+            target.current_hp = min(target.max_hp, target.current_hp + heal_amount)
+            print(f"💚 {target.name}이(가) {heal_amount} HP 회복했습니다!")
+            return "heal", {"amount": heal_amount}
+        
+        elif "마나" in item_name:
+            # 마나 회복 아이템
+            mp_amount = 50 if "고급" not in item_name else 100
+            target.current_mp = min(target.max_mp, target.current_mp + mp_amount)
+            print(f"💙 {target.name}이(가) {mp_amount} MP 회복했습니다!")
+            return "mp_restore", {"amount": mp_amount}
+        
+        elif "만능" in item_name:
+            # 만능 포션
+            heal_amount = 150
+            mp_amount = 75
+            target.current_hp = min(target.max_hp, target.current_hp + heal_amount)
+            target.current_mp = min(target.max_mp, target.current_mp + mp_amount)
+            print(f"✨ {target.name}이(가) HP {heal_amount}, MP {mp_amount} 회복했습니다!")
+            return "full_restore", {"hp": heal_amount, "mp": mp_amount}
+        
+        else:
+            # 기타 아이템은 소량 회복으로 처리
+            heal_amount = 50
+            target.current_hp = min(target.max_hp, target.current_hp + heal_amount)
+            print(f"💚 {target.name}이(가) {heal_amount} HP 회복했습니다!")
+            return "heal", {"amount": heal_amount}

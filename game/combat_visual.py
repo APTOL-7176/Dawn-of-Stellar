@@ -236,14 +236,14 @@ class CombatVisualizer:
             
             # ATB 게이지
             atb_gauge = getattr(char, 'atb_gauge', 0)
-            if atb_gauge >= 100:
+            if atb_gauge >= 1000:
                 atb_bar = f"[{Color.BRIGHT_CYAN}██████████{Color.RESET}]"
                 atb_status = f"{Color.BRIGHT_CYAN}⚡READY{Color.RESET}"
             else:
-                atb_percent = int(atb_gauge)
+                atb_percent = int(atb_gauge / 10)  # 1000 스케일을 100%로 변환
                 filled = "█" * (atb_percent // 10)
                 empty = "░" * (10 - atb_percent // 10)
-                if atb_gauge >= 75:
+                if atb_gauge >= 750:  # 75% = 750/1000
                     atb_bar = f"[{Color.CYAN}{filled}{Color.RESET}{empty}]"
                     atb_status = f"{Color.CYAN}{atb_percent:3}%{Color.RESET}"
                 else:
@@ -287,14 +287,14 @@ class CombatVisualizer:
             
             # ATB 게이지
             atb_gauge = getattr(enemy, 'atb_gauge', 0)
-            if atb_gauge >= 100:
+            if atb_gauge >= 1000:
                 atb_bar = f"[{Color.BRIGHT_CYAN}██████████{Color.RESET}]"
                 atb_status = f"{Color.BRIGHT_CYAN}⚡READY{Color.RESET}"
             else:
-                atb_percent = int(atb_gauge)
+                atb_percent = int(atb_gauge / 10)  # 1000 스케일을 100%로 변환
                 filled = "█" * (atb_percent // 10)
                 empty = "░" * (10 - atb_percent // 10)
-                if atb_gauge >= 75:
+                if atb_gauge >= 750:  # 75% = 750/1000
                     atb_bar = f"[{Color.CYAN}{filled}{Color.RESET}{empty}]"
                     atb_status = f"{Color.CYAN}{atb_percent:3}%{Color.RESET}"
                 else:
@@ -350,19 +350,19 @@ class CombatVisualizer:
             effect_icon = "✨"
             action_text = skill_name or "행동"
         
-        # 간단한 이펙트 출력
-        print(f"\n{color}{Color.BOLD}")
-        action_line = f"{attacker_sprite} {attacker.name} {effect_icon} {action_text} → {target_sprite} {target.name}"
-        print(f"  {action_line}")
+        # 간단한 이펙트 출력 (로그 제거)
+        # print(f"\n{color}{Color.BOLD}")
+        # action_line = f"{attacker_sprite} {attacker.name} {effect_icon} {action_text} → {target_sprite} {target.name}"
+        # print(f"  {action_line}")
         
-        # 데미지/효과 표시
-        if damage > 0:
-            damage_color = Color.BRIGHT_RED if effect_type == EffectType.CRITICAL else Color.RED
-            print(f"  {damage_color}💢 {damage} 데미지!{Color.RESET}")
-        elif effect_type == EffectType.HEAL and damage < 0:
-            print(f"  {Color.BRIGHT_GREEN}💚 {-damage} 회복!{Color.RESET}")
+        # 데미지/효과 표시 (로그 제거)
+        # if damage > 0:
+        #     damage_color = Color.BRIGHT_RED if effect_type == EffectType.CRITICAL else Color.RED
+        #     print(f"  {damage_color}💢 {damage} 데미지!{Color.RESET}")
+        # elif effect_type == EffectType.HEAL and damage < 0:
+        #     print(f"  {Color.BRIGHT_GREEN}💚 {-damage} 회복!{Color.RESET}")
         
-        print(f"{Color.RESET}")
+        # print(f"{Color.RESET}")
         
         # 짧은 대기 시간
         time.sleep(0.5)
@@ -444,6 +444,15 @@ class CombatVisualizer:
         """화면 지우기"""
         import os
         os.system('cls' if os.name == 'nt' else 'clear')
+    
+    def show_death_effect(self, character):
+        """사망 효과 표시"""
+        if not hasattr(character, 'name'):
+            return
+            
+        sprite = self.get_character_sprite(character)
+        print(f"  {Color.BRIGHT_BLACK}💀 {sprite} {character.name}이(가) 쓰러졌습니다!{Color.RESET}")
+        time.sleep(0.5)
 
 # 전역 인스턴스
 combat_visualizer = CombatVisualizer()

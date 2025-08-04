@@ -99,7 +99,8 @@ class ATBCharacter:
             
         if self.current_action is None:
             effective_speed = self.get_effective_speed()
-            self.atb_gauge += effective_speed * delta_time
+            # ATB 업데이트 속도를 1/5로 느리게 조정
+            self.atb_gauge += (effective_speed * delta_time) / 5.0
             self.atb_gauge = min(self.atb_gauge, self.atb_max)
     
     def is_ready_to_act(self) -> bool:

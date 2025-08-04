@@ -98,29 +98,36 @@ class BraveManager:
     """Brave 시스템 관리자"""
     
     def __init__(self):
-        self.base_brave = 500   # 기본 Brave 값 (INT BRV) - 1000에서 500으로 감소
-        self.max_brave = 9999   # 최대 Brave 값 (MAX BRV)
+        self.base_brave = 50   # 기본 Brave 값 (INT BRV) - 500에서 50으로 대폭 감소
+        self.max_brave = 999   # 최대 Brave 값 (MAX BRV) - 9999에서 999로 감소
         
     def get_initial_brave(self, character) -> int:
-        """캐릭터의 초기 Brave 계산 (INT BRV)"""
+        """캐릭터의 초기 Brave 계산 (INT BRV) - 밸런스 조정됨, 아군 3배 보너스"""
         base_int_brv = getattr(character, 'int_brv', self.base_brave)
-        # 레벨과 장비에 따른 보정 (레벨 보너스 감소)
-        level_bonus = (character.level - 1) * 25 if hasattr(character, 'level') else 0  # 50에서 25로 감소
+        # 레벨과 장비에 따른 보정 (BRV 스케일 조정: 레벨당 2.5 증가)
+        level_bonus = (character.level - 1) * 3 if hasattr(character, 'level') else 0  # 25에서 3으로 감소
         equipment_bonus = self._get_equipment_int_brv_bonus(character)
-        return base_int_brv + level_bonus + equipment_bonus
+        
+        calculated_int_brv = base_int_brv + level_bonus + equipment_bonus
+        
+        # 🎯 아군은 INT BRV 3배 보너스 적용
+        if hasattr(character, 'character_class') and character.character_class != "Enemy":
+            calculated_int_brv *= 3
+            
+        return calculated_int_brv
         
     def get_max_brave(self, character) -> int:
-        """캐릭터의 최대 Brave 계산 (MAX BRV) - 아군 2배 보너스"""
+        """캐릭터의 최대 Brave 계산 (MAX BRV) - 아군 3배 보너스, 밸런스 조정됨"""
         base_max_brv = getattr(character, 'max_brv', self.max_brave)
-        # 레벨과 장비에 따른 보정
-        level_bonus = (character.level - 1) * 100 if hasattr(character, 'level') else 0
+        # 레벨과 장비에 따른 보정 (BRV 스케일 조정: 레벨당 10 증가)
+        level_bonus = (character.level - 1) * 10 if hasattr(character, 'level') else 0  # 100에서 10으로 감소
         equipment_bonus = self._get_equipment_max_brv_bonus(character)
         
         calculated_max_brv = base_max_brv + level_bonus + equipment_bonus
         
-        # 🎯 아군은 MAX BRV 2배 보너스 적용
+        # 🎯 아군은 MAX BRV 3배 보너스 적용 (2배에서 3배로 증가)
         if hasattr(character, 'character_class') and character.character_class != "Enemy":
-            calculated_max_brv *= 2
+            calculated_max_brv *= 3
             
         return calculated_max_brv
         
@@ -477,11 +484,15 @@ class BraveMixin:
         self.brave_points = self.brave_manager.get_initial_brave(self)
         
     def gain_brave(self, amount: int) -> int:
-        """Brave 포인트 획득 (효율성 적용)"""
+        """Brave 포인트 획득 (효율성 적용) - 아군과 적군 동일한 기본 흡수율"""
         try:
             amount = max(0, int(amount))
             efficiency = getattr(self, 'brave_bonus_rate', 1.0)
             actual_gain = int(amount * efficiency)
+            
+            # 기본 BRV 흡수율은 아군과 적군 동일 (기존 2.5배 보너스 제거)
+            # if hasattr(self, 'character_class') and self.character_class != "Enemy":
+            #     actual_gain = int(actual_gain * 2.5)
             
             max_brv = self.brave_manager.get_max_brave(self)
             old_brave = self.brave_points

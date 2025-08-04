@@ -14,9 +14,9 @@ from pathlib import Path
 class AudioCategory(Enum):
     BGM = "bgm"
     SFX = "sfx"
-    AMBIENT = "ambient"
     UI = "ui"
     VOICE = "voice"
+    AMBIENT = "ambient"
 
 class FFVIISoundSystem:
     """FFVII 사운드 팩을 사용하는 사운드 시스템"""
@@ -52,9 +52,11 @@ class FFVIISoundSystem:
             pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=1024)
             pygame.mixer.set_num_channels(16)
             self._initialize_ffvii_sounds()
-            print("🎵 FFVII 사운드 시스템 초기화 완료!")
+            if self.debug_mode:
+                print("🎵 FFVII 사운드 시스템 초기화 완료!")
         except Exception as e:
-            print(f"⚠️ 사운드 시스템 초기화 실패: {e}")
+            if self.debug_mode:
+                print(f"⚠️ 사운드 시스템 초기화 실패: {e}")
             self.enabled = False
     
     def _initialize_ffvii_sounds(self):
@@ -65,7 +67,7 @@ class FFVIISoundSystem:
     
     def _load_bgm_tracks(self):
         """FFVII BGM 트랙들을 로드"""
-        print("🎵 FFVII BGM 로딩 중...")
+        # 조용히 로드 (로그 출력 제거)
         
         # 게임 상황별 BGM 매핑
         self.bgm_mapping = {
@@ -108,7 +110,7 @@ class FFVIISoundSystem:
             # 스토리
             'sad': '65-Aeris\' Theme.mp3',
             'dramatic': '52-The Nightmare\'s Beginning.mp3',
-            'peaceful': '26-Ahead on Our Way.mp3',
+            'peaceful': '15-Underneath the Rotting Pizza.mp3',  # 1층 던전 BGM으로 변경!
             'credits': '89-Staff Roll.mp3'
         }
         
@@ -119,15 +121,19 @@ class FFVIISoundSystem:
                 try:
                     # pygame.mixer.music 대신 Sound 객체 사용 (더 나은 제어)
                     self.bgm_tracks[name] = str(file_path)
-                    print(f"  ✅ {name}: {filename}")
+                    if self.debug_mode:
+                        print(f"  ✅ {name}: {filename}")
                 except Exception as e:
-                    print(f"  ❌ {name} 로드 실패: {e}")
+                    if self.debug_mode:
+                        print(f"  ❌ {name} 로드 실패: {e}")
             else:
-                print(f"  ⚠️ {name} 파일 없음: {filename}")
+                if self.debug_mode:
+                    print(f"  ⚠️ {name} 파일 없음: {filename}")
     
     def _load_sfx_sounds(self):
         """FFVII SFX 사운드들을 로드"""
-        print("🎵 FFVII SFX 로딩 중...")
+        if self.debug_mode:
+            print("🎵 FFVII SFX 로딩 중...")
         
         # 게임 액션별 SFX 매핑 (FFVII 공식 사운드 인덱스 기반)
         self.sfx_mapping = {
@@ -278,14 +284,16 @@ class FFVIISoundSystem:
                     self.sfx_sounds[name] = sound
                     loaded_count += 1
                 except Exception as e:
-                    print(f"  ❌ {name} 로드 실패: {e}")
+                    if self.debug_mode:
+                        print(f"  ❌ {name} 로드 실패: {e}")
                     # Fallback 비활성화 - 로드 실패한 SFX는 건너뜀
             else:
                 # 파일이 없으면 건너뜀 (Fallback 비활성화)
                 if self.debug_mode:
                     print(f"  ⚠️ {name} 파일 없음: {file_path}")
         
-        print(f"  ✅ {loaded_count}개 SFX 로드됨")
+        if self.debug_mode:
+            print(f"  ✅ {loaded_count}개 SFX 로드됨")
     
     def _setup_game_sound_mapping(self):
         """게임에서 사용할 수 있도록 사운드 매핑 통합"""
@@ -294,9 +302,10 @@ class FFVIISoundSystem:
         self.sounds.update(self.bgm_tracks)
         self.sounds.update({name: sound for name, sound in self.sfx_sounds.items()})
         
-        print(f"🎵 총 {len(self.sounds)}개 사운드 준비 완료!")
-        print(f"  📀 BGM: {len(self.bgm_tracks)}개")
-        print(f"  🔊 SFX: {len(self.sfx_sounds)}개")
+        if self.debug_mode:
+            print(f"🎵 총 {len(self.sounds)}개 사운드 준비 완료!")
+            print(f"  📀 BGM: {len(self.bgm_tracks)}개")
+            print(f"  🔊 SFX: {len(self.sfx_sounds)}개")
     
     def play_sound(self, sound_name: str, category: AudioCategory = AudioCategory.SFX, 
                    volume_override: Optional[float] = None, loop: int = 0):

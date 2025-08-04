@@ -122,7 +122,34 @@ class CursorMenu:
         os.system('cls' if os.name == 'nt' else 'clear')
         
     def display_menu(self):
-        """메뉴 화면 표시 - 개선된 버전 (커서 복사 방지)"""
+        """메뉴 화면 표시 - 아스키 아트 보존 버전"""
+        # clear_screen이 False인 경우, 아스키 아트 보존을 위해 업데이트 방식 변경
+        if not self.clear_screen:
+            # 첫 표시인 경우에만 메뉴 표시
+            if not hasattr(self, '_menu_displayed') or not self._menu_displayed:
+                # 제목 표시 (간소화)
+                if self.title:
+                    print(f"\n{self.title}\n")
+                
+                # 추가 콘텐츠 표시 (파티 정보 등) - 처음 한 번만
+                if self.extra_content:
+                    print(self.extra_content)
+                    print()
+                
+                # 메뉴 아이템들 표시
+                self._display_menu_items()
+                
+                # 설명과 조작법 표시
+                self._display_menu_footer()
+                
+                # 메뉴가 표시되었음을 표시
+                self._menu_displayed = True
+            else:
+                # 이미 표시된 경우, 현재 선택만 업데이트 (인라인)
+                self._update_selection_inline()
+            return
+        
+        # clear_screen이 True인 경우, 기존 방식 유지
         # 첫 표시가 아닌 경우, 메뉴만 업데이트
         if hasattr(self, '_menu_displayed') and self._menu_displayed:
             self._update_menu_only()
@@ -131,14 +158,10 @@ class CursorMenu:
         # 첫 표시인 경우에만 전체 화면 처리
         if self.clear_screen:
             self._clear_screen()
-        else:
-            # clear_screen이 False인 경우, 메뉴 시작을 알리는 구분선만
-            print("\n" + "─" * 60)
         
-        # 제목 표시 (처음 한 번만)
+        # 제목 표시
         if self.title:
-            print(f"\n🎮 {self.title}\n")
-            print("=" * (len(self.title) + 6))
+            print(f"\n{self.title}\n")
             print()
         
         # 추가 콘텐츠 표시 (파티 정보 등) - 처음 한 번만
@@ -154,6 +177,39 @@ class CursorMenu:
         
         # 메뉴가 표시되었음을 표시
         self._menu_displayed = True
+    
+    def _update_selection_inline(self):
+        """선택 항목만 인라인으로 업데이트 (아스키 아트 보존용)"""
+        try:
+            # 커서를 메뉴 시작 위치로 이동하여 메뉴 부분만 다시 그리기
+            print("\033[2K", end='')  # 현재 라인 클리어
+            
+            # 메뉴 아이템들만 다시 표시
+            self._display_menu_items()
+            
+            # 설명 부분 업데이트
+            if self.show_description and self.items and self.selected_index < len(self.items):
+                current_item = self.items[self.selected_index]
+                if current_item.description:
+                    print(f"\n💡 {current_item.description}")
+            
+            # 조작법 다시 표시
+            self._display_menu_footer()
+            
+        except Exception as e:
+            # 인라인 업데이트 실패 시 전체 다시 그리기
+            self._display_full_menu()
+    
+    def _display_full_menu(self):
+        """전체 메뉴 다시 표시 (폴백용)"""
+        if not self.clear_screen:
+            # 아스키 아트 보존 모드에서는 메뉴 부분만 다시 그리기
+            print(f"\n{self.title}\n" if self.title else "")
+            self._display_menu_items()
+            self._display_menu_footer()
+        else:
+            # 일반 모드에서는 전체 화면 클리어 후 다시 그리기
+            self.display_menu()
         
     def _get_current_line(self):
         """현재 커서 위치 라인 반환 (추정)"""
@@ -161,14 +217,13 @@ class CursorMenu:
         return 0
         
     def _update_menu_only(self):
-        """메뉴 항목만 업데이트 (커서 복사 방지)"""
-        # clear_screen이 False인 경우에도 메뉴 부분만 지우기 위해 화면을 클리어
+        """메뉴 항목만 업데이트 (clear_screen=True인 경우만 사용)"""
+        # 전체 화면 클리어
         self._clear_screen()
         
         # 제목 다시 표시
         if self.title:
-            print(f"\n🎮 {self.title}\n")
-            print("=" * (len(self.title) + 6))
+            print(f"\n{self.title}\n")
             print()
         
         # 추가 콘텐츠 표시 (파티 정보 등)
@@ -203,24 +258,31 @@ class CursorMenu:
                     print(f"   {item.text}")
         
     def _display_menu_footer(self):
-        """메뉴 하단 정보 표시"""
+        """메뉴 하단 정보 표시 - 화려한 버전"""
         # 설명 표시
         if self.show_description and self.items and self.selected_index < len(self.items):
             current_item = self.items[self.selected_index]
             if current_item.description:
                 print(f"\n💡 {current_item.description}")
         
-        # 조작법 표시
-        print(f"\n{'─' * 50}")
+        # 화려한 구분선과 조작법 표시
+        print(f"\n{'═' * 70}")
+        
+        # 조작법 표시 (더 예쁜 버전)
         controls = []
         if len(self.items) > 1:
-            controls.append("W/S: 위/아래")
-        controls.append("Enter: 선택")
+            controls.append("🔼🔽 W/S: 위/아래")
+        controls.append("⚡ Enter: 선택")
         if self.cancellable:
-            controls.append("Q: 취소")
-        controls.append("I: 정보")
+            controls.append("❌ Q: 취소")
+        controls.append("📋 I: 정보")
         
-        print(f"🎮 {' | '.join(controls)}")
+        control_text = f" | ".join(controls)
+        print(f"{control_text:^70}")
+        print(f"{'═' * 70}")
+        
+        # 멋진 하단 장식
+        print(f"{'✦':^14} {'✧':^14} {'✦':^14} {'✧':^14} {'✦':^14}")
         
     def move_cursor(self, direction: int, silent: bool = False):
         """커서 이동 (사운드 중복 방지 강화)"""
@@ -324,7 +386,10 @@ class CursorMenu:
             return
             
         item = self.items[self.selected_index]
-        self._clear_screen()
+        if self.clear_screen:
+            self._clear_screen()
+        else:
+            print("\n" + "─" * 60)
         
         print(f"\n📋 {item.text} - 상세 정보\n")
         print("=" * 40)
@@ -449,7 +514,7 @@ def create_character_detail_menu(title: str, characters: List[Any], audio_manage
         controls.append("Enter: 선택")
         controls.append("Q: 취소")
         
-        print(f"🎮 {' | '.join(controls)}")
+        print(f"{' | '.join(controls)}")
     
     menu._display_menu_footer = custom_display_footer
     return menu

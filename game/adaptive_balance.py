@@ -78,9 +78,10 @@ class AdaptiveBalanceSystem:
         self.max_adjustment = 0.5         # 최대 조정 폭
         self.analysis_window = 10         # 분석 윈도우 (최근 N번의 전투)
         
-    def start_session(self):
+    def start_session(self, debug_mode=False):
         """새로운 게임 세션 시작 - 세션별 데이터 초기화"""
-        print("🎯 적응형 밸런스 시스템 세션 시작")
+        if debug_mode:
+            print("🎯 적응형 밸런스 시스템 세션 시작")
         
         # 세션별 메트릭 초기화 (전체 데이터는 유지)
         self.recent_performance = []
@@ -88,12 +89,13 @@ class AdaptiveBalanceSystem:
         self.mastery_indicators = []
         
         # 현재 난이도 표시
-        print(f"   현재 난이도: {self.current_difficulty.value}")
-        print(f"   적응 민감도: {self.adaptation_sensitivity:.1%}")
+        if debug_mode:
+            print(f"   현재 난이도: {self.current_difficulty.value}")
+            print(f"   적응 민감도: {self.adaptation_sensitivity:.1%}")
         
         # 기존 데이터가 있다면 로드
         try:
-            self.load_balance_data()
+            self.load_balance_data(debug_mode=debug_mode)
         except:
             pass  # 첫 실행시에는 파일이 없을 수 있음
         
@@ -377,7 +379,7 @@ class AdaptiveBalanceSystem:
         except Exception as e:
             print(f"밸런스 데이터 저장 실패: {e}")
     
-    def load_balance_data(self, filename: str = "balance_data.json"):
+    def load_balance_data(self, filename: str = "balance_data.json", debug_mode: bool = False):
         """밸런스 데이터 로드"""
         try:
             with open(filename, 'r', encoding='utf-8') as f:
@@ -396,12 +398,15 @@ class AdaptiveBalanceSystem:
             # 최근 성과 복원
             self.recent_performance = data.get('recent_performance', [])
             
-            print("✅ 밸런스 데이터 로드 완료")
+            if debug_mode:
+                print("✅ 밸런스 데이터 로드 완료")
             
         except FileNotFoundError:
-            print("🔵 새로운 밸런스 데이터 시작")
+            if debug_mode:
+                print("🔵 새로운 밸런스 데이터 시작")
         except Exception as e:
-            print(f"❌ 밸런스 데이터 로드 실패: {e}")
+            if debug_mode:
+                print(f"❌ 밸런스 데이터 로드 실패: {e}")
 
 
 # 전역 적응형 밸런스 시스템

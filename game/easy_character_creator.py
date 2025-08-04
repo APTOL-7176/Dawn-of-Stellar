@@ -218,7 +218,113 @@ class EasyCharacterCreator:
             return self._auto_party_creation_fallback()
     
     def _recommended_combo_creation(self) -> List[Character]:
-        """추천 조합 선택"""
+        """추천 조합 선택 - 커서 메뉴 방식"""
+        try:
+            # 메뉴 옵션 구성
+            options = []
+            descriptions = []
+            combo_details = []
+            
+            for name, classes in self.recommended_combos.items():
+                classes_str = " + ".join(classes)
+                options.append(f"{name}")
+                descriptions.append(f"구성: {classes_str}")
+                combo_details.append(classes)
+            
+            # 랜덤 조합 추가
+            options.append("🎲 랜덤 추천 조합")
+            descriptions.append("추천 조합 중 하나를 랜덤하게 선택합니다")
+            combo_details.append(None)  # 랜덤은 나중에 처리
+            
+            # 추가 정보 텍스트
+            extra_content = f"""{CYAN}💡 추천 파티 조합 가이드:{RESET}
+
+{GREEN}• 균형잡힌 파티{RESET}: 초보자에게 추천, 모든 상황에 대응 가능
+{GREEN}• 물리 특화{RESET}: 높은 물리 데미지와 생존력
+{GREEN}• 마법 특화{RESET}: 강력한 마법 공격과 다양한 상태효과
+{GREEN}• 생존 특화{RESET}: 회복과 방어에 특화된 안정적인 구성
+{GREEN}• 속도 특화{RESET}: 빠른 행동과 크리티컬 위주의 전투
+{GREEN}• 독특한 조합{RESET}: 특별한 스킬과 유니크한 플레이"""
+
+            if CURSOR_MENU_AVAILABLE:
+                try:
+                    from .cursor_menu_system import CursorMenu
+                    
+                    menu = CursorMenu(
+                        title=f"{CYAN}📋 추천 파티 조합{RESET}",
+                        options=options,
+                        descriptions=descriptions,
+                        extra_content=extra_content,
+                        audio_manager=getattr(self, 'audio_manager', None),
+                        keyboard=self.keyboard
+                    )
+                    
+                    choice = menu.run()
+                    
+                    if choice == -1 or choice is None:  # 취소
+                        return self.show_character_creation_menu()
+                    
+                    # 선택된 조합 처리
+                    if choice == len(options) - 1:  # 랜덤 선택
+                        selected_combo = random.choice(list(self.recommended_combos.values()))
+                        combo_name = "랜덤 추천"
+                    else:
+                        selected_combo = combo_details[choice]
+                        combo_name = list(self.recommended_combos.keys())[choice]
+                    
+                    print(f"\n{YELLOW}선택된 조합으로 파티 생성 중...{RESET}")
+                    print(f"{CYAN}선택된 조합: {combo_name} ({' + '.join(selected_combo)}){RESET}")
+                    
+                except ImportError:
+                    # 폴백: 기본 메뉴 방식
+                    return self._recommended_combo_creation_fallback()
+                    
+            else:
+                return self._recommended_combo_creation_fallback()
+            
+            # 특성 선택 방식 묻기 (커서 메뉴)
+            trait_options = ["🤖 자동 선택 (빠름)", "✋ 수동 선택 (상세)"]
+            trait_descriptions = [
+                "특성을 자동으로 선택하여 빠르게 게임을 시작합니다",
+                "커서를 사용하여 특성을 직접 선택합니다"
+            ]
+            
+            if CURSOR_MENU_AVAILABLE:
+                try:
+                    trait_menu = CursorMenu(
+                        title="🎭 특성 선택 방식", 
+                        options=trait_options, 
+                        descriptions=trait_descriptions, 
+                        audio_manager=getattr(self, 'audio_manager', None),
+                        keyboard=self.keyboard,
+                        cancellable=True
+                    )
+                    trait_choice_idx = trait_menu.run()
+                    if trait_choice_idx is None:
+                        return None
+                    manual_traits = (trait_choice_idx == 1)  # 0: 자동, 1: 수동
+                except Exception:
+                    # 폴백: 기본 입력 방식
+                    manual_traits = self._ask_trait_selection_method_fallback()
+            else:
+                manual_traits = self._ask_trait_selection_method_fallback()
+            
+            # 파티 생성
+            party = self._create_party_from_classes(selected_combo, manual_traits)
+            
+            if party:
+                print(f"\n{GREEN}✅ {combo_name} 파티 생성 완료!{RESET}")
+                return party
+            else:
+                print(f"{RED}❌ 파티 생성에 실패했습니다.{RESET}")
+                return self._recommended_combo_creation()
+                
+        except Exception as e:
+            print(f"{RED}❌ 메뉴 오류: {e}{RESET}")
+            return self._recommended_combo_creation_fallback()
+    
+    def _recommended_combo_creation_fallback(self) -> List[Character]:
+        """추천 조합 선택 - 기본 메뉴 방식 (폴백)"""
         print(f"\n{CYAN}📋 추천 파티 조합{RESET}")
         print("검증된 조합 중에서 선택하세요:")
         print()
@@ -250,87 +356,77 @@ class EasyCharacterCreator:
             print(f"\n{YELLOW}선택된 조합으로 파티 생성 중...{RESET}")
             print(f"{CYAN}선택된 조합: {' + '.join(selected_combo)}{RESET}")
             
-            # 특성 선택 방식 묻기 (커서 메뉴)
-            trait_options = ["🤖 자동 선택 (빠름)", "✋ 수동 선택 (상세)"]
-            trait_descriptions = [
-                "특성을 자동으로 선택하여 빠르게 게임을 시작합니다",
-                "커서를 사용하여 특성을 직접 선택합니다"
-            ]
+            # 특성 선택 방식 묻기
+            manual_traits = self._ask_trait_selection_method_fallback()
             
-            if CURSOR_MENU_AVAILABLE:
-                try:
-                    trait_menu = CursorMenu("🎭 특성 선택 방식", trait_options, trait_descriptions, cancellable=True)
-                    trait_choice_idx = trait_menu.run()
-                    if trait_choice_idx is None:
-                        return None
-                    manual_traits = (trait_choice_idx == 1)  # 0: 자동, 1: 수동
-                except Exception:
-                    # 폴백: 커서 메뉴 방식
-                    trait_options = ["🤖 자동 선택 (빠름)", "✋ 수동 선택 (상세)"]
-                    trait_descriptions = [
-                        "AI가 캐릭터에 적합한 특성을 자동으로 선택합니다",
-                        "플레이어가 직접 각 캐릭터의 특성을 선택합니다"
-                    ]
-                    trait_menu = CursorMenu("🎭 특성 선택 방식", trait_options, trait_descriptions, cancellable=True)
-                    trait_choice_idx = trait_menu.run()
-                    if trait_choice_idx is None:
-                        return None
-                    manual_traits = (trait_choice_idx == 1)
-            else:
-                # 폴백: 커서 메뉴 방식
-                trait_options = ["🤖 자동 선택 (빠름)", "✋ 수동 선택 (상세)"]
-                trait_descriptions = [
-                    "AI가 캐릭터에 적합한 특성을 자동으로 선택합니다",
-                    "플레이어가 직접 각 캐릭터의 특성을 선택합니다"
-                ]
-                trait_menu = CursorMenu("🎭 특성 선택 방식", trait_options, trait_descriptions, cancellable=True)
-                trait_choice_idx = trait_menu.run()
-                if trait_choice_idx is None:
-                    return None
-                manual_traits = (trait_choice_idx == 1)
-                
-            if manual_traits:
-                print(f"{GREEN}✅ 수동 특성 선택 모드{RESET}")
-            else:
-                print(f"{GREEN}✅ 자동 특성 선택 모드{RESET}")
-            
-            try:
-                if manual_traits:
-                    # 수동 특성 선택을 위해 특성 없이 파티 생성
-                    party = self.auto_builder.create_balanced_party(selected_combo, auto_select_traits=False)
-                else:
-                    # 자동 특성 선택 포함해서 파티 생성
-                    party = self.auto_builder.create_balanced_party(selected_combo, auto_select_traits=True)
-            except Exception as e:
-                print(f"{RED}파티 생성 중 오류 발생: {e}{RESET}")
-                if self._show_yes_no_menu("🔄 오류 발생", "다시 시도하시겠습니까?", "다시 시도", "메뉴로 돌아가기"):
-                    return self._recommended_combo_creation()
-                else:
-                    return self.show_character_creation_menu()
-            
-            # 수동 특성 선택이면 각 캐릭터마다 특성 선택
-            if manual_traits and party:
-                print(f"\n{CYAN}=== 특성 선택 단계 ==={RESET}")
-                for i, character in enumerate(party, 1):
-                    print(f"\n{YELLOW}━━━ {i}/4: {character.name} ({character.character_class}) ━━━{RESET}")
-                    trait_success = self._manual_trait_selection(character)
-                    if not trait_success:  # 특성 선택이 취소된 경우
-                        print(f"{RED}특성 선택이 취소되어 파티 생성을 중단합니다.{RESET}")
-                        return None
+            # 파티 생성
+            party = self._create_party_from_classes(selected_combo, manual_traits)
             
             if party:
-                confirm_result = self._confirm_party_cursor(party)
-                if confirm_result is True:
-                    return party
-                elif confirm_result is False:
-                    return self._recommended_combo_creation()  # 재생성
-                else:  # confirm_result is None (취소)
-                    return None
-            return None
-            
+                print(f"\n{GREEN}✅ 추천 조합 파티 생성 완료!{RESET}")
+                return party
+            else:
+                print(f"{RED}❌ 파티 생성에 실패했습니다.{RESET}")
+                return self._recommended_combo_creation()
+                
         except ValueError:
-            print(f"{RED}숫자를 입력해주세요.{RESET}")
+            print(f"{RED}올바른 숫자를 입력해주세요.{RESET}")
             return self._recommended_combo_creation()
+        except Exception as e:
+            print(f"{RED}오류 발생: {e}{RESET}")
+            return self._recommended_combo_creation()
+    
+    def _ask_trait_selection_method_fallback(self) -> bool:
+        """특성 선택 방식 묻기 - 기본 방식"""
+        print(f"\n{CYAN}🎭 특성 선택 방식{RESET}")
+        print("1. 🤖 자동 선택 (빠름)")
+        print("2. ✋ 수동 선택 (상세)")
+        
+        try:
+            choice = int(self.keyboard.get_key())
+            return choice == 2  # 2번이면 수동 선택
+        except ValueError:
+            print(f"{RED}잘못된 입력입니다. 자동 선택으로 진행합니다.{RESET}")
+            return False
+    
+    def _create_party_from_classes(self, selected_combo: List[str], manual_traits: bool) -> List[Character]:
+        """직업 리스트로부터 파티 생성"""
+        if manual_traits:
+            print(f"{GREEN}✅ 수동 특성 선택 모드{RESET}")
+        else:
+            print(f"{GREEN}✅ 자동 특성 선택 모드{RESET}")
+        
+        try:
+            if manual_traits:
+                # 수동 특성 선택을 위해 특성 없이 파티 생성
+                party = self.auto_builder.create_balanced_party(selected_combo, auto_select_traits=False)
+            else:
+                # 자동 특성 선택 포함해서 파티 생성
+                party = self.auto_builder.create_balanced_party(selected_combo, auto_select_traits=True)
+        except Exception as e:
+            print(f"{RED}파티 생성 중 오류 발생: {e}{RESET}")
+            return None
+        
+        # 수동 특성 선택이면 각 캐릭터마다 특성 선택
+        if manual_traits and party:
+            print(f"\n{CYAN}=== 특성 선택 단계 ==={RESET}")
+            for i, character in enumerate(party, 1):
+                print(f"\n{YELLOW}━━━ {i}/4: {character.name} ({character.character_class}) ━━━{RESET}")
+                trait_success = self._manual_trait_selection(character)
+                if not trait_success:  # 특성 선택이 취소된 경우
+                    print(f"{RED}특성 선택이 취소되어 파티 생성을 중단합니다.{RESET}")
+                    return None
+        
+        if party:
+            confirm_result = self._confirm_party_cursor(party)
+            if confirm_result is True:
+                return party
+            elif confirm_result is False:
+                return self._recommended_combo_creation()  # 재생성
+            else:  # confirm_result is None (취소)
+                return None
+        
+        return None
     
     def _custom_party_creation(self) -> List[Character]:
         """커스텀 파티 생성 - 커서 방식"""
@@ -886,46 +982,46 @@ class EasyCharacterCreator:
             return self._select_character_class_fallback()
     
     def _get_class_description(self, class_name: str) -> str:
-        """클래스별 간단한 설명"""
+        """클래스별 간단한 설명 (새로운 스킬 시스템 기반)"""
         descriptions = {
             # 탱커
-            "전사": "균형잡힌 전투 능력의 기본 탱커",
-            "성기사": "치유 능력이 있는 신성한 수호자",
-            "기사": "높은 방어력과 기동성을 가진 기사단",
-            "암흑기사": "어둠의 힘으로 적을 압도하는 탱커",
+            "전사": "방어력 기반 적응형 전투의 균형잡힌 탱커",
+            "성기사": "빛의 힘과 치유 능력을 가진 신성한 수호자",
+            "기사": "기사도 정신으로 파티를 보호하는 명예로운 전사",
+            "암흑기사": "어둠의 흡수와 디버프로 적을 압도하는 타락한 기사",
             
             # 물리 딜러
-            "검성": "검술의 달인, 강력한 검기 공격",
-            "사무라이": "일격필살의 검술과 무사도 정신",
-            "암살자": "은밀함과 치명타로 적을 제거",
-            "몽크": "맨손 격투와 내공을 다루는 수행자",
-            "검투사": "투기장의 전사, 연속 공격 특화",
-            "광전사": "분노로 전투력이 증가하는 전사",
+            "검성": "검기와 도심으로 완벽한 검술을 구사하는 검의 대가",
+            "사무라이": "빛의 정신력과 거합으로 일격필살을 노리는 무사",
+            "암살자": "은신과 즉사술로 적을 조용히 제거하는 그림자 암살자",
+            "몽크": "내공과 정신 수련으로 자신을 강화하는 수행자",
+            "검투사": "연속 공격과 관중 버프로 화려하게 싸우는 투기사",
+            "광전사": "분노 상태로 폭발적 화력을 발휘하는 광기의 전사",
             
             # 원거리 딜러
-            "궁수": "정확한 활 사격의 원거리 전문가",
-            "도적": "빠른 몸놀림과 기습 공격",
-            "해적": "총기와 함께 바다를 누비는 자유인",
-            "기계공학자": "발명품과 기계 장치로 전투",
+            "궁수": "바람과 독을 다루는 정밀한 원거리 사격 전문가",
+            "도적": "독과 은신술로 기습하는 빠른 몸놀림의 도둑",
+            "해적": "물과 번개를 조합한 자유분방한 바다의 전사",
+            "기계공학자": "번개 에너지와 기계술로 전투하는 과학자",
             
             # 마법사
-            "아크메이지": "모든 원소 마법의 대마법사",
-            "네크로맨서": "죽음과 언데드를 다루는 마법사",
-            "정령술사": "자연 정령과 소통하는 마법사",
-            "시간술사": "시간을 조작하는 신비한 마법사",
-            "연금술사": "물질 변환과 독을 다루는 학자",
-            "차원술사": "공간과 차원을 조작하는 마법사",
+            "아크메이지": "화염을 중심으로 모든 원소를 다루는 대마법사",
+            "네크로맨서": "어둠과 언데드를 조종하는 죽음의 마법사",
+            "정령술사": "대지, 물, 화염 정령과 소통하는 자연의 친구",
+            "시간술사": "시간과 공간을 조작하는 신비한 시공간 마법사",
+            "연금술사": "독과 폭발로 물질을 변환하는 실험적 학자",
+            "차원술사": "공간 조작과 차원 이동을 다루는 차원의 지배자",
             
             # 서포터
-            "바드": "음악으로 파티를 버프하는 예술가",
-            "드루이드": "자연의 힘으로 치유하는 현자",
-            "신관": "신성한 치유와 축복의 성직자",
-            "무당": "영혼과 저주를 다루는 샤먼",
+            "바드": "빛과 어둠의 음악으로 파티를 지원하는 예술가",
+            "드루이드": "대지와 번개로 자연을 치유하는 현명한 현자",
+            "신관": "빛의 치유와 언데드 퇴치를 담당하는 성직자",
+            "무당": "빛과 어둠, 대지의 영력을 다루는 영적 샤먼",
             
-            # 특수
-            "용기사": "용의 힘을 다루는 전설적 존재",
-            "철학자": "지혜와 논리로 전투하는 사상가",
-            "마검사": "마법과 검술을 융합한 전사"
+            # 특수/하이브리드
+            "용기사": "화염 드래곤의 힘을 계승한 전설적 존재",
+            "철학자": "논리와 지혜로 현실을 조작하는 사상가",
+            "마검사": "마법과 검술을 완벽히 융합한 마검의 달인"
         }
         return descriptions.get(class_name, "특별한 능력을 가진 클래스")
     

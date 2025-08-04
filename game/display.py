@@ -423,11 +423,21 @@ class GameDisplay:
         return f"[{bar}]"
         
     def show_level_up_effect(self, character: Character, old_level: int):
-        """레벨업 이펙트"""
-        print("\n" + "="*50)
-        print(f"    ★ LEVEL UP! ★")
-        print(f"    {character.name}: Lv.{old_level} → Lv.{character.level}")
-        print("="*50)
+        """레벨업 이펙트 - 색상 개선"""
+        from .color_text import bright_green, bright_yellow, bright_cyan, cyan, yellow, red, blue, magenta, white
+        
+        print("\n" + bright_cyan("="*50))
+        print(f"    {bright_yellow('★ LEVEL UP! ★')}")
+        print(f"    {bright_green(character.name)}: {cyan(f'Lv.{old_level}')} → {bright_yellow(f'Lv.{character.level}')}")
+        
+        # 스탯 증가 정보 (개선된 색상으로)
+        if hasattr(character, '_last_level_stats'):
+            stats = character._last_level_stats
+            print(f"  {red('💪 HP')} +{character.max_hp - stats.get('hp', character.max_hp)}, {blue('MP')} +{character.max_mp - stats.get('mp', character.max_mp)}, {yellow('물리공격')} +{character.physical_attack - stats.get('p_atk', character.physical_attack)}, {magenta('마법공격')} +{character.magic_attack - stats.get('m_atk', character.magic_attack)}")
+            print(f"  {cyan('🛡️ 물리방어')} +{character.physical_defense - stats.get('p_def', character.physical_defense)}, {blue('마법방어')} +{character.magic_defense - stats.get('m_def', character.magic_defense)}, {bright_green('속도')} +{character.speed - stats.get('speed', character.speed)}")
+            print(f"  {red('⚡ 현재 HP:')} {bright_green(f'{character.current_hp}/{character.max_hp}')}, {blue('MP:')} {bright_cyan(f'{character.current_mp}/{character.max_mp}')}")
+        
+        print(bright_cyan("="*50))
         
     def show_status_effects(self, character: Character):
         """상태 이상 효과 표시"""
@@ -442,7 +452,7 @@ class GameDisplay:
                 effects.append("경상")
                 
         # ATB 상태
-        if character.atb_gauge >= 100:
+        if character.atb_gauge >= 1000:
             effects.append("행동가능")
         elif character.atb_gauge >= 75:
             effects.append("준비중")

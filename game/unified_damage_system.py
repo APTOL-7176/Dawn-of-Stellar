@@ -131,7 +131,7 @@ class UnifiedDamageSystem:
     # =====================================
     
     # BRV 데미지 관련
-    BRV_BASE_MULTIPLIER = 1.0     # 기본 BRV 배율 (5.0에서 0.1으로 대폭 감소하여 밸런스 조정)
+    BRV_BASE_MULTIPLIER = 2.0     # 기본 BRV 배율 (5.0에서 0.1으로 대폭 감소하여 밸런스 조정)
     BRV_DEFENSE_REDUCTION = 1.0    # 방어력 감소 비율 (0%) - 실제 게임과 동일
     BRV_LEVEL_BONUS_PER_LEVEL = 0.0  # 레벨당 데미지 보너스 (0%)
 
@@ -194,14 +194,28 @@ class UnifiedDamageSystem:
         result.level_bonus = 1.0 + (attacker_level * self.BRV_LEVEL_BONUS_PER_LEVEL)
         
         # 4. 기본 데미지 계산 (BRV_BASE_MULTIPLIER 적용)
-        defense_reduction = result.defender_defense * self.BRV_DEFENSE_REDUCTION
-        raw_attack = max(1, result.attacker_attack / max(1, defense_reduction))  # 나누기로 수정
+        # 방어력 계산: 실제 방어력이 아닌 감소율로 사용
+        if self.BRV_DEFENSE_REDUCTION == 1.0:
+            # 방어력을 그대로 나누는 방식
+            effective_defense = max(1, result.defender_defense)
+            raw_attack = result.attacker_attack / effective_defense
+        else:
+            # 기존 방식 (방어력 감소)
+            defense_reduction = result.defender_defense * self.BRV_DEFENSE_REDUCTION
+            raw_attack = max(1, result.attacker_attack - defense_reduction)
+        
         base_damage_before_multiplier = raw_attack * result.skill_multiplier * result.level_bonus
         result.base_damage = int(base_damage_before_multiplier * self.BRV_BASE_MULTIPLIER)
         
-        result.calculation_steps.append(
-            f"기본 데미지: ({result.attacker_attack} ÷ {defense_reduction:.1f}) × {result.skill_multiplier} × {result.level_bonus:.2f} × {self.BRV_BASE_MULTIPLIER} = {result.base_damage}"
-        )
+        if self.BRV_DEFENSE_REDUCTION == 1.0:
+            result.calculation_steps.append(
+                f"기본 데미지: ({result.attacker_attack} ÷ {effective_defense:.1f}) × {result.skill_multiplier} × {result.level_bonus:.2f} × {self.BRV_BASE_MULTIPLIER} = {result.base_damage}"
+            )
+        else:
+            defense_reduction = result.defender_defense * self.BRV_DEFENSE_REDUCTION
+            result.calculation_steps.append(
+                f"기본 데미지: ({result.attacker_attack} - {defense_reduction:.1f}) × {result.skill_multiplier} × {result.level_bonus:.2f} × {self.BRV_BASE_MULTIPLIER} = {result.base_damage}"
+            )
         
         # 5. 크리티컬 판정
         result.is_critical = self._check_critical_hit(attacker)
@@ -236,6 +250,28 @@ class UnifiedDamageSystem:
         # 9. 디버그 출력
         if self.debug_mode:
             self._print_damage_calculation("BRV 데미지", result)
+            
+            # 10초 대기 (아무 키나 눌러서 스킵 가능) - 윈도우 호환 버전
+            import time
+            import threading
+            import msvcrt
+            
+            def wait_for_key():
+                """키 입력을 대기하는 함수"""
+                msvcrt.getch()
+            
+            print(f"\n⏰ 10초 후 계속됩니다... (아무 키나 누르면 즉시 계속)")
+            
+            # 키 입력을 기다리는 스레드 시작
+            key_thread = threading.Thread(target=wait_for_key)
+            key_thread.daemon = True
+            key_thread.start()
+            
+            # 10초 대기하거나 키 입력까지 대기
+            for i in range(100):  # 10초 = 100 × 0.1초
+                if not key_thread.is_alive():
+                    break
+                time.sleep(0.1)
             
         return result
     
@@ -273,12 +309,12 @@ class UnifiedDamageSystem:
         if hp_power is None:
             hp_power = skill.get('hp_power', 1.0)
         
-        # 3. 기본 HP 데미지 계산
-        base_hp_damage = brv_points * hp_power * self.HP_DAMAGE_MULTIPLIER
+        # 3. 기본 HP 데미지 계산 (HP_SKILL_POWER_SCALING 적용)
+        base_hp_damage = brv_points * hp_power * self.HP_DAMAGE_MULTIPLIER * self.HP_SKILL_POWER_SCALING
         result.base_damage = int(base_hp_damage)
         
         result.calculation_steps.append(
-            f"기본 HP 데미지: {brv_points} × {hp_power} × {self.HP_DAMAGE_MULTIPLIER} = {result.base_damage}"
+            f"기본 HP 데미지: {brv_points} × {hp_power} × {self.HP_DAMAGE_MULTIPLIER} × {self.HP_SKILL_POWER_SCALING} = {result.base_damage}"
         )
         
         # 4. 속성 상성 적용
@@ -311,6 +347,28 @@ class UnifiedDamageSystem:
         if self.debug_mode:
             self._print_damage_calculation("HP 데미지", result)
             
+            # 10초 대기 (엔터키로 스킵 가능) - 윈도우 호환 버전
+            import time
+            import threading
+            import msvcrt
+            
+            def wait_for_enter():
+                """엔터키 입력을 대기하는 함수"""
+                msvcrt.getch()
+            
+            print(f"\n⏰ 10초 후 계속됩니다... (아무 키나 누르면 즉시 계속)")
+            
+            # 키 입력을 기다리는 스레드 시작
+            key_thread = threading.Thread(target=wait_for_enter)
+            key_thread.daemon = True
+            key_thread.start()
+            
+            # 10초 대기하거나 키 입력까지 대기
+            for i in range(100):  # 10초 = 100 × 0.1초
+                if not key_thread.is_alive():
+                    break
+                time.sleep(0.1)
+            
         return result, result.wound_damage
     
     # =====================================
@@ -331,8 +389,15 @@ class UnifiedDamageSystem:
         result.defender_defense = getattr(target, 'magic_defense', 50)
         
         # 마법 데미지 재계산 (BRV_BASE_MULTIPLIER 적용)
-        defense_reduction = result.defender_defense * self.BRV_DEFENSE_REDUCTION
-        raw_attack = max(1, result.attacker_attack / max(1, defense_reduction))  # 나누기로 수정
+        if self.BRV_DEFENSE_REDUCTION == 1.0:
+            # 방어력을 그대로 나누는 방식
+            effective_defense = max(1, result.defender_defense)
+            raw_attack = result.attacker_attack / effective_defense
+        else:
+            # 기존 방식 (방어력 감소)
+            defense_reduction = result.defender_defense * self.BRV_DEFENSE_REDUCTION
+            raw_attack = max(1, result.attacker_attack - defense_reduction)
+        
         base_damage_before_multiplier = raw_attack * result.skill_multiplier * result.level_bonus
         result.base_damage = int(base_damage_before_multiplier * self.BRV_BASE_MULTIPLIER)
         
@@ -525,7 +590,7 @@ class UnifiedDamageSystem:
         return bonus
     
     def _print_damage_calculation(self, calculation_type: str, result: DamageResult):
-        """데미지 계산 과정 출력 - 이쁜 신버전 로그"""
+        """데미지 계산 과정 출력 - 간소화된 버전"""
         
         # 계산 타입에 따른 이모지와 색상 설정
         if "BRV" in calculation_type:
@@ -541,41 +606,12 @@ class UnifiedDamageSystem:
             type_color = Color.BRIGHT_YELLOW
             damage_emoji = "⭐"
         
-        # 헤더 출력
+        # 간단한 헤더만 출력
         header = f"{type_emoji} {calculation_type} 계산 결과 {type_emoji}"
         print(f"\n{type_color}╭{'─' * (len(header) + 6)}╮{Color.RESET}")
         print(f"{type_color} {header} {Color.RESET}")
         print(f"{type_color}╰{'─' * (len(header) + 6)}╯{Color.RESET}")
-        
-        # 크리티컬 표시
-        if result.is_critical:
-            print(f"  {Color.BRIGHT_RED}🔥💥 CRITICAL HIT! 💥🔥{Color.RESET}")
-        
-        # 최종 데미지 표시 (크기에 따라 다른 스타일)
-        if result.final_damage >= 1000:
-            print(f"  {damage_emoji}{Color.BRIGHT_YELLOW} 최종 데미지: {Color.BRIGHT_RED}{result.final_damage:,}{Color.RESET} {damage_emoji}")
-        elif result.final_damage >= 500:
-            print(f"  {damage_emoji}{Color.BRIGHT_YELLOW} 최종 데미지: {Color.BRIGHT_MAGENTA}{result.final_damage}{Color.RESET} {damage_emoji}")
-        elif result.final_damage >= 100:
-            print(f"  {damage_emoji}{Color.BRIGHT_YELLOW} 최종 데미지: {Color.BRIGHT_CYAN}{result.final_damage}{Color.RESET} {damage_emoji}")
-        else:
-            print(f"  {damage_emoji}{Color.BRIGHT_YELLOW} 최종 데미지: {Color.BRIGHT_WHITE}{result.final_damage}{Color.RESET} {damage_emoji}")
-        
-        # 상처 데미지 표시
-        if result.wound_damage > 0:
-            print(f"  🩸{Color.BRIGHT_RED} 상처 데미지: {result.wound_damage}{Color.RESET} 🩸")
-        
-        # 계산 과정 표시 (디버그 모드에서만)
-        if self.debug_mode and result.calculation_steps:
-            print(f"  {Color.DIM}📊 계산 과정:{Color.RESET}")
-            for step in result.calculation_steps[-3:]:  # 마지막 3단계만 표시
-                print(f"    {Color.DIM}• {step}{Color.RESET}")
-        
-        # 푸터 - 더 긴 구분선과 빈 줄 추가
-        footer_length = max(50, len(header) + 20)  # 최소 50자, 헤더보다 20자 더 길게
-        print(f"{type_color}{'─' * footer_length}{Color.RESET}")
-        print()  # 빈 줄 추가
-        
+
 
 # =====================================
 # 🌟 전역 인스턴스 및 편의 함수

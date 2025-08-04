@@ -107,7 +107,10 @@ class SFXType(Enum):
 class AudioManager:
     """오디오 관리자"""
     
-    def __init__(self):
+    def __init__(self, debug_mode: bool = False):
+        # 디버그 모드 설정
+        self.debug_mode = debug_mode
+        
         # pygame mixer 초기화
         try:
             pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=512)
@@ -322,12 +325,12 @@ class AudioManager:
                 "79-The Countdown Begins.mp3"       # 카운트다운 시작 (최종층)
             ],
             BGMType.BATTLE: [
-                "11-Fighting.mp3",              # 전투! (일반 전투)
-                "21-Still More Fighting.mp3"    # 더욱 전투를! (일반 전투)
+                "11-Fighting.mp3",                  # 전투! (일반 전투)
+                "21-Still More Fighting.mp3",       # 더욱 전투를! (일반 전투)
+                "85-Jenova Absolute.mp3",           # 제노바 앱솔루트 (일반 전투)
             ],
             BGMType.BOSS: [
                 "38-J-E-N-O-V-A.mp3",              # 제노바 (보스급)
-                "85-Jenova Absolute.mp3",           # 제노바 앱솔루트 (보스급)
                 "86-The Birth of God.mp3",          # 신의 탄생 (보스급)
                 "23-Crazy Motorcycle Chase.mp3",    # 크레이지 모터사이클
                 "70-Full-Scale Attack.mp3",         # 전면 공격
@@ -338,7 +341,8 @@ class AudioManager:
             BGMType.SHOP: [
                 "44-Cait Sith's Theme.mp3",          # 상인
                 "40-Costa del Sol.mp3",              # 코스타 델 솔
-                "19-Don of the Slums.mp3"            # 월 마켓
+                "19-Don of the Slums.mp3",            # 월 마켓
+                "65-Aeris' Theme.mp3"                 # 에어리스의 테마
             ],
             BGMType.VICTORY: [
                 "12-Fanfare.mp3",                    # 승리의 팡파르 (우선 재생)
@@ -440,19 +444,23 @@ class AudioManager:
                 if filepath:
                     tracks.append(filepath)
                 else:
-                    # 파일이 없으면 로그만 출력하고 계속 진행
-                    print(f"🔇 BGM 파일 없음: {filename}")
+                    # 파일이 없으면 로그만 출력하고 계속 진행 (조용히)
+                    pass  # print(f"🔇 BGM 파일 없음: {filename}")
             
             if tracks:
                 self.bgm_tracks[bgm_type] = tracks
                 self.loaded_bgm.add(bgm_type)
-                print(f"✅ BGM 로드 성공: {bgm_type.value} ({len(tracks)}개 파일)")
+                # 로드 성공 메시지는 조용히 처리
+                if hasattr(self, 'debug_mode') and self.debug_mode:
+                    print(f"✅ BGM 로드 성공: {bgm_type.value} ({len(tracks)}개 파일)")
                 return True
             else:
-                print(f"⚠️ BGM 타입 {bgm_type.value}에 사용 가능한 파일이 없습니다")
+                if hasattr(self, 'debug_mode') and self.debug_mode:
+                    print(f"⚠️ BGM 타입 {bgm_type.value}에 사용 가능한 파일이 없습니다")
             
         except Exception as e:
-            print(f"⚠️ BGM 로드 실패 {bgm_type.value}: {e}")
+            if hasattr(self, 'debug_mode') and self.debug_mode:
+                print(f"⚠️ BGM 로드 실패 {bgm_type.value}: {e}")
         
         return False
     
@@ -480,7 +488,7 @@ class AudioManager:
             if sounds:
                 self.sfx_sounds[sfx_type] = sounds
                 self.loaded_sfx.add(sfx_type)
-                print(f"✅ SFX 로드 성공: {sfx_type.value} ({len(sounds)}개 파일)")
+                # SFX 로드 로그 제거 (너무 많은 출력)
                 return True
             else:
                 print(f"⚠️ SFX 타입 {sfx_type.value}에 사용 가능한 파일이 없습니다")
@@ -732,7 +740,7 @@ class AudioManager:
             "prelude": BGMType.MENU,
             "character_select": BGMType.MENU,
             "dungeon_theme": BGMType.FLOOR_1_3,
-            "peaceful": BGMType.SHOP,
+            "peaceful": BGMType.FLOOR_1_3,  # 1층 던전 BGM으로 수정!
             "battle": BGMType.BATTLE,
             "victory": BGMType.VICTORY,
             "game_over": BGMType.GAME_OVER,
@@ -745,15 +753,20 @@ class AudioManager:
             "dungeon": BGMType.FLOOR_1_3,
             "mako_reactor": BGMType.FLOOR_1_3,
             "bombing_mission": BGMType.FLOOR_1_3,
+            # 제노바 컴플리트 추가 (보스급 전투 음악으로 매핑)
+            "jenova_complete": BGMType.BOSS,
+            "jenova_absolute": BGMType.BOSS,
+            "aerith_theme": BGMType.SHOP  # 트레이닝룸용 Aerith 테마
         }
         
         bgm_type = bgm_mapping.get(bgm_name.lower(), BGMType.FLOOR_1_3)
         
         # 디버그: 매핑 정보 출력
-        if bgm_name.lower() in bgm_mapping:
-            print(f"🎵 BGM 매핑: '{bgm_name}' → {bgm_type.name}")
-        else:
-            print(f"⚠️ BGM 매핑 없음: '{bgm_name}' → 기본값 {bgm_type.name} 사용")
+        if self.debug_mode:
+            if bgm_name.lower() in bgm_mapping:
+                print(f"🎵 BGM 매핑: '{bgm_name}' → {bgm_type.name}")
+            else:
+                print(f"⚠️ BGM 매핑 없음: '{bgm_name}' → 기본값 {bgm_type.name} 사용")
         
         self._play_bgm_internal(bgm_type, loop=loop, fade_in=fade_in)
     
@@ -772,13 +785,16 @@ class AudioManager:
             try:
                 if (self.current_bgm_type == bgm_type and 
                     pygame.mixer.music.get_busy()):
+                    if hasattr(self, 'debug_mode') and self.debug_mode:
+                        print(f"🎵 같은 BGM이 재생 중이므로 스킵: {bgm_type}")
                     return  # 이미 같은 BGM이 재생 중
             except Exception:
                 # pygame.mixer.music.get_busy() 오류 시 재생 진행
                 pass
         
-        # 현재 BGM 정지 (같은 BGM이어도 재생이 끊어진 경우 재시작)
-        self.stop_bgm(fade_out=300)  # 더 짧은 페이드아웃으로 끊김 최소화
+        # 🎯 BGM 중단 최소화: 같은 BGM이 아닐 때만 정지
+        if self.current_bgm_type != bgm_type:
+            self.stop_bgm(fade_out=300)  # 다른 BGM으로 변경할 때만 정지
         
         # 새 BGM 로드 및 재생
         if self.load_bgm(bgm_type):
@@ -791,14 +807,16 @@ class AudioManager:
                         self.current_track_index = 0  # 새로운 필드면 인덱스 초기화
                     selected_track = tracks[self.current_track_index % len(tracks)]
                     self.current_track_index += 1  # 다음 트랙을 위해 인덱스 증가
-                    print(f"🎵 필드 BGM 순환 재생: {os.path.basename(selected_track)}")
+                    if hasattr(self, 'debug_mode') and self.debug_mode:
+                        print(f"🎵 필드 BGM 순환 재생: {os.path.basename(selected_track)}")
                 else:
                     # 전투/보스/기타 BGM: 랜덤 선택
                     selected_track = random.choice(tracks)
-                    if bgm_type == BGMType.BATTLE:
+                    # 승리 BGM은 조용히 재생
+                    if bgm_type == BGMType.BATTLE and (hasattr(self, 'debug_mode') and self.debug_mode):
                         print(f"🔥 전투 BGM 랜덤 선택: {os.path.basename(selected_track)}")
                     elif bgm_type == BGMType.VICTORY:
-                        print(f"🎉 승리 BGM 재생: {os.path.basename(selected_track)}")
+                        pass  # 승리 BGM은 조용히 재생
                 
                 try:
                     pygame.mixer.music.load(selected_track)
@@ -808,14 +826,19 @@ class AudioManager:
                     
                     self.current_bgm = selected_track
                     self.current_bgm_type = bgm_type
-                    print(f"✅ BGM 재생 시작: {bgm_type.value}")
+                    # BGM 재생 시작 메시지는 승리 시에는 조용히
+                    if bgm_type != BGMType.VICTORY and (hasattr(self, 'debug_mode') and self.debug_mode):
+                        print(f"✅ BGM 재생 시작: {bgm_type.value}")
                     
                 except Exception as e:
-                    print(f"⚠️ BGM 재생 실패: {e}")
+                    if hasattr(self, 'debug_mode') and self.debug_mode:
+                        print(f"⚠️ BGM 재생 실패: {e}")
             else:
-                print(f"🔇 BGM 타입 {bgm_type.value}에 사용 가능한 트랙이 없습니다")
+                if hasattr(self, 'debug_mode') and self.debug_mode:
+                    print(f"🔇 BGM 타입 {bgm_type.value}에 사용 가능한 트랙이 없습니다")
         else:
-            print(f"🔇 BGM 로드 실패로 {bgm_type.value} 재생을 건너뜁니다")
+            if hasattr(self, 'debug_mode') and self.debug_mode:
+                print(f"🔇 BGM 로드 실패로 {bgm_type.value} 재생을 건너뜁니다")
     
     def set_sfx_volume(self, volume: float):
         """SFX 볼륨 설정 (0.0 ~ 1.0)"""
@@ -968,6 +991,20 @@ class AudioManager:
             else:
                 self.play_sfx(SFXType.DEBUFF_OFF)
     
+    def play_dungeon_bgm(self, floor: int):
+        """던전 층수에 맞는 BGM 재생 (FFVII 호환)"""
+        if self.debug_mode:
+            print(f"🎵 AudioManager.play_dungeon_bgm 호출: {floor}층")
+        
+        # 층수에 맞는 BGM 타입 가져오기
+        bgm_type = self.get_bgm_for_floor(floor)
+        
+        if self.debug_mode:
+            print(f"🎵 {floor}층 → {bgm_type.value} BGM 타입")
+        
+        # BGM 재생
+        self.play_bgm(bgm_type, loop=True, fade_in=500)
+    
     def cleanup(self):
         """오디오 시스템 정리 - 안전한 처리"""
         if not self.mixer_available:
@@ -983,12 +1020,12 @@ class AudioManager:
 # 전역 오디오 매니저 (안전한 초기화)
 audio_manager = None
 
-def get_audio_manager() -> AudioManager:
+def get_audio_manager(debug_mode: bool = False) -> AudioManager:
     """오디오 매니저 반환"""
     global audio_manager
     if audio_manager is None:
         try:
-            audio_manager = AudioManager()
+            audio_manager = AudioManager(debug_mode=debug_mode)
         except Exception as e:
             print(f"⚠️ 오디오 매니저 초기화 실패: {e}")
             # 더미 오디오 매니저 생성
@@ -999,6 +1036,7 @@ class DummyAudioManager:
     """사운드가 없을 때 사용하는 더미 오디오 매니저"""
     
     def __init__(self):
+        self.debug_mode = False  # 더미에서는 디버그 모드 비활성화
         self.mixer_available = False
         self.bgm_volume = 0.7
         self.sfx_volume = 0.8
