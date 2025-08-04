@@ -129,31 +129,79 @@ CHANGELOG_*.md
 DEVLOG_*.md
 
 # ===================================================================
-# 백업 및 아카이브 디렉토리/파일들
+# 백업 및 아카이브 디렉토리/파일들 (완전 제외)
 # ===================================================================
+
+# 백업 디렉토리들
 archive/
 backup/
+backup_*/
 old/
 temp/
 tmp/
 release/
 dist/
+backups/
+archives/
+
+# 날짜별 백업 디렉토리들
+backup_*_*/
+*_backup_*/
+archive_*_*/
+
+# 백업 파일 확장자들
 *.backup
 *.bak
+*.old
+*.orig
+*.save
+*.sav
+*.tmp
+*.temp
+*.cache
+
+# Python 백업 파일들
 *.py.backup
 *.py.bak
-*_backup.*
-*_old.*
+*.py.old
+*.py.orig
+*_backup.py
+*_old.py
+*_original.py
+*_copy.py
+
+# 설정 백업 파일들
 config_backup*.py
 config_broken_backup.py
+config_*_backup.py
+*_config_backup.py
+
+# 런처 백업들
 launcher_old.py
 launcher_simple.py
+launcher_backup*.py
+launcher_*_backup.py
+
+# JSON 백업 파일들
+*.json.backup
+*.json.bak
+*.json.old
+*_backup.json
+*_old.json
 
 # 백업된 README 파일들
 README_OLD.md
 README_NEW.md
 README_v*.md
 README_backup*.md
+README_*_backup.md
+
+# 기타 백업 패턴들
+*~
+*.swp
+*.swo
+.#*
+#*#
 
 # ===================================================================
 # 사용자 데이터 및 세이브 파일들
