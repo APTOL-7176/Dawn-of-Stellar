@@ -1562,9 +1562,18 @@ class GameDisplay:
     def __init__(self):
         self.screen_width = 120  # 화면 너비 증가
         self.screen_height = 35  # 화면 높이 증가
+        self._last_clear_time = 0  # 화면 클리어 디바운싱
         
     def clear_screen(self):
-        """화면 지우기 - 간단하고 안정적인 버전"""
+        """화면 지우기 - 간단하고 안정적인 버전 + 디바운싱"""
+        import time
+        
+        # 디바운싱: 0.2초 이내 중복 클리어 방지 (맵 화면용으로 더 길게)
+        current_time = time.time()
+        if current_time - self._last_clear_time < 0.2:
+            return  # 너무 빈번한 클리어 방지
+        self._last_clear_time = current_time
+        
         # 파이프/모바일 모드에서는 화면 깜빡임 방지를 위해 하드 클리어 금지
         if os.getenv('SUBPROCESS_MODE') == '1':
             try:
@@ -1615,9 +1624,9 @@ class GameDisplay:
         input("Enter 키를 눌러 계속...")
         
     def show_game_screen(self, party_manager: PartyManager, world: GameWorld, cooking_system=None):
-        """메인 게임 화면 표시 - 간소화된 버전"""
-        # 화면 클리어 먼저 실행
-        self.clear_screen()
+        """메인 게임 화면 표시 - 간소화된 버전 (클리어 제거)"""
+        # 화면 클리어를 메인 루프에서 관리하므로 여기서는 제거
+        # self.clear_screen()
         
         try:
             # 안전한 너비 설정

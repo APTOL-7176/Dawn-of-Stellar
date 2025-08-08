@@ -336,6 +336,15 @@ class DawnOfStellarGame:
     """Dawn Of Stellar 메인 게임 클래스 - 완전 통합 시스템"""
     
     def __init__(self):
+        # 화면 클리어 디바운싱 변수
+        self._last_clear_time = 0
+        
+        # 키 입력 디바운싱 변수 (키 반복 방지) - 완화된 설정
+        self._last_key_time = {}
+        self._key_debounce_delay = 0.12  # 120ms (초당 8회 허용)
+        self._key_sequence_count = {}  # 키 연속 입력 카운터
+        self._max_key_sequence = 3  # 최대 연속 입력 허용 횟수 (3회로 증가)
+        
         # 게임 메시지 버퍼 시스템 초기화
         self.message_buffer = []
         self.max_messages = 5  # 최대 메시지 개수
@@ -583,26 +592,18 @@ class DawnOfStellarGame:
         self.encounter_rate_increase = 0.002  # 걸음당 0.2% 증가로 감소 (0.01 → 0.002)
     
     def __del__(self):
-        """소멸자 - 오디오 시스템 강제 정리"""
+        """소멸자 - 오디오 시스템 보존 (정리하지 않음)"""
         try:
-            if hasattr(self, 'audio_system') and self.audio_system:
-                self.audio_system.cleanup()
-            import pygame
-            if pygame.get_init():
-                pygame.mixer.quit()
-                pygame.quit()
+            # 오디오 시스템은 정리하지 않음 (다른 인스턴스에서 사용 중일 수 있음)
+            pass
         except:
             pass
     
     def cleanup(self):
-        """수동 정리 메서드"""
+        """수동 정리 메서드 - 오디오 시스템 보존"""
         try:
-            if hasattr(self, 'audio_system') and self.audio_system:
-                self.audio_system.cleanup()
-            import pygame
-            if pygame.get_init():
-                pygame.mixer.quit()
-                pygame.quit()
+            # 오디오 시스템은 정리하지 않음 (전역 시스템이므로)
+            pass
         except:
             pass
     
@@ -788,6 +789,66 @@ class DawnOfStellarGame:
             print(f"⚠️ 오디오 복원 중 오류: {e}")
         
         print("✅ [AUDIO RESTORED] 정상 오디오 모드가 복원되었습니다")
+    
+    def safe_clear_screen(self):
+        """안전한 화면 클리어 - 디바운싱 적용"""
+        import time
+        
+        current_time = time.time()
+        # 0.1초 이내 중복 클리어 방지
+        if current_time - self._last_clear_time < 0.1:
+            return
+        
+        self._last_clear_time = current_time
+        print("\033[2J\033[H", end='', flush=True)
+    
+    def is_key_debounced(self, key: str) -> bool:
+        """강화된 키 디바운싱 체크 - 키 홀드 및 빠른 반복 방지"""
+        import time
+        
+        current_time = time.time()
+        last_time = self._last_key_time.get(key, 0)
+        
+        # 키별 디바운싱 시간 조정 (완화된 설정)
+        if key in ['w', 'a', 's', 'd']:  # 이동키
+            debounce_time = 0.08  # 80ms (초당 12회 허용 - 이동은 더 빠르게)
+        elif key in ['h', '?', 'esc']:  # 정보성 키
+            debounce_time = 0.3  # 300ms (정보성 키는 적당히)
+        else:  # 기타 키
+            debounce_time = self._key_debounce_delay  # 120ms (초당 8회)
+        
+        # 기본 디바운싱 체크
+        if current_time - last_time < debounce_time:
+            return False  # 너무 빨리 눌림, 무시
+        
+        # 키 연속 입력 카운터 체크 (완화된 키 홀드 방지)
+        if key not in self._key_sequence_count:
+            self._key_sequence_count[key] = 0
+        
+        # 시간 간격이 너무 짧으면 연속 입력으로 간주 (완화)
+        if current_time - last_time < 0.3:  # 300ms 이내 (500ms에서 단축)
+            self._key_sequence_count[key] += 1
+            if self._key_sequence_count[key] > self._max_key_sequence:
+                # 너무 많은 연속 입력은 차단 (3회까지 허용)
+                return False
+        else:
+            # 시간 간격이 충분하면 카운터 리셋
+            self._key_sequence_count[key] = 1
+        
+        self._last_key_time[key] = current_time
+        return True  # 정상 입력
+    
+    def clear_key_buffer(self):
+        """키 버퍼 클리어 - 키 홀드 상태 해제"""
+        try:
+            import os
+            if os.name == 'nt':
+                import msvcrt
+                # Windows에서 키 버퍼 모두 클리어
+                while msvcrt.kbhit():
+                    msvcrt.getch()
+        except:
+            pass
     
     def add_gold(self, amount: int):
         """골드 시스템 통일 - 두 골드 시스템에 모두 추가"""
@@ -5074,9 +5135,9 @@ class DawnOfStellarGame:
                 
                 descriptions.append(description)
             
-            # 커서 메뉴 생성 및 실행
+            # 커서 메뉴 생성 및 실행 (화면 겹침 방지)
             title = "⚔️ 게임 난이도 선택"
-            menu = CursorMenu(title, options, descriptions, cancellable=True)
+            menu = CursorMenu(title, options, descriptions, cancellable=True, clear_screen=False)
             result = menu.run()
             
             if result is None:  # 취소
@@ -5105,7 +5166,7 @@ class DawnOfStellarGame:
             ]
             
             confirm_title = f"{settings['color']} {settings['name']} 선택 확인"
-            confirm_menu = CursorMenu(confirm_title, confirm_options, confirm_descriptions, cancellable=True)
+            confirm_menu = CursorMenu(confirm_title, confirm_options, confirm_descriptions, cancellable=True, clear_screen=False)
             confirm_result = confirm_menu.run()
             
             if confirm_result == 0:  # 확인
@@ -5230,9 +5291,8 @@ class DawnOfStellarGame:
         except Exception:
             pass
 
-        # 게임 시작 화면 클리어
-        import os
-        os.system('cls' if os.name == 'nt' else 'clear')
+        # 게임 시작 화면 클리어 (한 번만)
+        self.safe_clear_screen()
         
         # AI 게임모드 초기화 확인
         if hasattr(self, 'ai_game_mode_enabled') and self.ai_game_mode_enabled:
@@ -5245,9 +5305,16 @@ class DawnOfStellarGame:
         
         # 초기 화면 표시
         need_screen_refresh = True
+        loop_count = 0  # 루프 카운터 (키 버퍼 클리어용)
         
         while self.running:
             try:
+                loop_count += 1
+                
+                # 주기적으로 키 버퍼 클리어 (키 홀드 방지) - 빈도 감소
+                if loop_count % 200 == 0:  # 200번 루프마다 (50번에서 증가)
+                    self.clear_key_buffer()
+                
                 # 층 변경 시 BGM 업데이트
                 if self.current_floor != previous_floor:
                     self.update_floor_bgm()
@@ -5273,9 +5340,11 @@ class DawnOfStellarGame:
                 
                 # 화면 갱신이 필요한 경우에만 표시
                 if need_screen_refresh:
-                    # 화면 클리어 (UI 겹침 방지)
-                    import os
-                    os.system('cls' if os.name == 'nt' else 'clear')
+                    # 화면 클리어 (UI 겹침 방지) - 디바운싱 적용
+                    if hasattr(self, 'display') and self.display:
+                        self.display.clear_screen()  # display 객체의 디바운싱 사용
+                    else:
+                        self.safe_clear_screen()  # 직접 디바운싱 사용
                     
                     try:
                         display_success = False
@@ -5326,12 +5395,8 @@ class DawnOfStellarGame:
                         
                         # 모든 표시 방법 실패 시 최소한의 정보
                         if not display_success:
-                            # 화면 클리어 (폴백용)
-                            import os
-                            if os.name == 'nt':
-                                os.system('cls')
-                            else:
-                                os.system('clear')
+                            # 화면 클리어 (폴백용) - 디바운싱 적용
+                            self.safe_clear_screen()
                                 
                             print(f"\n🎮 Dawn of Stellar - 던전 {getattr(self.world, 'current_level', 1)}층")
                             print(f"📍 플레이어 위치: {getattr(self.world, 'player_pos', '알 수 없음')}")
@@ -5357,11 +5422,36 @@ class DawnOfStellarGame:
                 # 플레이어 입력 받기
                 action = self.get_player_input()
                 
-                # 액션 처리
-                self.process_action(action)
+                # 빈 입력이나 무효한 입력은 처리하지 않음 (화면 복사 방지)
+                if not action or action == '' or len(action.strip()) == 0:
+                    import time
+                    time.sleep(0.05)  # 딜레이 감소 (50ms)
+                    continue  # 다시 입력 대기
                 
-                # 액션 처리 후 화면 갱신 필요 설정
-                need_screen_refresh = True
+                # 특수 키 체크 (키 홀드로 인한 특수 문자 방지)
+                if ord(action[0]) < 32 and action not in ['\r', '\n', '\t']:
+                    continue  # 제어 문자는 무시
+                
+                # 키 디바운싱 체크 (빠른 키 반복 및 키 홀드 방지) - 완화
+                if not self.is_key_debounced(action.lower()):
+                    # 키 홀드가 감지되면 짧은 대기 시간
+                    import time
+                    time.sleep(0.03)  # 30ms로 단축
+                    continue  # 너무 빨리 눌린 키는 무시
+                
+                # 액션 처리
+                action_result = self.process_action(action)
+                
+                # 액션 처리 후 화면 갱신이 필요한 경우에만 설정
+                # 이동, 상호작용은 화면 갱신 필요 / 정보성 명령은 불필요
+                if action in ['w', 'a', 's', 'd']:  # 이동
+                    need_screen_refresh = True
+                elif action in ['i', 'm', 'c', 'p', 'x', 'z', 'f']:  # 메뉴/상호작용
+                    need_screen_refresh = True
+                elif action in ['h', '?', 'esc']:  # 정보성/도움말
+                    need_screen_refresh = False  # 화면 갱신 불필요
+                else:
+                    need_screen_refresh = True  # 기타 액션은 안전하게 갱신
                 
                 # 액션 처리 후 화면 업데이트는 메인 루프에서 자동으로 처리됨
                 # 중복 화면 클리어 제거 - WASD 키마다 2번 클리어되는 문제 해결
@@ -6638,7 +6728,14 @@ class DawnOfStellarGame:
             
             # 간단한 입력 프롬프트만 표시
             print(f"\n{bright_yellow('명령 입력:')} ", end="", flush=True)
-            return self.keyboard.get_input()
+            
+            # 블로킹 입력으로 확실한 키 입력만 받음 (빈 입력 방지)
+            while True:
+                key = self.keyboard.get_input()
+                if key and key.strip():  # 유효한 입력만 반환
+                    return key
+                import time
+                time.sleep(0.05)  # 딜레이를 50ms로 단축 (반응성 향상)
         except Exception as e:
             print(f"⚠️ 입력 처리 오류: {e}")
             return 'q'  # 오류 시 종료
@@ -10054,8 +10151,8 @@ class DawnOfStellarGame:
                 sys.stdout.flush()
                 time.sleep(2)  # 폴백 메시지 표시 시간
                 
-                # 화면 클리어 후 메뉴 표시
-                print("\033[2J\033[H")
+                # 화면 클리어 후 메뉴 표시 (디바운싱 적용)
+                self.safe_clear_screen()
                 sys.stdout.flush()
                 time.sleep(0.5)  # 화면 클리어 후 대기
                 
@@ -10352,13 +10449,17 @@ class DawnOfStellarGame:
                     pass
             
             game = DawnOfStellarGame()  # 새 인스턴스 생성
+            # 기존 오디오 시스템 공유 (중복 초기화 방지)
+            if hasattr(self, 'sound_manager') and self.sound_manager:
+                game.audio_system = self.sound_manager
+                game.sound_manager = self.sound_manager
             game.permanent_progression = self.permanent_progression  # 영구 진행상황 유지
             
             # 먼저 난이도 선택
             selected_difficulty = game.select_difficulty()
             if selected_difficulty is None:
                 # 난이도 선택 취소 시 메인 메뉴로 돌아가기
-                print("\033[2J\033[H")  # 화면 클리어
+                self.safe_clear_screen()  # 화면 클리어 (디바운싱)
                 print(f"\n{bright_cyan('메인 메뉴로 돌아갑니다.')}")
                 # 메인 메뉴 BGM 스마트 재생 (중복 방지)
                 self._smart_play_main_menu_bgm()
@@ -10389,6 +10490,10 @@ class DawnOfStellarGame:
             # print(f"📊 현재 영구 진행상황: {self.permanent_progression}")  # 숨김
             
             load_game = DawnOfStellarGame()  # 새 인스턴스 생성
+            # 기존 오디오 시스템 공유 (중복 초기화 방지)
+            if hasattr(self, 'sound_manager') and self.sound_manager:
+                load_game.audio_system = self.sound_manager
+                load_game.sound_manager = self.sound_manager
             load_game.permanent_progression = self.permanent_progression  # 영구 진행상황 유지
             
             # print(f"✅ 새 게임 인스턴스 생성 완료")  # 숨김
@@ -10531,6 +10636,10 @@ class DawnOfStellarGame:
                     pass
             
             game = DawnOfStellarGame()  # 새 인스턴스 생성
+            # 기존 오디오 시스템 공유 (중복 초기화 방지)
+            if hasattr(self, 'sound_manager') and self.sound_manager:
+                game.audio_system = self.sound_manager
+                game.sound_manager = self.sound_manager
             game.permanent_progression = self.permanent_progression  # 영구 진행상황 유지
             
             # 먼저 난이도 선택
@@ -10566,6 +10675,10 @@ class DawnOfStellarGame:
             print(f"\n🔄 게임 불러오기를 시작합니다...")
             
             load_game = DawnOfStellarGame()  # 새 인스턴스 생성
+            # 기존 오디오 시스템 공유 (중복 초기화 방지)
+            if hasattr(self, 'sound_manager') and self.sound_manager:
+                load_game.audio_system = self.sound_manager
+                load_game.sound_manager = self.sound_manager
             load_game.permanent_progression = self.permanent_progression  # 영구 진행상황 유지
             
             try:
@@ -14115,6 +14228,10 @@ class DawnOfStellarGame:
                 print(f"{bright_cyan('🎮 바로 게임을 시작합니다!')}")
                 # 새 게임 인스턴스 생성하여 게임 시작
                 game = DawnOfStellarGame()
+                # 기존 오디오 시스템 공유 (중복 초기화 방지)
+                if hasattr(self, 'sound_manager') and self.sound_manager:
+                    game.audio_system = self.sound_manager
+                    game.sound_manager = self.sound_manager
                 game.permanent_progression = self.permanent_progression
                 
                 # 난이도 선택

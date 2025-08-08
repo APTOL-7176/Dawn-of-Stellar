@@ -707,8 +707,14 @@ class UnifiedInputManager:
             return True
     
     def get_input(self) -> str:
-        """키보드 또는 게임패드 입력 받기 - 논블로킹 모드"""
+        """키보드 또는 게임패드 입력 받기 - 논블로킹 모드 + 키 홀드 방지"""
         import time
+        
+        # 키 홀드 방지를 위한 이전 키 상태 추적 (완화된 설정)
+        if not hasattr(self, '_last_key_time'):
+            self._last_key_time = {}
+        if not hasattr(self, '_key_hold_delay'):
+            self._key_hold_delay = 0.08  # 80ms로 단축 (초당 12회 허용)
         
         # 게임패드 입력 우선 체크 (활성화된 경우에만)
         if self.enable_gamepad and self.gamepad and self.gamepad.is_available():
@@ -724,7 +730,32 @@ class UnifiedInputManager:
                     key = msvcrt.getch()
                     if isinstance(key, bytes):
                         key = key.decode('utf-8', errors='ignore')
-                    return key.lower()
+                    
+                    key_lower = key.lower()
+                    current_time = time.time()
+                    
+                    # 키 홀드 방지: 같은 키가 너무 빨리 반복되면 무시
+                    if key_lower in self._last_key_time:
+                        if current_time - self._last_key_time[key_lower] < self._key_hold_delay:
+                            # 버퍼에 남은 키 모두 제거 (키 홀드 방지)
+                            while msvcrt.kbhit():
+                                msvcrt.getch()
+                            return ''  # 빈 문자열 반환으로 무시
+                    
+                    self._last_key_time[key_lower] = current_time
+                    
+                    # 버퍼에 남은 같은 키 모두 제거 (키 홀드 방지)
+                    while msvcrt.kbhit():
+                        next_key = msvcrt.getch()
+                        if isinstance(next_key, bytes):
+                            next_key = next_key.decode('utf-8', errors='ignore')
+                        if next_key.lower() == key_lower:
+                            continue  # 같은 키는 계속 제거
+                        else:
+                            # 다른 키가 나오면 다시 버퍼에 넣을 수 없으므로 처리 종료
+                            break
+                    
+                    return key_lower
             except:
                 pass
         

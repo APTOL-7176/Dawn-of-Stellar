@@ -842,7 +842,7 @@ class AudioManager:
             return False
     
     def stop_bgm(self, fade_out: int = 0):
-        """BGM 정지 - 안전한 처리"""
+        """BGM 정지 - 상태 보존"""
         if not self.mixer_available:
             return
             
@@ -852,9 +852,9 @@ class AudioManager:
             else:
                 pygame.mixer.music.stop()
             
-            self.current_bgm = None
-            self.current_bgm_type = None
-            # 인덱스는 초기화하지 않음 (같은 필드로 돌아올 때 이어서 재생)
+            # 상태 초기화하지 않음 - 새로운 BGM이 로드될 때 갱신됨
+            # self.current_bgm = None
+            # self.current_bgm_type = None
             
         except Exception as e:
             print(f"⚠️ BGM 정지 실패: {e}")
@@ -988,14 +988,13 @@ class AudioManager:
                 # pygame.mixer.music.get_busy() 오류 시 재생 진행
                 pass
         
-        # 🎯 BGM 부드러운 전환: fadeout을 통해 자연스럽게 전환
+        # 🎯 BGM 안전한 전환: 기존 BGM 상태 확인 후 처리
         if self.current_bgm_type != bgm_type:
-            # 기존 BGM이 재생 중이면 fadeout으로 자연스럽게 전환
+            # 기존 BGM이 재생 중이면 즉시 정지하고 새 BGM 준비
             try:
                 if pygame.mixer.music.get_busy():
-                    pygame.mixer.music.fadeout(500)  # 0.5초 fade out
-                    import time
-                    time.sleep(0.1)  # 짧은 대기로 자연스러운 전환
+                    pygame.mixer.music.stop()  # 즉시 정지로 충돌 방지
+                # 상태 초기화하지 않음 (load_bgm에서 처리)
             except Exception:
                 pass
         
@@ -1027,7 +1026,19 @@ class AudioManager:
                     
                     # 🎵 pygame BGM 재생 (정상 모드)
                     pygame.mixer.music.load(selected_track)
-                    pygame.mixer.music.set_volume(self.bgm_volume)
+                    
+                    # BGM 타입별 볼륨 조정 (일부 BGM이 더 큰 음량으로 제작됨)
+                    if bgm_type == BGMType.DIFFICULTY_SELECT:
+                        # 난이도 선택 BGM을 더 조용히 재생
+                        adjusted_volume = self.bgm_volume * 0.6
+                    elif bgm_type in [BGMType.MENU, BGMType.MAIN_MENU_OPENING]:
+                        # 메인 메뉴 BGM 표준 볼륨
+                        adjusted_volume = self.bgm_volume * 0.8
+                    else:
+                        # 기타 BGM 표준 볼륨
+                        adjusted_volume = self.bgm_volume
+                    
+                    pygame.mixer.music.set_volume(adjusted_volume)
                     loops = -1 if loop else 0
                     pygame.mixer.music.play(loops, fade_ms=fade_in)
                     

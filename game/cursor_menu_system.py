@@ -173,7 +173,16 @@ class CursorMenu:
                 pass  # 사운드 재생 실패해도 계속 진행
     
     def _clear_screen(self):
-        """화면 클리어 - 개선된 버전"""
+        """화면 클리어 - 개선된 버전 + 디바운싱"""
+        import time
+        
+        # 디바운싱: 0.1초 이내 중복 클리어 방지
+        current_time = time.time()
+        if hasattr(self, '_last_clear_time'):
+            if current_time - self._last_clear_time < 0.1:
+                return  # 너무 빈번한 클리어 방지
+        self._last_clear_time = current_time
+        
         # 버퍼 모드에서는 ANSI 클리어 + 홈 커서 토큰만 보냄
         if self.buffered:
             try:
