@@ -32,16 +32,21 @@ class GameConfig:
         self.UNLIMITED_ESSENCE = getattr(self, 'UNLIMITED_ESSENCE', self.DEVELOPMENT_MODE)
         self.ALL_CHARACTERS_UNLOCKED = getattr(self, 'ALL_CHARACTERS_UNLOCKED', self.DEVELOPMENT_MODE)
         
+        # 개발자 전용 스토리 설정 (BGM 정상 재생을 위해 비활성화)
+        self.FORCE_GLITCH_MODE = getattr(self, 'FORCE_GLITCH_MODE', False)  # 강제 글리치 모드 비활성화
+        self.DISABLE_GLITCH_MODE = getattr(self, 'DISABLE_GLITCH_MODE', True)  # 글리치 모드 완전 비활성화
+        self.FORCE_TRUE_ENDING = getattr(self, 'FORCE_TRUE_ENDING', False)  # 강제 진 엔딩 모드 비활성화
+        
         # BGM 설정 (확장된 버전)
         self.BGM_SETTINGS = {
             "character_select": "prelude",  # 캐릭터 선택창 BGM
-            "main_menu": "Main theme of FFVII",  # 메인화면 BGM
-            "combat": "Battle on the Big Bridge",  # 전투 BGM
-            "exploration": "Roaming Sheep",  # 탐험 BGM
-            "village": "Hometown Domina",  # 마을 BGM
-            "victory": "Victory Fanfare",  # 승리 BGM
-            "game_over": "Game Over",  # 게임 오버 BGM
-            "boss": "Dancing Mad"  # 보스 BGM
+          #  "main_menu": "Main theme of FFVII",  # 메인화면 BGM
+          #  "combat": "Battle on the Big Bridge",  # 전투 BGM
+         #   "exploration": "Roaming Sheep",  # 탐험 BGM
+         #   "village": "Hometown Domina",  # 마을 BGM
+          #  "victory": "Victory Fanfare",  # 승리 BGM
+           # "game_over": "Game Over",  # 게임 오버 BGM
+            #"boss": "Dancing Mad"  # 보스 BGM
         }
         
         # 내구도 시스템 설정
@@ -680,6 +685,45 @@ class GameConfig:
         self.save_settings()
         return self.DEVELOPMENT_MODE
     
+    def toggle_force_glitch_mode(self):
+        """강제 글리치 모드 토글 (개발자 전용)"""
+        self.FORCE_GLITCH_MODE = not self.FORCE_GLITCH_MODE
+        # 강제 글리치 모드가 켜지면 비활성화 모드는 자동으로 꺼짐
+        if self.FORCE_GLITCH_MODE:
+            self.DISABLE_GLITCH_MODE = False
+        self.save_settings()
+        return self.FORCE_GLITCH_MODE
+    
+    def toggle_disable_glitch_mode(self):
+        """글리치 모드 비활성화 토글 (개발자 전용)"""
+        self.DISABLE_GLITCH_MODE = not self.DISABLE_GLITCH_MODE
+        # 비활성화 모드가 켜지면 강제 모드는 자동으로 꺼짐
+        if self.DISABLE_GLITCH_MODE:
+            self.FORCE_GLITCH_MODE = False
+        self.save_settings()
+        return self.DISABLE_GLITCH_MODE
+    
+    def reset_glitch_mode_settings(self):
+        """글리치 모드 설정 초기화 (개발자 전용)"""
+        self.FORCE_GLITCH_MODE = False
+        self.DISABLE_GLITCH_MODE = False
+        self.save_settings()
+        return True
+    
+    def toggle_force_true_ending(self):
+        """강제 진 엔딩 모드 토글 (개발자 전용)"""
+        self.FORCE_TRUE_ENDING = not self.FORCE_TRUE_ENDING
+        self.save_settings()
+        return self.FORCE_TRUE_ENDING
+    
+    def reset_story_mode_settings(self):
+        """스토리 모드 설정 전체 초기화 (개발자 전용)"""
+        self.FORCE_GLITCH_MODE = False
+        self.DISABLE_GLITCH_MODE = False
+        self.FORCE_TRUE_ENDING = False
+        self.save_settings()
+        return True
+    
     def get_performance_settings(self):
         """성능 설정 반환"""
         return {
@@ -693,26 +737,11 @@ class GameConfig:
         }
     
     def apply_terminal_fullscreen(self):
-        """전체화면 사용법 안내"""
+        """전체화면 모드 조용히 적용"""
         if self.FULLSCREEN_MODE:
-            print("\n" + "="*70)
-            print("🖥️ 전체화면 모드 사용 안내")
-            print("="*70)
-            print("🎮 게임을 전체화면으로 즐기려면:")
-            print("")
-            print("   ⌨️  F11 키를 누르세요!")
-            print("")
-            print("💡 전체화면 해제:")
-            print("   • F11 키를 다시 누르기")
-            print("   • ESC 키 누르기")
-            print("   • Alt + Tab으로 다른 창으로 이동")
-            print("")
-            print("📝 참고사항:")
-            print("   • 대부분의 터미널에서 F11은 전체화면 토글 키입니다")
-            print("   • Windows 터미널, PowerShell, 명령 프롬프트 모두 지원")
-            print("   • 전체화면에서 더욱 몰입감 있는 게임을 즐기세요!")
-            print("="*70)
-            print("")
+            # 전체화면 모드 설정은 터미널 환경에서 자동으로 처리
+            # 안내 메시지 제거 - 게임 플레이에 방해되지 않도록
+            pass
     
     def restore_window_mode(self):
         """전체화면 해제 안내"""
@@ -808,6 +837,11 @@ class GameConfig:
                 self.TOOLTIPS_ENABLED = gameplay.get('tooltips_enabled', self.TOOLTIPS_ENABLED)
                 self.CAMERA_SMOOTHING = gameplay.get('camera_smoothing', self.CAMERA_SMOOTHING)
                 self.DEVELOPMENT_MODE = gameplay.get('development_mode', self.DEVELOPMENT_MODE)  # 개발자 모드 추가
+                
+                # 개발자 전용 글리치 모드 설정 로드
+                self.FORCE_GLITCH_MODE = gameplay.get('force_glitch_mode', self.FORCE_GLITCH_MODE)
+                self.DISABLE_GLITCH_MODE = gameplay.get('disable_glitch_mode', self.DISABLE_GLITCH_MODE)
+                self.FORCE_TRUE_ENDING = gameplay.get('force_true_ending', self.FORCE_TRUE_ENDING)
                 
                 # 디스플레이 설정 로드
                 display = settings.get('display', {})
@@ -914,7 +948,10 @@ class GameConfig:
                 'tutorial_enabled': self.TUTORIAL_ENABLED,
                 'tooltips_enabled': self.TOOLTIPS_ENABLED,
                 'camera_smoothing': self.CAMERA_SMOOTHING,
-                'development_mode': self.DEVELOPMENT_MODE  # 개발자 모드 추가
+                'development_mode': self.DEVELOPMENT_MODE,  # 개발자 모드 추가
+                'force_glitch_mode': self.FORCE_GLITCH_MODE,  # 강제 글리치 모드
+                'disable_glitch_mode': self.DISABLE_GLITCH_MODE,  # 글리치 모드 비활성화
+                'force_true_ending': self.FORCE_TRUE_ENDING  # 강제 진 엔딩 모드
             })
             
             # 디스플레이 설정 업데이트

@@ -247,7 +247,7 @@ class SequentialGaugeAnimator:
         print(f"{gauge_emoji} {character.name}: {color}{gauge_name} {new_value}/{max_val} {{{bar}}}\033[0m")
         
         # 2초 대기 (엔터로 스킵 가능)
-        self._wait_with_skip_option(2.0, f"{gauge_name} 변화 확인")
+        self._wait_with_skip_option(0.3, f"{gauge_name} 변화 확인")
     
     def _wait_with_skip_option(self, wait_time: float, description: str):
         """지정된 시간 대기 (엔터로 스킵 가능) - 간단한 구현"""
@@ -709,12 +709,10 @@ def show_status_change_animation(character_name: str, status_name: str, is_appli
     else:
         print(f"\n✨ {character_name}의 {status_name} 효과 해제! ✨")
 
-# 전역 게이지 애니메이터 인스턴스
-_gauge_animator = SequentialGaugeAnimator()
-
+# 전역 게이지 애니메이터 인스턴스 (단일 통합 인스턴스)
 def get_gauge_animator():
-    """게이지 애니메이터 인스턴스 반환"""
-    return _gauge_animator
+    """게이지 애니메이터 인스턴스 반환 - sequential_animator와 통합"""
+    return sequential_animator
 
 def show_coordination_attack_animation(attacker_name: str, supporter_name: str):
     """협동 공격 애니메이션"""

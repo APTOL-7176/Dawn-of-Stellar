@@ -113,8 +113,12 @@ class AICompanion:
         }
     
     def decide_action(self, party: List, enemies: List) -> Tuple[str, Dict]:
-        """AI 행동 결정"""
+        """AI 행동 결정 - 특성 기반 강화"""
         situation = self.analyze_situation(party, enemies)
+        
+        # 특성 기반 행동 조정
+        character_traits = getattr(self.character, 'traits', [])
+        character_class = getattr(self.character, 'character_class', '전사')
         
         # 생존 우선 체크
         if situation["my_hp_ratio"] < 0.2:
@@ -123,38 +127,75 @@ class AICompanion:
             elif situation["critical_allies"] >= 2:
                 return "request", {"type": AIRequest.NEED_HEALING}
         
+        # 특성 기반 우선순위 조정
+        action_weights_copy = self.action_weights.copy()
+        
+        for trait in character_traits:
+            trait_name = getattr(trait, 'name', '')
+            trait_effects = getattr(trait, 'effects', {})
+            
+            # 공격 강화 특성
+            if '공격력' in trait_name or '피해' in trait_name:
+                action_weights_copy["attack"] *= 1.2
+                action_weights_copy["skill_attack"] *= 1.15
+            
+            # 방어 강화 특성
+            if '방어' in trait_name or '보호' in trait_name:
+                action_weights_copy["defend"] *= 1.3
+            
+            # 회복 강화 특성
+            if '치유' in trait_name or '회복' in trait_name:
+                action_weights_copy["heal"] *= 1.4
+            
+            # 특정 직업 특성 반영
+            if character_class == "성기사" and '성역' in trait_name:
+                if situation["critical_allies"] > 0:
+                    action_weights_copy["heal"] *= 1.5
+            elif character_class == "검투사" and '처치' in trait_name:
+                if situation["weak_enemies"] > 0:
+                    action_weights_copy["attack"] *= 1.3
+            elif character_class == "암살자" and '그림자' in trait_name:
+                shadow_count = getattr(self.character, 'shadow_count', 0)
+                if shadow_count >= 2:
+                    action_weights_copy["skill_attack"] *= 1.4
+            elif character_class == "광전사" and '광기' in trait_name:
+                if situation["my_hp_ratio"] < 0.5:
+                    action_weights_copy["attack"] *= 1.6
+            elif character_class == "아크메이지" and '원소' in trait_name:
+                action_weights_copy["skill_attack"] *= 1.3
+        
         # 성격과 상황에 따른 행동 선택
         actions = []
         
         # 공격 옵션
         if situation["weak_enemies"] > 0:
-            actions.append(("attack", self.action_weights["attack"] * 1.3))  # 약한 적이 있으면 공격 가중치 증가
+            actions.append(("attack", action_weights_copy["attack"] * 1.3))  # 약한 적이 있으면 공격 가중치 증가
         else:
-            actions.append(("attack", self.action_weights["attack"]))
+            actions.append(("attack", action_weights_copy["attack"]))
         
         # 스킬 사용
         if situation["enemy_threat"] > 200 or situation["weak_enemies"] > 1:
-            actions.append(("skill", self.action_weights["skill_attack"] * 1.2))
+            actions.append(("skill", action_weights_copy["skill_attack"] * 1.2))
         else:
-            actions.append(("skill", self.action_weights["skill_attack"]))
+            actions.append(("skill", action_weights_copy["skill_attack"]))
         
         # 방어
         if situation["my_hp_ratio"] < 0.5 or situation["enemy_threat"] > 300:
-            actions.append(("defend", self.action_weights["defend"] * 1.5))
+            actions.append(("defend", action_weights_copy["defend"] * 1.5))
         else:
-            actions.append(("defend", self.action_weights["defend"]))
+            actions.append(("defend", action_weights_copy["defend"]))
         
         # 회복
         if situation["critical_allies"] > 0 or situation["party_hp_avg"] < 0.6:
-            actions.append(("heal", self.action_weights["heal"] * 1.4))
+            actions.append(("heal", action_weights_copy["heal"] * 1.4))
         else:
-            actions.append(("heal", self.action_weights["heal"]))
+            actions.append(("heal", action_weights_copy["heal"]))
         
         # 아이템 사용
         if self._should_use_item(situation):
-            actions.append(("item", self.action_weights["item_use"] * 1.3))
+            actions.append(("item", action_weights_copy["item_use"] * 1.3))
         else:
-            actions.append(("item", self.action_weights["item_use"]))
+            actions.append(("item", action_weights_copy["item_use"]))
         
         # 협동 공격 요청
         if self._can_request_coordination(situation):
@@ -218,11 +259,13 @@ class AICompanion:
             return random.choices(alive_enemies, weights=weights)[0]
     
     def _select_skill_and_target(self, party: List, enemies: List, situation: Dict):
-        """스킬과 대상 선택"""
+        """스킬과 대상 선택 - 독 시스템 통합"""
         # 간단한 스킬 선택 로직
         available_skills = getattr(self.character, 'available_skills', [])
         if not available_skills:
             return None, None
+        
+        character_class = getattr(self.character, 'character_class', '')
         
         # MP 상황 고려
         usable_skills = [skill for skill in available_skills 
@@ -234,14 +277,20 @@ class AICompanion:
         # 상황에 맞는 스킬 선택
         if situation["critical_allies"] > 0:
             # 힐링 스킬 우선
-            heal_skills = [skill for skill in usable_skills if 'heal' in skill.name.lower() or 'cure' in skill.name.lower()]
+            heal_skills = [skill for skill in usable_skills if 'heal' in skill.name.lower() or 
+                          'cure' in skill.name.lower() or '치유' in skill.name or '회복' in skill.name]
             if heal_skills:
                 skill = random.choice(heal_skills)
                 target = min([ally for ally in party if ally.is_alive], key=lambda a: a.current_hp / a.max_hp)
                 return skill, target
         
+        # 도적 전용 독 전략
+        if character_class == "도적":
+            return self._select_rogue_skill_strategy(usable_skills, enemies, situation)
+        
         # 공격 스킬
-        attack_skills = [skill for skill in usable_skills if 'attack' in skill.name.lower() or 'damage' in skill.name.lower()]
+        attack_skills = [skill for skill in usable_skills if 'attack' in skill.name.lower() or 
+                        'damage' in skill.name.lower() or '공격' in skill.name or '타격' in skill.name]
         if attack_skills:
             skill = random.choice(attack_skills)
             target = self._select_attack_target(enemies)
@@ -251,6 +300,96 @@ class AICompanion:
         skill = random.choice(usable_skills)
         target = random.choice([enemy for enemy in enemies if enemy.is_alive])
         return skill, target
+    
+    def _select_rogue_skill_strategy(self, usable_skills: List, enemies: List, situation: Dict):
+        """도적 전용 독 전략 스킬 선택"""
+        alive_enemies = [enemy for enemy in enemies if enemy.is_alive]
+        if not alive_enemies:
+            return None, None
+        
+        # 베놈 파워 확인
+        venom_power = getattr(self.character, 'venom_power', 0)
+        
+        # 독 관련 스킬들 분류
+        poison_skills = []
+        venom_skills = []
+        attack_skills = []
+        
+        for skill in usable_skills:
+            skill_name = skill.name.lower()
+            korean_name = skill.name
+            
+            if ('독' in korean_name or 'poison' in skill_name or 
+                '베놈' in korean_name or 'venom' in skill_name):
+                if '흡수' in korean_name or 'absorption' in skill_name:
+                    venom_skills.append(skill)
+                else:
+                    poison_skills.append(skill)
+            else:
+                attack_skills.append(skill)
+        
+        # 독이 걸리지 않은 적들 찾기
+        non_poisoned_enemies = []
+        poisoned_enemies = []
+        
+        for enemy in alive_enemies:
+            enemy_status = getattr(enemy, 'status_effects', {})
+            is_poisoned = any('독' in str(effect) or 'poison' in str(effect).lower() 
+                             for effect in enemy_status.keys())
+            
+            if is_poisoned:
+                poisoned_enemies.append(enemy)
+            else:
+                non_poisoned_enemies.append(enemy)
+        
+        # 전략 결정
+        # 1. 독이 걸리지 않은 적이 있으면 독 스킬 우선
+        if non_poisoned_enemies and poison_skills:
+            skill = random.choice(poison_skills)
+            target = random.choice(non_poisoned_enemies)
+            return skill, target
+        
+        # 2. 베놈 파워가 높고 독 흡수 스킬이 있으면 사용
+        if venom_power > 30 and venom_skills:
+            skill = random.choice(venom_skills)
+            # 독이 가장 많이 걸린 적 우선
+            if poisoned_enemies:
+                target = max(poisoned_enemies, key=lambda e: self._get_enemy_poison_amount(e))
+            else:
+                target = random.choice(alive_enemies)
+            return skill, target
+        
+        # 3. 일반 공격 스킬
+        if attack_skills:
+            skill = random.choice(attack_skills)
+            target = self._select_attack_target(alive_enemies)
+            return skill, target
+        
+        # 4. 기본값
+        if usable_skills:
+            skill = random.choice(usable_skills)
+            target = random.choice(alive_enemies)
+            return skill, target
+        
+        return None, None
+    
+    def _get_enemy_poison_amount(self, enemy) -> float:
+        """적의 독 누적량 확인"""
+        try:
+            status_effects = getattr(enemy, 'status_effects', {})
+            total_poison = 0.0
+            
+            for effect_name, effect_data in status_effects.items():
+                if '독' in effect_name or 'poison' in effect_name.lower():
+                    if isinstance(effect_data, dict):
+                        amount = effect_data.get('amount', 0)
+                        total_poison += amount
+                    elif hasattr(effect_data, 'amount'):
+                        total_poison += effect_data.amount
+            
+            return total_poison
+        except:
+            return 0.0
     
     def _select_heal_target(self, party: List):
         """회복 대상 선택"""

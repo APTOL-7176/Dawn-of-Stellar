@@ -11,6 +11,13 @@ from enum import Enum
 from .ai_companion_system import AICompanion, AIPersonality, AIRequest, ai_mercenary_manager
 from .character import Character
 
+def setup_ai_combat_mode(combat_system):
+    """전투 시스템에 AI 모드 설정"""
+    if hasattr(combat_system, 'set_ai_game_mode'):
+        combat_system.set_ai_game_mode(True)
+        print("🤖 AI 게임 모드 전투 설정 완료")
+    return combat_system
+
 # 캐릭터 성별/성격 시스템
 class CharacterGender(Enum):
     """캐릭터 성별"""
@@ -555,9 +562,12 @@ class AIGameModeManager:
         self.pending_ai_requests = []           # AI의 요청/제안 목록
         self.coordination_opportunities = []    # 협동 공격 기회
         self.item_sharing_enabled = True       # 아이템 공유 허용
+        self.ai_mode_active = False             # AI 모드 활성화 상태
         
     def initialize_ai_mode(self, party_members: List[Character], controlled_count: int = 1):
         """AI 모드 초기화"""
+        self.ai_mode_active = True  # AI 모드 활성화
+        
         if controlled_count >= len(party_members):
             print("⚠️ 모든 캐릭터를 직접 조작합니다.")
             self.player_controlled_characters = party_members[:]
@@ -751,8 +761,16 @@ class AIGameModeManager:
         """AI 턴 처리"""
         # 해당 캐릭터의 AI 동료 찾기
         ai_companion = next((ai for ai in self.ai_companions if ai.character == character), None)
+        
+        # AI 동료가 아니면 적일 가능성이 높음 - 기본 적 AI 사용
         if not ai_companion:
-            return "defend", {}  # 기본 방어
+            # 적 캐릭터인지 확인
+            if character in enemies or getattr(character, 'character_class', '') == 'Enemy':
+                print(f"\n🤖 {character.name}의 턴 (적 AI)")
+                return self._process_enemy_ai_turn(character, party, enemies)
+            else:
+                # 그 외의 경우 기본 방어
+                return "defend", {}
         
         print(f"\n🤖 {character.name}의 턴 (AI 조작)")
         
@@ -777,6 +795,275 @@ class AIGameModeManager:
         # AI 행동 실행
         print(f"   💭 AI 판단: {self._get_action_description(action_type, action_data)}")
         return action_type, action_data
+    
+    def _process_enemy_ai_turn(self, character: Character, party: List[Character], enemies: List[Character]):
+        """적 AI 턴 처리 - 고급 AI 시스템 사용"""
+        import random
+        
+        # 살아있는 아군 타겟 찾기
+        alive_party = [char for char in party if char.is_alive]
+        if not alive_party:
+            return "defend", {}
+        
+        # 고급 AI 시스템 사용
+        try:
+            from .smart_ai import SmartEnemyAI, AIPersonality
+            from .enemy_system import EnemyType
+            
+            # 적의 성격 결정 (캐릭터 클래스나 타입에 따라)
+            character_class = getattr(character, 'character_class', '전사')
+            enemy_personality = self._determine_enemy_personality(character_class)
+            
+            # 스마트 AI 생성
+            if not hasattr(character, '_smart_ai'):
+                character._smart_ai = SmartEnemyAI(enemy_personality)
+            
+            smart_ai = character._smart_ai
+            
+            # 전장 상태 정보
+            battlefield_state = {
+                'turn_number': getattr(self, 'turn_count', 0),
+                'party_formation': self._analyze_party_formation(alive_party),
+                'enemy_formation': self._analyze_party_formation([e for e in enemies if e.is_alive])
+            }
+            
+            # AI 행동 결정
+            ai_action = smart_ai.choose_action(character, enemies, alive_party, battlefield_state)
+            
+            action_type = ai_action.get('type', 'attack')
+            target = ai_action.get('target')
+            skill = ai_action.get('skill')
+            reasoning = ai_action.get('expected_outcome', '전략적 행동')
+            
+            print(f"   🧠 고급 AI 판단: {reasoning}")
+            
+            # 행동 실행
+            if action_type == 'brv_attack' and target:
+                return "brv_attack", {"target": target}
+            elif action_type == 'hp_attack' and target:
+                return "hp_attack", {"target": target}
+            elif action_type == 'skill' and target:
+                # 스킬 정보가 있으면 사용, 없으면 기본 공격
+                if skill:
+                    return "skill", {"skill": skill, "target": target}
+                else:
+                    return "attack", {"target": target}
+            elif action_type == 'defend':
+                return "defend", {}
+            elif action_type == 'heal':
+                return "heal", {"target": character}
+            else:
+                # 기본 공격
+                return "attack", {"target": target or alive_party[0]}
+                
+        except ImportError:
+            # 고급 AI가 없으면 기본 AI 사용
+            return self._basic_enemy_ai_turn(character, party, enemies)
+    
+    def _determine_enemy_personality(self, character_class: str):
+        """적의 성격 결정 - 실제 적 종류 기반"""
+        from .smart_ai import AIPersonality
+        
+        # 실제 적 종류에 따른 성격 매핑
+        personality_map = {
+            # 일반 몬스터 (1-10층) - 단순하고 공격적
+            '고블린': AIPersonality.AGGRESSIVE,
+            '오크': AIPersonality.BERSERKER,
+            '스켈레톤': AIPersonality.DEFENSIVE,
+            '좀비': AIPersonality.BERSERKER,
+            '거미': AIPersonality.TACTICAL,
+            '쥐': AIPersonality.AGGRESSIVE,
+            '박쥐': AIPersonality.AGGRESSIVE,
+            '늑대': AIPersonality.BERSERKER,
+            '슬라임': AIPersonality.DEFENSIVE,
+            '임프': AIPersonality.TACTICAL,
+            
+            # 중급 몬스터 (11-20층) - 전술적
+            '다크엘프': AIPersonality.TACTICAL,
+            '트롤': AIPersonality.BERSERKER,
+            '오거': AIPersonality.AGGRESSIVE,
+            '홉고블린': AIPersonality.TACTICAL,
+            '와이트': AIPersonality.TACTICAL,
+            '레이스': AIPersonality.ADAPTIVE,
+            '가고일': AIPersonality.DEFENSIVE,
+            '미노타우로스': AIPersonality.BERSERKER,
+            '켄타우로스': AIPersonality.TACTICAL,
+            '하피': AIPersonality.AGGRESSIVE,
+            '바실리스크': AIPersonality.TACTICAL,
+            
+            # 고급 몬스터 (21-30층) - 지능적
+            '드레이크': AIPersonality.AGGRESSIVE,
+            '키메라': AIPersonality.ADAPTIVE,
+            '만티코어': AIPersonality.BERSERKER,
+            '그리폰': AIPersonality.TACTICAL,
+            '와이번': AIPersonality.AGGRESSIVE,
+            '리치': AIPersonality.TACTICAL,
+            '뱀파이어': AIPersonality.ADAPTIVE,
+            '데몬': AIPersonality.AGGRESSIVE,
+            '데빌': AIPersonality.TACTICAL,
+            '엘리멘탈': AIPersonality.ADAPTIVE,
+            
+            # 최고급 몬스터 (31-40층) - 매우 지능적
+            '드래곤': AIPersonality.TACTICAL,
+            '아치리치': AIPersonality.ADAPTIVE,
+            '발로그': AIPersonality.BERSERKER,
+            '서큐버스': AIPersonality.ADAPTIVE,
+            '인큐버스': AIPersonality.ADAPTIVE,
+            '고대골렘': AIPersonality.DEFENSIVE,
+            '크라켄': AIPersonality.BERSERKER,
+            '베히모스': AIPersonality.AGGRESSIVE,
+            '리바이어던': AIPersonality.TACTICAL,
+            '피닉스': AIPersonality.ADAPTIVE,
+            
+            # 전설급 몬스터 (41-50층) - 최고 지능
+            '엘더드래곤': AIPersonality.TACTICAL,
+            '타이탄': AIPersonality.AGGRESSIVE,
+            '천계인': AIPersonality.DEFENSIVE,
+            '타락천사': AIPersonality.ADAPTIVE,
+            '공허군주': AIPersonality.TACTICAL,
+            '그림자왕': AIPersonality.ADAPTIVE,
+            '죽음군주': AIPersonality.TACTICAL,
+            '혼돈야수': AIPersonality.BERSERKER,
+            '나이트메어': AIPersonality.ADAPTIVE,
+            '아바타': AIPersonality.TACTICAL,
+            
+            # 정령 계열 - 원소에 따른 성격
+            '화염도롱뇽': AIPersonality.AGGRESSIVE,
+            '얼음골렘': AIPersonality.DEFENSIVE,
+            '폭풍새': AIPersonality.TACTICAL,
+            '대지정령': AIPersonality.DEFENSIVE,
+            '바람정령': AIPersonality.ADAPTIVE,
+            '물님프': AIPersonality.SUPPORT,
+            '빛세라핌': AIPersonality.DEFENSIVE,
+            '어둠그림자': AIPersonality.TACTICAL,
+            '독히드라': AIPersonality.BERSERKER,
+            '수정골렘': AIPersonality.DEFENSIVE,
+            
+            # 특수 몬스터들
+            '철기사': AIPersonality.DEFENSIVE,
+            '뼈드래곤': AIPersonality.AGGRESSIVE,
+            '유령기사': AIPersonality.TACTICAL,
+            '화염악마': AIPersonality.BERSERKER,
+            '서리거인': AIPersonality.AGGRESSIVE,
+            '천둥독수리': AIPersonality.TACTICAL,
+            '바위거인': AIPersonality.DEFENSIVE,
+            '바람지니': AIPersonality.ADAPTIVE,
+            '물드래곤': AIPersonality.TACTICAL,
+            '그림자암살자': AIPersonality.TACTICAL,
+            
+            # 고위 존재들
+            '공허추적자': AIPersonality.ADAPTIVE,
+            '혼돈새끼': AIPersonality.BERSERKER,
+            '꿈먹는자': AIPersonality.TACTICAL,
+            '영혼수확자': AIPersonality.AGGRESSIVE,
+            '정신지배자': AIPersonality.TACTICAL,
+            '시간망령': AIPersonality.ADAPTIVE,
+            '공간공포': AIPersonality.TACTICAL,
+            '현실왜곡자': AIPersonality.ADAPTIVE,
+            '차원마귀': AIPersonality.TACTICAL,
+            '영원수호자': AIPersonality.DEFENSIVE,
+            
+            # 최종 보스급
+            '우주공포': AIPersonality.ADAPTIVE,
+            '태고야수': AIPersonality.BERSERKER,
+            '고대악': AIPersonality.TACTICAL,
+            '잊혀진신': AIPersonality.ADAPTIVE,
+            '심연군주': AIPersonality.TACTICAL,
+            '지옥공작': AIPersonality.AGGRESSIVE,
+            '천계경비병': AIPersonality.DEFENSIVE,
+            '공허황제': AIPersonality.TACTICAL,
+            '그림자여제': AIPersonality.ADAPTIVE,
+            '혼돈대군주': AIPersonality.BERSERKER,
+            '죽음화신': AIPersonality.TACTICAL,
+            '파괴자': AIPersonality.BERSERKER,
+            '창조자': AIPersonality.ADAPTIVE,
+            '관찰자': AIPersonality.TACTICAL,
+            '심판자': AIPersonality.DEFENSIVE,
+            '처형자': AIPersonality.AGGRESSIVE,
+            '전령': AIPersonality.SUPPORT,
+            '예언자': AIPersonality.TACTICAL,
+            '신탁': AIPersonality.ADAPTIVE,
+            '현자': AIPersonality.TACTICAL,
+            '광인': AIPersonality.BERSERKER,
+            '방랑자': AIPersonality.ADAPTIVE,
+            '탐구자': AIPersonality.TACTICAL,
+            '수호자': AIPersonality.DEFENSIVE,
+            '세계파괴자': AIPersonality.BERSERKER,
+            
+
+            
+            # 기본 적들
+            'Enemy': AIPersonality.AGGRESSIVE,
+        }
+        
+        return personality_map.get(character_class, AIPersonality.AGGRESSIVE)
+    
+    def _analyze_party_formation(self, party: List[Character]) -> Dict:
+        """파티 구성 분석"""
+        if not party:
+            return {}
+        
+        total_hp = sum(char.current_hp for char in party)
+        max_total_hp = sum(char.max_hp for char in party)
+        avg_hp_ratio = total_hp / max_total_hp if max_total_hp > 0 else 0
+        
+        # 직업 분포
+        classes = [getattr(char, 'character_class', '전사') for char in party]
+        class_count = {}
+        for cls in classes:
+            class_count[cls] = class_count.get(cls, 0) + 1
+        
+        return {
+            'size': len(party),
+            'avg_hp_ratio': avg_hp_ratio,
+            'class_distribution': class_count,
+            'frontline_count': len([c for c in party if getattr(c, 'character_class', '') in ['전사', '성기사', '기사', '몽크']]),
+            'backline_count': len([c for c in party if getattr(c, 'character_class', '') in ['마법사', '궁수', '바드', '신관']])
+        }
+    
+    def _basic_enemy_ai_turn(self, character: Character, party: List[Character], enemies: List[Character]):
+        """기본 적 AI (폴백)"""
+        import random
+        
+        alive_party = [char for char in party if char.is_alive]
+        if not alive_party:
+            return "defend", {}
+        
+        # 기본 AI 행동 패턴 (이전 로직)
+        action_chance = random.random()
+        
+        if action_chance < 0.7:
+            # 공격 - 가장 HP가 낮은 타겟을 우선 공격
+            target = min(alive_party, key=lambda x: x.current_hp / x.max_hp)
+            print(f"   💭 기본 AI 판단: {target.name}을(를) 공격!")
+            return "attack", {"target": target}
+            
+        elif action_chance < 0.9:
+            # 스킬 사용 시도
+            try:
+                from .new_skill_system import SkillDatabase
+                skill_db = SkillDatabase()
+                character_class = getattr(character, 'character_class', '전사')
+                skills = skill_db.get_skills(character_class)
+                
+                if skills:
+                    # MP가 충분한 스킬 중에서 선택
+                    usable_skills = [s for s in skills if s.get('mp_cost', 0) <= character.current_mp]
+                    if usable_skills:
+                        skill = random.choice(usable_skills)
+                        target = random.choice(alive_party)
+                        print(f"   💭 기본 AI 판단: {skill.get('name', '스킬')}을(를) 사용!")
+                        return "skill", {"skill": skill, "target": target}
+            except:
+                pass
+            
+            # 스킬 사용 실패시 공격
+            target = random.choice(alive_party)
+            return "attack", {"target": target}
+        else:
+            # 방어
+            print(f"   💭 기본 AI 판단: 방어 자세!")
+            return "defend", {}
     
     def _check_ai_requests(self):
         """AI 요청 확인 및 표시"""
@@ -2353,11 +2640,11 @@ class AIGameModeManager:
         # 치명적 내구도 문제가 있으면 경고
         critical_items = [w for w in durability_warnings if w['level'] == 'critical']
         if critical_items:
-            print("⚠️ 치명적 내구도 문제 발견!")
+            print("🤖 로-바트 긴급 경고: 치명적 내구도 문제 발견!")
             for warning in critical_items:
                 char = warning['character']
                 item = warning['item']
-                print(f"   {char.name}의 {item.name}: {warning['durability']:.1f}%")
+                print(f"   ⚠️ {char.name}의 {item.name}: {warning['durability']:.1f}% (로-바트 진단: 매우 위험!)")
             
             # AI가 전투 전 조언
             if self.ai_companions and random.random() < 0.8:
@@ -2436,19 +2723,19 @@ class AIGameModeManager:
                     
                     concern_dialogues = {
                         CharacterPersonality.CHEERFUL: [
-                            f"{item.name}이 많이 닳았네!",
-                            f"전투가 격렬했나봐!",
-                            f"곧 수리해야겠어!"
+                            f"🤖 로-바트 알림: {item.name}이 많이 닳았네!",
+                            f"전투가 격렬했나봐! 로-바트도 놀랐어!",
+                            f"곧 수리해야겠어! 내 진단이 맞다니까!"
                         ],
                         CharacterPersonality.SERIOUS: [
-                            f"{item.name}의 내구도 저하를 확인했다.",
-                            f"정비가 필요한 상태다.",
-                            f"전투 효율에 영향을 줄 수 있다."
+                            f"🔍 로-바트 분석: {item.name}의 내구도 저하를 확인했다.",
+                            f"로-바트 권고: 정비가 필요한 상태다.",
+                            f"⚠️ 로-바트 경고: 전투 효율에 영향을 줄 수 있다."
                         ],
                         CharacterPersonality.COLD: [
-                            f"{item.name}... 손상됐다.",
-                            f"수리 필요.",
-                            f"교체 고려."
+                            f"🤖 {item.name}... 로-바트 진단 결과 손상됨.",
+                            f"로-바트 권고: 수리 필요.",
+                            f"로-바트 제안: 교체 고려."
                         ]
                     }
                     
@@ -2679,13 +2966,17 @@ class AIGameModeManager:
         if not character:
             return False
         
+        # AI 모드가 비활성화된 경우 모든 캐릭터는 플레이어 조작
+        if not hasattr(self, 'ai_mode_active') or not getattr(self, 'ai_mode_active', False):
+            return False
+        
         # AI 동료 리스트에서 확인
         for ai_companion in self.ai_companions:
             if ai_companion.character == character:
                 return True
         
-        # 플레이어 조작 캐릭터가 아니면 AI 조작으로 판단
-        if character not in self.player_controlled_characters:
+        # 플레이어 조작 캐릭터가 아니고 AI 모드가 활성화된 경우에만 AI 조작으로 판단
+        if character not in self.player_controlled_characters and len(self.ai_companions) > 0:
             return True
         
         return False
@@ -3748,49 +4039,164 @@ class BasicEquipmentManager:
         }
     
     def auto_equip_best_items(self, character: Character, inventory_items: List = None) -> List[str]:
-        """캐릭터에게 최적의 장비를 자동으로 장착"""
+        """캐릭터에게 최적의 장비를 자동으로 장착 - 간소화된 버전"""
         if not inventory_items:
+            print(f"🤖 {character.name}: 장착할 아이템이 없습니다.")
             return []
         
         character_class = getattr(character, 'character_class', '전사')
         equipped_items = []
         
         try:
-            from .items import ItemDatabase
-            item_db = ItemDatabase()
+            # ItemDatabase 가져오기 시도
+            try:
+                from .items import ItemDatabase, ItemType
+                item_db = ItemDatabase()
+            except ImportError:
+                print("❌ ItemDatabase를 불러올 수 없어 기본 장착 시스템을 사용합니다.")
+                return self._basic_equip_items(character, inventory_items)
             
-            # 장비 타입별로 최적의 아이템 찾기
-            equipment_slots = ['weapon', 'armor', 'helmet', 'boots', 'gloves', 'shield', 'accessory']
+            # 단순화된 장비 장착 로직
+            equipment_found = False
             
-            for slot in equipment_slots:
-                best_item = self._find_best_item_for_slot(
-                    character, slot, inventory_items, item_db
-                )
-                
-                if best_item:
-                    success = self._equip_item_to_character(character, best_item, slot)
-                    if success:
-                        equipped_items.append(f"{slot}: {best_item.name}")
+            # 인벤토리에서 실제 장비 아이템 찾기
+            for item_name in inventory_items:
+                try:
+                    # 아이템 정보 가져오기
+                    if isinstance(item_name, str):
+                        item = item_db.get_item(item_name)
+                    else:
+                        item = item_name
+                        item_name = getattr(item, 'name', str(item))
+                    
+                    # 장비 아이템인지 확인
+                    if item and hasattr(item, 'item_type'):
+                        item_type = item.item_type
+                        if item_type in [ItemType.WEAPON, ItemType.ARMOR, ItemType.ACCESSORY]:
+                            # 실제로 장착 시도
+                            success = self._simple_equip_item(character, item)
+                            if success:
+                                equipped_items.append(f"{item_type.value}: {item_name}")
+                                equipment_found = True
+                                print(f"   ✅ {character.name}에게 {item_name} 장착 완료")
+                            
+                            # 최대 3개 장비까지만 장착
+                            if len(equipped_items) >= 3:
+                                break
+                                
+                except Exception as e:
+                    print(f"   ⚠️ {item_name} 장착 시도 중 오류: {e}")
+                    continue
             
-            # 장착 결과 출력
-            if equipped_items:
-                print(f"🎒 {character.name}에게 자동 장착 완료:")
-                for item_info in equipped_items:
-                    print(f"   ✅ {item_info}")
+            if not equipment_found:
+                print(f"🤖 {character.name}: 장착 가능한 장비를 찾지 못했습니다.")
             
             return equipped_items
             
-        except ImportError:
-            print("❌ 아이템 시스템을 불러올 수 없습니다.")
+        except Exception as e:
+            print(f"❌ AI 자동장착 시스템 오류: {e}")
             return []
     
+    def _simple_equip_item(self, character: Character, item) -> bool:
+        """간단한 장비 장착 메서드"""
+        try:
+            # 캐릭터가 장비 시스템을 지원하는지 확인
+            if not hasattr(character, 'equip_item'):
+                return False
+                
+            # 장비 장착 시도
+            result = character.equip_item(item)
+            return result is not False  # None이나 True면 성공으로 간주
+            
+        except Exception as e:
+            return False
+    
+    def _basic_equip_items(self, character: Character, inventory_items: List) -> List[str]:
+        """기본 장착 시스템 (폴백용) - 파티 균등 분배"""
+        equipped_items = []
+        print(f"🔧 {character.name}에 대해 기본 장착 시스템을 사용합니다...")
+        
+        # 캐릭터별 적합도 점수를 계산하여 가장 적합한 아이템만 선택
+        character_class = getattr(character, 'character_class', '전사')
+        class_priorities = {
+            '전사': ['weapon', 'armor', 'shield'],
+            '아크메이지': ['weapon', 'accessory'],
+            '궁수': ['weapon', 'boots'],
+            '도적': ['weapon', 'boots', 'gloves'],
+            '성기사': ['armor', 'shield', 'helmet'],
+            '암살자': ['weapon', 'boots']
+        }
+        
+        preferred_slots = class_priorities.get(character_class, ['weapon', 'armor'])
+        
+        # 우선순위가 높은 슬롯의 아이템만 선택
+        for i, item_name in enumerate(inventory_items[:2]):  # 최대 2개까지만
+            try:
+                slot = preferred_slots[i % len(preferred_slots)]
+                equipped_items.append(f"{slot}: {item_name}")
+                if len(equipped_items) >= 2:  # 캐릭터당 최대 2개
+                    break
+            except Exception as e:
+                continue
+        
+        if equipped_items:
+            print(f"✅ {character.name} 기본 장착 완료: {len(equipped_items)}개 아이템")
+        
+        return equipped_items
+    
+    def _find_best_item_for_type(self, character: Character, item_type_value: str, available_items: List, item_db):
+        """특정 아이템 타입에 최적인 아이템 찾기"""
+        character_class = getattr(character, 'character_class', '전사')
+        
+        # 해당 타입에 장착 가능한 아이템들 필터링
+        suitable_items = []
+        for item_name in available_items:
+            # 먼저 인벤토리에서 실제 아이템이 있는지 확인
+            has_in_inventory = False
+            if hasattr(character, 'inventory') and hasattr(character.inventory, 'has_item'):
+                has_in_inventory = character.inventory.has_item(item_name)
+            elif hasattr(character, 'inventory') and hasattr(character.inventory, 'items'):
+                has_in_inventory = item_name in character.inventory.items and character.inventory.items[item_name] > 0
+            
+            if not has_in_inventory:
+                continue  # 인벤토리에 없는 아이템은 스킵
+            
+            item = item_db.get_item(item_name)
+            if item and hasattr(item, 'item_type') and item.item_type.value == item_type_value:
+                suitable_items.append(item)
+        
+        if not suitable_items:
+            return None
+        
+        # 각 아이템의 점수 계산
+        best_item = None
+        best_score = -1
+        
+        for item in suitable_items:
+            score = self._calculate_item_score(character, item, character_class)
+            if score > best_score:
+                best_score = score
+                best_item = item
+        
+        return best_item
+    
     def _find_best_item_for_slot(self, character: Character, slot: str, available_items: List, item_db):
-        """특정 슬롯에 최적인 아이템 찾기"""
+        """특정 슬롯에 최적인 아이템 찾기 (레거시 함수)"""
         character_class = getattr(character, 'character_class', '전사')
         
         # 해당 슬롯에 장착 가능한 아이템들 필터링
         suitable_items = []
         for item_name in available_items:
+            # 먼저 인벤토리에서 실제 아이템이 있는지 확인
+            has_in_inventory = False
+            if hasattr(character, 'inventory') and hasattr(character.inventory, 'has_item'):
+                has_in_inventory = character.inventory.has_item(item_name)
+            elif hasattr(character, 'inventory') and hasattr(character.inventory, 'items'):
+                has_in_inventory = item_name in character.inventory.items and character.inventory.items[item_name] > 0
+            
+            if not has_in_inventory:
+                continue  # 인벤토리에 없는 아이템은 스킵
+            
             item = item_db.get_item(item_name)
             if item and hasattr(item, 'item_type') and item.item_type == 'equipment':
                 item_slot = getattr(item, 'equipment_slot', None)
@@ -3863,23 +4269,69 @@ class BasicEquipmentManager:
         return score
     
     def _equip_item_to_character(self, character: Character, item, slot: str) -> bool:
-        """캐릭터에게 아이템 장착"""
+        """캐릭터에게 아이템 장착 (인벤토리 연동 포함) - 아이템 소실 방지 강화"""
         try:
+            # 🛡️ 안전 검증: 아이템이 이미 장착되어 있는지 확인
+            if hasattr(character, 'equipped_items'):
+                current_equipped = character.equipped_items.get(slot)
+                if current_equipped and current_equipped.name == item.name:
+                    return True  # 이미 장착된 아이템이면 성공으로 처리
+            
+            # 🎒 인벤토리 검증: 아이템이 실제로 보유하고 있는지 확인
+            if hasattr(character, 'inventory'):
+                current_count = character.inventory.items.get(item.name, 0)
+                if current_count <= 0:
+                    return False
+            
+            # 캐릭터의 기본 장착 시스템 사용 (우선 시도)
+            if hasattr(character, 'equip_item'):
+                # Character 클래스의 기본 장착 함수 사용 (인벤토리 처리 포함)
+                success = character.equip_item(item)
+                return success
+            
+            # 🔒 폴백 시스템: Character.equip_item()이 없는 경우만 사용
             if not hasattr(character, 'equipped_items'):
                 character.equipped_items = {}
             
-            # 기존 아이템이 있다면 해제
+            # 기존 아이템이 있다면 안전하게 해제
             old_item = character.equipped_items.get(slot)
             if old_item:
+                # 기존 아이템을 인벤토리로 반환 (중복 방지)
+                if hasattr(character, 'inventory') and hasattr(character.inventory, 'add_item'):
+                    if not character.inventory.has_item(old_item.name):
+                        character.inventory.add_item(old_item, 1)
+                
+                # 기존 아이템 보너스 제거
                 self._remove_equipment_bonuses(character, old_item)
             
             # 새 아이템 장착
             character.equipped_items[slot] = item
             self._apply_equipment_bonuses(character, item)
             
+            # 🔥 중요: 인벤토리에서 아이템 1개만 제거 (아이템 소실 방지 재검증)
+            if hasattr(character, 'inventory') and hasattr(character.inventory, 'remove_item'):
+                before_count = character.inventory.items.get(item.name, 0)
+                if before_count > 0:
+                    success = character.inventory.remove_item(item.name, 1)
+                    after_count = character.inventory.items.get(item.name, 0)
+                    print(f"📦 {item.name} 인벤토리에서 제거: {before_count}개 → {after_count}개")
+                    if not success:
+                        print(f"⚠️ {item.name} 제거 실패 - 폴백 장착 취소")
+                        return False
+                else:
+                    print(f"⚠️ {item.name} 인벤토리에 없음 - 제거 건너뜀")
+            
+            print(f"✅ {character.name}: {item.name} 폴백 장착 완료")
             return True
+            
         except Exception as e:
             print(f"❌ 장비 장착 실패: {e}")
+            # 오류 발생 시 아이템 상태 복구 시도
+            if hasattr(character, 'inventory') and hasattr(character.inventory, 'has_item'):
+                if not character.inventory.has_item(item.name):
+                    # 아이템이 소실된 경우 복구
+                    character.inventory.add_item(item, 1)
+                    print(f"🔧 아이템 소실 복구: {item.name}")
             return False
     
     def _apply_equipment_bonuses(self, character: Character, item):
@@ -4634,7 +5086,8 @@ def respond_to_ai_request(request):
                 equipment_in_inventory = []
                 for item_name, quantity in character.inventory.get_items_list():
                     item = item_db.get_item(item_name)
-                    if item and item.item_type == ItemType.EQUIPMENT:
+                    # 장비 타입 확인 (WEAPON, ARMOR, ACCESSORY)
+                    if item and item.item_type in [ItemType.WEAPON, ItemType.ARMOR, ItemType.ACCESSORY]:
                         equipment_in_inventory.append((item, quantity))
                 
                 if equipment_in_inventory:
@@ -4990,8 +5443,32 @@ def initialize_ai_game_mode(party_members: List[Character], controlled_count: in
 
 # 기본 게임모드용 장비 자동 장착 함수
 def auto_equip_for_basic_mode(character: Character, inventory_items: List = None) -> List[str]:
-    """기본 게임모드에서 캐릭터에게 최적의 장비를 자동으로 장착"""
-    return basic_equipment_manager.auto_equip_best_items(character, inventory_items)
+    """기본 게임모드에서 캐릭터에게 최적의 장비를 자동으로 장착 - 균등 분배"""
+    if not inventory_items:
+        return []
+    
+    # 파티원별 장착 횟수를 추적 (전역 변수 사용)
+    if not hasattr(auto_equip_for_basic_mode, 'equipment_distribution'):
+        auto_equip_for_basic_mode.equipment_distribution = {}
+    
+    char_id = f"{character.name}_{getattr(character, 'character_class', '전사')}"
+    current_count = auto_equip_for_basic_mode.equipment_distribution.get(char_id, 0)
+    
+    # 이미 2개 이상 장착한 캐릭터는 스킵
+    if current_count >= 2:
+        print(f"🚫 {character.name}는 이미 {current_count}개 장착하여 추가 장착을 스킵합니다.")
+        return []
+    
+    # 최대 2개까지만 장착
+    max_items = min(2 - current_count, len(inventory_items))
+    result = basic_equipment_manager.auto_equip_best_items(character, inventory_items[:max_items])
+    
+    # 장착 횟수 업데이트
+    if result:
+        auto_equip_for_basic_mode.equipment_distribution[char_id] = current_count + len(result)
+        print(f"🎒 {character.name} 장착 현황: {auto_equip_for_basic_mode.equipment_distribution[char_id]}개")
+    
+    return result
 
 def get_equipment_recommendations_for_basic_mode(character: Character, available_items: List) -> List[Dict]:
     """기본 게임모드에서 캐릭터용 장비 추천"""

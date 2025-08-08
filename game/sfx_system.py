@@ -19,15 +19,15 @@ class SFXSystem:
     def _load_cooking_sounds(self):
         """요리 관련 사운드 로드 - FFVII 스타일"""
         sound_files = {
-            'cooking_success': 'sounds/sfx/ff7_item_get.wav',  # 아이템 획득 사운드
-            'cooking_failure': 'sounds/sfx/ff7_error.wav',     # 에러 사운드
-            'cooking_start': 'sounds/sfx/ff7_menu_select.wav', # 메뉴 선택 사운드
-            'ingredient_chop': 'sounds/sfx/ff7_sword_hit1.wav', # 검격 사운드 (재료 자르기)
-            'sizzle': 'sounds/sfx/ff7_fire_magic.wav',         # 파이어 마법 (지글지글)
-            'boiling': 'sounds/sfx/ff7_water_magic.wav',       # 워터 마법 (끓는 소리)
-            'recipe_discovered': 'sounds/sfx/ff7_fanfare.wav', # 팡파레 (새 레시피 발견)
-            'level_up': 'sounds/sfx/ff7_level_up.wav',         # 레벨업 (요리 레벨업)
-            'quick_cook': 'sounds/sfx/ff7_cursor.wav'          # 커서 이동 (빠른 요리)
+            'cooking_success': 'game/audio/sfx/ff7_item_get.wav',  # 아이템 획득 사운드
+            'cooking_failure': 'game/audio/sfx/ff7_error.wav',     # 에러 사운드
+            'cooking_start': 'game/audio/sfx/ff7_menu_select.wav', # 메뉴 선택 사운드
+            'ingredient_chop': 'game/audio/sfx/ff7_sword_hit1.wav', # 검격 사운드 (재료 자르기)
+            'sizzle': 'game/audio/sfx/ff7_fire_magic.wav',         # 파이어 마법 (지글지글)
+            'boiling': 'game/audio/sfx/ff7_water_magic.wav',       # 워터 마법 (끓는 소리)
+            'recipe_discovered': 'game/audio/sfx/ff7_fanfare.wav', # 팡파레 (새 레시피 발견)
+            'level_up': 'game/audio/sfx/ff7_level_up.wav',         # 레벨업 (요리 레벨업)
+            'quick_cook': 'game/audio/sfx/ff7_cursor.wav'          # 커서 이동 (빠른 요리)
         }
         
         for sound_name, file_path in sound_files.items():

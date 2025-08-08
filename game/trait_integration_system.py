@@ -386,7 +386,53 @@ def calculate_trait_dodge_chance(character: 'Character') -> float:
 
 def calculate_trait_critical_chance(character: 'Character') -> float:
     """편의 함수: 특성 포함 크리티컬 확률 계산"""
-    return trait_processor.calculate_critical_chance(character)
+    base_crit = getattr(character, 'critical_chance', 5.0)  # 기본 5%
+    trait_bonus = 0.0
+    
+    # 그림자 숙련 특성 (암살자)
+    if hasattr(character, 'selected_traits'):
+        for trait in character.selected_traits:
+            if hasattr(trait, 'name') and trait.name == "그림자 숙련":
+                shadow_count = getattr(character, 'shadow_count', 0)
+                # 그림자 1개당 8% 크리티컬, 최대 5개 = 40%
+                trait_bonus += min(shadow_count * 8, 40)
+                break
+    
+    return min(base_crit + trait_bonus, 95.0)  # 최대 95%
+
+def calculate_trait_dodge_chance(character: 'Character') -> float:
+    """편의 함수: 특성 포함 회피율 계산"""
+    base_dodge = getattr(character, 'dodge_chance', 5.0)  # 기본 5%
+    trait_bonus = 0.0
+    
+    # 그림자 숙련 특성 (암살자)
+    if hasattr(character, 'selected_traits'):
+        for trait in character.selected_traits:
+            if hasattr(trait, 'name') and trait.name == "그림자 숙련":
+                shadow_count = getattr(character, 'shadow_count', 0)
+                # 그림자 1개당 6% 회피, 최대 5개 = 30%
+                trait_bonus += min(shadow_count * 6, 30)
+                break
+    
+    return min(base_dodge + trait_bonus, 85.0)  # 최대 85%
+
+def apply_speed_debuff_aura(character: 'Character', enemies: List['Character']) -> None:
+    """식물 친화 특성의 속도 감소 오라 적용"""
+    if not hasattr(character, 'selected_traits'):
+        return
+    
+    for trait in character.selected_traits:
+        if hasattr(trait, 'name') and trait.name == "식물 친화":
+            for enemy in enemies:
+                if hasattr(enemy, 'is_alive') and enemy.is_alive:
+                    # 적들의 속도 20% 감소
+                    speed_debuff = getattr(enemy, 'speed_debuff_aura', 0)
+                    if speed_debuff < 20:  # 중복 적용 방지
+                        enemy.speed_debuff_aura = 20
+                        current_speed = getattr(enemy, 'speed', 50)
+                        enemy.effective_speed = int(current_speed * 0.8)
+                        print(f"🌿 {character.name}의 식물 친화로 {enemy.name}의 속도가 감소했습니다!")
+            break
 
 def get_character_utility_bonuses(character: 'Character') -> Dict[str, Any]:
     """편의 함수: 캐릭터의 유틸리티 보너스 반환"""

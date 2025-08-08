@@ -22,13 +22,13 @@ def get_all_sound_files():
     bgm_dir = sounds_dir / "bgm"
     if bgm_dir.exists():
         for bgm_file in bgm_dir.glob("*.mp3"):
-            sound_files.append((str(bgm_file), "sounds/bgm"))
+            sound_files.append((str(bgm_file), "game/audio/bgm"))
     
     # SFX 파일들
     sfx_dir = sounds_dir / "sfx"
     if sfx_dir.exists():
         for sfx_file in sfx_dir.glob("*.wav"):
-            sound_files.append((str(sfx_file), "sounds/sfx"))
+            sound_files.append((str(sfx_file), "game/audio/sfx"))
     
     print(f"📁 발견된 사운드 파일: {len(sound_files)}개")
     return sound_files

@@ -55,7 +55,7 @@ class FieldItemSystem:
             menu = create_simple_menu("🎒 아이템 사용 - 대상 선택", options, descriptions)
             result = menu.run()
             
-            if result == -1 or result >= len(alive_members):  # 취소
+            if result is None or result == -1 or result >= len(alive_members):  # 취소
                 return False
             else:
                 selected_member = alive_members[result]
@@ -123,7 +123,7 @@ class FieldItemSystem:
             menu = create_simple_menu(f"{user.name}의 아이템", options, descriptions)
             result = menu.run()
             
-            if result == -1 or result >= len(field_items):  # 취소
+            if result is None or result == -1 or result >= len(field_items):  # 취소
                 return False
             else:
                 selected_item, quantity = field_items[result]

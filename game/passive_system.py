@@ -365,7 +365,7 @@ def show_passive_selection_menu(player_stats: Dict) -> PassiveSystem:
         menu1 = create_simple_menu("1번째 패시브 선택", options, descriptions)
         first_result = menu1.run()
         
-        if first_result == -1 or first_result >= len(available_passives):
+        if first_result is None or first_result == -1 or first_result >= len(available_passives):
             return passive_system
             
         first_passive = available_passives[first_result]
@@ -407,7 +407,7 @@ def show_passive_selection_menu(player_stats: Dict) -> PassiveSystem:
         menu2 = create_simple_menu("2번째 패시브 선택", second_options, second_descriptions)
         second_result = menu2.run()
         
-        if second_result == -1 or second_result >= len(second_available):
+        if second_result is None or second_result == -1 or second_result >= len(second_available):
             return passive_system
             
         second_passive = second_available[second_result]

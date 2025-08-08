@@ -6,7 +6,7 @@
 import os
 import sys
 from typing import List, Optional
-from .combat_visual import Color
+from .color_text import Color  # color_text.Color로 통일
 
 class BufferedDisplay:
     """버퍼링 기반 화면 출력 시스템"""
@@ -144,9 +144,8 @@ class BufferedDisplay:
             if not changes_detected:
                 return  # 변경사항이 없으면 출력하지 않음
             
-            # 화면 번쩍임 방지를 위한 미세한 딜레이
-            import time
-            time.sleep(0.01)  # 10ms 대기로 화면 안정화
+            # 화면 번쩍임 방지를 위한 딜레이 완전 제거 (즉시 렌더링)
+            # time.sleep(0.01)  # 딜레이 제거로 최대한 부드럽게
         else:
             # 전체 화면 업데이트
             self.move_cursor(1, 1)
@@ -159,9 +158,8 @@ class BufferedDisplay:
                 self.move_cursor(i + 1, 1)
                 print('\033[K', end='', flush=True)
             
-            # 전체 화면 업데이트 후 약간 더 긴 안정화 딜레이
-            import time
-            time.sleep(0.02)  # 20ms 대기로 화면 안정화
+            # 전체 화면 업데이트 후 딜레이 제거 (즉시 완료)
+            # time.sleep(0.02)  # 딜레이 제거로 최대한 부드럽게
         
         # 현재 버퍼를 이전 버퍼로 저장
         self.previous_buffer = display_buffer.copy()

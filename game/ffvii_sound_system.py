@@ -355,6 +355,23 @@ class FFVIISoundSystem:
         if not self.enabled:
             return
         
+        # 🔇 글리치 모드 체크 - FFVII sound system BGM 차단
+        try:
+            import __main__
+            if hasattr(__main__, 'game'):
+                game = __main__.game
+                # 강제 글리치 모드 체크
+                if hasattr(game, '_force_glitch_mode') and game._force_glitch_mode:
+                    print("🔇 [FFVII SOUND BLOCKED] Force glitch mode - FFVII BGM denied")
+                    return
+                # 일반 글리치 모드 체크
+                if hasattr(game, 'story_system') and game.story_system:
+                    if hasattr(game.story_system, 'is_glitch_mode') and game.story_system.is_glitch_mode():
+                        print("🔇 [FFVII SOUND BLOCKED] Glitch mode - FFVII BGM denied")
+                        return
+        except:
+            pass
+        
         # 같은 BGM이 이미 재생 중이면 계속 재생
         if self.current_bgm == bgm_name and pygame.mixer.music.get_busy():
             if self.debug_mode:
@@ -365,21 +382,23 @@ class FFVIISoundSystem:
         if self.current_bgm and self.current_bgm != bgm_name:
             if self.debug_mode:
                 print(f"🎵 BGM 변경: {self.current_bgm} → {bgm_name}")
-            # 짧은 페이드아웃으로 부드러운 전환
-            pygame.mixer.music.fadeout(300)  # 300ms 페이드아웃
-            pygame.time.wait(350)  # 페이드아웃 완료 대기
+            # 💀 직접 pygame 호출 주석처리 - 밤샌 고생 끝!
+            # pygame.mixer.music.fadeout(300)  # 300ms 페이드아웃
+            # pygame.time.wait(350)  # 페이드아웃 완료 대기
         
         if bgm_name in self.bgm_tracks:
             try:
                 file_path = self.bgm_tracks[bgm_name]
                 
-                # pygame.mixer.music 사용 (스트리밍 방식)
-                pygame.mixer.music.load(file_path)
+                # 💀 직접 pygame 호출 완전 주석처리 - 밤샌 고생 끝!
+                # pygame.mixer.music.load(file_path)
                 
                 volume = self.master_volume * self.category_volumes[AudioCategory.BGM]
                 
-                # 재생 시작
-                pygame.mixer.music.play(-1 if loop else 0)
+                # 💀 직접 pygame 호출 주석처리 - 밤샌 고생 끝!
+                # pygame.mixer.music.play(-1 if loop else 0)
+                
+                print(f"🔇 [FFVII BGM BLOCKED] '{bgm_name}' 호출 차단됨")
                 
                 # 부드러운 페이드인 효과
                 if fade_in > 0:

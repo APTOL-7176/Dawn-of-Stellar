@@ -21,7 +21,7 @@ class BraveSkill:
     def __init__(self, name: str, attack_type: BraveAttackType, 
                  brave_multiplier: float = 1.0, hp_multiplier: float = 1.0,
                  uses: int = -1, mp_cost: int = 0, description: str = "", 
-                 hp_sacrifice_rate: float = 0.0):
+                 hp_sacrifice_rate: float = 0.0, special_effects: list = None):
         self.name = name
         self.attack_type = attack_type
         self.brave_multiplier = brave_multiplier  # Brave 데미지 배율
@@ -31,6 +31,7 @@ class BraveSkill:
         self.mp_cost = mp_cost                    # MP 소모량
         self.description = description
         self.effects = []                         # 특수 효과들
+        self.special_effects = special_effects or []  # 새로운 스킬 시스템 특수 효과
         self.is_healing_skill = self._check_if_healing()  # 회복 스킬 여부
         self.hp_sacrifice_rate = hp_sacrifice_rate  # HP 희생 비율 (0.0 ~ 1.0)
         

@@ -21,8 +21,8 @@ class UnifiedAudioSystem:
         self.sfx_sounds = {}
         self.sounds = {}  # 통합 사운드 딕셔너리
         
-        # 경로 설정
-        self.base_path = Path("sounds")
+        # 경로 설정 - 새로운 game/audio 구조 사용
+        self.base_path = Path("game/audio")
         self.bgm_path = self.base_path / "bgm"
         self.sfx_path = self.base_path / "sfx"
         

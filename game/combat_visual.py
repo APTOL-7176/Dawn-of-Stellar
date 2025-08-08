@@ -443,6 +443,10 @@ class CombatVisualizer:
     def clear_screen(self):
         """화면 지우기"""
         import os
+        # 파이프/모바일 모드에서는 하드 클리어 금지 (깜빡임/검은 화면 방지)
+        if os.getenv('SUBPROCESS_MODE') == '1':
+            print("\n")
+            return
         os.system('cls' if os.name == 'nt' else 'clear')
     
     def show_death_effect(self, character):

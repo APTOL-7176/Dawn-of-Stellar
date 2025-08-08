@@ -319,7 +319,7 @@ class GameSettings:
             diff_menu = create_simple_menu("난이도 선택", difficulty_options, difficulty_descriptions)
             diff_result = diff_menu.run()
             
-            if diff_result == -1 or diff_result >= len(difficulties):
+            if diff_result is None or diff_result == -1 or diff_result >= len(difficulties):
                 return
             
             # 선택된 난이도 저장

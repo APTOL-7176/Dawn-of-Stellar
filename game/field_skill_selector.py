@@ -78,6 +78,87 @@ class FieldSkillSelector:
                 "cooldown": 8,
                 "required_class": ["마법사", "정령술사", "바드", "대마법사"],
                 "effect_type": "enhancement"
+            },
+            # 상호작용 전용 필드스킬들
+            "자물쇠해제": {
+                "name": "🔓 자물쇠 해제",
+                "description": "잠긴 문이나 상자를 열 수 있습니다",
+                "mp_cost": 8,
+                "cooldown": 2,
+                "required_class": ["도적", "궁수", "암살자", "스카웃"],
+                "effect_type": "utility"
+            },
+            "비밀탐지": {
+                "name": "🕵️ 비밀 탐지",
+                "description": "숨겨진 문이나 통로를 발견할 수 있습니다",
+                "mp_cost": 10,
+                "cooldown": 3,
+                "required_class": ["도적", "궁수", "철학자", "스카웃"],
+                "effect_type": "detection"
+            },
+            "함정탐지": {
+                "name": "⚠️ 함정 탐지",
+                "description": "숨겨진 함정을 발견할 수 있습니다",
+                "mp_cost": 12,
+                "cooldown": 4,
+                "required_class": ["도적", "궁수", "암살자", "레인저"],
+                "effect_type": "detection"
+            },
+            "함정해제": {
+                "name": "🛠️ 함정 해제",
+                "description": "발견된 함정을 안전하게 해제합니다",
+                "mp_cost": 15,
+                "cooldown": 3,
+                "required_class": ["도적", "궁수", "암살자", "기계공학자"],
+                "effect_type": "utility"
+            },
+            "신성마법": {
+                "name": "✨ 신성마법",
+                "description": "제단이나 신성한 물체와 상호작용할 수 있습니다",
+                "mp_cost": 20,
+                "cooldown": 5,
+                "required_class": ["성기사", "신관", "성직자", "클레릭"],
+                "effect_type": "holy"
+            },
+            "기계조작": {
+                "name": "⚙️ 기계 조작",
+                "description": "레버나 기계 장치를 조작할 수 있습니다",
+                "mp_cost": 10,
+                "cooldown": 2,
+                "required_class": ["기계공학자", "도적", "궁수"],
+                "effect_type": "utility"
+            },
+            "지식탐구": {
+                "name": "📚 지식 탐구",
+                "description": "책장이나 고대 문헌에서 지식을 얻을 수 있습니다",
+                "mp_cost": 15,
+                "cooldown": 4,
+                "required_class": ["철학자", "아크메이지", "바드"],
+                "effect_type": "knowledge"
+            },
+            "기계공학": {
+                "name": "🔧 기계공학",
+                "description": "대장간이나 복잡한 기계를 다룰 수 있습니다",
+                "mp_cost": 18,
+                "cooldown": 5,
+                "required_class": ["기계공학자"],
+                "effect_type": "crafting"
+            },
+            "자연친화": {
+                "name": "🌿 자연 친화",
+                "description": "정원이나 자연 환경과 교감할 수 있습니다",
+                "mp_cost": 12,
+                "cooldown": 3,
+                "required_class": ["드루이드", "레인저"],
+                "effect_type": "nature"
+            },
+            "정령술": {
+                "name": "🔮 정령술",
+                "description": "마법 수정이나 정령 관련 물체를 다룰 수 있습니다",
+                "mp_cost": 22,
+                "cooldown": 6,
+                "required_class": ["정령술사", "아크메이지", "마법사"],
+                "effect_type": "elemental"
             }
         }
         
@@ -176,7 +257,7 @@ class FieldSkillSelector:
             
             result = menu.run()
             
-            if result == -1 or result >= len(capable_members):  # 취소
+            if result is None or result == -1 or result >= len(capable_members):  # 취소
                 return None
             else:
                 selected_member = capable_members[result]
@@ -293,6 +374,27 @@ class FieldSkillSelector:
             return self._execute_purify(user, party)
         elif skill_id == "haste":
             return self._execute_haste(user, party)
+        # 상호작용 전용 스킬들
+        elif skill_id == "자물쇠해제":
+            return self._execute_lock_pick(user, world, target_pos)
+        elif skill_id == "비밀탐지":
+            return self._execute_secret_detect(user, world, target_pos)
+        elif skill_id == "함정탐지":
+            return self._execute_trap_detect(user, world, target_pos)
+        elif skill_id == "함정해제":
+            return self._execute_trap_disarm(user, world, target_pos)
+        elif skill_id == "신성마법":
+            return self._execute_holy_magic(user, party, world, target_pos)
+        elif skill_id == "기계조작":
+            return self._execute_mechanical_control(user, world, target_pos)
+        elif skill_id == "지식탐구":
+            return self._execute_knowledge_research(user, party, world, target_pos)
+        elif skill_id == "기계공학":
+            return self._execute_mechanical_engineering(user, party, world, target_pos)
+        elif skill_id == "자연친화":
+            return self._execute_nature_affinity(user, party, world, target_pos)
+        elif skill_id == "정령술":
+            return self._execute_elemental_magic(user, party, world, target_pos)
         else:
             return {"success": False, "message": f"알 수 없는 스킬: {skill_id}"}
     
@@ -671,6 +773,447 @@ class FieldSkillSelector:
         ]
         
         return "\n".join(info_lines)
+
+    # 상호작용 전용 스킬 효과 구현
+    def _execute_lock_pick(self, user: Character, world, target_pos) -> Dict[str, Any]:
+        """자물쇠 해제 스킬"""
+        if not world or not target_pos:
+            return {"success": False, "message": "해제할 자물쇠를 찾을 수 없습니다."}
+        
+        x, y = target_pos
+        if (hasattr(world, 'tiles') and world.tiles and
+            0 <= y < len(world.tiles) and 0 <= x < len(world.tiles[y])):
+            
+            tile = world.tiles[y][x]
+            if hasattr(tile, 'is_locked') and tile.is_locked:
+                # 성공률 계산 (사용자 능력치 기반)
+                success_rate = 0.8 + (getattr(user, 'agility', 10) / 100)
+                success_rate = min(0.95, success_rate)  # 최대 95%
+                
+                import random
+                if random.random() < success_rate:
+                    tile.is_locked = False
+                    if hasattr(tile, 'type'):
+                        # 잠긴 문을 일반 문으로 변경
+                        from .world import TileType
+                        if tile.type == TileType.LOCKED_DOOR:
+                            tile.type = TileType.DOOR
+                    
+                    return {
+                        "success": True, 
+                        "message": f"{user.name}이(가) 자물쇠를 성공적으로 해제했습니다!",
+                        "target_unlocked": True
+                    }
+                else:
+                    return {
+                        "success": False, 
+                        "message": f"{user.name}이(가) 자물쇠 해제에 실패했습니다. 다시 시도해보세요."
+                    }
+        
+        return {"success": False, "message": "여기에는 해제할 자물쇠가 없습니다."}
+
+    def _execute_secret_detect(self, user: Character, world, target_pos) -> Dict[str, Any]:
+        """비밀 탐지 스킬"""
+        if not world:
+            return {"success": False, "message": "탐지할 영역이 없습니다."}
+        
+        detected_secrets = []
+        player_pos = getattr(world, 'player_pos', (0, 0))
+        px, py = player_pos
+        
+        # 3x3 범위 내 비밀 요소 탐지
+        detection_range = 3
+        for dx in range(-detection_range, detection_range + 1):
+            for dy in range(-detection_range, detection_range + 1):
+                check_x, check_y = px + dx, py + dy
+                
+                if (hasattr(world, 'tiles') and world.tiles and
+                    0 <= check_y < len(world.tiles) and 0 <= check_x < len(world.tiles[check_y])):
+                    
+                    tile = world.tiles[check_y][check_x]
+                    
+                    # 비밀 문 탐지
+                    if (hasattr(tile, 'type') and hasattr(tile, 'secret_revealed')):
+                        from .world import TileType
+                        if tile.type == TileType.SECRET_DOOR and not tile.secret_revealed:
+                            tile.secret_revealed = True
+                            distance = abs(dx) + abs(dy)
+                            detected_secrets.append(f"비밀 문 (거리: {distance})")
+        
+        if detected_secrets:
+            message = f"{user.name}이(가) 비밀을 발견했습니다!\n🔍 발견된 비밀: " + ", ".join(detected_secrets)
+            return {"success": True, "message": message, "detected_secrets": detected_secrets}
+        else:
+            return {"success": False, "message": f"{user.name}이(가) 주변을 탐지했지만 비밀을 찾지 못했습니다."}
+
+    def _execute_trap_detect(self, user: Character, world, target_pos) -> Dict[str, Any]:
+        """함정 탐지 스킬"""
+        if not world:
+            return {"success": False, "message": "탐지할 영역이 없습니다."}
+        
+        detected_traps = []
+        player_pos = getattr(world, 'player_pos', (0, 0))
+        px, py = player_pos
+        
+        # 5x5 범위 내 함정 탐지
+        detection_range = 5
+        for dx in range(-detection_range, detection_range + 1):
+            for dy in range(-detection_range, detection_range + 1):
+                check_x, check_y = px + dx, py + dy
+                
+                if (hasattr(world, 'tiles') and world.tiles and
+                    0 <= check_y < len(world.tiles) and 0 <= check_x < len(world.tiles[check_y])):
+                    
+                    tile = world.tiles[check_y][check_x]
+                    
+                    # 함정 탐지
+                    if (hasattr(tile, 'type') and hasattr(tile, 'trap_detected')):
+                        from .world import TileType
+                        if tile.type == TileType.TRAP and not tile.trap_detected:
+                            tile.trap_detected = True
+                            distance = abs(dx) + abs(dy)
+                            detected_traps.append(f"함정 (거리: {distance})")
+        
+        if detected_traps:
+            message = f"{user.name}이(가) 함정을 발견했습니다!\n⚠️ 발견된 함정: " + ", ".join(detected_traps)
+            return {"success": True, "message": message, "detected_traps": detected_traps}
+        else:
+            return {"success": True, "message": f"{user.name}이(가) 주변을 탐지했습니다. 다행히 함정은 없는 것 같습니다."}
+
+    def _execute_trap_disarm(self, user: Character, world, target_pos) -> Dict[str, Any]:
+        """함정 해제 스킬"""
+        if not world or not target_pos:
+            return {"success": False, "message": "해제할 함정을 찾을 수 없습니다."}
+        
+        x, y = target_pos
+        if (hasattr(world, 'tiles') and world.tiles and
+            0 <= y < len(world.tiles) and 0 <= x < len(world.tiles[y])):
+            
+            tile = world.tiles[y][x]
+            if (hasattr(tile, 'type') and hasattr(tile, 'trap_detected')):
+                from .world import TileType
+                if tile.type == TileType.TRAP and tile.trap_detected:
+                    # 성공률 계산
+                    success_rate = 0.85 + (getattr(user, 'agility', 10) / 150)
+                    success_rate = min(0.98, success_rate)  # 최대 98%
+                    
+                    import random
+                    if random.random() < success_rate:
+                        tile.type = TileType.FLOOR
+                        tile.is_trapped = False
+                        
+                        return {
+                            "success": True, 
+                            "message": f"{user.name}이(가) 함정을 안전하게 해제했습니다!",
+                            "trap_disarmed": True
+                        }
+                    else:
+                        # 실패 시 약간의 피해
+                        damage = max(1, user.max_hp // 10)
+                        user.current_hp = max(1, user.current_hp - damage)
+                        return {
+                            "success": False, 
+                            "message": f"{user.name}이(가) 함정 해제에 실패하여 {damage} 피해를 입었습니다!"
+                        }
+        
+        return {"success": False, "message": "여기에는 해제할 함정이 없습니다."}
+
+    def _execute_holy_magic(self, user: Character, party: PartyManager, world, target_pos) -> Dict[str, Any]:
+        """신성마법 스킬 (제단 등과 상호작용)"""
+        if not world or not target_pos:
+            return {"success": False, "message": "신성한 힘을 사용할 대상이 없습니다."}
+        
+        x, y = target_pos
+        if (hasattr(world, 'tiles') and world.tiles and
+            0 <= y < len(world.tiles) and 0 <= x < len(world.tiles[y])):
+            
+            tile = world.tiles[y][x]
+            if hasattr(tile, 'type'):
+                from .world import TileType
+                if tile.type == TileType.ALTAR:
+                    # 제단 축복 효과
+                    blessed_members = []
+                    for member in party.get_alive_members():
+                        # 완전 회복
+                        healed_hp = member.max_hp - member.current_hp
+                        healed_mp = member.max_mp - member.current_mp
+                        member.current_hp = member.max_hp
+                        member.current_mp = member.max_mp
+                        
+                        if healed_hp > 0 or healed_mp > 0:
+                            blessed_members.append(f"{member.name}: HP+{healed_hp}, MP+{healed_mp}")
+                    
+                    message = f"{user.name}이(가) 신성한 축복을 받았습니다!"
+                    if blessed_members:
+                        message += "\n✨ 파티 전체가 완전히 회복되었습니다:\n" + "\n".join(blessed_members)
+                    
+                    return {"success": True, "message": message, "holy_blessing": True}
+                
+                elif tile.type == TileType.CURSED_ALTAR:
+                    # 저주받은 제단 정화
+                    purification_power = getattr(user, 'magic_attack', 20)
+                    success_rate = min(0.9, 0.6 + (purification_power / 100))
+                    
+                    import random
+                    if random.random() < success_rate:
+                        # 정화 성공 - 제단을 일반 제단으로 변경
+                        tile.type = TileType.ALTAR
+                        return {
+                            "success": True, 
+                            "message": f"{user.name}이(가) 저주받은 제단을 정화했습니다! 이제 축복을 받을 수 있습니다.",
+                            "purification_success": True
+                        }
+                    else:
+                        # 정화 실패 - 반격 피해
+                        damage = max(5, user.max_hp // 8)
+                        user.current_hp = max(1, user.current_hp - damage)
+                        return {
+                            "success": False, 
+                            "message": f"{user.name}이(가) 정화에 실패하여 저주의 반격으로 {damage} 피해를 입었습니다!"
+                        }
+        
+        return {"success": False, "message": "여기에는 신성한 힘을 사용할 대상이 없습니다."}
+
+    def _execute_mechanical_control(self, user: Character, world, target_pos) -> Dict[str, Any]:
+        """기계 조작 스킬 (레버 등)"""
+        if not world or not target_pos:
+            return {"success": False, "message": "조작할 기계 장치가 없습니다."}
+        
+        x, y = target_pos
+        if (hasattr(world, 'tiles') and world.tiles and
+            0 <= y < len(world.tiles) and 0 <= x < len(world.tiles[y])):
+            
+            tile = world.tiles[y][x]
+            if hasattr(tile, 'type'):
+                from .world import TileType
+                if tile.type == TileType.LEVER:
+                    # 레버 조작 효과
+                    if not hasattr(tile, 'is_activated') or not tile.is_activated:
+                        tile.is_activated = True
+                        
+                        # 레버 효과 (랜덤)
+                        import random
+                        effects = [
+                            "숨겨진 통로가 개방되었습니다!",
+                            "함정들이 일시적으로 비활성화되었습니다!",
+                            "비밀 문이 나타났습니다!",
+                            "이 층의 모든 문이 열렸습니다!",
+                            "마법의 보호막이 활성화되었습니다!"
+                        ]
+                        effect_message = random.choice(effects)
+                        
+                        return {
+                            "success": True, 
+                            "message": f"{user.name}이(가) 레버를 조작했습니다!\n⚙️ {effect_message}",
+                            "lever_activated": True
+                        }
+                    else:
+                        return {"success": False, "message": "이 레버는 이미 작동되었습니다."}
+        
+        return {"success": False, "message": "여기에는 조작할 기계 장치가 없습니다."}
+
+    def _execute_knowledge_research(self, user: Character, party: PartyManager, world, target_pos) -> Dict[str, Any]:
+        """지식 탐구 스킬 (책장 등)"""
+        if not world or not target_pos:
+            return {"success": False, "message": "연구할 지식의 원천이 없습니다."}
+        
+        x, y = target_pos
+        if (hasattr(world, 'tiles') and world.tiles and
+            0 <= y < len(world.tiles) and 0 <= x < len(world.tiles[y])):
+            
+            tile = world.tiles[y][x]
+            if hasattr(tile, 'type'):
+                from .world import TileType
+                if tile.type == TileType.BOOKSHELF:
+                    # 지식 습득 효과
+                    intelligence_bonus = getattr(user, 'intelligence', 15)
+                    exp_gain = 50 + (intelligence_bonus * 2) + (getattr(world, 'current_level', 1) * 10)
+                    
+                    enhanced_members = []
+                    for member in party.get_alive_members():
+                        if hasattr(member, 'experience'):
+                            member.experience += exp_gain
+                            enhanced_members.append(f"{member.name}: +{exp_gain} 경험치")
+                        
+                        # 지혜 일시 보너스 (마법 공격력 증가)
+                        if hasattr(member, 'magic_attack'):
+                            bonus = member.magic_attack // 10
+                            if not hasattr(member, 'knowledge_bonus'):
+                                member.knowledge_bonus = bonus
+                                enhanced_members.append(f"{member.name}: 마법 공격력 +{bonus} (일시적)")
+                    
+                    message = f"{user.name}이(가) 고대 지식을 습득했습니다!"
+                    if enhanced_members:
+                        message += "\n📚 파티가 지혜를 얻었습니다:\n" + "\n".join(enhanced_members)
+                    
+                    return {"success": True, "message": message, "knowledge_gained": True}
+        
+        return {"success": False, "message": "여기에는 연구할 지식이 없습니다."}
+
+    def _execute_mechanical_engineering(self, user: Character, party: PartyManager, world, target_pos) -> Dict[str, Any]:
+        """기계공학 스킬 (대장간 등)"""
+        if not world or not target_pos:
+            return {"success": False, "message": "작업할 기계 시설이 없습니다."}
+        
+        x, y = target_pos
+        if (hasattr(world, 'tiles') and world.tiles and
+            0 <= y < len(world.tiles) and 0 <= x < len(world.tiles[y])):
+            
+            tile = world.tiles[y][x]
+            if hasattr(tile, 'type'):
+                from .world import TileType
+                if tile.type == TileType.FORGE:
+                    # 대장간 강화 효과
+                    engineering_skill = getattr(user, 'intelligence', 15) + getattr(user, 'agility', 10)
+                    
+                    enhanced_members = []
+                    for member in party.get_alive_members():
+                        # 무기/방어구 강화 효과 (일시적)
+                        if hasattr(member, 'physical_attack'):
+                            attack_bonus = max(5, member.physical_attack // 10)
+                            if not hasattr(member, 'forge_attack_bonus'):
+                                member.forge_attack_bonus = attack_bonus
+                                enhanced_members.append(f"{member.name}: 공격력 +{attack_bonus}")
+                        
+                        if hasattr(member, 'physical_defense'):
+                            defense_bonus = max(3, member.physical_defense // 15)
+                            if not hasattr(member, 'forge_defense_bonus'):
+                                member.forge_defense_bonus = defense_bonus
+                                enhanced_members.append(f"{member.name}: 방어력 +{defense_bonus}")
+                    
+                    message = f"{user.name}이(가) 마법 대장간을 활용했습니다!"
+                    if enhanced_members:
+                        message += "\n🔧 장비가 강화되었습니다 (전투 중 지속):\n" + "\n".join(enhanced_members)
+                    
+                    return {"success": True, "message": message, "equipment_enhanced": True}
+        
+        return {"success": False, "message": "여기에는 작업할 기계 시설이 없습니다."}
+
+    def _execute_nature_affinity(self, user: Character, party: PartyManager, world, target_pos) -> Dict[str, Any]:
+        """자연 친화 스킬 (정원, 독구름 정화 등)"""
+        if not world or not target_pos:
+            return {"success": False, "message": "자연과 교감할 대상이 없습니다."}
+        
+        x, y = target_pos
+        if (hasattr(world, 'tiles') and world.tiles and
+            0 <= y < len(world.tiles) and 0 <= x < len(world.tiles[y])):
+            
+            tile = world.tiles[y][x]
+            if hasattr(tile, 'type'):
+                from .world import TileType
+                if tile.type == TileType.GARDEN:
+                    # 정원에서 자연의 축복
+                    nature_power = getattr(user, 'magic_attack', 15)
+                    
+                    blessed_members = []
+                    for member in party.get_alive_members():
+                        # 상태이상 치유
+                        if hasattr(member, 'status_manager'):
+                            negative_effects = ['독', '화상', '저주', '마비']
+                            cured_effects = []
+                            for effect in negative_effects:
+                                # 실제 구현에서는 status_manager와 연동
+                                cured_effects.append(effect)
+                            if cured_effects:
+                                blessed_members.append(f"{member.name}: {', '.join(cured_effects)} 치유")
+                        
+                        # 생명력 증가
+                        hp_bonus = max(10, member.max_hp // 10)
+                        heal_amount = min(hp_bonus, member.max_hp - member.current_hp)
+                        member.current_hp += heal_amount
+                        if heal_amount > 0:
+                            blessed_members.append(f"{member.name}: HP +{heal_amount}")
+                    
+                    message = f"{user.name}이(가) 자연의 축복을 받았습니다!"
+                    if blessed_members:
+                        message += "\n🌿 자연의 치유력:\n" + "\n".join(blessed_members)
+                    
+                    return {"success": True, "message": message, "nature_blessing": True}
+                
+                elif tile.type == TileType.POISON_CLOUD:
+                    # 독구름 정화
+                    tile.type = TileType.FLOOR  # 일반 바닥으로 변경
+                    
+                    # 파티 독 저항력 증가
+                    resistance_members = []
+                    for member in party.get_alive_members():
+                        if hasattr(member, 'poison_resistance'):
+                            member.poison_resistance = min(1.0, member.poison_resistance + 0.3)
+                            resistance_members.append(f"{member.name}: 독 저항력 증가")
+                    
+                    message = f"{user.name}이(가) 독구름을 정화했습니다!"
+                    if resistance_members:
+                        message += "\n🍃 독 저항력이 증가했습니다:\n" + "\n".join(resistance_members)
+                    
+                    return {"success": True, "message": message, "poison_purified": True}
+        
+        return {"success": False, "message": "여기에는 자연과 교감할 대상이 없습니다."}
+
+    def _execute_elemental_magic(self, user: Character, party: PartyManager, world, target_pos) -> Dict[str, Any]:
+        """정령술 스킬 (마법 수정, 포털 봉인 등)"""
+        if not world or not target_pos:
+            return {"success": False, "message": "정령술을 사용할 대상이 없습니다."}
+        
+        x, y = target_pos
+        if (hasattr(world, 'tiles') and world.tiles and
+            0 <= y < len(world.tiles) and 0 <= x < len(world.tiles[y])):
+            
+            tile = world.tiles[y][x]
+            if hasattr(tile, 'type'):
+                from .world import TileType
+                if tile.type == TileType.CRYSTAL:
+                    # 마법 수정에서 마력 충전
+                    elemental_power = getattr(user, 'magic_attack', 20)
+                    
+                    charged_members = []
+                    for member in party.get_alive_members():
+                        # 마나 완전 충전
+                        mp_restored = member.max_mp - member.current_mp
+                        member.current_mp = member.max_mp
+                        
+                        # 마법 효율 증가 (일시적)
+                        if hasattr(member, 'magic_attack'):
+                            magic_bonus = max(8, member.magic_attack // 8)
+                            if not hasattr(member, 'crystal_magic_bonus'):
+                                member.crystal_magic_bonus = magic_bonus
+                                charged_members.append(f"{member.name}: MP 완충, 마법력 +{magic_bonus}")
+                            else:
+                                charged_members.append(f"{member.name}: MP +{mp_restored}")
+                    
+                    message = f"{user.name}이(가) 마법 수정에서 마력을 끌어냈습니다!"
+                    if charged_members:
+                        message += "\n🔮 마법력이 충전되었습니다:\n" + "\n".join(charged_members)
+                    
+                    return {"success": True, "message": message, "mana_charged": True}
+                
+                elif tile.type == TileType.DARK_PORTAL:
+                    # 어둠의 포털 봉인
+                    sealing_power = getattr(user, 'magic_attack', 20)
+                    success_rate = min(0.9, 0.7 + (sealing_power / 100))
+                    
+                    import random
+                    if random.random() < success_rate:
+                        tile.type = TileType.FLOOR  # 포털 봉인 (일반 바닥으로)
+                        
+                        # MP 보상
+                        mp_reward = max(10, sealing_power // 3)
+                        user.current_mp = min(user.max_mp, user.current_mp + mp_reward)
+                        
+                        return {
+                            "success": True, 
+                            "message": f"{user.name}이(가) 어둠의 포털을 성공적으로 봉인했습니다!\n🔮 마법력이 {mp_reward} 회복되었습니다.",
+                            "portal_sealed": True
+                        }
+                    else:
+                        # 봉인 실패 - 마법력 소모
+                        mp_drain = max(5, user.current_mp // 4)
+                        user.current_mp = max(0, user.current_mp - mp_drain)
+                        return {
+                            "success": False, 
+                            "message": f"{user.name}이(가) 포털 봉인에 실패했습니다. 마법력이 {mp_drain} 소모되었습니다."
+                        }
+        
+        return {"success": False, "message": "여기에는 정령술을 사용할 대상이 없습니다."}
 
 # 전역 필드 스킬 선택기
 _field_skill_selector = None

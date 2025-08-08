@@ -242,9 +242,23 @@ class TraitCombatIntegrator:
         return messages
     
     @staticmethod
-    def apply_skill_cost_reduction(character: Character, base_mp_cost: int) -> int:
+    def apply_skill_cost_reduction(character: Character, base_mp_cost: int, skill_data: dict = None) -> int:
         """스킬 MP 소모량 특성 효과 적용"""
         reduced_cost = base_mp_cost
+        
+        # 전투 본능 특성: 자세 변경 스킬 MP 소모 없음
+        if skill_data and hasattr(character, 'active_traits'):
+            for trait in character.active_traits:
+                trait_name = trait.name if hasattr(trait, 'name') else trait.get('name', '')
+                if trait_name == "전투 본능":
+                    # 자세 변경 관련 스킬인지 확인
+                    skill_name = skill_data.get('name', '')
+                    special_effects = skill_data.get('special_effects', [])
+                    if ('stance_adaptation' in special_effects or 
+                        '전술 분석' in skill_name or 
+                        '자세' in skill_name):
+                        print(f"⚔️ {character.name}의 전투 본능! 자세 변경 스킬 MP 소모 없음!")
+                        return 0
         
         # 1. 지혜 (temp_skill_cost_reduction)
         cost_reduction = getattr(character, 'temp_skill_cost_reduction', 0)
@@ -317,6 +331,65 @@ class TraitCombatIntegrator:
             print(f"💡 철학적 깨달음으로 {enlightenment_bonus} 추가 경험치!")
         
         return bonus_exp
+
+    @staticmethod
+    def apply_shadow_mastery_effects(character: Character) -> Dict[str, float]:
+        """그림자 숙련 특성 효과 계산"""
+        if not hasattr(character, 'selected_traits'):
+            return {"crit_bonus": 0.0, "dodge_bonus": 0.0}
+        
+        for trait in character.selected_traits:
+            if hasattr(trait, 'name') and trait.name == "그림자 숙련":
+                shadow_count = getattr(character, 'shadow_count', 0)
+                # 그림자 1개당 크리티컬 8%, 회피 6%
+                crit_bonus = min(shadow_count * 8, 40)  # 최대 40%
+                dodge_bonus = min(shadow_count * 6, 30)  # 최대 30%
+                
+                if shadow_count > 0:
+                    print(f"🌑 {character.name}의 그림자 숙련: 크리티컬 +{crit_bonus}%, 회피 +{dodge_bonus}%")
+                
+                return {"crit_bonus": crit_bonus, "dodge_bonus": dodge_bonus}
+        
+        return {"crit_bonus": 0.0, "dodge_bonus": 0.0}
+
+    @staticmethod
+    def apply_machine_mastery_effects(character: Character) -> Dict[str, float]:
+        """기계 숙련 특성 효과 계산"""
+        if not hasattr(character, 'selected_traits'):
+            return {"attack_boost": 0.0, "magic_attack_boost": 0.0, "mp_recovery": 0.0}
+        
+        for trait in character.selected_traits:
+            if hasattr(trait, 'name') and trait.name == "기계 숙련":
+                print(f"🔧 {character.name}의 기계 숙련: 공격력 +15%, 마법공격력 +15%, MP회복 +50%")
+                return {
+                    "attack_boost": 0.15,
+                    "magic_attack_boost": 0.15, 
+                    "mp_recovery": 0.5
+                }
+        
+        return {"attack_boost": 0.0, "magic_attack_boost": 0.0, "mp_recovery": 0.0}
+
+    @staticmethod
+    def apply_plant_mastery_aura(character: Character, enemies: List[Character]) -> None:
+        """식물 친화 특성의 속도 감소 오라 적용"""
+        if not hasattr(character, 'selected_traits'):
+            return
+        
+        for trait in character.selected_traits:
+            if hasattr(trait, 'name') and trait.name == "식물 친화":
+                affected_enemies = []
+                for enemy in enemies:
+                    if hasattr(enemy, 'is_alive') and enemy.is_alive:
+                        # 이미 적용된 경우 스킵
+                        if not getattr(enemy, 'plant_mastery_applied', False):
+                            original_speed = getattr(enemy, 'speed', 50)
+                            enemy.speed = int(original_speed * 0.8)  # 20% 감소
+                            enemy.plant_mastery_applied = True
+                            affected_enemies.append(enemy.name)
+                
+                if affected_enemies:
+                    print(f"🌿 {character.name}의 식물 친화로 적들의 속도 감소: {', '.join(affected_enemies)}")
+                break
 
 
 # 전역 연동 인스턴스 생성

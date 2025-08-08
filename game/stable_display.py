@@ -8,7 +8,7 @@ import os
 import re
 import time
 from typing import List, Optional
-from .combat_visual import Color
+from .color_text import Color  # color_text.Color로 통일
 
 class StableDisplay:
     """안정적인 화면 출력 클래스"""
@@ -178,9 +178,9 @@ class StableDisplay:
                 elif hasattr(char, 'status_manager') and char.status_manager.effects:
                     info2 += f" {Color.YELLOW}[BUFF]{Color.RESET}"
                 
-                # 상처 정보
+                # 상처 정보 - 0이 아닐 때만 표시, 이모지 제거
                 if hasattr(char, 'wounds') and char.wounds > 0:
-                    info2 += f" {Color.RED}🩸 WOUND:{char.wounds}{Color.RESET}"
+                    info2 += f" {Color.RED}WOUND:{char.wounds}{Color.RESET}"
                 
                 self.safe_print(f"  {info1}")
                 self.safe_print(f"  {info2}")

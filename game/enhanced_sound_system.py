@@ -387,6 +387,23 @@ class EnhancedSoundSystem:
         if not self.enabled:
             return
         
+        # 🔇 글리치 모드 체크 - Enhanced sound system BGM 차단
+        try:
+            import __main__
+            if hasattr(__main__, 'game'):
+                game = __main__.game
+                # 강제 글리치 모드 체크
+                if hasattr(game, '_force_glitch_mode') and game._force_glitch_mode:
+                    print("🔇 [ENHANCED SOUND BLOCKED] Force glitch mode - Enhanced BGM denied")
+                    return
+                # 일반 글리치 모드 체크
+                if hasattr(game, 'story_system') and game.story_system:
+                    if hasattr(game.story_system, 'is_glitch_mode') and game.story_system.is_glitch_mode():
+                        print("🔇 [ENHANCED SOUND BLOCKED] Glitch mode - Enhanced BGM denied")
+                        return
+        except:
+            pass
+        
         # 기존 BGM 페이드아웃
         if self.current_bgm and self.bgm_channel:
             self.fade_out_bgm(1.0)

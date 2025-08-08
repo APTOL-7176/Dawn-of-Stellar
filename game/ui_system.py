@@ -1,12 +1,20 @@
 #!/usr/bin/env python3
 """
-UI 시스템 개선 - 깔끔한 인터페이스, Windows 호환
+UI 시스템 개선 - 깔끔한 인터페이스, Windows 호환, 통합 폰트 관리
 """
 
 import math
 import os
 from typing import Tuple, List, Dict, Optional
 from enum import Enum
+
+# 폰트 매니저 import
+try:
+    from .font_manager import get_font_manager, apply_game_font
+    FONT_MANAGER_AVAILABLE = True
+except ImportError:
+    FONT_MANAGER_AVAILABLE = False
+    print("폰트 매니저를 사용할 수 없습니다.")
 
 # Windows용 curses 대안
 try:
@@ -44,10 +52,65 @@ class UIColor(Enum):
     BLACK = 8
 
 class UIManager:
-    """UI 관리자"""
+    """UI 관리자 - 통합 폰트 관리 포함"""
     
     def __init__(self):
         self.stdscr = None
+        self.font_manager = None
+        self.current_font_path = None
+        self._initialize_fonts()
+    
+    def _initialize_fonts(self):
+        """폰트 시스템 초기화"""
+        # Windows에서 UTF-8 인코딩 강제 설정
+        import sys
+        if sys.platform == "win32":
+            try:
+                # 콘솔 출력을 UTF-8로 설정
+                import os
+                os.system('chcp 65001 > nul')
+                
+                # Python 표준 출력을 UTF-8로 재설정
+                import codecs
+                sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())
+                sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
+                print("✓ UTF-8 인코딩이 활성화되었습니다.")
+            except Exception as e:
+                print(f"UTF-8 설정 중 오류: {e}")
+        
+        if FONT_MANAGER_AVAILABLE:
+            try:
+                # 폰트 매니저 초기화
+                self.font_manager = get_font_manager()
+                
+                # 게임 폰트 적용
+                self.current_font_path = apply_game_font()
+                
+                if self.current_font_path:
+                    print(f"🎮 게임 폰트 초기화 완료: {self.current_font_path}")
+                else:
+                    print("⚠️ 시스템 폰트를 사용합니다.")
+                
+            except Exception as e:
+                print(f"⚠️ 폰트 초기화 실패: {e}")
+        else:
+            print("기본 시스템 폰트를 사용합니다.")
+    
+    def get_font_info(self) -> Dict:
+        """현재 폰트 정보 반환"""
+        if self.font_manager:
+            return self.font_manager.get_font_info()
+        else:
+            return {"status": "font_manager_unavailable"}
+    
+    def set_font(self, font_name: str) -> bool:
+        """게임 폰트 변경"""
+        if self.font_manager:
+            success = self.font_manager.set_font(font_name)
+            if success:
+                self.current_font_path = self.font_manager.get_font_path()
+            return success
+        return False
         self.colors_initialized = False
         self.screen_height = 0
         self.screen_width = 0
@@ -126,6 +189,15 @@ class UIManager:
     
     def clear_screen(self):
         """화면 지우기"""
+        # 파이프/모바일 모드에서는 하드 클리어를 피한다
+        import os as _os
+        if _os.getenv('SUBPROCESS_MODE') == '1':
+            try:
+                print("\n")  # 소프트 클리어: 한 줄만 내려서 덮어쓰기 최소화
+                return
+            except Exception:
+                return
+
         if CURSES_AVAILABLE and self.stdscr:
             self.stdscr.clear()
         else:
@@ -406,10 +478,10 @@ class UIManager:
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
             "",
             "",
-            "1. ⚔️  새 게임 시작",
+            "1. ⚔새 게임 시작",
             "2. 📁  게임 불러오기", 
             "3. 📚  튜토리얼",
-            "4. ⚙️  설정",
+            "4. ⚙설정",
             "5. 🚪  게임 종료",
             "",
             "",

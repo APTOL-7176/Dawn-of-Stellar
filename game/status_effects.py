@@ -8,6 +8,14 @@ from typing import Dict, List, Any, Optional
 from enum import Enum
 import random
 
+# 간단한 Color 클래스 정의
+class Color:
+    GREEN = '\033[92m'
+    RED = '\033[91m'
+    YELLOW = '\033[93m'
+    BRIGHT_GREEN = '\033[92m'
+    RESET = '\033[0m'
+
 class StatusType(Enum):
     """상태 이상 타입"""
     BUFF = "buff"
@@ -60,10 +68,25 @@ class StatusEffect:
         
         # DOT 효과 (독, 화상 등)
         if self.status_type in [StatusType.POISON, StatusType.BURN, StatusType.DOT]:
-            damage = self._calculate_dot_damage(character)
-            actual_damage = character.take_damage(damage)
-            result["damage"] = actual_damage
-            result["message"] = f"💀 {character.name}이(가) {self.name}으로 {actual_damage} 피해!"
+            if self.status_type == StatusType.POISON:
+                # 새로운 독 시스템: 남은 독의 20%만큼 피해를 입히고 피해를 입힌 독은 사라짐
+                total_poison_damage = self._calculate_total_poison_damage()
+                damage_dealt = int(total_poison_damage * 0.2)  # 20% 피해
+                actual_damage = character.take_damage(damage_dealt)
+                result["damage"] = actual_damage
+                
+                # 피해를 입힌만큼 독 효과 감소
+                self._reduce_poison_by_damage(damage_dealt)
+                
+                remaining_duration = max(0, self.duration)
+                remaining_damage = self._calculate_total_poison_damage()
+                result["message"] = f"{Color.BRIGHT_GREEN}☠️ {character.name}이(가) 독으로 {Color.RED}{actual_damage}{Color.BRIGHT_GREEN} 피해! (남은 독: {Color.YELLOW}{remaining_damage}점{Color.BRIGHT_GREEN} / {remaining_duration}턴){Color.RESET}"
+            else:
+                # 기존 DOT 시스템 (화상 등)
+                damage = self._calculate_dot_damage(character)
+                actual_damage = character.take_damage(damage)
+                result["damage"] = actual_damage
+                result["message"] = f"💀 {character.name}이(가) {self.name}으로 {actual_damage} 피해!"
             
         # HOT 효과 (재생, 치유 등)
         elif self.status_type in [StatusType.REGENERATION, StatusType.HOT]:
@@ -105,7 +128,7 @@ class StatusEffect:
         return result
     
     def _calculate_dot_damage(self, character):
-        """DOT 데미지 계산"""
+        """DOT 데미지 계산 (기존 시스템 - 화상 등에 사용)"""
         if isinstance(self.effect_value, dict):
             base_damage = self.effect_value.get("damage", 10)
             damage_type = self.effect_value.get("type", "fixed")
@@ -118,6 +141,80 @@ class StatusEffect:
             else:
                 return base_damage * self.current_stacks
         return self.effect_value * self.current_stacks
+    
+    def _calculate_total_poison_damage(self):
+        """독 시스템: 총 남은 독 데미지 계산"""
+        if self.status_type != StatusType.POISON:
+            return 0
+            
+        # intensity를 독의 세기로, duration을 남은 턴으로 계산
+        base_poison = getattr(self, 'intensity', self.effect_value if isinstance(self.effect_value, (int, float)) else 10)
+        remaining_turns = max(0, self.duration)
+        
+        # 독 스택이 있다면 고려
+        poison_stacks = getattr(self, 'current_stacks', 1)
+        
+        # 총 독 데미지 = 독의 세기 × 남은 턴 × 스택
+        total_damage = int(base_poison * remaining_turns * poison_stacks * 10)
+        return max(0, total_damage)
+    
+    def _reduce_poison_by_damage(self, damage_dealt):
+        """독 시스템: 피해를 입힌만큼 독 효과 감소"""
+        if self.status_type != StatusType.POISON or damage_dealt <= 0:
+            return
+            
+        # 피해를 입힌만큼 독의 세기나 지속시간 감소
+        base_poison = getattr(self, 'intensity', self.effect_value if isinstance(self.effect_value, (int, float)) else 10)
+        poison_stacks = getattr(self, 'current_stacks', 1)
+        
+        # 감소량 계산 (피해량을 독 세기로 나누어 턴 감소량 계산)
+        turn_reduction = max(1, damage_dealt // (base_poison * poison_stacks * 10))
+        
+        # 지속시간 감소 (최소 1턴은 감소)
+        self.duration = max(0, self.duration - turn_reduction)
+        
+        # 독이 완전히 소모되면 비활성화
+        if self.duration <= 0:
+            self.is_active = False
+    
+    def merge_with_poison(self, new_intensity, new_duration):
+        """독 효과 합치기 - 새로운 독 효과와 기존 독 효과를 합쳐서 갱신"""
+        if self.status_type != StatusType.POISON:
+            return False
+            
+        # 현재 독의 총 데미지 계산
+        current_poison = getattr(self, 'intensity', self.effect_value if isinstance(self.effect_value, (int, float)) else 10)
+        current_total_damage = current_poison * self.duration
+        
+        # 새로운 독의 총 데미지 계산
+        new_total_damage = new_intensity * new_duration
+        
+        # 합쳐진 총 데미지
+        combined_total_damage = current_total_damage + new_total_damage
+        
+        # 최대 지속시간 제한 (독: 10턴, 맹독: 8턴)
+        max_duration_limit = 10 if self.name == "독" else 8 if self.name == "맹독" else 10
+        
+        # 새로운 지속시간은 더 긴 쪽으로 설정하되 최대 제한 적용
+        new_combined_duration = min(max_duration_limit, max(self.duration, new_duration))
+        
+        # 새로운 강도 계산 (총 데미지 / 새로운 지속시간)
+        if new_combined_duration > 0:
+            new_combined_intensity = combined_total_damage / new_combined_duration
+        else:
+            new_combined_intensity = current_poison
+        
+        # 독 효과 업데이트
+        self.intensity = new_combined_intensity
+        if isinstance(self.effect_value, dict):
+            self.effect_value['damage'] = new_combined_intensity
+        else:
+            self.effect_value = new_combined_intensity
+            
+        self.duration = new_combined_duration
+        self.max_duration = new_combined_duration
+        
+        return True
     
     def _calculate_hot_healing(self, character):
         """HOT 회복량 계산"""
@@ -219,16 +316,18 @@ class StatusEffectManager:
             "독": {
                 "type": StatusType.POISON,
                 "duration": 5,
+                "max_duration": 10,  # 최대 10턴 제한
                 "effect": {"damage": 15, "type": "fixed"},
-                "description": "매 턴 HP가 감소합니다",
-                "stackable": True,
-                "max_stacks": 3
+                "description": "매 턴 HP가 감소합니다 (중복시 합쳐짐)",
+                "stackable": False,  # 독은 스택이 아닌 합쳐지는 방식
+                "max_stacks": 1
             },
             "맹독": {
                 "type": StatusType.POISON,
                 "duration": 3,
-                "effect": {"damage": 8, "type": "percent"},
-                "description": "매 턴 최대 HP의 8%씩 감소합니다",
+                "max_duration": 8,   # 최대 8턴 제한
+                "effect": {"damage": 25, "type": "fixed"},
+                "description": "강력한 독으로 매 턴 큰 피해를 입습니다 (중복시 합쳐짐)",
                 "stackable": False
             },
             
@@ -426,8 +525,9 @@ class StatusEffectManager:
 # 전역 상태 이상 관리자 인스턴스
 status_manager = StatusEffectManager()
 
-def apply_status_to_character(character, status_name: str, duration: Optional[int] = None):
-    """캐릭터에게 상태 이상 적용"""
+def apply_status_to_character(character, status_name: str, duration: Optional[int] = None, 
+                             intensity: Optional[float] = None, caster=None):
+    """캐릭터에게 상태 이상 적용 - 독 효과는 기존과 합쳐서 갱신"""
     if not hasattr(character, 'status_effects'):
         character.status_effects = []
     
@@ -438,18 +538,48 @@ def apply_status_to_character(character, status_name: str, duration: Optional[in
             existing_status = status
             break
     
+    # 새로운 상태 이상 생성을 위한 준비
+    template = status_manager.status_templates.get(status_name)
+    if not template:
+        return False
+    
+    new_duration = duration if duration is not None else template["duration"]
+    new_intensity = intensity if intensity is not None else template["effect"].get("damage", 10)
+    
+    # 도적이 독을 적용했을 때 베놈 파워 증가
+    if (caster and hasattr(caster, 'character_class') and caster.character_class == "도적" and
+        status_name.startswith("독") and hasattr(caster, 'venom_power')):
+        venom_gain = min(10, 100 - caster.venom_power)  # 최대 10씩, 100% 초과 불가
+        if venom_gain > 0:
+            caster.venom_power = min(100, caster.venom_power + venom_gain)
+    
     if existing_status:
-        if existing_status.stackable:
+        # 독 효과의 경우 기존 독과 합쳐서 갱신
+        if existing_status.status_type == StatusType.POISON:
+            existing_status.merge_with_poison(new_intensity, new_duration)
+            return True
+        # 다른 효과의 경우 기존 방식
+        elif existing_status.stackable:
             existing_status.add_stack()
-            existing_status.duration = max(existing_status.duration, duration or existing_status.max_duration)
+            existing_status.duration = max(existing_status.duration, new_duration)
         else:
             # 지속시간 갱신
-            existing_status.duration = duration or existing_status.max_duration
+            existing_status.duration = new_duration
     else:
         # 새로운 상태 이상 추가
-        new_status = status_manager.create_status_effect(status_name, duration)
+        new_status = status_manager.create_status_effect(status_name, new_duration)
         if new_status:
+            # 독 효과의 경우 intensity 설정
+            if new_status.status_type == StatusType.POISON:
+                new_status.intensity = new_intensity
+                if isinstance(new_status.effect_value, dict):
+                    new_status.effect_value['damage'] = new_intensity
+                else:
+                    new_status.effect_value = new_intensity
             character.status_effects.append(new_status)
+            return True
+    
+    return False
     
 def update_character_status_effects(character):
     """캐릭터의 모든 상태 이상 업데이트"""
@@ -459,6 +589,21 @@ def update_character_status_effects(character):
     
     results = []
     expired_effects = []
+    
+    # 베놈 파워 자동 감소 (도적 전용)
+    if (hasattr(character, 'character_class') and character.character_class == "도적" and
+        hasattr(character, 'venom_power') and character.venom_power > 0):
+        # 매 턴마다 베놈 파워 5씩 감소
+        venom_decay = 5
+        old_venom = character.venom_power
+        character.venom_power = max(0, character.venom_power - venom_decay)
+        
+        if old_venom != character.venom_power:
+            results.append({
+                "message": f"☠️ {character.name}의 베놈 파워가 감소했습니다 ({old_venom}% → {character.venom_power}%)",
+                "damage": 0,
+                "heal": 0
+            })
     
     # 모든 상태 이상 처리
     for status in character.status_effects:

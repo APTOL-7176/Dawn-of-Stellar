@@ -237,6 +237,7 @@ class CookingSystem:
                 "🍳 완성된 요리 확인",
                 "✨ 활성 버프 확인",
                 "🌍 채집지 정보",
+                "⚔️ 전투 드롭 정보",
                 "📖 레시피 컬렉션"
             ]
             
@@ -247,6 +248,7 @@ class CookingSystem:
                 "완성된 요리 목록을 확인합니다",
                 "현재 활성화된 요리 버프를 확인합니다",
                 "채집 가능한 장소들을 확인합니다",
+                "적 처치 시 식재료 드롭 정보를 확인합니다",
                 "발견한 레시피들을 확인합니다"
             ]
             
@@ -281,7 +283,10 @@ class CookingSystem:
                 elif result == 5:  # 채집지 정보
                     self.show_gathering_locations()
                     input("아무 키나 눌러 계속...")
-                elif result == 6:  # 레시피 컬렉션
+                elif result == 6:  # 전투 드롭 정보
+                    self.show_combat_drop_info()
+                    input("아무 키나 눌러 계속...")
+                elif result == 7:  # 레시피 컬렉션
                     show_recipe_collection()
                     
         except ImportError:
@@ -1461,31 +1466,72 @@ class CookingSystem:
         location = GATHERING_LOCATIONS[location_name]
         gathered = []
         
-        # 3-5개의 재료를 채집 시도 (성공률 향상)
-        attempts = random.randint(3, 5)
+        # 6-10개의 재료를 채집 시도 (대폭 증가)
+        attempts = random.randint(6, 10)
         
         for _ in range(attempts):
-            # 85% 확률로 무언가는 발견
-            if random.random() < 0.15:  # 15% 확률로만 실패
+            # 95% 확률로 무언가는 발견 (성공률 대폭 증가)
+            if random.random() < 0.05:  # 5% 확률로만 실패
                 continue
                 
             rarity_roll = random.random()
             ingredient = None
+            amount = 1  # 기본 획득량
             
             if rarity_roll < 0.6:  # 60% 확률로 일반 재료
                 if location["common"]:
                     ingredient = random.choice(location["common"])
+                    amount = random.randint(2, 4)  # 일반 재료는 2-4개씩
             elif rarity_roll < 0.85:  # 25% 확률로 언커먼 재료
                 if location["uncommon"]:
                     ingredient = random.choice(location["uncommon"])
+                    amount = random.randint(1, 3)  # 언커먼 재료는 1-3개씩
             else:  # 15% 확률로 레어 재료
                 if location["rare"]:
                     ingredient = random.choice(location["rare"])
+                    amount = random.randint(1, 2)  # 레어 재료는 1-2개씩
             
-            if ingredient and self.add_ingredient(ingredient, 1):
-                gathered.append(ingredient)
+            if ingredient and self.add_ingredient(ingredient, amount):
+                gathered.extend([ingredient] * amount)
         
         return gathered
+    
+    def show_gathering_results(self, gathered_ingredients: List[str], location_name: str):
+        """채집 결과 표시"""
+        if not gathered_ingredients:
+            print(f"\n{YELLOW}😔 {location_name}에서 아무것도 찾지 못했습니다.{RESET}")
+            return
+        
+        # 아이템별로 개수 집계
+        gather_counts = {}
+        for ingredient in gathered_ingredients:
+            gather_counts[ingredient] = gather_counts.get(ingredient, 0) + 1
+        
+        print(f"\n{GREEN}🌿 {location_name} 채집 결과:{RESET}")
+        total_gathered = len(gathered_ingredients)
+        print(f"  총 {total_gathered}개의 식재료를 발견했습니다!")
+        
+        for ingredient, count in gather_counts.items():
+            if ingredient in self.all_ingredients:
+                rarity = self.all_ingredients[ingredient].rarity
+                rarity_color = {1: WHITE, 2: GREEN, 3: BLUE, 4: MAGENTA, 5: YELLOW}.get(rarity, WHITE)
+                print(f"  {rarity_color}🥕 {ingredient} x{count}{RESET}")
+            else:
+                print(f"  🥕 {ingredient} x{count}")
+        
+        if audio_manager:
+            audio_manager.play_sfx(SFXType.ITEM_PICKUP)
+    
+    def enhanced_gather_from_location(self, location_name: str) -> bool:
+        """향상된 채집 기능 (결과 표시 포함)"""
+        if not self.can_gather_from_location(location_name):
+            print(f"{RED}❌ '{location_name}'는 유효한 채집지가 아닙니다.{RESET}")
+            return False
+        
+        gathered = self.gather_ingredients_from_location(location_name)
+        self.show_gathering_results(gathered, location_name)
+        
+        return len(gathered) > 0
     
     def get_quick_cooking_menu(self) -> List[str]:
         """한 번 만든 요리들의 빠른 제작 목록"""
@@ -1561,8 +1607,8 @@ class CookingSystem:
         if not enemy_key:
             return None
         
-        # 60% 확률로 특정 드롭
-        if random.random() < 0.6:
+        # 85% 확률로 특정 드롭 (대폭 증가)
+        if random.random() < 0.85:
             possible_drops = ENEMY_SPECIFIC_DROPS[enemy_key]
             return random.choice(possible_drops)
         
@@ -1570,7 +1616,9 @@ class CookingSystem:
     
     def get_random_ingredient_drop(self, enemy_level: int = 1) -> Optional[str]:
         """일반 랜덤 식재료 드롭"""
-        drop_chance = 0.5 + (enemy_level * 0.05)
+        # 기본 80% 드롭률에서 시작, 레벨당 추가 5%
+        drop_chance = 0.8 + (enemy_level * 0.05)
+        drop_chance = min(drop_chance, 0.98)  # 최대 98%까지
         
         if random.random() > drop_chance:
             return None
@@ -1579,12 +1627,13 @@ class CookingSystem:
             1: 50, 2: 30, 3: 15, 4: 4, 5: 1
         }
         
+        # 고레벨 적일수록 희귀 재료 드롭률 증가
         if enemy_level >= 5:
-            rarity_weights[3] += 10
-            rarity_weights[4] += 5
+            rarity_weights[3] += 15  # 증가량 증가
+            rarity_weights[4] += 8
         if enemy_level >= 10:
-            rarity_weights[4] += 10
-            rarity_weights[5] += 5
+            rarity_weights[4] += 15  # 증가량 증가
+            rarity_weights[5] += 10
         
         available_ingredients = []
         for name, ingredient in self.all_ingredients.items():
@@ -1592,6 +1641,62 @@ class CookingSystem:
             available_ingredients.extend([name] * weight)
         
         return random.choice(available_ingredients) if available_ingredients else None
+    
+    def process_enemy_defeat_drops(self, enemy_name: str, enemy_level: int = 1) -> List[str]:
+        """적 처치 시 식재료 드롭 처리 (여러 개 가능)"""
+        dropped_ingredients = []
+        
+        # 1-3개의 드롭 시도 (레벨에 따라 증가)
+        max_drops = min(3 + (enemy_level // 5), 5)  # 최대 5개까지
+        drop_attempts = random.randint(1, max_drops)
+        
+        for _ in range(drop_attempts):
+            # 특정 드롭 시도 (85% 확률)
+            specific_drop = self.get_enemy_specific_ingredient_drop(enemy_name, enemy_level)
+            if specific_drop:
+                # 특정 드롭은 1-2개씩 (높은 레벨일수록 많이)
+                amount = 1 if enemy_level < 10 else random.randint(1, 2)
+                if self.add_ingredient(specific_drop, amount):
+                    dropped_ingredients.extend([specific_drop] * amount)
+                continue
+            
+            # 일반 랜덤 드롭 시도 (80%+ 확률)
+            random_drop = self.get_random_ingredient_drop(enemy_level)
+            if random_drop:
+                # 일반 드롭도 1-2개씩
+                amount = 1 if enemy_level < 5 else random.randint(1, 2)
+                if self.add_ingredient(random_drop, amount):
+                    dropped_ingredients.extend([random_drop] * amount)
+        
+        return dropped_ingredients
+    
+    def show_ingredient_drops(self, dropped_ingredients: List[str], enemy_name: str = "적"):
+        """드롭된 식재료 표시"""
+        if not dropped_ingredients:
+            return
+        
+        # 아이템별로 개수 집계
+        drop_counts = {}
+        for ingredient in dropped_ingredients:
+            drop_counts[ingredient] = drop_counts.get(ingredient, 0) + 1
+        
+        print(f"\n{GREEN}💰 {enemy_name} 처치 보상:{RESET}")
+        for ingredient, count in drop_counts.items():
+            print(f"  🥕 {ingredient} x{count}")
+        
+        if audio_manager:
+            audio_manager.play_sfx(SFXType.ITEM_PICKUP)
+    
+    def get_total_drop_rate_info(self, enemy_level: int = 1) -> str:
+        """현재 드롭률 정보 표시"""
+        specific_rate = 85
+        random_rate = min(80 + (enemy_level * 5), 98)
+        max_drops = min(3 + (enemy_level // 5), 5)
+        
+        return (f"드롭률 정보:\n"
+                f"  특정 드롭: {specific_rate}%\n"
+                f"  일반 드롭: {random_rate}%\n"
+                f"  최대 동시 드롭: {max_drops}개")
     
     def can_cook_with_substitutes(self, recipe_name: str) -> Tuple[bool, Dict[str, List[Tuple[str, float]]]]:
         """레시피를 재료 대체로 요리할 수 있는지 확인"""
@@ -1912,12 +2017,50 @@ class CookingSystem:
         print(f"{WHITE}{BOLD}🌍 채집 가능한 장소들{RESET}")
         print(f"{CYAN}{'='*70}{RESET}")
         
+        print(f"\n{GREEN}✨ 개선된 채집 시스템:{RESET}")
+        print(f"  • 채집 시도: 6-10회 (기존 3-5회)")
+        print(f"  • 성공률: 95% (기존 85%)")
+        print(f"  • 획득량: 일반 2-4개, 언커먼 1-3개, 레어 1-2개")
+        
         for i, (location_name, location_data) in enumerate(GATHERING_LOCATIONS.items(), 1):
             print(f"\n{YELLOW}[{i}] {location_data['icon']} {location_name}{RESET}")
             print(f"    {WHITE}{location_data['description']}{RESET}")
-            print(f"    {GREEN}일반: {', '.join(location_data['common'][:3])}...{RESET}")
-            print(f"    {BLUE}희귀: {', '.join(location_data['uncommon'][:2])}...{RESET}")
-            print(f"    {MAGENTA}전설: {', '.join(location_data['rare'])}...{RESET}")
+            print(f"    {GREEN}일반(60%): {', '.join(location_data['common'][:3])}...{RESET}")
+            print(f"    {BLUE}희귀(25%): {', '.join(location_data['uncommon'][:2])}...{RESET}")
+            print(f"    {MAGENTA}전설(15%): {', '.join(location_data['rare'])}...{RESET}")
+    
+    def show_combat_drop_info(self):
+        """전투 시 식재료 드롭 정보 표시"""
+        print(f"\n{CYAN}{'='*70}{RESET}")
+        print(f"{WHITE}{BOLD}⚔️ 전투 식재료 드롭 시스템{RESET}")
+        print(f"{CYAN}{'='*70}{RESET}")
+        
+        print(f"\n{GREEN}✨ 개선된 드롭 시스템:{RESET}")
+        print(f"  • 특정 몬스터 드롭: 85% (기존 60%)")
+        print(f"  • 일반 랜덤 드롭: 80%+ (레벨당 +5%)")
+        print(f"  • 동시 드롭 수: 1-5개 (레벨에 따라 증가)")
+        print(f"  • 고레벨 적일수록 희귀 재료 확률 증가")
+        
+        print(f"\n{YELLOW}📊 레벨별 드롭률:{RESET}")
+        for level in [1, 5, 10, 15, 20]:
+            random_rate = min(80 + (level * 5), 98)
+            max_drops = min(3 + (level // 5), 5)
+            print(f"  Lv.{level:2d}: 일반 드롭 {random_rate:2d}%, 최대 동시 {max_drops}개")
+        
+        print(f"\n{BLUE}🎯 특정 몬스터 드롭 예시:{RESET}")
+        sample_enemies = list(ENEMY_SPECIFIC_DROPS.keys())[:8]
+        for enemy in sample_enemies:
+            drops = ENEMY_SPECIFIC_DROPS[enemy][:3]  # 처음 3개만 표시
+            print(f"  {WHITE}{enemy}:{RESET} {', '.join(drops)}...")
+        
+        if len(ENEMY_SPECIFIC_DROPS) > 8:
+            remaining = len(ENEMY_SPECIFIC_DROPS) - 8
+            print(f"  {WHITE}... 그 외 {remaining}종의 몬스터별 고유 드롭{RESET}")
+        
+        print(f"\n{MAGENTA}💡 팁:{RESET}")
+        print(f"  • 높은 레벨의 적일수록 더 많은 식재료 드롭")
+        print(f"  • 특정 몬스터는 해당 몬스터만의 특별한 식재료 드롭")
+        print(f"  • 전설급 몬스터는 최고급 식재료 확정 드롭")
 
 # 전역 인스턴스
 cooking_system = CookingSystem()

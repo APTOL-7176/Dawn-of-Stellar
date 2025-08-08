@@ -16,6 +16,9 @@ class TutorialType(Enum):
     BRAVE_SYSTEM = "brave_system"
     WOUND_SYSTEM = "wound_system"
     SKILL_SYSTEM = "skill_system"
+    TRAIT_SYSTEM = "trait_system"  # 새로운 특성 시스템
+    ORGANIC_EFFECTS = "organic_effects"  # 유기적 효과 시스템
+    FIELD_SKILLS = "field_skills"  # 필드 스킬 시스템
     STATUS_EFFECTS = "status_effects"
     INVENTORY_SYSTEM = "inventory_system"
     PARTY_MANAGEMENT = "party_management"
@@ -25,6 +28,7 @@ class TutorialType(Enum):
     ADVANCED_COMBAT = "advanced_combat"
     ELEMENT_SYSTEM = "element_system"
     BOSS_STRATEGY = "boss_strategy"
+    AUDIO_SYSTEM = "audio_system"  # 사운드 시스템
 
 
 class TutorialStep:
@@ -245,20 +249,83 @@ class TutorialManager:
         )
         skill_system.add_step(TutorialStep(
             "스킬 메뉴",
-            "각 캐릭터는 6개의 고유 스킬을 가지고 있습니다.",
+            "각 캐릭터는 8개의 스킬을 가지고 있습니다 (기본 BRV/HP 공격 + 고유 스킬 6개).",
             "스킬 메뉴를 열어 스킬 목록을 확인하세요."
         ))
         skill_system.add_step(TutorialStep(
-            "스킬 사용",
-            "MP를 소모하여 강력한 스킬을 사용할 수 있습니다.",
-            "MP를 소모하여 스킬을 사용해보세요."
+            "기본 공격",
+            "모든 캐릭터는 기본 BRV 공격과 기본 HP 공격을 가지고 있습니다.",
+            "기본 BRV 공격으로 브레이브를 쌓은 후 기본 HP 공격을 사용해보세요."
+        ))
+        skill_system.add_step(TutorialStep(
+            "고유 스킬",
+            "각 직업마다 6개의 고유 스킬을 가지고 있으며, MP를 소모하여 사용합니다.",
+            "MP를 소모하여 고유 스킬을 사용해보세요."
         ))
         skill_system.add_step(TutorialStep(
             "스킬 효과",
             "스킬은 데미지, 회복, 상태 효과 등 다양한 효과가 있습니다.",
             "여러 종류의 스킬을 사용해보세요."
         ))
+        skill_system.add_step(TutorialStep(
+            "도적 특화: 독 시스템",
+            "도적은 독을 이용한 특수한 전투 스타일을 가지고 있습니다.",
+            "도적으로 적에게 독을 걸어보세요. 독은 매 턴마다 피해를 입힙니다."
+        ))
         self.tutorials[TutorialType.SKILL_SYSTEM] = skill_system
+        
+        # 특성 시스템 튜토리얼 (새로 추가)
+        trait_system = Tutorial(
+            TutorialType.TRAIT_SYSTEM,
+            "특성 시스템",
+            "각 직업의 고유 특성으로 전투 스타일을 개성화하세요",
+            "중급", "6분"
+        )
+        trait_system.add_step(TutorialStep(
+            "특성 개념",
+            "각 직업은 5개의 고유 특성을 가지고 있습니다.",
+            "캐릭터 정보에서 특성 목록을 확인해보세요."
+        ))
+        trait_system.add_step(TutorialStep(
+            "특성 해금",
+            "스타 조각을 사용하여 새로운 특성을 해금할 수 있습니다.",
+            "메타 진행도에서 특성 해금 비용을 확인하세요."
+        ))
+        trait_system.add_step(TutorialStep(
+            "특성 효과",
+            "특성은 스킬 위력, 회복량, 상태 저항 등에 영향을 줍니다.",
+            "특성 보유 여부에 따른 스킬 효과 차이를 체험해보세요."
+        ))
+        trait_system.add_step(TutorialStep(
+            "AI 특성 인식",
+            "아군과 적군 AI는 특성을 고려하여 전략을 결정합니다.",
+            "AI의 특성 기반 행동 패턴을 관찰해보세요."
+        ))
+        self.tutorials[TutorialType.TRAIT_SYSTEM] = trait_system
+        
+        # 유기적 효과 시스템 튜토리얼
+        organic_effects = Tutorial(
+            TutorialType.ORGANIC_EFFECTS,
+            "유기적 효과",
+            "특성과 스킬이 유기적으로 연동되는 시스템을 이해하세요",
+            "고급", "5분"
+        )
+        organic_effects.add_step(TutorialStep(
+            "유기적 연동",
+            "스킬 사용 시 보유 특성에 따라 추가 효과가 발동합니다.",
+            "특성을 보유한 상태에서 스킬을 사용해보세요."
+        ))
+        organic_effects.add_step(TutorialStep(
+            "특성 시너지",
+            "여러 특성을 조합하면 더 강력한 시너지 효과를 얻을 수 있습니다.",
+            "다양한 특성 조합을 실험해보세요."
+        ))
+        organic_effects.add_step(TutorialStep(
+            "밸런스 시스템",
+            "모든 효과는 신중하게 밸런스가 조정되어 있습니다.",
+            "다양한 특성 조합의 밸런스를 체험해보세요."
+        ))
+        self.tutorials[TutorialType.ORGANIC_EFFECTS] = organic_effects
         
         # 상태 효과 튜토리얼
         status_effects = Tutorial(
@@ -278,9 +345,19 @@ class TutorialManager:
             "상태 효과의 지속 시간을 관찰하세요."
         ))
         status_effects.add_step(TutorialStep(
-            "상태 중첩",
-            "일부 상태 효과는 중첩되어 더 강한 효과를 냅니다.",
-            "같은 상태 효과를 중첩시켜보세요."
+            "독 효과 (DOT)",
+            "독은 특별한 지속 피해 효과입니다. 매 턴마다 남은 독의 20%만큼 피해를 입히고, 피해를 입힌 독은 사라집니다.",
+            "독 상태의 적을 관찰하며 독이 어떻게 줄어드는지 확인해보세요."
+        ))
+        status_effects.add_step(TutorialStep(
+            "독 중첩과 병합",
+            "여러 독 효과가 적용되면 지속 시간이 더 긴 것을 우선으로 병합됩니다.",
+            "같은 적에게 여러 번 독을 걸어 병합 효과를 확인해보세요."
+        ))
+        status_effects.add_step(TutorialStep(
+            "베놈 파워",
+            "도적의 베놈 파워는 독 관련 스킬의 위력을 증가시킵니다. 적이 독에 걸릴 때마다 베놈 파워가 상승합니다.",
+            "도적으로 플레이하며 베놈 파워 시스템을 체험해보세요."
         ))
         self.tutorials[TutorialType.STATUS_EFFECTS] = status_effects
         
@@ -348,7 +425,7 @@ class TutorialManager:
         dungeon_exploration.add_step(TutorialStep(
             "맵 탐험",
             "던전의 모든 구역을 탐험하여 숨겨진 보물을 찾으세요.",
-            "던전을 구석구석 탐험해보세요."
+            "던전을 구석구석 탐험해보세요. 특수 지형을 찾아보세요."
         ))
         dungeon_exploration.add_step(TutorialStep(
             "계단 찾기",
@@ -356,9 +433,14 @@ class TutorialManager:
             "계단을 찾아 다음 층으로 내려가세요."
         ))
         dungeon_exploration.add_step(TutorialStep(
-            "함정 주의",
-            "! 표시는 함정이니 주의하세요.",
-            "함정을 발견하고 조심스럽게 지나가세요."
+            "특수 지형",
+            "= 보물상자, & 잠긴 문, ^ 함정, ? 비밀 문, T 제단, ~ 분수, B 책장, F 대장간, G 정원, * 마법 수정, / 레버",
+            "각 특수 지형은 특정 직업 스킬이 필요합니다."
+        ))
+        dungeon_exploration.add_step(TutorialStep(
+            "아이템 표시",
+            "! 소모품, L 무기, ] 방어구, Q 액세서리로 표시됩니다.",
+            "아이템을 찾아 수집해보세요."
         ))
         self.tutorials[TutorialType.DUNGEON_EXPLORATION] = dungeon_exploration
         
@@ -410,8 +492,81 @@ class TutorialManager:
         ))
         self.tutorials[TutorialType.BOSS_STRATEGY] = boss_strategy
         
+        # 오디오 시스템 튜토리얼 (새로 추가)
+        audio_system = Tutorial(
+            TutorialType.AUDIO_SYSTEM,
+            "사운드 시스템",
+            "게임의 풍부한 오디오 환경을 체험하세요",
+            "초급", "3분"
+        )
+        audio_system.add_step(TutorialStep(
+            "배경음악",
+            "각 던전 층마다 다른 BGM이 재생됩니다.",
+            "여러 층을 탐험하며 다양한 BGM을 들어보세요."
+        ))
+        audio_system.add_step(TutorialStep(
+            "스킬 효과음",
+            "각 스킬마다 고유한 SFX가 재생됩니다.",
+            "다양한 스킬을 사용하며 효과음을 들어보세요."
+        ))
+        audio_system.add_step(TutorialStep(
+            "상황별 사운드",
+            "전투 시작, 아이템 획득, 레벨업 등 상황마다 적절한 사운드가 재생됩니다.",
+            "게임을 플레이하며 다양한 상황 사운드를 체험해보세요."
+        ))
+        audio_system.add_step(TutorialStep(
+            "음량 조절",
+            "설정에서 BGM과 SFX 음량을 개별적으로 조절할 수 있습니다.",
+            "설정 메뉴에서 음량을 조절해보세요."
+        ))
+        self.tutorials[TutorialType.AUDIO_SYSTEM] = audio_system
+        
+        # 필드 스킬 튜토리얼 (새로 추가)
+        field_skills = Tutorial(
+            TutorialType.FIELD_SKILLS,
+            "필드 스킬 시스템",
+            "직업별 필드 스킬로 던전의 숨겨진 요소를 활용하세요",
+            "중급", "8분"
+        )
+        field_skills.add_step(TutorialStep(
+            "직업별 필드 스킬",
+            "각 직업은 고유한 필드 스킬을 가지고 있습니다.",
+            "파티 구성을 다양하게 해서 여러 스킬을 활용해보세요."
+        ))
+        field_skills.add_step(TutorialStep(
+            "잠긴 문과 상자",
+            "& 잠긴 문과 = 잠긴 보물상자는 도적이나 궁수의 '자물쇠해제' 스킬이 필요합니다.",
+            "도적이나 궁수를 파티에 넣고 잠긴 것들을 열어보세요."
+        ))
+        field_skills.add_step(TutorialStep(
+            "비밀 탐지",
+            "? 비밀 문이나 숨겨진 함정은 도적, 궁수, 철학자의 '비밀탐지' 스킬로 발견할 수 있습니다.",
+            "벽을 자세히 살펴보세요. 숨겨진 통로가 있을지도 모릅니다."
+        ))
+        field_skills.add_step(TutorialStep(
+            "함정 처리",
+            "^ 함정은 먼저 '함정탐지'로 발견하고 '함정해제'로 안전하게 제거할 수 있습니다.",
+            "도적이나 궁수로 함정을 조심스럽게 처리해보세요."
+        ))
+        field_skills.add_step(TutorialStep(
+            "신성한 힘",
+            "T 제단은 성기사나 신관의 '신성마법' 스킬로 축복을 받을 수 있습니다.",
+            "성기사나 신관으로 제단을 조사해보세요."
+        ))
+        field_skills.add_step(TutorialStep(
+            "지식과 기술",
+            "B 책장(철학자/아크메이지), F 대장간(기계공학자), G 정원(드루이드), * 마법 수정(정령술사/아크메이지), / 레버(기계공학자/도적)",
+            "각 직업의 전문 분야를 활용해 특별한 혜택을 얻어보세요."
+        ))
+        field_skills.add_step(TutorialStep(
+            "다양한 파티 구성",
+            "모든 필드 스킬을 활용하려면 다양한 직업으로 파티를 구성하세요.",
+            "탐험 중심 파티: 도적, 철학자, 기계공학자, 드루이드를 추천합니다."
+        ))
+        self.tutorials[TutorialType.FIELD_SKILLS] = field_skills
+        
         # 모든 튜토리얼 등록
-        for tutorial in [party_management, dungeon_exploration, element_system, boss_strategy]:
+        for tutorial in [party_management, dungeon_exploration, field_skills, element_system, boss_strategy, audio_system]:
             self.tutorials[tutorial.type] = tutorial
     
     def get_available_tutorials(self) -> List[Tutorial]:
@@ -483,7 +638,7 @@ class TutorialManager:
             "전투": [TutorialType.COMBAT_SYSTEM, TutorialType.ATB_SYSTEM, TutorialType.BRAVE_SYSTEM],
             "시스템": [TutorialType.WOUND_SYSTEM, TutorialType.SKILL_SYSTEM, TutorialType.STATUS_EFFECTS],
             "고급": [TutorialType.PARTY_MANAGEMENT, TutorialType.ELEMENT_SYSTEM, TutorialType.BOSS_STRATEGY],
-            "탐험": [TutorialType.DUNGEON_EXPLORATION, TutorialType.ITEM_USAGE, TutorialType.SAVE_LOAD]
+            "탐험": [TutorialType.DUNGEON_EXPLORATION, TutorialType.FIELD_SKILLS, TutorialType.ITEM_USAGE, TutorialType.SAVE_LOAD]
         }
         
         for category, tutorial_types in categories.items():

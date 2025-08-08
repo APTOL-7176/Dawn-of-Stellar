@@ -5,6 +5,7 @@
 from typing import List, Optional, Dict, Any, TYPE_CHECKING
 import random
 from .new_skill_system import StatusType, get_status_icon
+from game.color_text import bright_cyan, bright_yellow, yellow, green, red, bright_white, cyan, white, magenta, blue
 
 # 전역 전투 상태 변수
 _combat_active = False
@@ -33,14 +34,39 @@ class StatusManager:
         self.effects = self.status_effects  # 호환성을 위한 별칭
         self.name = "StatusManager"  # name 속성 추가
         
-    def add_status(self, status_effect: StatusEffect) -> bool:
-        """상태이상 추가"""
-        existing = self.get_status(status_effect.status_type)
+    def add_status(self, status_effect, duration=None, intensity=None) -> bool:
+        """상태이상 추가 (다양한 매개변수 형태 지원)"""
+        # StatusEffect 객체가 직접 전달된 경우
+        if hasattr(status_effect, 'status_type'):
+            status_obj = status_effect
+        else:
+            # 문자열과 추가 매개변수로 전달된 경우
+            if isinstance(status_effect, str):
+                # 문자열에서 StatusType으로 변환
+                try:
+                    if hasattr(StatusType, status_effect.upper()):
+                        status_type = getattr(StatusType, status_effect.upper())
+                    else:
+                        # 기본 StatusType 설정
+                        status_type = StatusType.BUFF
+                except:
+                    status_type = StatusType.BUFF
+                
+                status_obj = StatusEffect(
+                    name=status_effect,
+                    status_type=status_type,
+                    duration=duration or 3,
+                    intensity=intensity or 1
+                )
+            else:
+                return False
+        
+        existing = self.get_status(status_obj.status_type)
         if existing:
-            existing.duration = max(existing.duration, status_effect.duration)
+            existing.duration = max(existing.duration, status_obj.duration)
             return False
         else:
-            self.status_effects.append(status_effect)
+            self.status_effects.append(status_obj)
             self.effects = self.status_effects  # 별칭 업데이트
             return True
     
@@ -50,6 +76,10 @@ class StatusManager:
             if effect.status_type == status_type:
                 return effect
         return None
+    
+    def has_status(self, status_type: StatusType) -> bool:
+        """특정 상태이상이 있는지 확인"""
+        return self.get_status(status_type) is not None
     
     def process_turn_effects(self, character=None) -> List[str]:
         """턴 처리 - 상태이상 효과 적용 (자동 애니메이션)"""
@@ -214,6 +244,58 @@ class StatusManager:
         silencing_states = [StatusType.SILENCE, StatusType.MADNESS]
         return not any(effect.status_type in silencing_states for effect in self.status_effects)
     
+    def apply_status(self, status_type_str: str, duration: int, intensity: int = 1) -> bool:
+        """상태이상 적용 (문자열 타입 처리)"""
+        try:
+            # 문자열을 StatusType으로 변환
+            if isinstance(status_type_str, str):
+                # 독 -> POISON 변환
+                status_mapping = {
+                    '독': StatusType.POISON,
+                    '화상': StatusType.BURN,
+                    '출혈': StatusType.BLEED,
+                    '재생': StatusType.REGENERATION,
+                    '마비': StatusType.PARALYZE,
+                    '기절': StatusType.STUN,
+                    '수면': StatusType.SLEEP,
+                    '냉기': StatusType.CHILL,
+                    '감전': StatusType.SHOCK,
+                    '빙결': StatusType.FREEZE,
+                    '석화': StatusType.PETRIFY,
+                    '침묵': StatusType.SILENCE,
+                    '부식': StatusType.CORRODE,
+                    '괴사': StatusType.NECROSIS,
+                    '강화': StatusType.STRENGTHEN,
+                    '약화': StatusType.WEAKEN,
+                    '가속': StatusType.HASTE,
+                    '감속': StatusType.SLOW,
+                    '보호': StatusType.SHIELD,
+                    '매혹': StatusType.CHARM,
+                    '지배': StatusType.DOMINATE,
+                    '혼란': StatusType.CONFUSION,
+                    '광기': StatusType.MADNESS,
+                    '저주': StatusType.CURSE,
+                    '축복': StatusType.BLESSING,
+                    '시간정지': StatusType.TIME_STOP
+                }
+                
+                status_type = status_mapping.get(status_type_str, StatusType.POISON)
+            else:
+                status_type = status_type_str
+            
+            # StatusEffect 생성 및 추가
+            status_effect = StatusEffect(
+                name=f"{status_type.name.lower()}_effect",
+                status_type=status_type,
+                duration=duration,
+                effect_value=intensity
+            )
+            return self.add_status(status_effect)
+            
+        except Exception as e:
+            print(f"⚠️ 상태이상 적용 오류: {e}")
+            return False
+    
     def is_controlled(self) -> bool:
         """적에게 조종당하는 상태인지"""
         control_states = [StatusType.CHARM, StatusType.DOMINATE, StatusType.CONFUSION]
@@ -374,8 +456,10 @@ class CharacterTrait:
         self.name = name
         self.description = description
         self.effect_type = effect_type  # "passive", "active", "trigger"
+        self.trait_type = effect_type  # trait_type 별칭 추가 (호환성)
         self.effect_value = effect_value
-        self.is_active = True
+        # active 특성은 초기에 비활성화, passive/trigger는 항상 활성화
+        self.is_active = (effect_type != "active")
         self.cooldown = 0
         self.max_cooldown = 0
         self.stack_count = 0
@@ -433,15 +517,23 @@ class CharacterTrait:
             # 이동 후 적용되는 효과
             pass
         
-        # 도적 특성
-        if "item_no_turn" in effect:
-            character.item_no_turn_cost = True
+        # 도적 특성 (리메이크)
+        if "poison_mastery" in effect:
+            character.temp_poison_always = True
+            character.temp_poison_boost = effect.get("poison_boost", 1.5)
             
-        if "treasure_sense" in effect:
-            character.temp_treasure_bonus = effect["treasure_sense"]
+        if "silence_chance" in effect:
+            character.temp_silence_chance = effect["silence_chance"]
             
-        if "poison_chance" in effect:
-            character.temp_poison_chance = effect["poison_chance"]
+        if "poison_trigger" in effect:
+            character.temp_poison_trigger = effect["poison_trigger"]
+            
+        if "poison_immunity" in effect:
+            character.temp_poison_immunity = True
+            character.temp_poison_reflect = effect.get("poison_reflect", False)
+            
+        if "poison_spread" in effect:
+            character.temp_poison_spread = True
         
         # 성기사 특성
         if "holy_resistance" in effect:
@@ -452,6 +544,49 @@ class CharacterTrait:
             
         if "protection_bonus" in effect:
             character.temp_protection_bonus = effect["protection_bonus"]
+        
+        # 시간술사 특성
+        if "time_sense" in effect:
+            character.temp_time_sense = True  # 적의 다음 행동 예측
+            
+        if "time_acceleration" in effect:
+            character.temp_atb_boost = effect["time_acceleration"]  # ATB 충전 속도 증가
+            
+        if "future_sight" in effect:
+            character.temp_crit_resistance = effect["future_sight"]  # 크리티컬 받을 확률 감소
+            
+        if "time_control" in effect:
+            character.temp_debuff_reduction = effect["time_control"]  # 디버프 지속시간 감소
+        
+        # 차원술사 특성
+        if "space_distortion" in effect:
+            character.temp_enemy_accuracy_down = getattr(character, 'temp_enemy_accuracy_down', 0) + int(effect["space_distortion"] * 100)
+        
+        # 연금술사 특성
+        if "potion_craft" in effect:
+            character.temp_potion_multiplier = effect["potion_craft"]
+            
+        if "transmute" in effect:
+            character.temp_ignore_resistance = True
+            
+        if "explosion" in effect:
+            character.temp_explosion_boost = effect["explosion"]
+            
+        if "experiment" in effect:
+            character.temp_debuff_duration_boost = effect["experiment"]
+            
+        if "magic_substance" in effect:
+            character.temp_random_element = True  # 공격마다 랜덤 속성 부여
+        
+        # 철학자 특성
+        if "wisdom" in effect:
+            character.temp_mp_efficiency = 1.0 - effect["wisdom"]  # MP 소모량 감소
+            
+        if "logic" in effect:
+            character.temp_logic_dodge_bonus = 0.15  # 패턴 분석으로 회피율 15% 증가
+            
+        if "enlightenment" in effect:
+            character.temp_exp_bonus = effect["enlightenment"]  # 경험치 획득량 증가
         
         # 암흑기사 특성
         if "life_steal" in effect:
@@ -537,15 +672,20 @@ class CharacterTrait:
         if "mana_cycle" in effect:
             character.temp_mana_efficiency = effect["mana_cycle"]
         
-        # 암살자 특성
-        if "shadow_step" in effect:
-            character.temp_first_strike = True
+        # 암살자 특성 - 그림자 시스템
+        if "shadow_generation" in effect:
+            if not hasattr(character, 'shadow_count'):
+                character.shadow_count = 0
+            character.shadow_count += effect["shadow_generation"]
             
-        if "critical_expert" in effect:
-            character.temp_crit_bonus += effect["critical_expert"]
-            
-        if "poison_weapon" in effect:
-            character.temp_poison_weapon = True
+        if "shadow_power" in effect:
+            shadow_count = getattr(character, 'shadow_count', 0)
+            character.temp_attack_bonus += character.physical_attack * (effect["shadow_power"] * shadow_count)
+        
+        if "shadow_defense" in effect:
+            # 그림자 방어 시스템 - 피격 시 그림자 소모로 50% 피해 감소
+            character.temp_shadow_defense = True
+            character.temp_shadow_defense_reduction = effect.get("reduction", 0.5)  # 기본 50% 감소
         
         # 기계공학자 특성
         if "gear_enhance" in effect:
@@ -724,6 +864,16 @@ class CharacterTrait:
             # 출혈 효과 추가
             return True
         
+        # 암살자 특성 - 그림자 분신 공격
+        if trigger_type == "attack" and "shadow_clone_attack" in effect:
+            shadow_count = getattr(character, 'shadow_count', 0)
+            if shadow_count > 0:
+                character.shadow_count -= 1
+                # 추가 공격 데미지 (그림자 1개 소모로 50% 추가 피해)
+                character.temp_next_attack_bonus = 0.5
+                print(f"👤 {character.name}이(가) 그림자를 소모하여 분신 공격! (남은 그림자: {character.shadow_count})")
+                return True
+        
         # 성기사 특성
         if trigger_type == "attack" and "heal_on_attack" in effect:
             import random
@@ -734,6 +884,61 @@ class CharacterTrait:
         if trigger_type == "ally_down" and "justice_rage" in effect:
             character.temp_attack_bonus += character.physical_attack * effect["justice_rage"]
             character.temp_magic_bonus += character.magic_attack * effect["justice_rage"]
+            return True
+        
+        # 시간술사 특성 - 시간 역행
+        if trigger_type == "fatal_damage" and "time_rewind" in effect:
+            if not hasattr(character, 'time_rewind_used'):
+                character.time_rewind_used = 0
+            
+            if character.time_rewind_used < effect["time_rewind"]:
+                # 이전 상태로 복구 (HP 80% 회복)
+                character.current_hp = int(character.max_hp * 0.8)
+                character.current_mp = int(character.max_mp * 0.8)
+                character.time_rewind_used += 1
+                print(f"⏰ {character.name}이(가) 시간을 역행하여 상태를 복구했습니다!")
+                return True
+        
+        # 차원술사 특성 - 차원 방벽 (전투 시작)
+        if trigger_type == "battle_start" and "dimension_shield" in effect:
+            if not hasattr(character, 'dimension_shields'):
+                character.dimension_shields = effect["dimension_shield"]
+                print(f"🛡️ {character.name}이(가) 차원 방벽을 전개했습니다! ({character.dimension_shields}회 완전 회피)")
+                return True
+        
+        # 차원술사 특성 - 잔상 숙련 (회피 성공 시)
+        if trigger_type == "dodge_success" and "afterimage_master" in effect:
+            if not hasattr(character, 'afterimage_stacks'):
+                character.afterimage_stacks = 0
+            character.afterimage_stacks += effect["afterimage_master"]
+            print(f"👻 {character.name}이(가) 잔상 스택 {effect['afterimage_master']}개를 획득했습니다! (총 {character.afterimage_stacks}개)")
+            return True
+        
+        # 차원술사 특성 - 차원 이동 (공격 후)
+        if trigger_type == "after_attack" and "dimension_step" in effect:
+            import random
+            if random.random() < effect["dimension_step"]:
+                character.temp_next_dodge_guaranteed = True
+                print(f"🌀 {character.name}이(가) 차원 이동으로 다음 공격을 자동 회피합니다!")
+                return True
+        
+        # 차원술사 특성 - 차원 균열 (반격 시)
+        if trigger_type == "counter_attack" and "dimension_counter" in effect:
+            afterimage_stacks = getattr(character, 'afterimage_stacks', 0)
+            if afterimage_stacks > 0:
+                character.temp_next_attack_multiplier = effect["dimension_counter"]
+                character.afterimage_stacks -= 1
+                print(f"💥 {character.name}이(가) 잔상을 소모하여 차원 균열 반격! (피해 {effect['dimension_counter']}배)")
+                return True
+        
+        # 철학자 특성 - 사색의 힘 (MP 가득 찰 때)
+        if trigger_type == "mp_full" and "contemplation" in effect:
+            if not hasattr(character, 'wisdom_stacks'):
+                character.wisdom_stacks = 0
+            character.wisdom_stacks += 1
+            # 지혜 스택당 마법공격력 10% 증가
+            character.temp_magic_bonus += character.magic_attack * 0.1
+            print(f"🧠 {character.name}이(가) 사색으로 지혜를 얻었습니다! (지혜 스택: {character.wisdom_stacks})")
             return True
         
         # 암흑기사 특성
@@ -764,7 +969,7 @@ class CharacterTrait:
         effect = self.effect_value
         activated = False
         
-        # 도적 특성 - 은신
+        # 도적 특성 (리메이크) - 은신 관련 제거
         if "stealth_duration" in effect:
             character.stealth_turns = effect["stealth_duration"]
             self.cooldown = 10  # 10턴 쿨다운
@@ -772,16 +977,98 @@ class CharacterTrait:
             activated = True
             print(f"✨ {character.name}이(가) 은신 상태에 진입했습니다! (지속: {effect['stealth_duration']}턴)")
         
-        # 암살자 특성 - 연막탄
-        if "smoke_bomb" in effect:
-            character.stealth_turns = 3
-            # 적의 명중률 감소 (지속시간 포함)
-            character.temp_enemy_accuracy_down = getattr(character, 'temp_enemy_accuracy_down', 0) + 30
-            character.temp_enemy_accuracy_duration = 4  # 4턴 지속
+        # 시간술사 특성 - 시간 정지 (액티브)
+        if "time_stop" in effect:
+            # 모든 적의 ATB 게이지를 50% 감소
+            character.temp_time_stop_effect = True
+            self.cooldown = 12
+            self.max_cooldown = 12
+            activated = True
+            print(f"⏰ {character.name}이(가) 시간을 정지시켰습니다! 모든 적의 ATB 게이지 감소!")
+        
+        # 시간술사 특성 - 시간 가속 (액티브)
+        if "time_haste" in effect:
+            # 아군 전체의 ATB 게이지를 크게 증가
+            character.temp_time_haste_effect = True
             self.cooldown = 8
             self.max_cooldown = 8
             activated = True
-            print(f"💨 {character.name}이(가) 연막탄을 사용했습니다! 은신 및 적 명중률 감소! (4턴)")
+            print(f"⚡ {character.name}이(가) 시간을 가속시켰습니다! 아군 전체 ATB 게이지 증가!")
+        
+        # 차원술사 특성 - 차원 도약 (액티브)
+        if "dimension_leap" in effect:
+            # 즉시 턴 순서를 맨 앞으로 이동 + 다음 공격 필중
+            character.temp_dimension_leap = True
+            character.temp_next_attack_guaranteed_hit = True
+            self.cooldown = 10
+            self.max_cooldown = 10
+            activated = True
+            print(f"🌀 {character.name}이(가) 차원을 도약하여 시공간을 조작했습니다!")
+        
+        # 차원술사 특성 - 공간 왜곡 (액티브)
+        if "space_warp" in effect:
+            # 적 전체에게 혼란 상태 부여 (2턴간 행동 불가)
+            character.temp_space_warp_effect = True
+            self.cooldown = 15
+            self.max_cooldown = 15
+            activated = True
+            print(f"🌪️ {character.name}이(가) 공간을 왜곡시켰습니다! 적 전체 혼란 상태!")
+        
+        # 연금술사 특성 - 플라스크 폭발 (액티브)
+        if "flask_explosion" in effect:
+            # 광역 폭발 공격 (마법 공격력 기반)
+            character.temp_flask_explosion_damage = int(character.magic_attack * 2.5)
+            character.temp_flask_explosion_targets = "all_enemies"
+            self.cooldown = 8
+            self.max_cooldown = 8
+            activated = True
+            print(f"💥 {character.name}이(가) 폭발 플라스크를 던졌습니다! 적 전체 공격!")
+        
+        # 연금술사 특성 - 원소 변환 (액티브)
+        if "elemental_transmute" in effect:
+            # 다음 3번의 공격에 모든 속성 동시 부여
+            character.temp_multi_element_attacks = 3
+            self.cooldown = 12
+            self.max_cooldown = 12
+            activated = True
+            print(f"🔮 {character.name}이(가) 원소를 변환했습니다! 다음 3회 공격에 모든 속성 동시 부여!")
+        
+        # 철학자 특성 - 철학적 논증 (액티브)
+        if "confusion" in effect:
+            # 적 전체에게 혼란 상태 부여 + 지혜 스택당 추가 효과
+            wisdom_stacks = getattr(character, 'wisdom_stacks', 0)
+            confusion_duration = 2 + wisdom_stacks  # 기본 2턴 + 지혜 스택당 1턴
+            character.temp_confusion_effect = confusion_duration
+            character.temp_confusion_targets = "all_enemies"
+            self.cooldown = 10
+            self.max_cooldown = 10
+            activated = True
+            print(f"🤔 {character.name}이(가) 철학적 논증으로 적들을 혼란에 빠뜨렸습니다! ({confusion_duration}턴)")
+        
+        # 철학자 특성 - 진리 탐구 (액티브)
+        if "truth_seeking" in effect:
+            # 적의 모든 정보 공개 + 약점 노출
+            character.temp_truth_seeking = True
+            self.cooldown = 15
+            self.max_cooldown = 15
+            activated = True
+            print(f"🔍 {character.name}이(가) 진리를 탐구하여 적의 본질을 간파했습니다!")
+        
+        # 암살자 특성 - 그림자 폭발 (궁극기)
+        if "shadow_explosion" in effect:
+            shadow_count = getattr(character, 'shadow_count', 0)
+            
+            if shadow_count >= 3:  # 최소 3개 그림자 필요
+                # 모든 그림자를 소모하여 강력한 광역 공격
+                character.temp_ultimate_damage = character.physical_attack * (1.5 + shadow_count * 0.5)
+                character.temp_ultimate_targets = "all_enemies"  # 전체 적 대상
+                character.shadow_count = 0  # 모든 그림자 소모
+                self.cooldown = 15  # 긴 쿨다운
+                self.max_cooldown = 15
+                activated = True
+                print(f"💥 {character.name}이(가) 모든 그림자({shadow_count}개)를 폭발시켰습니다! 적 전체 공격!")
+            else:
+                print(f"❌ 그림자가 부족합니다! (필요: 최소 3개, 보유: {shadow_count})")
         
         # 기계공학자 특성 - 자동 포탑
         if "auto_turret" in effect:
@@ -792,6 +1079,8 @@ class CharacterTrait:
             self.max_cooldown = 12
             activated = True
             print(f"🔧 {character.name}이(가) 자동 포탑을 설치했습니다! (지속: 5턴, 턴당 {character.temp_turret_damage} 피해)")
+            print("⏸️ [ENTER를 눌러 계속...]")
+            input()  # 사용자가 ENTER를 누를 때까지 대기
         
         # 기계공학자 특성 - 오버클럭
         if "overclock" in effect:
@@ -1045,24 +1334,50 @@ class CharacterClassManager:
     
     @staticmethod
     def get_class_traits(character_class: str) -> List[CharacterTrait]:
-        """클래스별 고유 특성 반환 (5개씩, 2개 선택 가능)"""
+        """클래스별 고유 특성 반환 (5개씩) - 중복 제거 및 완전 통합"""
         trait_sets = {
+            # === 전사계 - 적응형 시스템과 균형 유지 ===
             "전사": [
-                CharacterTrait("불굴의 의지", "HP가 25% 이하일 때 공격력 50% 증가", "passive", {"low_hp_damage_boost": 1.5}),
-                CharacterTrait("전투 광기", "적을 처치할 때마다 다음 공격의 피해량 20% 증가", "trigger", {"kill_damage_stack": 0.2}),
-                CharacterTrait("방어 숙련", "방어 시 받는 피해 30% 추가 감소", "passive", {"defense_bonus": 0.3}),
-                CharacterTrait("위협적 존재", "전투 시작 시 적들의 공격력 10% 감소", "passive", {"enemy_attack_debuff": 0.1}),
-                CharacterTrait("피의 갈증", "HP가 50% 이상일 때 공격속도 25% 증가", "passive", {"high_hp_speed_boost": 1.25})
+                CharacterTrait("적응형 무술", "전투 중 자세 변경 시 다음 공격 위력 30% 증가", "trigger", {"stance_change_boost": 1.3}),
+                CharacterTrait("전장의 지배자", "같은 자세 유지 시 턴마다 능력치 누적 증가 (턴당 +5%, 최대 35%)", "passive", {"stance_mastery_stack": {"growth_per_turn": 0.05, "max_bonus": 0.35}}),
+                CharacterTrait("불굴의 의지", "모든 자세에서 매 턴 HP 8% 회복", "passive", {"universal_regeneration": 0.08}),
+                CharacterTrait("전투 본능", "자세 변경 스킬 MP 소모 없음", "passive", {"stance_change_no_mp": True}),
+                CharacterTrait("6단계 완전체", "6가지 자세 완전 숙달: 모든 자세에서 특화 보너스 획득 (공격:공격력+20%, 방어:방어력+25%, 균형:올스탯+12%, 광전사:크리+15%, 수호자:회복+30%, 신속:속도+35%)", "passive", {"stance_mastery": True})
             ],
             
-            "아크메이지": [
-                CharacterTrait("마나 순환", "스킬 사용 시 30% 확률로 MP 소모량 절반", "passive", {"mana_efficiency": 0.3}),
-                CharacterTrait("원소 지배", "속성 마법 사용 시 해당 속성 저항 20% 증가", "passive", {"elemental_mastery": 0.2}),
-                CharacterTrait("마법 연구자", "전투 후 획득 경험치 15% 증가", "passive", {"exp_bonus": 0.15}),
-                CharacterTrait("마법 폭주", "크리티컬 마법 시 주변 적들에게 연쇄 피해", "trigger", {"magic_chain": True}),
-                CharacterTrait("마력 집중", "MP가 75% 이상일 때 마법 피해 40% 증가", "passive", {"high_mp_magic_boost": 1.4})
+            "성기사": [
+                CharacterTrait("성역의 수호자", "성역 지속시간 50% 증가", "passive", {"sanctuary_duration": 1.5}),
+                CharacterTrait("축복의 빛", "버프 상태 아군 수에 따라 성역 생성 확률 증가", "trigger", {"blessing_sanctuary": True}),
+                CharacterTrait("신성한 힘", "성역 1개당 치유 효과 15% 증가", "passive", {"holy_healing": 0.15}),
+                CharacterTrait("정의의 심판", "성역이 5개 이상일 때 모든 공격에 성속성 추가", "trigger", {"divine_judgment": 5}),
+                CharacterTrait("천사의 가호", "성역 효과 범위 2배 확장", "passive", {"sanctuary_range": 2.0})
             ],
             
+            "암흑기사": [
+                CharacterTrait("어둠의 권능", "흡수 스택 최대치 +25% (HP의 100%까지)", "passive", {"absorption_limit": 1.25}),
+                CharacterTrait("생명력 지배", "흡수 스택으로 회복 시 효율 30% 증가", "passive", {"absorption_efficiency": 1.3}),
+                CharacterTrait("어둠의 오라", "적이 많을수록 지속 피해 증가", "passive", {"dark_aura_scale": True}),
+                CharacterTrait("불사의 계약", "흡수 스택이 50% 이상일 때 디버프 면역", "trigger", {"undead_immunity": 0.5}),
+                CharacterTrait("어둠의 군주", "궁극기 사용 시 모든 적에게 공포 부여", "trigger", {"dark_lord_fear": True})
+            ],
+            
+            "기사": [
+                CharacterTrait("의무의 수호자", "아군 보호 시 의무 스택 추가 획득", "trigger", {"duty_protection": True}),
+                CharacterTrait("기사도 정신", "의무 스택 3개 이상일 때 모든 능력치 20% 증가", "passive", {"chivalry_boost": 0.2}),
+                CharacterTrait("불굴의 방어", "의무 스택 5개일 때 다음 치명상 무효화", "trigger", {"immortal_duty": 5}),
+                CharacterTrait("수호 본능", "파티원 HP 30% 이하일 때 자동으로 보호", "trigger", {"auto_protect": 0.3}),
+                CharacterTrait("기사의 맹세", "아군이 죽을 때 모든 의무 스택 회복", "trigger", {"oath_recovery": True})
+            ],
+            
+            "용기사": [
+                CharacterTrait("표식 달인", "표식 부여 확률 30% 증가", "passive", {"mark_mastery": 0.3}),
+                CharacterTrait("도약의 숙련자", "도약 공격 시 무적 시간 50% 증가", "passive", {"leap_mastery": 1.5}),
+                CharacterTrait("용의 혈통", "표식 중첩 속도 25% 증가", "passive", {"mark_speed": 1.25}),
+                CharacterTrait("드래곤 하트", "표식이 3개 이상일 때 화염 저항 50% 증가", "trigger", {"dragon_resistance": 0.5}),
+                CharacterTrait("용왕의 권능", "모든 표식 폭발 시 추가 화염 피해", "trigger", {"dragon_explosion": True})
+            ],
+            
+            # === 원거리계 ===
             "궁수": [
                 CharacterTrait("정밀 사격", "크리티컬 확률 25% 증가", "passive", {"crit_chance_bonus": 0.25}),
                 CharacterTrait("원거리 숙련", "첫 공격 시 항상 크리티컬", "trigger", {"first_strike_crit": True}),
@@ -1071,69 +1386,13 @@ class CharacterClassManager:
                 CharacterTrait("바람의 가호", "이동 시 다음 공격의 명중률과 피해량 15% 증가", "passive", {"movement_bonus": 1.15})
             ],
             
-            "도적": [
-                CharacterTrait("그림자 은신", "전투 시작 시 3턴간 은신 상태", "active", {"stealth_duration": 3}),
-                CharacterTrait("치명적 급소", "크리티컬 시 추가 출혈 효과 부여", "trigger", {"crit_bleed": True}),
-                CharacterTrait("빠른 손놀림", "아이템 사용 시 턴 소모하지 않음", "passive", {"item_no_turn": True}),
-                CharacterTrait("도적의 직감", "함정과 보물 발견 확률 50% 증가", "passive", {"treasure_sense": 0.5}),
-                CharacterTrait("독 숙련", "모든 공격에 10% 확률로 독 효과 추가", "passive", {"poison_chance": 0.1})
-            ],
-            
-            "성기사": [
-                CharacterTrait("신성한 가호", "언데드와 악마에게 받는 피해 50% 감소", "passive", {"holy_resistance": 0.5}),
-                CharacterTrait("치유의 빛", "공격 시 30% 확률로 파티원 전체 소량 회복", "trigger", {"heal_on_attack": 0.3}),
-                CharacterTrait("정의의 분노", "아군이 쓰러질 때 공격력과 마법력 30% 증가", "trigger", {"justice_rage": 0.3}),
-                CharacterTrait("축복받은 무기", "모든 공격에 성속성 추가 피해", "passive", {"holy_damage": True}),
-                CharacterTrait("수호의 맹세", "파티원 보호 시 받는 피해 50% 감소", "passive", {"protection_bonus": 0.5})
-            ],
-            
-            "암흑기사": [
-                CharacterTrait("생명 흡수", "가한 피해의 15%만큼 HP 회복", "passive", {"life_steal": 0.15}),
-                CharacterTrait("어둠의 계약", "HP가 낮을수록 공격력 증가 (최대 100%)", "passive", {"dark_pact": True}),
-                CharacterTrait("공포 오라", "적들이 간헐적으로 행동 불가", "passive", {"fear_aura": 0.2}),
-                CharacterTrait("불사의 의지", "치명상 시 1회 한정 완전 회복", "trigger", {"undying_will": 1}),
-                CharacterTrait("어둠 조작", "턴 종료 시 20% 확률로 적에게 암속성 피해", "passive", {"dark_pulse": 0.2})
-            ],
-            
-            "몽크": [
-                CharacterTrait("내공 순환", "MP가 가득 찰 때마다 모든 능력치 일시 증가", "trigger", {"chi_burst": True}),
-                CharacterTrait("연타 숙련", "연속 공격 시마다 피해량 누적 증가", "passive", {"combo_multiplier": 0.1}),
-                CharacterTrait("정신 수양", "상태이상 저항 50% 증가", "passive", {"status_resist": 0.5}),
-                CharacterTrait("기절 공격", "일정 확률로 적을 기절시켜 1턴 행동 불가", "trigger", {"stun_chance": 0.2}),
-                CharacterTrait("참선의 깨달음", "전투 중 매 5턴마다 MP 완전 회복", "passive", {"meditation_recovery": 5})
-            ],
-            
-            # 새로운 직업들 추가 (21개 더 필요)
-            "바드": [
-                CharacterTrait("전투 노래", "파티원들의 공격력 15% 증가", "passive", {"party_damage_boost": 0.15}),
-                CharacterTrait("치유의 선율", "턴 종료 시 파티 전체 소량 회복", "passive", {"turn_heal": True}),
-                CharacterTrait("용기의 찬송", "파티원들의 크리티컬 확률 10% 증가", "passive", {"party_crit_boost": 0.1}),
-                CharacterTrait("마법 해제", "적의 버프를 무효화하는 확률 25%", "trigger", {"dispel_chance": 0.25}),
-                CharacterTrait("영감의 리듬", "스킬 사용 시 아군의 MP 회복", "trigger", {"inspire_mp": True})
-            ],
-            
-            "네크로맨서": [
-                CharacterTrait("어둠의 계약", "적 처치 시 MP 회복량 2배", "trigger", {"dark_pact_mp": 2.0}),
-                CharacterTrait("생명력 흡수", "적에게 피해를 줄 때 HP와 MP 동시 회복", "passive", {"life_mana_drain": True}),
-                CharacterTrait("저주술", "공격 시 25% 확률로 적에게 저주 부여", "trigger", {"curse_chance": 0.25}),
-                CharacterTrait("죽음의 오라", "주변 적들의 회복 효과 50% 감소", "passive", {"anti_heal_aura": 0.5}),
-                CharacterTrait("영혼 흡수", "적 처치 시 최대 MP 일시 증가", "trigger", {"soul_harvest": True})
-            ],
-            
-            "용기사": [
-                CharacterTrait("용의 숨결", "모든 공격에 화염 속성 추가", "passive", {"dragon_breath": True}),
-                CharacterTrait("비늘 방어", "받는 물리 피해 15% 감소", "passive", {"scale_armor": 0.15}),
-                CharacterTrait("용의 분노", "HP가 낮을수록 공격속도 증가", "passive", {"dragon_rage": True}),
-                CharacterTrait("날개 돌격", "크리티컬 시 추가 행동 기회", "trigger", {"wing_strike": True}),
-                CharacterTrait("용족의 긍지", "디버프 저항 40% 증가", "passive", {"debuff_resist": 0.4})
-            ],
-            
-            "검성": [
-                CharacterTrait("검술 달인", "무기 공격력 30% 증가", "passive", {"sword_mastery": 0.3}),
-                CharacterTrait("연속 베기", "공격 성공 시 30% 확률로 즉시 재공격", "trigger", {"combo_strike": 0.3}),
-                CharacterTrait("검기 충격", "공격 시 25% 확률로 2배 피해", "trigger", {"sword_impact": 2.0}),
-                CharacterTrait("완벽한 방어", "방어 시 100% 피해 무효화", "trigger", {"perfect_guard": True}),
-                CharacterTrait("검의 의지", "무기 파괴 무효", "passive", {"weapon_protection": True})
+            # === 마법계 ===
+            "아크메이지": [
+                CharacterTrait("원소 순환 마스터", "동일 원소 2회만으로도 자동 발동", "passive", {"element_cycle_fast": 2}),
+                CharacterTrait("마법 연구자", "원소 카운트 지속시간 50% 증가", "passive", {"element_duration": 1.5}),
+                CharacterTrait("원소 친화", "모든 원소 마법 위력 20% 증가", "passive", {"elemental_mastery": 0.2}),
+                CharacterTrait("대마법사", "원소 대폭발 재사용 대기시간 50% 감소", "passive", {"ultimate_cooldown": 0.5}),
+                CharacterTrait("원소의 현자", "원소 3개 축적 시 모든 원소 저항 25% 증가", "trigger", {"elemental_sage": 0.25})
             ],
             
             "정령술사": [
@@ -1144,20 +1403,119 @@ class CharacterClassManager:
                 CharacterTrait("원소 폭발", "마법 크리티컬 시 광역 피해", "trigger", {"elemental_blast": True})
             ],
             
+            "네크로맨서": [
+                CharacterTrait("어둠의 계약", "적 처치 시 MP 회복량 2배", "trigger", {"dark_pact_mp": 2.0}),
+                CharacterTrait("생명력 흡수", "적에게 피해를 줄 때 HP와 MP 동시 회복", "passive", {"life_mana_drain": True}),
+                CharacterTrait("저주술", "공격 시 25% 확률로 적에게 저주 부여", "trigger", {"curse_chance": 0.25}),
+                CharacterTrait("죽음의 오라", "주변 적들의 회복 효과 50% 감소", "passive", {"anti_heal_aura": 0.5}),
+                CharacterTrait("영혼 흡수", "적 처치 시 최대 MP 일시 증가", "trigger", {"soul_harvest": True})
+            ],
+            
+            "시간술사": [
+                CharacterTrait("시간 파동", "ATB 게이지 감소량 마스터리", "passive", {"time_mastery": True}),
+                CharacterTrait("시간 지연", "적 ATB 지연 효과 강화", "passive", {"time_delay_boost": 1.5}),
+                CharacterTrait("시간 가속", "아군 ATB 가속 효과 강화", "passive", {"time_accel_boost": 1.5}),
+                CharacterTrait("시간의 달인", "모든 시간 조작 스킬 25% 강화", "passive", {"temporal_mastery": 0.25}),
+                CharacterTrait("시공 왜곡", "궁극기 시 모든 적 5턴 느려짐", "trigger", {"spacetime_distort": 5})
+            ],
+            
+            "연금술사": [
+                CharacterTrait("폭발 연구", "폭발 계열 스킬 위력 40% 증가", "passive", {"explosion": 0.4}),
+                CharacterTrait("플라스크 달인", "공격 시 25% 확률로 폭발 효과 (마법공격력 2.5배)", "trigger", {"flask_mastery": 0.25}),
+                CharacterTrait("원소 변환", "공격 시 랜덤한 속성 효과 부여", "passive", {"elemental_transmute": True}),
+                CharacterTrait("연금 숙련", "모든 마법 스킬 MP 소모량 20% 감소", "passive", {"mana_efficiency": 0.8}),
+                CharacterTrait("생명 연성", "체력 회복 효과 50% 증가", "passive", {"healing_boost": 1.5})
+            ],
+            
+            "차원술사": [
+                CharacterTrait("차원 방벽", "전투 시작 시 보호막 자동 생성", "passive", {"dimension_barrier": True}),
+                CharacterTrait("잔상 숙련", "회피 성공 시 다음 공격 치명타 확정", "trigger", {"afterimage_mastery": True}),
+                CharacterTrait("차원 도약", "공격 받을 때 50% 확률로 완전 회피", "passive", {"dimension_dodge": 0.5}),
+                CharacterTrait("공간 왜곡", "적의 정확도 30% 감소", "passive", {"space_distortion": 0.3}),
+                CharacterTrait("차원 귀환", "HP 30% 이하 시 즉시 회복 + 무적 1턴", "trigger", {"dimension_return": True})
+            ],
+            
+            # === 하이브리드계 ===
+            "검성": [
+                CharacterTrait("검기 집중", "BRV 공격 시 20% 확률로 검기 스택 2개 획득", "trigger", {"sword_aura_double": 0.2}),
+                CharacterTrait("일섬의 달인", "검기 스택 소모 시 ATB 환급량 20% 증가", "passive", {"atb_refund_boost": 0.2}),
+                CharacterTrait("검의 이치", "검기 스택 최대치 +1 (최대 3스택)", "passive", {"max_sword_aura": 3}),
+                CharacterTrait("명경지수", "HP 50% 이상일 때 크리티컬 확률 25% 증가", "passive", {"high_hp_crit": 0.25}),
+                CharacterTrait("검신의 축복", "검기 스택이 최대일 때 모든 공격 크리티컬", "trigger", {"max_stack_crit": True})
+            ],
+            
+            "검투사": [
+                CharacterTrait("투기장의 경험", "적 처치 시 능력치 상승폭 25% 증가", "passive", {"kill_stack_boost": 0.25}),
+                CharacterTrait("패링 마스터", "패링 시 반격 피해 120% 증가", "passive", {"parry_damage_boost": 1.2}),
+                CharacterTrait("생존 본능", "HP 30% 이하일 때 패링 지속시간 연장", "trigger", {"survival_parry_duration": 3.0}),
+                CharacterTrait("투사의 긍지", "처치 스택 3개 이상일 때 디버프 면역", "trigger", {"gladiator_immunity": 3}),
+                CharacterTrait("콜로세움의 영웅", "적 처치 시 100% 확률로 즉시 행동", "trigger", {"heroic_action": 1.0})
+            ],
+            
+            "광전사": [
+                CharacterTrait("피의 갈증", "HP 소모량 15% 감소, 흡혈 효과 25% 증가", "passive", {"blood_efficiency": {"hp_cost": 0.85, "lifesteal": 1.25}}),
+                CharacterTrait("광기의 힘", "HP가 낮을수록 보호막 생성량 증가", "passive", {"rage_shield": True}),
+                CharacterTrait("불굴의 의지", "HP 15% 이하일 때 받는 피해 50% 감소", "trigger", {"last_stand": 0.5}),
+                CharacterTrait("혈투의 광기", "HP가 낮을수록 공격력과 치명타율 증가", "passive", {"hp_based_rage": True}),
+                CharacterTrait("최후의 일격", "HP 10% 이하일 때 다음 공격이 치명타 + 200% 추가 피해", "trigger", {"last_strike": {"threshold": 0.1, "damage_multiplier": 3.0}})
+            ],
+            
+            "마검사": [
+                CharacterTrait("마검 일체", "물리와 마법 공격력 동시 적용", "passive", {"magic_sword": True}),
+                CharacterTrait("마력 충전", "공격할 때마다 MP 회복", "passive", {"mana_charge": True}),
+                CharacterTrait("검기 폭발", "검 공격에 마법 피해 추가", "passive", {"sword_blast": True}),
+                CharacterTrait("이중 속성", "두 가지 속성 동시 공격", "passive", {"dual_element": True}),
+                CharacterTrait("마검 오의", "궁극기 사용 시 모든 적에게 피해", "trigger", {"mystic_art": True})
+            ],
+            
             "암살자": [
-                CharacterTrait("그림자 이동", "첫 턴에 반드시 선공", "passive", {"shadow_step": True}),
-                CharacterTrait("치명타 특화", "크리티컬 확률 40% 증가", "passive", {"critical_expert": 0.4}),
-                CharacterTrait("독날 무기", "모든 공격에 독 효과", "passive", {"poison_weapon": True}),
-                CharacterTrait("은신 공격", "은신 상태에서 공격 시 피해 200% 증가", "trigger", {"stealth_attack": 2.0}),
-                CharacterTrait("연막탄", "전투 도중 은신 상태 진입 가능", "active", {"smoke_bomb": True})
+                CharacterTrait("그림자 조작", "전투 시작 시 그림자 3개 생성", "passive", {"shadow_generation": 3}),
+                CharacterTrait("그림자 강화", "그림자 1개당 공격력 15% 증가", "passive", {"shadow_power": 0.15}),
+                CharacterTrait("그림자 분신", "그림자 소모로 추가 공격 가능", "trigger", {"shadow_clone_attack": True}),
+                CharacterTrait("그림자 방어", "피격 시 그림자 1개 소모로 50% 피해 감소", "passive", {"shadow_defense": {"reduction": 0.5}}),
+                CharacterTrait("그림자 숙련", "그림자 개수에 비례하여 크리티컬 확률 최대 40%, 회피율 최대 30% 증가", "passive", {"shadow_mastery": {"crit_per_shadow": 8, "dodge_per_shadow": 6, "max_shadows": 5}})
+            ],
+            
+            # === 서포터계 ===
+            "바드": [
+                CharacterTrait("전투 노래", "파티원들의 공격력 15% 증가", "passive", {"party_damage_boost": 0.15}),
+                CharacterTrait("치유의 선율", "턴 종료 시 파티 전체 소량 회복", "passive", {"turn_heal": True}),
+                CharacterTrait("용기의 찬송", "파티원들의 크리티컬 확률 10% 증가", "passive", {"party_crit_boost": 0.1}),
+                CharacterTrait("마법 해제", "적의 버프를 무효화하는 확률 25%", "trigger", {"dispel_chance": 0.25}),
+                CharacterTrait("영감의 리듬", "스킬 사용 시 아군의 MP 회복", "trigger", {"inspire_mp": True})
+            ],
+            
+            "신관": [
+                CharacterTrait("신의 가호", "치명타 무효화 확률 20%", "passive", {"divine_grace": 0.2}),
+                CharacterTrait("성스러운 빛", "언데드에게 2배 피해", "passive", {"holy_light": 2.0}),
+                CharacterTrait("치유 특화", "모든 회복 효과 50% 증가", "passive", {"heal_mastery": 0.5}),
+                CharacterTrait("축복의 오라", "파티 전체 디버프 저항 30% 증가", "passive", {"blessing_aura": 0.3}),
+                CharacterTrait("신탁", "랜덤하게 강력한 기적 발생", "trigger", {"oracle": True})
+            ],
+            
+            "몽크": [
+                CharacterTrait("내공 순환", "MP가 가득 찰 때마다 모든 능력치 일시 증가", "trigger", {"chi_burst": True}),
+                CharacterTrait("연타 숙련", "연속 공격 시마다 피해량 누적 증가", "passive", {"combo_multiplier": 0.1}),
+                CharacterTrait("정신 수양", "상태이상 저항 50% 증가", "passive", {"status_resist": 0.5}),
+                CharacterTrait("기절 공격", "일정 확률로 적을 기절시켜 1턴 행동 불가", "trigger", {"stun_chance": 0.2}),
+                CharacterTrait("참선의 깨달음", "전투 중 매 5턴마다 MP 완전 회복", "passive", {"meditation_recovery": 5})
+            ],
+            
+            # === 특수 직업들 ===
+            "도적": [
+                CharacterTrait("독술 지배", "모든 공격에 독 효과 부여, 독 피해량 50% 증가", "passive", {"poison_mastery": True, "poison_boost": 1.5}),
+                CharacterTrait("침묵 술", "공격 시 30% 확률로 적의 스킬 봉인 2턴", "trigger", {"silence_chance": 0.3}),
+                CharacterTrait("독 촉진", "독에 걸린 적 공격 시 남은 독 피해의 25%를 즉시 피해", "trigger", {"poison_trigger": 0.25}),
+                CharacterTrait("맹독 면역", "모든 독과 상태이상에 완전 면역, 독 공격 받을 때 반사", "passive", {"poison_immunity": True, "poison_reflect": True}),
+                CharacterTrait("독왕의 권능", "적이 독으로 죽을 때 주변 적들에게 독 전파", "trigger", {"poison_spread": True})
             ],
             
             "기계공학자": [
-                CharacterTrait("자동 포탑", "전투 시작 시 포탑 설치", "active", {"auto_turret": True}),
+                CharacterTrait("기계 정밀", "전투 시작 시 정밀도 향상 (명중률과 크리티컬률 20% 증가)", "passive", {"machine_precision": {"accuracy": 0.2, "crit": 0.2}}),
                 CharacterTrait("기계 정비", "전투 후 5턴간 장비 효과 10% 증가 (중첩 가능)", "trigger", {"machine_maintenance": {"bonus": 0.1, "duration": 5}}),
                 CharacterTrait("폭탄 제작", "소모품 폭탄 무한 사용", "passive", {"bomb_craft": True}),
                 CharacterTrait("강화 장비", "모든 장비 효과 20% 증가", "passive", {"gear_enhance": 0.2}),
-                CharacterTrait("오버클럭", "일시적으로 모든 능력치 50% 증가", "active", {"overclock": 0.5})
+                CharacterTrait("기계 숙련", "공격력과 마법공격력 15% 증가, MP 회복량 50% 증가", "passive", {"machine_mastery": {"attack_boost": 0.15, "magic_attack_boost": 0.15, "mp_recovery": 0.5}})
             ],
             
             "무당": [
@@ -1187,85 +1545,267 @@ class CharacterClassManager:
             "드루이드": [
                 CharacterTrait("자연의 가호", "턴 시작 시 HP/MP 소량 회복", "passive", {"nature_blessing_heal": True}),
                 CharacterTrait("자연 치유", "야외에서 지속적인 HP 회복", "passive", {"nature_heal": True}),
-                CharacterTrait("식물 조종", "적의 이동 제한 스킬", "active", {"plant_control": True}),
-                CharacterTrait("동물 변신", "늑대형태: 공속+30%, 곰형태: 방어+30%, 독수리형태: 회피+25%", "active", {"shape_shift": True}),
+                CharacterTrait("식물 친화", "적들의 속도 20% 감소 오라", "passive", {"plant_mastery": {"speed_debuff": 0.2}}),
+                CharacterTrait("야생 본능", "공격력 30%, 방어력 30%, 회피율 25% 중 하나가 랜덤하게 증가", "passive", {"wild_instinct": True}),
                 CharacterTrait("계절의 힘", "전투마다 랜덤 속성 강화", "passive", {"seasonal_power": True})
             ],
             
             "철학자": [
                 CharacterTrait("현자의 지혜", "모든 스킬 MP 소모량 20% 감소", "passive", {"wisdom": 0.2}),
-                CharacterTrait("논리적 사고", "적의 패턴 분석으로 회피율 증가", "passive", {"logic": True}),
+                CharacterTrait("논리적 사고", "적의 패턴 분석으로 회피율 15% 증가", "passive", {"logic": True}),
                 CharacterTrait("깨달음", "경험치 획득량 25% 증가", "passive", {"enlightenment": 0.25}),
-                CharacterTrait("사색의 힘", "MP가 가득 찰 때마다 지혜 스택 증가", "trigger", {"contemplation": True}),
-                CharacterTrait("철학적 논증", "적을 혼란에 빠뜨리는 스킬", "active", {"confusion": True})
-            ],
-            
-            "시간술사": [
-                CharacterTrait("시간 정지", "적의 행동을 1턴 지연", "active", {"time_stop": True}),
-                CharacterTrait("과거 회귀", "한 번 받은 피해 되돌리기", "trigger", {"time_rewind": True}),
-                CharacterTrait("시간 인식", "적의 다음 행동 타입 미리 파악", "passive", {"time_sense": True}),
-                CharacterTrait("순간 가속", "크리티컬 시 20% 확률로 즉시 재행동", "trigger", {"instant_accel": 0.2}),
-                CharacterTrait("인과 조작", "공격 실패 시 재계산 가능", "trigger", {"causality_fix": True})
-            ],
-            
-            "연금술사": [
-                CharacterTrait("포션 제조", "회복 아이템 효과 2배", "passive", {"potion_craft": 2.0}),
-                CharacterTrait("원소 변환", "적의 속성 저항 무시", "passive", {"transmute": True}),
-                CharacterTrait("폭발물 전문", "폭발 계열 스킬 위력 50% 증가", "passive", {"explosion": 0.5}),
-                CharacterTrait("실험 정신", "디버프 지속시간 25% 증가", "passive", {"experiment": 0.25}),
-                CharacterTrait("마법 물질", "모든 공격에 랜덤 속성 추가", "passive", {"magic_substance": True})
-            ],
-            
-            "검투사": [
-                CharacterTrait("관중의 환호", "적을 많이 처치할수록 능력치 증가", "trigger", {"crowd_cheer": True}),
-                CharacterTrait("검투 기술", "반격 확률 30% 증가", "passive", {"gladiator_skill": 0.3}),
-                CharacterTrait("투기장 경험", "1대1 전투 시 모든 능력치 25% 증가", "trigger", {"arena_exp": 0.25}),
-                CharacterTrait("생존 본능", "HP 30% 이하에서 회피율 50% 증가", "passive", {"survival": 0.5}),
-                CharacterTrait("전사의 혼", "파티원이 전멸해도 5턴간 홀로 전투 지속", "trigger", {"warrior_soul": 5})
-            ],
-            
-            "기사": [
-                CharacterTrait("명예의 수호", "아군 보호 시 받는 피해 30% 감소", "passive", {"honor_guard": 0.3}),
-                CharacterTrait("창술 숙련", "창류 무기 공격력 35% 증가", "passive", {"lance_master": 0.35}),
-                CharacterTrait("기사도 정신", "디버프 지속시간 50% 감소", "passive", {"chivalry": 0.5}),
-                CharacterTrait("용맹한 돌격", "첫 공격이 크리티컬일 시 추가 피해", "trigger", {"brave_charge": True}),
-                CharacterTrait("영광의 맹세", "파티원 수만큼 능력치 증가", "passive", {"glory_oath": True})
-            ],
-            
-            "신관": [
-                CharacterTrait("신의 가호", "치명타 무효화 확률 20%", "passive", {"divine_grace": 0.2}),
-                CharacterTrait("성스러운 빛", "언데드에게 2배 피해", "passive", {"holy_light": 2.0}),
-                CharacterTrait("치유 특화", "모든 회복 효과 50% 증가", "passive", {"heal_mastery": 0.5}),
-                CharacterTrait("축복의 기도", "파티 전체 버프 효과", "active", {"blessing": True}),
-                CharacterTrait("신탁", "랜덤하게 강력한 기적 발생", "trigger", {"oracle": True})
-            ],
-            
-            "마검사": [
-                CharacterTrait("마검 일체", "물리와 마법 공격력 동시 적용", "passive", {"magic_sword": True}),
-                CharacterTrait("마력 충전", "공격할 때마다 MP 회복", "passive", {"mana_charge": True}),
-                CharacterTrait("검기 폭발", "검 공격에 마법 피해 추가", "passive", {"sword_blast": True}),
-                CharacterTrait("이중 속성", "두 가지 속성 동시 공격", "passive", {"dual_element": True}),
-                CharacterTrait("마검 오의", "궁극기 사용 시 모든 적에게 피해", "trigger", {"mystic_art": True})
-            ],
-            
-            "차원술사": [
-                CharacterTrait("차원 보관", "무제한 아이템 보관", "passive", {"dimension_storage": True}),
-                CharacterTrait("공간 이동", "위치 변경으로 공격 회피", "trigger", {"teleport": True}),
-                CharacterTrait("차원 균열", "마법공격력 비례 차원 피해 (보스 50% 감소)", "active", {"dimension_rift": True}),
-                CharacterTrait("평행우주", "공격 실패 시 재시도 가능", "trigger", {"parallel_world": True}),
-                CharacterTrait("공간 왜곡", "적의 정확도 30% 감소", "passive", {"space_distortion": 0.3})
-            ],
-            
-            "광전사": [
-                CharacterTrait("광기 상태", "HP가 낮을수록 공격력과 속도 증가", "passive", {"berserker_rage": True}),
-                CharacterTrait("무모한 돌진", "방어 무시하고 최대 피해 공격", "active", {"reckless_charge": True}),
-                CharacterTrait("고통 무시", "상태이상 무효", "passive", {"pain_ignore": True}),
-                CharacterTrait("전투 광증", "적 처치 시 즉시 재행동", "trigger", {"battle_frenzy": True}),
-                CharacterTrait("불사의 의지", "치명상 시 3턴간 불사 상태", "trigger", {"undying_will": 3})
+                CharacterTrait("사색의 힘", "MP 가득 찰 때마다 지혜 스택 증가 (마법공격력 10% 증가)", "trigger", {"contemplation": True}),
+                CharacterTrait("철학적 통찰", "적 전체의 능력치 10% 감소 오라", "passive", {"philosophical_insight": 0.1})
             ]
         }
         
+
+
+        
         return trait_sets.get(character_class, [])
+    
+    @staticmethod
+    def get_trait_sfx_mapping(trait_name: str) -> str:
+        """특성별 SFX 매핑 - 특성 발동 시 재생할 사운드"""
+        trait_sfx = {
+            "방패 강타": "sword_hit",
+            "파괴의 일격": "critical_hit",
+            "검기 집중": "magic_cast",
+            "일섬의 달인": "critical_hit",
+            "검의 이치": "haste",
+            "명경지수": "heal",
+            "검신의 축복": "protect",
+            "그림자 조작": "magic_cast",
+            "그림자 강화": "berserk",
+            "그림자 분신": "teleport",
+            "그림자 숙련": "haste",
+            "그림자 방어": "protect",
+            "기계 정밀": "machine_start",
+            "기계 숙련": "power_up",
+            "플라스크 달인": "explosion",
+            "원소 변환": "magic_cast",
+            "축복의 오라": "holy_blessing",
+            "철학적 통찰": "wisdom_aura",
+            "식물 친화": "nature_call",
+            "야생 본능": "wild_instinct",
+            "마력 파동": "magic_cast",
+            "마력 폭발": "fire3",
+            "원소 순환 마스터": "magic_cast",
+            "원소 친화": "haste",
+            "원소의 현자": "limit_break",
+            "정령 친화": "heal",
+            "자연의 축복": "protect",
+            "삼연사": "gun_hit",
+            "관통사격": "gun_critical",
+            "정밀 사격": "gun_hit",
+            "민첩한 몸놀림": "haste",
+            "바람의 가호": "protect",
+            "독술 지배": "poison",
+            "독 촉진": "poison",
+            "맹독 면역": "protect",
+            "독왕의 권능": "limit_break",
+            "저주술": "slow",
+            "신성한 가호": "protect",
+            "치유의 빛": "heal",
+            "정의의 분노": "thunder3",
+            "축복받은 무기": "haste",
+            "수호의 맹세": "protect",
+            "성역의 수호자": "shell",
+            "천사의 가호": "heal3",
+            "생명 흡수": "magic_cast",
+            "어둠의 계약": "dark3",
+            "공포 오라": "slow",
+            "불사의 의지": "protect",
+            "어둠 조작": "dark2",
+            "어둠의 권능": "dark3",
+            "어둠의 군주": "limit_break",
+            "용의 숨결": "fire3",
+            "용의 분노": "fire2",
+            "드래곤 하트": "protect",
+            "용왕의 권능": "limit_break",
+            "표식 달인": "haste",
+        }
+        
+        return trait_sfx.get(trait_name, "trait_activate")  # 기본 SFX
+    
+    @staticmethod
+    def get_trait_activation_conditions(trait_name: str) -> Dict[str, Any]:
+        """특성별 발동 조건 및 효과 상세 정보"""
+        conditions = {
+            # === 검성 특성 조건 ===
+            "검기 집중": {
+                "condition": "BRV 공격 시",
+                "probability": 0.2,
+                "effect_duration": 0,
+                "stack_limit": 2,
+                "description": "BRV 공격 시 20% 확률로 검기 스택 2개 획득"
+            },
+            "일섬의 달인": {
+                "condition": "검기 스택 소모 시",
+                "probability": 1.0,
+                "effect_duration": 0,
+                "atb_refund": 0.2,
+                "description": "검기 스택 소모 시 ATB 환급량 20% 증가"
+            },
+            
+            # === 암살자 특성 조건 ===
+            "그림자 조작": {
+                "condition": "전투 시작 시",
+                "probability": 1.0,
+                "effect_duration": -1,
+                "initial_shadows": 3,
+                "description": "전투 시작 시 그림자 3개 생성"
+            },
+            "그림자 강화": {
+                "condition": "그림자 보유 시",
+                "probability": 1.0,
+                "effect_duration": -1,
+                "attack_bonus_per_shadow": 0.15,
+                "description": "그림자 1개당 공격력 15% 증가"
+            },
+            
+            # === 검투사 특성 조건 ===
+            "투기장의 경험": {
+                "condition": "적 처치 시",
+                "probability": 1.0,
+                "effect_duration": -1,
+                "stat_boost": 0.25,
+                "description": "적 처치 시 능력치 상승폭 25% 증가"
+            },
+            "패링 마스터": {
+                "condition": "패링 시도 시",
+                "probability": 1.0,
+                "effect_duration": 0,
+                "parry_damage_boost": 1.2,
+                "description": "패링 시 반격 피해 120% 증가"
+            },
+            
+            # === 광전사 특성 조건 ===
+            "피의 갈증": {
+                "condition": "HP 소모 스킬 사용 시",
+                "probability": 1.0,
+                "effect_duration": 0,
+                "hp_cost_reduction": 0.15,
+                "lifesteal_boost": 0.25,
+                "description": "HP 소모량 15% 감소, 흡혈 효과 25% 증가"
+            },
+            "광기의 힘": {
+                "condition": "HP 비율에 따라",
+                "probability": 1.0,
+                "effect_duration": -1,
+                "shield_scaling": True,
+                "description": "HP가 낮을수록 보호막 생성량 증가"
+            },
+            
+            # === 성기사 특성 조건 ===
+            "성역의 수호자": {
+                "condition": "성역 생성 시",
+                "probability": 1.0,
+                "effect_duration": 1.5,
+                "duration_multiplier": 1.5,
+                "description": "성역 지속시간 50% 증가"
+            },
+            "축복의 빛": {
+                "condition": "버프 상태 아군 수에 따라",
+                "probability": "variable",
+                "effect_duration": 0,
+                "sanctuary_chance_boost": True,
+                "description": "버프 상태 아군 수에 따라 성역 생성 확률 증가"
+            },
+            
+            # === 아크메이지 특성 조건 ===
+            "원소 순환 마스터": {
+                "condition": "원소 마법 사용 시",
+                "probability": 1.0,
+                "effect_duration": 0,
+                "cycle_requirement": 2,
+                "description": "동일 원소 2회만으로도 자동 발동"
+            },
+            "원소의 현자": {
+                "condition": "원소 3개 축적 시",
+                "probability": 1.0,
+                "effect_duration": -1,
+                "resistance_bonus": 0.25,
+                "description": "원소 3개 축적 시 모든 원소 저항 25% 증가"
+            },
+            
+            # === 새로 추가된 특성 조건 ===
+            "그림자 숙련": {
+                "condition": "그림자 보유 시",
+                "probability": 1.0,
+                "effect_duration": -1,
+                "crit_per_shadow": 8,
+                "dodge_per_shadow": 6,
+                "max_bonus": {"crit": 40, "dodge": 30},
+                "description": "그림자 개수에 비례하여 크리티컬과 회피 증가"
+            },
+            "기계 정밀": {
+                "condition": "전투 시작 시",
+                "probability": 1.0,
+                "effect_duration": -1,
+                "accuracy_bonus": 0.2,
+                "crit_bonus": 0.2,
+                "description": "전투 시작 시 정밀도 향상"
+            },
+            "기계 숙련": {
+                "condition": "지속 효과",
+                "probability": 1.0,
+                "effect_duration": -1,
+                "attack_boost": 0.15,
+                "magic_attack_boost": 0.15,
+                "mp_recovery": 0.5,
+                "description": "공격력과 마법공격력 15% 증가, MP 회복량 50% 증가"
+            },
+            "플라스크 달인": {
+                "condition": "공격 시",
+                "probability": 0.25,
+                "effect_duration": 0,
+                "explosion_multiplier": 2.5,
+                "description": "공격 시 25% 확률로 폭발 효과"
+            },
+            "원소 변환": {
+                "condition": "공격 시",
+                "probability": 1.0,
+                "effect_duration": 0,
+                "element_types": ["fire", "ice", "lightning", "earth"],
+                "description": "공격 시 랜덤한 속성 효과 부여"
+            },
+            "축복의 오라": {
+                "condition": "지속 효과",
+                "probability": 1.0,
+                "effect_duration": -1,
+                "debuff_resistance": 0.3,
+                "description": "파티 전체 디버프 저항 30% 증가"
+            },
+            "식물 친화": {
+                "condition": "지속 효과",
+                "probability": 1.0,
+                "effect_duration": -1,
+                "speed_debuff": 0.2,
+                "description": "적들의 속도 20% 감소 오라"
+            },
+            "야생 본능": {
+                "condition": "전투 시작 시",
+                "probability": 1.0,
+                "effect_duration": -1,
+                "random_bonus": {"attack": 0.3, "defense": 0.3, "dodge": 0.25},
+                "description": "랜덤한 능력치 증가"
+            },
+            "철학적 통찰": {
+                "condition": "지속 효과",
+                "probability": 1.0,
+                "effect_duration": -1,
+                "enemy_debuff": 0.1,
+                "description": "적 전체의 능력치 10% 감소 오라"
+            }
+        }
+        
+        return conditions.get(trait_name, {
+            "condition": "특정 조건 시",
+            "probability": 1.0,
+            "effect_duration": 0,
+            "description": "특성 효과가 발동됩니다"
+        })
     
     @staticmethod  
     def get_class_specialization(character_class: str) -> Dict[str, Any]:
@@ -1510,42 +2050,44 @@ class Character(BraveMixin):
         self.name = name
         self.character_class = character_class
         
-        # 🎯 기본 스탯값 설정 (1레벨 캐릭터용)
+        # 🎯 클래스별 기본 스탯 설정 (클래스 보너스 적용 안 함)
+        class_defaults = {
+            "전사": {"hp": 210, "p_atk": 60, "m_atk": 40, "p_def": 60, "m_def": 60, "speed": 60},
+            "아크메이지": {"hp": 121, "p_atk": 43, "m_atk": 78, "p_def": 33, "m_def": 67, "speed": 58},
+            "궁수": {"hp": 164, "p_atk": 74, "m_atk": 33, "p_def": 44, "m_def": 43, "speed": 68},
+            "도적": {"hp": 150, "p_atk": 64, "m_atk": 38, "p_def": 43, "m_def": 49, "speed": 93},
+            "성기사": {"hp": 197, "p_atk": 67, "m_atk": 38, "p_def": 76, "m_def": 62, "speed": 43},
+            "암흑기사": {"hp": 189, "p_atk": 71, "m_atk": 54, "p_def": 58, "m_def": 51, "speed": 52},
+            "몽크": {"hp": 172, "p_atk": 82, "m_atk": 51, "p_def": 59, "m_def": 64, "speed": 76},
+            "바드": {"hp": 107, "p_atk": 43, "m_atk": 66, "p_def": 38, "m_def": 58, "speed": 69},
+            "네크로맨서": {"hp": 134, "p_atk": 44, "m_atk": 84, "p_def": 39, "m_def": 74, "speed": 48},
+            "용기사": {"hp": 181, "p_atk": 78, "m_atk": 62, "p_def": 67, "m_def": 58, "speed": 61},
+            "검성": {"hp": 164, "p_atk": 83, "m_atk": 31, "p_def": 51, "m_def": 47, "speed": 71},
+            "정령술사": {"hp": 107, "p_atk": 49, "m_atk": 85, "p_def": 42, "m_def": 69, "speed": 59},
+            "암살자": {"hp": 134, "p_atk": 81, "m_atk": 28, "p_def": 34, "m_def": 39, "speed": 87},
+            "기계공학자": {"hp": 156, "p_atk": 63, "m_atk": 59, "p_def": 54, "m_def": 48, "speed": 53},
+            "무당": {"hp": 121, "p_atk": 48, "m_atk": 86, "p_def": 44, "m_def": 77, "speed": 64},
+            "해적": {"hp": 164, "p_atk": 74, "m_atk": 34, "p_def": 52, "m_def": 41, "speed": 77},
+            "사무라이": {"hp": 167, "p_atk": 74, "m_atk": 45, "p_def": 58, "m_def": 53, "speed": 67},
+            "드루이드": {"hp": 175, "p_atk": 53, "m_atk": 81, "p_def": 48, "m_def": 69, "speed": 59},
+            "철학자": {"hp": 107, "p_atk": 38, "m_atk": 76, "p_def": 54, "m_def": 86, "speed": 49},
+            "시간술사": {"hp": 121, "p_atk": 54, "m_atk": 77, "p_def": 49, "m_def": 64, "speed": 57},
+            "연금술사": {"hp": 135, "p_atk": 59, "m_atk": 72, "p_def": 44, "m_def": 58, "speed": 54},
+            "검투사": {"hp": 172, "p_atk": 79, "m_atk": 41, "p_def": 56, "m_def": 48, "speed": 64},
+            "기사": {"hp": 216, "p_atk": 79, "m_atk": 46, "p_def": 72, "m_def": 54, "speed": 48},
+            "신관": {"hp": 143, "p_atk": 42, "m_atk": 79, "p_def": 57, "m_def": 89, "speed": 52},
+            "마검사": {"hp": 164, "p_atk": 67, "m_atk": 70, "p_def": 54, "m_def": 61, "speed": 58},
+            "차원술사": {"hp": 84, "p_atk": 33, "m_atk": 88, "p_def": 28, "m_def": 72, "speed": 47},
+            "광전사": {"hp": 327, "p_atk": 64, "m_atk": 13, "p_def": 22, "m_def": 21, "speed": 74},
+            "마법사": {"hp": 121, "p_atk": 43, "m_atk": 78, "p_def": 33, "m_def": 67, "speed": 58},  # 아크메이지와 동일
+            "성직자": {"hp": 143, "p_atk": 42, "m_atk": 79, "p_def": 57, "m_def": 89, "speed": 52},  # 신관과 동일
+        }
+        
+        # 기본값 설정 (항상 사용 가능)
+        defaults = class_defaults.get(character_class, class_defaults["전사"])  # 기본값은 전사
+        
+        # 기본 스탯값 설정 (1레벨 캐릭터용)
         if max_hp is None:
-            # 클래스별 기본 스탯 설정 (클래스 보너스 적용 안 함)
-            class_defaults = {
-                "전사": {"hp": 216, "p_atk": 75, "m_atk": 43, "p_def": 63, "m_def": 48, "speed": 56},
-                "아크메이지": {"hp": 121, "p_atk": 43, "m_atk": 78, "p_def": 33, "m_def": 67, "speed": 58},
-                "궁수": {"hp": 164, "p_atk": 74, "m_atk": 33, "p_def": 44, "m_def": 43, "speed": 68},
-                "도적": {"hp": 150, "p_atk": 64, "m_atk": 38, "p_def": 43, "m_def": 49, "speed": 93},
-                "성기사": {"hp": 197, "p_atk": 67, "m_atk": 38, "p_def": 76, "m_def": 62, "speed": 43},
-                "암흑기사": {"hp": 189, "p_atk": 71, "m_atk": 54, "p_def": 58, "m_def": 51, "speed": 52},
-                "몽크": {"hp": 172, "p_atk": 82, "m_atk": 51, "p_def": 59, "m_def": 64, "speed": 76},
-                "바드": {"hp": 107, "p_atk": 43, "m_atk": 66, "p_def": 38, "m_def": 58, "speed": 69},
-                "네크로맨서": {"hp": 134, "p_atk": 44, "m_atk": 84, "p_def": 39, "m_def": 74, "speed": 48},
-                "용기사": {"hp": 181, "p_atk": 78, "m_atk": 62, "p_def": 67, "m_def": 58, "speed": 61},
-                "검성": {"hp": 164, "p_atk": 83, "m_atk": 31, "p_def": 51, "m_def": 47, "speed": 71},
-                "정령술사": {"hp": 107, "p_atk": 49, "m_atk": 85, "p_def": 42, "m_def": 69, "speed": 59},
-                "암살자": {"hp": 134, "p_atk": 81, "m_atk": 28, "p_def": 34, "m_def": 39, "speed": 87},
-                "기계공학자": {"hp": 156, "p_atk": 63, "m_atk": 59, "p_def": 54, "m_def": 48, "speed": 53},
-                "무당": {"hp": 121, "p_atk": 48, "m_atk": 86, "p_def": 44, "m_def": 77, "speed": 64},
-                "해적": {"hp": 164, "p_atk": 74, "m_atk": 34, "p_def": 52, "m_def": 41, "speed": 77},
-                "사무라이": {"hp": 167, "p_atk": 74, "m_atk": 45, "p_def": 58, "m_def": 53, "speed": 67},
-                "드루이드": {"hp": 175, "p_atk": 53, "m_atk": 81, "p_def": 48, "m_def": 69, "speed": 59},
-                "철학자": {"hp": 107, "p_atk": 38, "m_atk": 76, "p_def": 54, "m_def": 86, "speed": 49},
-                "시간술사": {"hp": 121, "p_atk": 54, "m_atk": 77, "p_def": 49, "m_def": 64, "speed": 57},
-                "연금술사": {"hp": 135, "p_atk": 59, "m_atk": 72, "p_def": 44, "m_def": 58, "speed": 54},
-                "검투사": {"hp": 172, "p_atk": 79, "m_atk": 41, "p_def": 56, "m_def": 48, "speed": 64},
-                "기사": {"hp": 216, "p_atk": 79, "m_atk": 46, "p_def": 72, "m_def": 54, "speed": 48},
-                "신관": {"hp": 143, "p_atk": 42, "m_atk": 79, "p_def": 57, "m_def": 89, "speed": 52},
-                "마검사": {"hp": 164, "p_atk": 67, "m_atk": 70, "p_def": 54, "m_def": 61, "speed": 58},
-                "차원술사": {"hp": 84, "p_atk": 33, "m_atk": 88, "p_def": 28, "m_def": 72, "speed": 47},
-                "광전사": {"hp": 327, "p_atk": 64, "m_atk": 13, "p_def": 22, "m_def": 21, "speed": 74},
-                "마법사": {"hp": 121, "p_atk": 43, "m_atk": 78, "p_def": 33, "m_def": 67, "speed": 58},  # 아크메이지와 동일
-                "성직자": {"hp": 143, "p_atk": 42, "m_atk": 79, "p_def": 57, "m_def": 89, "speed": 52},  # 신관과 동일
-            }
-            
-            defaults = class_defaults.get(character_class, class_defaults["전사"])  # 기본값은 전사
             max_hp = defaults["hp"]
             physical_attack = defaults["p_atk"]
             magic_attack = defaults["m_atk"]
@@ -1580,11 +2122,58 @@ class Character(BraveMixin):
         
         # 애니메이션 비활성화 플래그 (초기화 중에는 애니메이션 안 함)
         self._animation_enabled = False
-        self.physical_attack = physical_attack
-        self.magic_attack = magic_attack
-        self.physical_defense = physical_defense
-        self.magic_defense = magic_defense
-        self.speed = speed
+        
+        # 스탯 할당 - None 체크와 함께
+        self.physical_attack = physical_attack if physical_attack is not None else defaults["p_atk"]
+        self.magic_attack = magic_attack if magic_attack is not None else defaults["m_atk"]
+        self.physical_defense = physical_defense if physical_defense is not None else defaults["p_def"]
+        self.magic_defense = magic_defense if magic_defense is not None else defaults["m_def"]
+        self.speed = speed if speed is not None else defaults["speed"]
+        
+        # 💨 기믹 초기화 (디버그 메시지 최소화)
+        # print(f"💨 [FORCE INIT] {name} ({character_class}) 기믹 강제 초기화...")
+        
+        # 기본 기믹들 - 안전한 초기화
+        self.poison_stacks = 0
+        # 이제 self.physical_attack은 안전하게 설정되어 있음
+        self.max_poison_stacks = max(10, int(self.physical_attack * 1.5))
+        
+        # 직업별 기믹
+        if character_class == "전사":
+            # 6단계 전사 자세 시스템 초기화
+            self.current_stance = 2  # 0=공격, 1=방어, 2=균형, 3=광전사, 4=수호자, 5=속도 (기본: 균형)
+            self.warrior_stance = 'balanced'  # attack, defense, balanced, berserker, guardian, speed
+            self.warrior_focus = 0
+            # 전사 자세 변경 메서드 추가
+            self.available_stances = ['attack', 'defense', 'balanced', 'berserker', 'guardian', 'speed']
+        elif character_class == "아크메이지":
+            self.fire_count = 0
+            self.ice_count = 0
+            self.lightning_count = 0
+        elif character_class == "궁수":
+            self.aim_points = 0
+            self.precision_points = 0
+        elif character_class == "암살자":
+            self.shadow_count = 0
+            self.shadows = 0
+        elif character_class == "검성":
+            self.sword_aura = 0
+            self.sword_aura_stacks = 0
+        elif character_class == "바드":
+            self.melody_stacks = 0
+            self.song_power = 0
+            self.melody_notes = []  # DO/RE/MI 시스템용 멜로디 노트 리스트
+            self.current_melody = ""  # 현재 연주 중인 멜로디 문자열
+        elif character_class == "광전사":
+            self.rage_stacks = 0
+            self.berserk_level = 0
+        elif character_class == "몽크":
+            self.chi_points = 0
+            self.ki_energy = 0
+            self.strike_marks = 0
+        
+        # print(f"💨 [FORCE INIT] {name} 기믹 초기화 완료!")
+        
         self.level = 1
         self.experience = 0
         self.experience_to_next = 30  # 다음 레벨까지 필요한 경험치
@@ -1605,10 +2194,11 @@ class Character(BraveMixin):
         self.element_weaknesses = self._get_class_element_weaknesses(character_class)
         self.element_resistances = self._get_class_element_resistances(character_class)
         
-        # 크리티컬 및 명중/회피 시스템
+        # 크리티컬 및 명중/회피 시스템 - 안전한 초기화
         self.critical_rate = self._get_class_base_critical_rate(character_class)  # 기본 크리티컬 확률
-        self.accuracy = 85 + (speed // 10)  # 기본 명중률 (85% + 스피드 보너스)
-        self.evasion = 10 + (speed // 5)   # 기본 회피율 (10% + 스피드 보너스)
+        # 이제 self.speed는 안전하게 설정되어 있음
+        self.accuracy = 85 + (self.speed // 10)  # 기본 명중률 (85% + 스피드 보너스)
+        self.evasion = 10 + (self.speed // 5)   # 기본 회피율 (10% + 스피드 보너스)
         
         # 상태이상 관련 속성 추가
         self.stunned = False
@@ -1630,6 +2220,29 @@ class Character(BraveMixin):
         self.burning = False
         self.regenerating = False
         
+        # 도적 전용 베놈 파워 시스템 (대폭 강화)
+        if character_class == "도적":
+            self.venom_power = 0      # 현재 베놈 파워
+            self.venom_power_max = 200  # 최대 베놈 파워 (100 → 200으로 2배 증가)
+        else:
+            self.venom_power = 0
+            self.venom_power_max = 0
+        
+        # 직업별 특수 시스템 초기화 (기존 시스템 활용)
+        # 암살자 그림자 시스템 (이미 구현되어 있음 - shadow_count)
+        if not hasattr(self, 'shadow_count'):
+            self.shadow_count = 0
+        
+        # 철학자 지혜 시스템 (이미 구현되어 있음 - wisdom_stacks)  
+        if not hasattr(self, 'wisdom_stacks'):
+            self.wisdom_stacks = 0
+        
+        # 전사 스탠스 시스템 (이미 구현되어 있음 - current_stance)
+        if character_class == "전사" and not hasattr(self, 'current_stance'):
+            self.current_stance = "balanced"
+        elif character_class != "전사":
+            self.current_stance = None
+        
         # 특성 시스템
         available_traits = CharacterClassManager.get_class_traits(character_class)
         self.available_traits = available_traits  # 선택 가능한 모든 특성
@@ -1641,7 +2254,8 @@ class Character(BraveMixin):
         # 상태이상 관리자
         self.status_manager = StatusManager()
         
-        # 인벤토리 (개인 인벤토리) 및 경제 시스템
+        # 인벤토리 (개인 인벤토리) 및 경제 시스템 - 안전한 초기화
+        # 이제 self.physical_attack은 안전하게 설정되어 있음
         self.max_carry_weight = 15.0 + (self.physical_attack * 0.05)  # 체력에 따른 하중 한계
         self.inventory = Inventory(max_size=15, max_weight=self.max_carry_weight)  # 실제 계산된 하중 제한
         self.gold = 0  # 개인 골드는 0 (파티 공용으로 관리)
@@ -1669,7 +2283,8 @@ class Character(BraveMixin):
             self.max_brv = 2800
             self.brv_efficiency = 1.0
             self.brv_loss_resistance = 1.0
-        self.brv_regen = speed // 10  # Brave 자동 회복량
+        # 이제 self.speed는 안전하게 설정되어 있음
+        self.brv_regen = self.speed // 10  # Brave 자동 회복량
         self.brave_bonus_rate = 1.0  # Brave 획득 배율
         self.brv_efficiency = 1.0  # Brave 효율성
         
@@ -1731,6 +2346,121 @@ class Character(BraveMixin):
         self.temp_gold_bonus = 0
         self.temp_mp_regen_boost = 0
         self.temp_all_stats_bonus = 0
+        
+        # 🏹 궁수 전용 조준 포인트 시스템
+        if character_class == "궁수":
+            self.aim_points = 0  # 조준 포인트 (최대 5)
+            self.max_aim_points = 5  # 최대 조준 포인트
+            self.support_fire_active = False  # 지원사격 활성화 상태
+            # print(f"🏹 [MECHANIC INIT] 궁수 {name} 조준 시스템 초기화")
+            # print(f"🏹 [MECHANIC INIT] - aim_points: {self.aim_points}/{self.max_aim_points}")
+            # print(f"🏹 [MECHANIC INIT] - support_fire_active: {self.support_fire_active}")
+        
+        # 🗡️ 도적 전용 독 시스템 (독화살, 독침 등)
+        if character_class == "도적":
+            self.poison_stacks = 0  # 독 스택 (최대 공격력 * 1.5)
+            self.max_poison_stacks = max(10, int(self.physical_attack * 1.5))  # 최대 독 스택 (공격력 기반)
+            self.venom_power = 0  # 독액 흡수력 (%)
+            self.poison_immunity = False  # 독 면역
+            # print(f"🗡️ [MECHANIC INIT] 도적 {name} 독 시스템 초기화")
+            # print(f"🗡️ [MECHANIC INIT] - poison_stacks: {self.poison_stacks}/{self.max_poison_stacks}")
+            # print(f"🗡️ [MECHANIC INIT] - venom_power: {self.venom_power}%, poison_immunity: {self.poison_immunity}")
+        
+        # 💨 강제 기믹 초기화 - 이미 위에서 완료됨
+        
+        # 🔪 암살자 전용 그림자 시스템
+        if character_class == "암살자":
+            self.shadow_count = 0  # 그림자 스택 (최대 5)
+            self.max_shadow_count = 5  # 최대 그림자 스택
+            self.stealth_mode = False  # 은신 모드
+            self.assassination_ready = False  # 암살 준비 상태
+            # print(f"🔪 [MECHANIC INIT] 암살자 {name} 그림자 시스템 초기화")
+            # print(f"🔪 [MECHANIC INIT] - shadow_count: {self.shadow_count}/{self.max_shadow_count}")
+            # print(f"🔪 [MECHANIC INIT] - stealth_mode: {self.stealth_mode}, assassination_ready: {self.assassination_ready}")
+        
+        # 💢 광전사 전용 분노 시스템
+        if character_class == "광전사":
+            self.rage_stacks = 0  # 분노 스택 (최대 10)
+            self.max_rage_stacks = 10  # 최대 분노 스택
+            self.berserk_mode = False  # 광폭화 모드
+            self.blood_shield = 0  # 피의 방패
+            # print(f"💢 [DEBUG] 광전사 {name} 초기화 완료 - rage_stacks: {self.rage_stacks}, berserk_mode: {self.berserk_mode}")
+        
+        # ⚔️ 검성 전용 검기 시스템
+        if character_class == "검성":
+            self.sword_aura = 0  # 검기 스택 (최대 5)
+            self.max_sword_aura = 5  # 최대 검기 스택
+            self.sword_aura_stacks = 0  # 검기 오라 스택 (별명)
+            # print(f"⚔️ [DEBUG] 검성 {name} 초기화 완료 - sword_aura: {self.sword_aura}")
+        
+        # 🐉 용기사 전용 용의 힘 시스템
+        if character_class == "용기사":
+            self.dragon_marks = 0  # 용의 표식 (최대 3)
+            self.max_dragon_marks = 3  # 최대 용의 표식
+            self.dragon_power = 0  # 용의 힘
+            self.dragon_breath_ready = False  # 드래곤 브레스 준비
+            # print(f"🐉 [DEBUG] 용기사 {name} 초기화 완료 - dragon_marks: {self.dragon_marks}")
+        
+        # 👊 몽크 전용 기 에너지 시스템
+        if character_class == "몽크":
+            self.ki_energy = 0  # 기 에너지 (최대 100)
+            self.max_ki_energy = 100  # 최대 기 에너지
+            self.combo_count = 0  # 연계 공격 카운트
+            self.strike_marks = 0  # 타격 표식
+            # print(f"👊 [DEBUG] 몽크 {name} 초기화 완료 - ki_energy: {self.ki_energy}, combo_count: {self.combo_count}")
+        
+        # 🎵 바드 전용 음표 시스템
+        if character_class == "바드":
+            self.melody_stacks = 0  # 음표 스택 (최대 7: 도 레 미 파 솔 라 시)
+            self.max_melody_stacks = 7  # 최대 음표 스택
+            self.song_power = 0  # 노래의 힘
+            self.current_song = None  # 현재 연주 중인 노래
+            self.melody_notes = []  # 멜로디 노트 리스트
+            self.current_melody = ""  # 현재 멜로디 표시
+            # print(f"🎵 [DEBUG] 바드 {name} 초기화 완료 - melody_stacks: {self.melody_stacks}")
+        
+        # 💀 네크로맨서 전용 네크로 에너지 시스템
+        if character_class == "네크로맨서":
+            self.necro_energy = 0  # 네크로 에너지 (최대 50)
+            self.max_necro_energy = 50  # 최대 네크로 에너지
+            self.soul_power = 0  # 영혼력
+            self.undead_count = 0  # 언데드 소환 개수
+            # print(f"💀 [DEBUG] 네크로맨서 {name} 초기화 완료 - necro_energy: {self.necro_energy}, soul_power: {self.soul_power}")
+        
+        # 🌟 정령술사 전용 정령 친화도 시스템
+        if character_class == "정령술사":
+            self.spirit_bond = 0  # 정령 친화도 (최대 25)
+            self.max_spirit_bond = 25  # 최대 정령 친화도
+            self.elemental_affinity = 0  # 원소 친화도
+            # print(f"🌟 [DEBUG] 정령술사 {name} 초기화 완료 - spirit_bond: {self.spirit_bond}")
+        
+        # ⏰ 시간술사 전용 시간 조작 시스템
+        if character_class == "시간술사":
+            self.time_marks = 0  # 시간 기록점 (최대 7)
+            self.max_time_marks = 7  # 최대 시간 기록점
+            self.time_manipulation_stacks = 0  # 시간 조작 스택
+            self.temporal_energy = 0  # 시간 에너지
+            # print(f"⏰ [DEBUG] 시간술사 {name} 초기화 완료 - time_marks: {self.time_marks}")
+        
+        # 🔮 아크메이지 전용 원소 카운트 시스템  
+        if character_class == "아크메이지":
+            self.fire_count = 0  # 화염 원소 카운트
+            self.ice_count = 0   # 빙결 원소 카운트
+            self.lightning_count = 0  # 번개 원소 카운트
+            self.earth_count = 0  # 대지 원소 카운트
+            self.wind_count = 0   # 바람 원소 카운트
+            self.water_count = 0  # 물 원소 카운트
+            # print(f"🔮 [DEBUG] 아크메이지 {name} 초기화 완료 - 원소 카운트들: Fire:{self.fire_count}, Ice:{self.ice_count}")
+        
+        # 🏛️ 검투사 전용 투기장 시스템
+        if character_class == "검투사":
+            self.arena_points = 0  # 투기장 포인트 (최대 20)
+            self.max_arena_points = 20  # 최대 투기장 포인트  
+            self.gladiator_experience = 0  # 검투사 경험
+            # print(f"🏛️ [DEBUG] 검투사 {name} 초기화 완료 - arena_points: {self.arena_points}")
+        
+        # 디버깅을 위한 전체 특수 속성 출력
+        # print(f"🔍 [DEBUG] {character_class} {name} 특수 속성 초기화 완료")
         self.temp_skill_cost_reduction = 0
         self.temp_pattern_analysis = False
         self.temp_future_sight = False
@@ -2065,7 +2795,7 @@ class Character(BraveMixin):
         return effects
     
     def _apply_passive_trait(self, trait, situation: str, **kwargs) -> Dict[str, Any]:
-        """패시브 특성 효과 적용 (대폭 확장)"""
+        """패시브 특성 효과 적용 - 새로운 직업 시스템 대응"""
         effects = {}
         
         # trait가 딕셔너리인 경우와 객체인 경우 모두 처리
@@ -2076,26 +2806,252 @@ class Character(BraveMixin):
             effect_value = getattr(trait, 'effect_value', {})
             trait_name = getattr(trait, 'name', '')
         
-        # 전사 계열 특성들
-        if trait_name == "불굴의 의지" and self.current_hp <= self.max_hp * 0.25:
-            effects["damage_multiplier"] = 1.5  # 50% 데미지 증가
-            effects["status_resistance"] = 0.8  # 80% 상태이상 저항
-        
-        if trait_name == "방어 숙련" and situation == "defending":
-            effects["defense_bonus"] = 0.3  # 30% 방어력 증가
-            effects["damage_reduction"] = 0.15  # 15% 데미지 감소
+        # === 암살자 특성 ===
+        if trait_name == "그림자 조작" and situation == "combat_start":
+            # 전투 시작 시 그림자 3개 생성
+            if not hasattr(self, 'shadow_count'):
+                self.shadow_count = 0
+            self.shadow_count += 3
+            effects["shadow_generation"] = 3
             
-        if trait_name == "피의 갈증" and situation == "attacking":
-            if self.current_hp < self.max_hp:
-                missing_hp_ratio = 1.0 - (self.current_hp / self.max_hp)
-                effects["damage_multiplier"] = 1.0 + (missing_hp_ratio * 0.8)  # 최대 80% 증가
+        if trait_name == "그림자 강화" and situation == "attacking":
+            # 그림자 1개당 공격력 15% 증가
+            shadow_count = getattr(self, 'shadow_count', 0)
+            if shadow_count > 0:
+                effects["shadow_damage_boost"] = shadow_count * 0.15
         
-        if trait_name == "전투 광기" and situation == "attacking":
-            effects["crit_chance_bonus"] = 0.25  # 25% 크리티컬 확률 증가
-            effects["accuracy_bonus"] = 0.2  # 20% 명중률 증가
+        if trait_name == "그림자 숙련":
+            # 그림자 개수에 비례하여 크리티컬과 회피 증가
+            shadow_count = getattr(self, 'shadow_count', 0)
+            if shadow_count > 0:
+                crit_bonus = min(shadow_count * 8, 40)  # 최대 40%
+                dodge_bonus = min(shadow_count * 6, 30)  # 최대 30%
+                effects["shadow_crit_bonus"] = crit_bonus
+                effects["shadow_dodge_bonus"] = dodge_bonus
+        
+        if trait_name == "그림자 방어" and situation == "defending":
+            # 피격 시 그림자 1개 소모로 50% 피해 감소
+            shadow_count = getattr(self, 'shadow_count', 0)
+            if shadow_count > 0:
+                self.shadow_count -= 1
+                effects["damage_reduction"] = 0.5
+                effects["shadow_consumed"] = True
+        
+        # === 기계공학자 특성 ===
+        if trait_name == "기계 정밀" and situation == "combat_start":
+            # 전투 시작 시 정밀도 향상
+            effects["accuracy_bonus"] = 0.2
+            effects["crit_bonus"] = 0.2
+        
+        if trait_name == "기계 숙련":
+            # 공격력과 마법공격력 15% 증가, MP 회복량 50% 증가
+            effects["attack_boost"] = 0.15
+            effects["magic_attack_boost"] = 0.15
+            effects["mp_recovery_boost"] = 0.5
+        
+        # === 드루이드 특성 ===
+        if trait_name == "식물 친화" and situation == "combat_start":
+            # 적들의 속도 20% 감소 오라
+            effects["speed_debuff_aura"] = 0.2
+        
+        if trait_name == "야생 본능" and situation == "combat_start":
+            # 랜덤한 능력치 증가
+            import random
+            bonus_type = random.choice(["attack", "defense", "dodge"])
+            if bonus_type == "attack":
+                effects["attack_boost"] = 0.3
+            elif bonus_type == "defense":
+                effects["defense_boost"] = 0.3
+            else:
+                effects["dodge_bonus"] = 0.25
+        
+        # === 연금술사 특성 ===
+        if trait_name == "플라스크 달인" and situation == "attacking":
+            import random
+            if random.random() < 0.25:  # 25% 확률로 폭발 효과
+                effects["flask_explosion"] = True
+                effects["explosion_damage"] = self.magic_attack * 2.5
+        
+        if trait_name == "원소 변환" and situation == "attacking":
+            # 공격 시 랜덤한 속성 효과 부여
+            import random
+            element_types = ["fire", "ice", "lightning", "earth"]
+            selected_element = random.choice(element_types)
+            effects["element_effect"] = selected_element
+        
+        # === 신관 특성 ===
+        if trait_name == "축복의 오라":
+            # 파티 전체 디버프 저항 30% 증가
+            effects["party_debuff_resistance"] = 0.3
+        
+        # === 철학자 특성 ===
+        if trait_name == "철학적 통찰":
+            # 적 전체의 능력치 10% 감소 오라
+            effects["enemy_stat_debuff"] = 0.1
+        
+        # === 검성 특성 ===
+        if trait_name == "검기 집중" and situation == "sword_aura_gain":
+            import random
+            if random.random() < 0.2:  # 20% 확률로 검기 스택 2개 획득
+                effects["double_sword_aura"] = True
+                
+        if trait_name == "일섬의 달인" and situation == "atb_refund":
+            effects["atb_refund_bonus"] = 0.2  # ATB 환급량 20% 증가
             
-        if trait_name == "위협적 존재" and situation == "combat_start":
-            effects["enemy_debuff"] = {"attack": -0.1, "accuracy": -0.15}  # 적 디버프
+        if trait_name == "검의 이치":
+            effects["max_sword_aura"] = 3  # 검기 스택 최대치 +1
+            
+        if trait_name == "명경지수" and situation == "attacking":
+            if self.current_hp >= self.max_hp * 0.5:
+                effects["crit_bonus"] = 0.25  # HP 50% 이상일 때 크리티컬 25% 증가
+                
+        if trait_name == "검신의 축복" and situation == "attacking":
+            if hasattr(self, 'sword_aura_stacks') and self.sword_aura_stacks >= 2:
+                effects["guaranteed_crit"] = True  # 검기 스택 최대일 때 크리티컬 확정
+        
+        # === 검투사 특성 ===
+        if trait_name == "투기장의 경험" and situation == "kill_stack":
+            effects["kill_stack_boost"] = 0.25  # 처치 시 능력치 상승폭 25% 증가
+            
+        if trait_name == "패링 마스터" and situation == "parrying":
+            effects["parry_damage_boost"] = 1.2  # 패링 시 반격 피해 120% 증가
+            
+        if trait_name == "생존 본능" and situation == "parrying":
+            if self.current_hp <= self.max_hp * 0.3:
+                effects["survival_parry_duration"] = 3.0  # HP 30% 이하일 때 패링 지속시간 3배 연장
+        
+        # === 광전사 특성 ===
+        if trait_name == "피의 갈증":
+            effects["hp_cost_reduction"] = 0.85  # HP 소모량 15% 감소
+            effects["lifesteal_boost"] = 1.25  # 흡혈 효과 25% 증가
+            
+        if trait_name == "광기의 힘" and situation == "shield_generation":
+            hp_ratio = self.current_hp / self.max_hp
+            effects["rage_shield_bonus"] = (1.0 - hp_ratio) * 0.5  # HP 낮을수록 보호막 증가
+            
+        # === 광전사 특성 ===
+        if trait_name == "혈투의 광기" and situation == "stat_calculation":
+            hp_ratio = self.current_hp / self.max_hp
+            if hp_ratio <= 0.15:  # HP 15% 이하일 때
+                # 공격력 100% 증가 (너프됨, 이전: 300%)
+                effects["berserker_rage_attack"] = 1.0  # 100% 공격력 증가
+                effects["all_attacks_hp"] = True  # 모든 공격이 HP 공격으로 변환
+                print(f"🔥 {self.name}의 혈투의 광기 발동! 공격력 100% 증가!")
+            elif hp_ratio < 0.5:  # HP 50% 이하일 때 (기존 효과)
+                rage_multiplier = (1.0 - hp_ratio) * 2  # HP가 낮을수록 강화
+                effects["rage_attack_bonus"] = rage_multiplier * 0.3  # 공격력 증가
+                effects["rage_crit_bonus"] = rage_multiplier * 0.25   # 치명타율 증가
+        
+        if trait_name == "피의 갈증" and situation == "lifesteal":
+            effects["lifesteal_bonus"] = 0.25  # 흡혈 효과 25% 증가
+            effects["hp_cost_reduction"] = 0.15  # HP 소모량 15% 감소
+        
+        if trait_name == "광기의 힘" and situation == "shield_creation":
+            hp_ratio = self.current_hp / self.max_hp
+            rage_shield_bonus = (1.0 - hp_ratio) * 0.5  # HP가 낮을수록 보호막 증가
+            effects["rage_shield_bonus"] = rage_shield_bonus
+        
+        if trait_name == "불굴의 의지" and situation == "damage_taken":
+            if self.current_hp <= self.max_hp * 0.15:  # HP 15% 이하일 때
+                effects["last_stand_reduction"] = 0.5  # 받는 피해 50% 감소
+        
+        # === 차원술사 특성 ===
+        if trait_name == "차원 방벽" and situation == "combat_start":
+            # 전투 시작 시 보호막 자동 생성 (최대 HP의 20%)
+            shield_amount = int(self.max_hp * 0.2)
+            effects["dimension_barrier"] = shield_amount
+            
+        if trait_name == "잔상 숙련" and situation == "dodge_success":
+            # 회피 성공 시 다음 공격 치명타 확정
+            effects["next_attack_crit"] = True
+            
+        if trait_name == "차원 도약" and situation == "being_attacked":
+            # 공격 받을 때 50% 확률로 완전 회피
+            import random
+            if random.random() < 0.5:
+                effects["dimension_dodge"] = True
+                
+        if trait_name == "공간 왜곡" and situation == "being_targeted":
+            # 적의 정확도 30% 감소
+            effects["enemy_accuracy_reduction"] = 0.3
+            
+        if trait_name == "차원 귀환" and situation == "damage_taken":
+            if self.current_hp <= self.max_hp * 0.3:  # HP 30% 이하일 때
+                # 즉시 HP 회복 + 1턴 무적
+                heal_amount = int(self.max_hp * 0.3)
+                effects["dimension_return_heal"] = heal_amount
+                effects["dimension_invincible"] = 1  # 1턴 무적
+        
+        # === 기사 특성 ===
+        if trait_name == "의무의 수호자" and situation == "protecting_ally":
+            effects["extra_duty_stack"] = True  # 아군 보호 시 의무 스택 추가 획득
+            
+        if trait_name == "기사도 정신" and situation == "stat_calculation":
+            if hasattr(self, 'duty_stacks') and self.duty_stacks >= 3:
+                effects["chivalry_boost"] = 0.2  # 의무 스택 3개 이상일 때 모든 능력치 20% 증가
+        
+        # === 전사 특성 ===
+        if trait_name == "전장의 지배자" and situation == "stance_bonus":
+            # 같은 자세 유지 시 능력치 누적 증가 구현
+            effects["stance_mastery_stack"] = {
+                "growth_per_turn": 0.03,
+                "max_bonus": 0.35
+            }
+            
+        if trait_name == "6단계 완전체" and situation == "stance_bonus":
+            # 6가지 자세 완전 숙달 효과
+            effects["stance_mastery"] = True
+            
+        if trait_name == "적응형 무술" and situation == "stance_change":
+            # 자세 변경 시 다음 공격 위력 30% 증가
+            effects["stance_change_boost"] = 1.3
+            
+        if trait_name == "불굴의 의지" and situation == "turn_start":
+            # 모든 자세에서 매 턴 HP 8% 회복
+            heal_amount = int(self.max_hp * 0.08)
+            self.heal(heal_amount, show_animation=False)
+            effects["universal_regeneration"] = True
+            
+        if trait_name == "전투 본능" and situation == "skill_cost":
+            # 자세 변경 스킬 MP 소모 없음
+            effects["stance_change_no_mp"] = True
+        
+        # === 성기사 특성 ===
+        if trait_name == "성역의 수호자":
+            effects["sanctuary_duration"] = 1.5  # 성역 지속시간 50% 증가
+            
+        if trait_name == "신성한 힘" and situation == "healing":
+            sanctuary_count = getattr(self, 'sanctuary_count', 0)
+            effects["holy_healing_bonus"] = sanctuary_count * 0.15  # 성역 1개당 치유 15% 증가
+        
+        # === 암흑기사 특성 ===
+        if trait_name == "어둠의 권능":
+            effects["absorption_limit_bonus"] = 1.25  # 흡수 스택 최대치 +25%
+            
+        if trait_name == "생명력 지배" and situation == "absorption_healing":
+            effects["absorption_efficiency"] = 1.3  # 흡수 스택 회복 효율 30% 증가
+        
+        # === 용기사 특성 ===
+        if trait_name == "표식 달인" and situation == "dragon_marking":
+            effects["mark_chance_bonus"] = 0.3  # 표식 부여 확률 30% 증가
+            
+        if trait_name == "도약의 숙련자" and situation == "leap_attack":
+            effects["leap_invincible_duration"] = 1.5  # 무적 시간 50% 증가
+        
+        # === 아크메이지 특성 ===
+        if trait_name == "원소 순환 마스터":
+            effects["fast_element_cycle"] = 2  # 동일 원소 2회만으로도 자동 발동
+            
+        if trait_name == "원소 친화" and situation == "elemental_attack":
+            effects["elemental_damage_bonus"] = 0.2  # 모든 원소 마법 위력 20% 증가
+        
+        # === 기존 직업 특성 (유지) ===
+        if trait_name == "마나 순환" and situation == "spell_cast":
+            import random
+            if random.random() < 0.3:
+                effects["mana_efficiency"] = 0.5  # 30% 확률로 MP 소모량 절반
+        
+        return effects
         
         # 마법사 계열 특성들
         if trait_name == "마력 집중" and situation == "skill_use":
@@ -2137,24 +3093,26 @@ class Character(BraveMixin):
         if trait_name == "사냥꾼의 직감" and situation == "combat_start":
             effects["first_strike"] = True  # 선제공격 확률 증가
             
-        # 도적 계열 특성들
-        if trait_name == "빠른 손놀림" and situation == "item_use":
-            effects["no_turn_cost"] = True  # 아이템 사용 시 턴 소모 없음
+        # 도적 특성 (리메이크)
+        if trait_name == "독술 지배" and situation in ["attacking", "poison_attack"]:
+            effects["poison_always"] = True  # 모든 공격에 독 부여
+            effects["poison_boost"] = 1.5  # 독 피해량 50% 증가
             
-        if trait_name == "그림자 은신" and situation in ["stealth", "surprise_attack"]:
-            effects["stealth_bonus"] = True
-            effects["crit_damage_bonus"] = 0.5  # 50% 크리티컬 데미지 증가
+        if trait_name == "침묵 술" and situation == "attacking":
+            effects["silence_chance"] = 0.3  # 30% 침묵 부여 확률
+            effects["silence_duration"] = 2  # 2턴 지속
             
-        if trait_name == "독 숙련" and situation == "poison_attack":
-            effects["poison_chance"] = 0.4  # 40% 독 부여 확률
-            effects["poison_duration"] = 3  # 독 지속시간 증가
+        if trait_name == "독 촉진" and situation == "poison_target_attack":
+            effects["poison_trigger"] = 0.25  # 남은 독 피해의 25% 즉시 피해
             
-        if trait_name == "치명적 급소" and situation == "attacking":
-            effects["crit_damage_bonus"] = 0.4  # 40% 크리티컬 데미지 증가
+        if trait_name == "맹독 면역" and situation in ["poison_defense", "status_defense"]:
+            effects["poison_immunity"] = True  # 독 완전 면역
+            effects["status_immunity"] = 0.7  # 70% 상태이상 저항
+            effects["poison_reflect"] = True  # 독 공격 반사
             
-        if trait_name == "도적의 직감" and situation == "trap_detection":
-            effects["trap_detection"] = True
-            effects["treasure_bonus"] = 0.2  # 20% 보물 발견율 증가
+        if trait_name == "독왕의 권능" and situation == "poison_kill":
+            effects["poison_spread"] = True  # 독으로 처치 시 주변에 독 전파
+            effects["poison_aura"] = 2  # 2칸 범위
             
         # 성기사 계열 특성들
         if trait_name == "치유의 빛" and situation in ["healing", "turn_end"]:
@@ -2237,13 +3195,69 @@ class Character(BraveMixin):
             effects["negotiation_bonus"] = True
             effects["shop_discount"] = 0.1  # 10% 상점 할인
             
+        # === 차원술사 새 특성 ===
+        if trait_name == "차원 방벽" and situation == "combat_start":
+            barrier_amount = int(self.max_hp * 0.3)  # 최대 HP 30% 보호막
+            effects["auto_barrier"] = barrier_amount
+            
+        if trait_name == "잔상 숙련" and situation == "dodge_success":
+            effects["next_attack_critical"] = True  # 다음 공격 치명타 확정
+            
+        if trait_name == "차원 도약" and situation == "being_attacked":
+            if random.random() < 0.5:  # 50% 확률
+                effects["complete_dodge"] = True  # 완전 회피
+                
+        if trait_name == "차원 귀환" and situation == "low_hp":
+            if self.current_hp <= self.max_hp * 0.3:  # HP 30% 이하일 때
+                heal_amount = int(self.max_hp * 0.5)  # 50% 회복
+                effects["emergency_heal"] = heal_amount
+                effects["invincible_turns"] = 1  # 1턴 무적
+            
         return effects
     
     def _apply_trigger_trait(self, trait: CharacterTrait, situation: str, **kwargs) -> Dict[str, Any]:
-        """트리거 특성 효과 적용"""
+        """트리거 특성 효과 적용 - 새로운 특성들 포함"""
         effects = {}
-        effect_value = trait.effect_value
         
+        # trait가 딕셔너리인 경우와 객체인 경우 모두 처리
+        if isinstance(trait, dict):
+            effect_value = trait.get('effect_value', {})
+            trait_name = trait.get('name', '')
+        else:
+            effect_value = getattr(trait, 'effect_value', {})
+            trait_name = getattr(trait, 'name', '')
+            
+        # === 광전사 트리거 특성 ===
+        if trait_name == "불굴의 의지" and situation == "damage_taken":
+            if self.current_hp <= self.max_hp * 0.15:  # HP 15% 이하일 때
+                effects["last_stand_reduction"] = 0.5  # 받는 피해 50% 감소
+                
+        if trait_name == "광전사의 최후" and situation == "ultimate_use":
+            effects["berserker_immortal"] = 1  # 1턴간 무적
+            
+        # === 차원술사 트리거 특성 ===
+        if trait_name == "잔상 숙련" and situation == "dodge_success":
+            effects["next_attack_crit"] = True  # 다음 공격 치명타 확정
+            
+        if trait_name == "차원 귀환" and situation == "low_hp":
+            if self.current_hp <= self.max_hp * 0.3:  # HP 30% 이하일 때
+                heal_amount = int(self.max_hp * 0.3)
+                effects["dimension_return_heal"] = heal_amount
+                effects["dimension_invincible"] = 1  # 1턴 무적
+                
+        # === 검투사 트리거 특성 ===
+        if trait_name == "생존 본능" and situation == "parrying":
+            if self.current_hp <= self.max_hp * 0.3:
+                effects["survival_parry_duration"] = 3.0  # 패링 지속시간 3배 연장
+                
+        if trait_name == "투사의 긍지" and situation == "debuff_check":
+            if hasattr(self, 'kill_stacks') and self.kill_stacks >= 3:
+                effects["debuff_immunity"] = True  # 디버프 면역
+                
+        if trait_name == "콜로세움의 영웅" and situation == "on_kill":
+            effects["immediate_action"] = True  # 즉시 행동
+        
+        # === 기존 트리거 특성들 ===
         if situation == "on_kill" and "kill_damage_stack" in effect_value:
             # 적 처치 시 다음 공격 피해량 증가
             current_stack = getattr(self, "_kill_damage_stack", 0)
@@ -2620,10 +3634,65 @@ class Character(BraveMixin):
         wound_amount = max(0, int(wound_amount))
         self.wounds = min(self.wounds + wound_amount, self.max_wounds)
         
-    def take_damage(self, damage: int) -> int:
+    def take_damage(self, damage: int, damage_source: str = "", ignore_armor: bool = False) -> int:
         """데미지를 받고 실제 입은 데미지량 반환"""
         if not self.is_alive:
             return 0
+        
+        # 🌑 암살자 그림자 방어 (피격 시 그림자 1개 소모로 50% 피해 감소)
+        if (self.character_class == "암살자" and 
+            hasattr(self, 'status_effects') and 
+            any(effect.status_type == "그림자축적" for effect in self.status_effects) and
+            damage > 0):
+            
+            # 그림자 스택을 찾아서 1개 소모
+            for effect in self.status_effects[:]:  # 복사본으로 순회
+                if effect.status_type == "그림자축적":
+                    if effect.effect_value > 0:
+                        # 그림자 방어 발동
+                        original_damage = damage
+                        damage = int(damage * 0.5)  # 50% 피해 감소
+                        reduced_damage = original_damage - damage
+                        
+                        # 그림자 1개 소모
+                        effect.effect_value -= 1
+                        print(f"🌑💀 그림자 방어 발동! 그림자 1개를 소모하여 {reduced_damage} 피해 감소 ({original_damage} → {damage})")
+                        
+                        # 그림자가 0개가 되면 상태효과 제거
+                        if effect.effect_value <= 0:
+                            self.status_effects.remove(effect)
+                            print(f"🌑 {self.name}의 마지막 그림자가 사라졌습니다...")
+                        else:
+                            print(f"🌑 잔여 그림자: {effect.effect_value}개")
+                    break
+
+        # 🛡️ 피의 방패 보호막 확인 (암흑기사)
+        if hasattr(self, 'blood_shield') and self.blood_shield > 0:
+            shield_absorbed = min(damage, self.blood_shield)
+            self.blood_shield -= shield_absorbed
+            damage -= shield_absorbed
+            print(f"🛡️ 피의 방패가 {shield_absorbed} 데미지를 흡수! (보호막 잔여: {self.blood_shield})")
+            
+            # 보호막이 모두 소진되면 지속시간도 초기화
+            if self.blood_shield <= 0:
+                self.blood_shield = 0
+                if hasattr(self, 'blood_shield_turns'):
+                    self.blood_shield_turns = 0
+                print("🛡️ 피의 방패가 완전히 파괴되었습니다!")
+            
+            # 보호막이 모든 데미지를 흡수한 경우
+            if damage <= 0:
+                return shield_absorbed
+        
+        # 수호자 보호 효과 확인 (파티원 중에 수호자 자세 전사가 있는지)
+        try:
+            guardian_protection = self._check_guardian_protection()
+            if guardian_protection:
+                damage = int(damage * 0.7)  # 수호자가 있으면 30% 데미지 감소
+                print(f"🛠️ 수호자의 보호로 {self.name}이(가) 받는 데미지 30% 감소!")
+        except AttributeError:
+            # _check_guardian_protection 메서드가 없는 경우 무시
+            pass
             
         actual_damage = min(damage, self.current_hp)
         self.current_hp -= actual_damage
@@ -2675,6 +3744,16 @@ class Character(BraveMixin):
             wound_healing_bonus = self.game_instance.permanent_progression.get_passive_bonus("wound_healing")
             if wound_healing_bonus > 0:
                 healing_bonus = 1.0 + (wound_healing_bonus / 100.0)
+        
+        # 전사 특성: 불굴의 의지 - 방어형 자세에서 회복량 2배
+        if (hasattr(self, 'apply_trait_effects') and 
+            hasattr(self, 'current_stance') and 
+            self.current_stance == "defensive"):
+            trait_effects = self.apply_trait_effects("healing")
+            healing_multiplier = trait_effects.get("healing_multiplier", 1.0)
+            healing_bonus *= healing_multiplier
+            if healing_multiplier > 1.0:
+                print(f"🛡️ {self.name}의 불굴의 의지 (방어형)로 회복량 {int((healing_multiplier-1)*100)}% 증가!")
                 
         # 치유량에 보너스 적용
         enhanced_heal_amount = int(heal_amount * healing_bonus)
@@ -2739,18 +3818,41 @@ class Character(BraveMixin):
         return "[" + "■" * filled + "□" * empty + "]"
         
     def update_atb(self):
-        """ATB 게이지 업데이트"""
-        if self.is_alive:
+        """ATB 게이지 업데이트 - 안전한 버전"""
+        if self.is_alive and hasattr(self, 'atb_gauge'):
             # ATB 업데이트 속도를 1/5로 느리게 조정
+            old_gauge = self.atb_gauge
             self.atb_gauge = min(1000, self.atb_gauge + (self.atb_speed / 5.0))
             
+            # 디버그: ATB 변화 확인
+            if abs(self.atb_gauge - old_gauge) > 0:
+                pass  # 필요시 디버그 출력
+            
+            # 안전장치: 1000을 절대 초과하지 않도록
+            if self.atb_gauge > 1000:
+                self.atb_gauge = 1000
+            
     def reset_atb(self):
-        """ATB 게이지 리셋"""
+        """ATB 게이지 리셋 - 강화된 버전"""
         self.atb_gauge = 0
+        # 추가: 캐스팅 관련 상태도 리셋
+        if hasattr(self, 'is_casting'):
+            self.is_casting = False
+        if hasattr(self, 'casting_skill'):
+            self.casting_skill = None
         
     def can_act(self) -> bool:
-        """행동 가능한지 확인"""
-        return self.is_alive and self.atb_gauge >= 1000 and self.status_manager.can_act()
+        """행동 가능한지 확인 - 개선된 버전"""
+        if not self.is_alive:
+            return False
+        if not hasattr(self, 'atb_gauge'):
+            self.atb_gauge = 0
+            return False
+        if self.atb_gauge < 1000:
+            return False
+        if hasattr(self, 'status_manager') and not self.status_manager.can_act():
+            return False
+        return True
         
     def get_effective_stats(self) -> dict:
         """상태이상과 장비를 고려한 실제 능력치"""
@@ -2864,15 +3966,53 @@ class Character(BraveMixin):
         return self.status_manager.process_turn_effects(self)
         
     def equip_item(self, item: Item) -> bool:
-        """아이템 장착"""
+        """아이템 장착 (인벤토리 연동 포함) - 중복 제거 방지"""
+        # 먼저 인벤토리에서 아이템이 있는지 확인
+        if hasattr(self, 'inventory') and self.inventory:
+            if not self.inventory.has_item(item.name):
+                print(f"⚠️ {self.name}의 인벤토리에 {item.name}이(가) 없습니다.")
+                return False
+            
+            # 🔒 현재 수량 확인 (디버그용)
+            current_count = self.inventory.items.get(item.name, 0)
+            print(f"🔍 장착 전 {item.name} 보유 수량: {current_count}개")
+        
+        # 기존 장착된 아이템이 있다면 인벤토리로 반환
+        old_item = None
         if item.item_type.value == "무기":
+            old_item = self.equipped_weapon
             self.equipped_weapon = item
         elif item.item_type.value == "방어구":
+            old_item = self.equipped_armor
             self.equipped_armor = item
         elif item.item_type.value == "장신구":
+            old_item = self.equipped_accessory
             self.equipped_accessory = item
         else:
             return False
+        
+        # 기존 아이템을 인벤토리로 반환
+        if old_item and hasattr(self, 'inventory') and self.inventory:
+            self.inventory.add_item(old_item, 1)
+            print(f"📦 {old_item.name}을(를) 인벤토리로 반환했습니다.")
+        
+        # 🎯 새 아이템을 인벤토리에서 1개만 제거 (안전한 제거)
+        if hasattr(self, 'inventory') and self.inventory:
+            if self.inventory.has_item(item.name):
+                # 제거 전 수량 확인
+                before_count = self.inventory.items.get(item.name, 0)
+                success = self.inventory.remove_item(item.name, 1)
+                after_count = self.inventory.items.get(item.name, 0)
+                
+                if success:
+                    print(f"🎒 {item.name}을(를) 장착했습니다. ({before_count}개 → {after_count}개)")
+                else:
+                    print(f"❌ {item.name} 제거 실패")
+                    return False
+            else:
+                print(f"⚠️ 장착 시점에 {item.name}이(가) 인벤토리에 없습니다.")
+                return False
+        
         return True
     
     def unequip_item(self, slot: str) -> Optional[Item]:
@@ -2936,35 +4076,35 @@ class Character(BraveMixin):
         """레벨업 시 능력치 증가량 계산"""
         # 클래스별 성장률 (MP 성장량을 대폭 줄임)
         growth_rates = {
-            "전사": {"hp": 25, "mp": 1, "p_atk": 6, "m_atk": 2, "p_def": 5, "m_def": 2, "speed": 3},
-            "아크메이지": {"hp": 15, "mp": 3, "p_atk": 2, "m_atk": 8, "p_def": 2, "m_def": 6, "speed": 4},
-            "궁수": {"hp": 18, "mp": 1, "p_atk": 6, "m_atk": 2, "p_def": 3, "m_def": 4, "speed": 7},
-            "도적": {"hp": 16, "mp": 1, "p_atk": 5, "m_atk": 2, "p_def": 2, "m_def": 2, "speed": 8},
-            "성기사": {"hp": 20, "mp": 2, "p_atk": 4, "m_atk": 6, "p_def": 5, "m_def": 6, "speed": 2},
-            "암흑기사": {"hp": 22, "mp": 1, "p_atk": 6, "m_atk": 4, "p_def": 4, "m_def": 4, "speed": 4},
-            "몽크": {"hp": 19, "mp": 2, "p_atk": 5, "m_atk": 2, "p_def": 4, "m_def": 4, "speed": 6},
-            "바드": {"hp": 14, "mp": 2, "p_atk": 2, "m_atk": 5, "p_def": 2, "m_def": 4, "speed": 5},
-            "네크로맨서": {"hp": 12, "mp": 3, "p_atk": 2, "m_atk": 8, "p_def": 2, "m_def": 6, "speed": 4},
-            "용기사": {"hp": 28, "mp": 1, "p_atk": 6, "m_atk": 2, "p_def": 6, "m_def": 4, "speed": 2},
-            "검성": {"hp": 21, "mp": 1, "p_atk": 7, "m_atk": 2, "p_def": 4, "m_def": 4, "speed": 4},
-            "정령술사": {"hp": 13, "mp": 3, "p_atk": 2, "m_atk": 8, "p_def": 2, "m_def": 6, "speed": 4},
-            "암살자": {"hp": 14, "mp": 1, "p_atk": 6, "m_atk": 2, "p_def": 2, "m_def": 2, "speed": 8},
-            "기계공학자": {"hp": 17, "mp": 2, "p_atk": 4, "m_atk": 4, "p_def": 4, "m_def": 4, "speed": 4},
-            "무당": {"hp": 16, "mp": 2, "p_atk": 2, "m_atk": 6, "p_def": 4, "m_def": 6, "speed": 2},
-            "해적": {"hp": 20, "mp": 1, "p_atk": 6, "m_atk": 2, "p_def": 4, "m_def": 2, "speed": 6},
-            "사무라이": {"hp": 20, "mp": 1, "p_atk": 7, "m_atk": 2, "p_def": 4, "m_def": 4, "speed": 4},
-            "드루이드": {"hp": 16, "mp": 2, "p_atk": 2, "m_atk": 6, "p_def": 4, "m_def": 6, "speed": 4},
-            "철학자": {"hp": 14, "mp": 3, "p_atk": 2, "m_atk": 5, "p_def": 2, "m_def": 6, "speed": 3},
-            "시간술사": {"hp": 12, "mp": 3, "p_atk": 2, "m_atk": 8, "p_def": 2, "m_def": 6, "speed": 4},
-            "연금술사": {"hp": 15, "mp": 2, "p_atk": 2, "m_atk": 6, "p_def": 2, "m_def": 4, "speed": 4},
-            "검투사": {"hp": 24, "mp": 1, "p_atk": 7, "m_atk": 2, "p_def": 4, "m_def": 2, "speed": 4},
-            "기사": {"hp": 30, "mp": 1, "p_atk": 5, "m_atk": 2, "p_def": 7, "m_def": 4, "speed": 2},
-            "신관": {"hp": 18, "mp": 2, "p_atk": 2, "m_atk": 6, "p_def": 4, "m_def": 8, "speed": 2},
-            "마검사": {"hp": 18, "mp": 2, "p_atk": 5, "m_atk": 6, "p_def": 4, "m_def": 4, "speed": 4},
-            "차원술사": {"hp": 12, "mp": 3, "p_atk": 2, "m_atk": 8, "p_def": 2, "m_def": 6, "speed": 4},
-            "광전사": {"hp": 26, "mp": 1, "p_atk": 6, "m_atk": 1, "p_def": 2, "m_def": 1, "speed": 5},
-            "마법사": {"hp": 13, "mp": 3, "p_atk": 2, "m_atk": 8, "p_def": 2, "m_def": 6, "speed": 4},
-            "성직자": {"hp": 18, "mp": 2, "p_atk": 2, "m_atk": 6, "p_def": 4, "m_def": 8, "speed": 2},
+            "전사": {"hp": 18, "mp": 2, "p_atk": 4, "m_atk": 3, "p_def": 4, "m_def": 4, "speed": 4},
+            "아크메이지": {"hp": 11, "mp": 4, "p_atk": 2, "m_atk": 7, "p_def": 2, "m_def": 5, "speed": 4},  # 총 35
+            "궁수": {"hp": 15, "mp": 2, "p_atk": 6, "m_atk": 2, "p_def": 3, "m_def": 3, "speed": 6},  # 총 37
+            "도적": {"hp": 13, "mp": 1, "p_atk": 6, "m_atk": 2, "p_def": 3, "m_def": 3, "speed": 8},  # 총 36
+            "성기사": {"hp": 17, "mp": 3, "p_atk": 5, "m_atk": 3, "p_def": 6, "m_def": 5, "speed": 3},  # 총 42
+            "암흑기사": {"hp": 17, "mp": 2, "p_atk": 6, "m_atk": 4, "p_def": 4, "m_def": 4, "speed": 4},  # 총 41
+            "몽크": {"hp": 15, "mp": 2, "p_atk": 7, "m_atk": 3, "p_def": 4, "m_def": 4, "speed": 6},  # 총 41
+            "바드": {"hp": 10, "mp": 3, "p_atk": 3, "m_atk": 5, "p_def": 3, "m_def": 4, "speed": 5},  # 총 33
+            "네크로맨서": {"hp": 12, "mp": 4, "p_atk": 2, "m_atk": 7, "p_def": 2, "m_def": 6, "speed": 3},  # 총 36
+            "용기사": {"hp": 16, "mp": 2, "p_atk": 6, "m_atk": 4, "p_def": 5, "m_def": 4, "speed": 4},  # 총 41
+            "검성": {"hp": 15, "mp": 1, "p_atk": 7, "m_atk": 2, "p_def": 4, "m_def": 3, "speed": 5},  # 총 37
+            "정령술사": {"hp": 10, "mp": 4, "p_atk": 3, "m_atk": 7, "p_def": 3, "m_def": 5, "speed": 4},  # 총 36
+            "암살자": {"hp": 12, "mp": 1, "p_atk": 7, "m_atk": 2, "p_def": 2, "m_def": 2, "speed": 8},  # 총 34
+            "기계공학자": {"hp": 14, "mp": 2, "p_atk": 5, "m_atk": 4, "p_def": 4, "m_def": 3, "speed": 4},  # 총 36
+            "무당": {"hp": 11, "mp": 3, "p_atk": 3, "m_atk": 7, "p_def": 3, "m_def": 6, "speed": 4},  # 총 37
+            "해적": {"hp": 15, "mp": 1, "p_atk": 6, "m_atk": 2, "p_def": 4, "m_def": 3, "speed": 6},  # 총 37
+            "사무라이": {"hp": 15, "mp": 1, "p_atk": 6, "m_atk": 3, "p_def": 4, "m_def": 4, "speed": 5},  # 총 38
+            "드루이드": {"hp": 16, "mp": 3, "p_atk": 3, "m_atk": 6, "p_def": 3, "m_def": 5, "speed": 4},  # 총 40
+            "철학자": {"hp": 10, "mp": 4, "p_atk": 2, "m_atk": 6, "p_def": 4, "m_def": 7, "speed": 3},  # 총 36
+            "시간술사": {"hp": 11, "mp": 4, "p_atk": 3, "m_atk": 6, "p_def": 3, "m_def": 5, "speed": 4},  # 총 36
+            "연금술사": {"hp": 12, "mp": 3, "p_atk": 4, "m_atk": 6, "p_def": 3, "m_def": 4, "speed": 4},  # 총 36
+            "검투사": {"hp": 15, "mp": 1, "p_atk": 7, "m_atk": 3, "p_def": 4, "m_def": 3, "speed": 5},  # 총 38
+            "기사": {"hp": 19, "mp": 1, "p_atk": 6, "m_atk": 3, "p_def": 6, "m_def": 4, "speed": 3},  # 총 42
+            "신관": {"hp": 13, "mp": 3, "p_atk": 3, "m_atk": 6, "p_def": 4, "m_def": 7, "speed": 3},  # 총 39
+            "마검사": {"hp": 15, "mp": 2, "p_atk": 5, "m_atk": 5, "p_def": 4, "m_def": 4, "speed": 4},  # 총 39
+            "차원술사": {"hp": 8, "mp": 4, "p_atk": 2, "m_atk": 8, "p_def": 2, "m_def": 6, "speed": 3},  # 총 33
+            "광전사": {"hp": 29, "mp": 1, "p_atk": 5, "m_atk": 1, "p_def": 1, "m_def": 1, "speed": 6},  # 총 44
+            "마법사": {"hp": 11, "mp": 4, "p_atk": 2, "m_atk": 7, "p_def": 2, "m_def": 5, "speed": 4},  # 총 35
+            "성직자": {"hp": 13, "mp": 3, "p_atk": 3, "m_atk": 6, "p_def": 4, "m_def": 7, "speed": 3},  # 총 39
             "Enemy": {"hp": 20, "mp": 1, "p_atk": 4, "m_atk": 4, "p_def": 4, "m_def": 4, "speed": 3}
         }
         
@@ -3060,7 +4200,7 @@ class Character(BraveMixin):
             elif self.character_class == "도적":
                 skills.append("그림자 이동")
             elif self.character_class == "궁수":
-                skills.append("연사")
+                skills.append("삼연사")
         
         return skills
         
@@ -3152,6 +4292,127 @@ class Character(BraveMixin):
         status += f"{mp_text} {mp_bar} | "
         status += f"ATB {atb_bar} | SPD:{self.get_effective_stats()['speed']:2}"
         
+        # 캐릭터별 기믹 표시 추가 - 이모지와 함께
+        mechanics = ""
+        
+        # 전사 자세 시스템
+        if hasattr(self, 'current_stance') and self.current_stance:
+            stance_emoji = {"balanced": "⚖️", "aggressive": "⚔️", "defensive": "🛡️", 
+                          "swift": "💨", "berserker": "💀", "guardian": "🗡️"}
+            stance_names = {"balanced": "BAL", "aggressive": "ATK", "defensive": "DEF",
+                          "swift": "SPD", "berserker": "RAGE", "guardian": "GUARD"}
+            emoji = stance_emoji.get(self.current_stance, "⚖️")
+            name = stance_names.get(self.current_stance, "BAL")
+            mechanics += f" {emoji}STANCE:{name}"
+        
+        # 궁수 조준 포인트
+        if hasattr(self, 'aim_points') and self.aim_points > 0:
+            mechanics += f" 🎯AIM:{self.aim_points}"
+        elif hasattr(self, 'precision_points') and self.precision_points > 0:
+            mechanics += f" 🎯AIM:{self.precision_points}"
+        
+        # 도적 독 스택
+        if hasattr(self, 'poison_stacks') and self.poison_stacks > 0:
+            mechanics += f" 🐍VENOM:{self.poison_stacks}"
+        elif hasattr(self, 'venom_power') and self.venom_power > 0:
+            mechanics += f" 🐍VENOM:{self.venom_power}%"
+        
+        # 암살자 그림자
+        if hasattr(self, 'shadow_count') and self.shadow_count > 0:
+            mechanics += f" 🌑SHADOW:{self.shadow_count}"
+        elif hasattr(self, 'shadows') and self.shadows > 0:
+            mechanics += f" 🌑SHADOW:{self.shadows}"
+        
+        # 검성 검기
+        if hasattr(self, 'sword_aura') and self.sword_aura > 0:
+            mechanics += f" ⚡AURA:{self.sword_aura}"
+        elif hasattr(self, 'sword_aura_stacks') and self.sword_aura_stacks > 0:
+            mechanics += f" ⚡AURA:{self.sword_aura_stacks}"
+        
+        # 바드 멜로디 - 한글 음계 표시
+        if hasattr(self, 'melody_notes') and len(self.melody_notes) > 0:
+            note_names = ["도", "레", "미", "파", "솔", "라", "시"]
+            melody_str = "/".join([note_names[note] for note in self.melody_notes if 0 <= note < len(note_names)])
+            mechanics += f" 🎵MELODY:{melody_str}"
+        elif hasattr(self, 'melody_stacks') and self.melody_stacks > 0:
+            mechanics += f" 🎵MELODY:{self.melody_stacks}"
+        elif hasattr(self, 'song_power') and self.song_power > 0:
+            mechanics += f" 🎵MELODY:{self.song_power}"
+        
+        # 광전사 분노 (0일 때도 표시)
+        if hasattr(self, 'rage_stacks'):
+            mechanics += f" 💥RAGE:{self.rage_stacks}"
+        elif hasattr(self, 'rage_points'):
+            mechanics += f" 💥RAGE:{self.rage_points}"
+        
+        # 몽크 기
+        if hasattr(self, 'ki_energy') and self.ki_energy > 0:
+            mechanics += f" 🔥KI:{self.ki_energy}"
+        elif hasattr(self, 'combo_count') and self.combo_count > 0:
+            mechanics += f" 👊COMBO:{self.combo_count}"
+        
+        # 네크로맨서 네크로 에너지
+        if hasattr(self, 'necro_energy') and self.necro_energy > 0:
+            mechanics += f" 💀NECRO:{self.necro_energy}"
+        elif hasattr(self, 'soul_power') and self.soul_power > 0:
+            mechanics += f" 👻SOUL:{self.soul_power}"
+        
+        # 정령술사 정령 친화도
+        if hasattr(self, 'spirit_bond') and self.spirit_bond > 0:
+            mechanics += f" 🌟SPIRIT:{self.spirit_bond}"
+        elif hasattr(self, 'elemental_affinity') and self.elemental_affinity > 0:
+            mechanics += f" 🌟ELEM:{self.elemental_affinity}"
+        
+        # 시간술사 시간 조작
+        if hasattr(self, 'time_marks') and self.time_marks > 0:
+            mechanics += f" ⏰TIME:{self.time_marks}"
+        elif hasattr(self, 'temporal_energy') and self.temporal_energy > 0:
+            mechanics += f" ⏰TEMP:{self.temporal_energy}"
+        
+        # 아크메이지 원소 카운트
+        if hasattr(self, 'fire_count') and self.fire_count > 0:
+            mechanics += f" 🔥FIRE:{self.fire_count}"
+        if hasattr(self, 'ice_count') and self.ice_count > 0:
+            mechanics += f" ❄️ICE:{self.ice_count}"
+        if hasattr(self, 'lightning_count') and self.lightning_count > 0:
+            mechanics += f" ⚡LIGHT:{self.lightning_count}"
+        
+        # 용기사 용인
+        if hasattr(self, 'dragon_marks') and self.dragon_marks > 0:
+            mechanics += f" 🐲DRAGON:{self.dragon_marks}"
+        elif hasattr(self, 'dragon_energy') and self.dragon_energy > 0:
+            mechanics += f" 🐲ENERGY:{self.dragon_energy}"
+        
+        # 기계공학자 차지
+        if hasattr(self, 'charge_level') and self.charge_level > 0:
+            mechanics += f" 🔧CHARGE:{self.charge_level}"
+        elif hasattr(self, 'turret_count') and self.turret_count > 0:
+            mechanics += f" 🤖TURRET:{self.turret_count}"
+        
+        # 연금술사 연금 에너지
+        if hasattr(self, 'alchemy_energy') and self.alchemy_energy > 0:
+            mechanics += f" ⚗️ALCHEMY:{self.alchemy_energy}"
+        
+        # 검투사 투기장
+        if hasattr(self, 'arena_points') and self.arena_points > 0:
+            mechanics += f" 🏟️ARENA:{self.arena_points}"
+        elif hasattr(self, 'gladiator_stacks') and self.gladiator_stacks > 0:
+            mechanics += f" ⚔️GLAD:{self.gladiator_stacks}"
+        
+        # 무당 영혼력
+        if hasattr(self, 'spirit_power') and self.spirit_power > 0:
+            mechanics += f" 👻SPIRIT:{self.spirit_power}"
+        elif hasattr(self, 'ritual_power') and self.ritual_power > 0:
+            mechanics += f" 🔮RITUAL:{self.ritual_power}"
+        
+        # 차원술사 차원 에너지
+        if hasattr(self, 'dimension_energy') and self.dimension_energy > 0:
+            mechanics += f" 🌀DIM:{self.dimension_energy}"
+        elif hasattr(self, 'portal_count') and self.portal_count > 0:
+            mechanics += f" 🌀PORTAL:{self.portal_count}"
+        
+        status += mechanics
+        
         # 상태이상 표시
         active_effects = self.status_manager.get_active_effects()
         if active_effects:
@@ -3198,7 +4459,23 @@ class Character(BraveMixin):
         
     def get_atb_bar(self, length: int = 6) -> str:
         """ATB 게이지 바 문자열 생성 (색상 적용, 간결한 형태)"""
-        ratio = self.atb_gauge / 100
+        # 캐스팅 중인 경우 캐스팅 진행률 표시
+        if hasattr(self, 'is_casting') and self.is_casting:
+            # 캐스팅 진행률 계산 (ATB 게이지 변화량 기준)
+            if hasattr(self, 'casting_start_atb') and hasattr(self, 'atb_gauge'):
+                cast_progress = (self.atb_gauge - self.casting_start_atb) / (10000 - self.casting_start_atb) if (10000 - self.casting_start_atb) > 0 else 0
+                cast_progress = max(0, min(1.0, cast_progress))
+            else:
+                # 캐스팅 정보가 없다면 현재 ATB 비율 사용
+                cast_progress = min(1.0, self.atb_gauge / 10000)
+            
+            filled = int(cast_progress * length)
+            bar = "█" * filled + "░" * (length - filled)
+            return bright_cyan(f"{bar}")
+        
+        # ATB 게이지는 0~10000 범위 (READY_THRESHOLD = 10000)
+        ready_threshold = 10000
+        ratio = min(1.0, self.atb_gauge / ready_threshold)
         filled = int(ratio * length)
         bar = "█" * filled + "░" * (length - filled)
         
@@ -3386,6 +4663,24 @@ class PartyManager:
         total_level = sum(getattr(member, 'level', 1) for member in alive_members)
         return total_level / len(alive_members)
         
+    @property
+    def party_members(self) -> List[Character]:
+        """파티 멤버 목록 반환 (호환성을 위한 별칭)"""
+        return self.members
+    
+    @property
+    def party(self) -> List[Character]:
+        """파티 멤버 목록 반환 (호환성을 위한 별칭)"""
+        return self.members
+    
+    def get_all_members(self) -> List[Character]:
+        """모든 파티 멤버 반환 (호환성을 위한 메서드)"""
+        return self.members
+    
+    def get_active_party(self) -> List[Character]:
+        """활성 파티 멤버 반환 (살아있는 멤버들)"""
+        return self.get_alive_members()
+    
     def update_atb_all(self):
         """모든 파티 멤버의 ATB 게이지 업데이트"""
         for member in self.members:
@@ -3559,28 +4854,7 @@ class PartyManager:
             "evasion": self.evasion + self.temp_dodge_bonus
         }
     
-    def equip_item(self, item) -> bool:
-        """아이템 착용"""
-        if not hasattr(item, 'item_type'):
-            return False
-            
-        from .items import ItemType
-        
-        if item.item_type == ItemType.WEAPON:
-            self.equipped_weapon = item
-            print(f"{self.name}이(가) {item.name}을(를) 착용했습니다.")
-        elif item.item_type == ItemType.ARMOR:
-            self.equipped_armor = item
-            print(f"{self.name}이(가) {item.name}을(를) 착용했습니다.")
-        elif item.item_type == ItemType.ACCESSORY:
-            self.equipped_accessory = item
-            print(f"{self.name}이(가) {item.name}을(를) 착용했습니다.")
-        else:
-            return False
-        
-        # 장비 효과 적용
-        self._apply_equipment_effects()
-        return True
+    # 중복된 equip_item 메서드 제거 - 인벤토리 연동 버전만 사용
     
     def unequip_item(self, slot: str) -> bool:
         """아이템 해제"""
@@ -3680,6 +4954,59 @@ class PartyManager:
         if elapsed_time >= self.casting_duration:
             return True  # 캐스팅 완료
         return False
+    
+    def is_casting_ready_atb(self):
+        """ATB 기반 캐스팅 완료 체크"""
+        if not self.is_casting:
+            return False
+        
+        # 캐스팅 시작 ATB와 필요한 ATB 증가량 확인
+        if hasattr(self, 'casting_start_atb') and hasattr(self, 'casting_duration'):
+            if self.casting_duration <= 0:
+                return True  # 즉시 완료
+            
+            # casting_duration만큼의 ATB가 증가했는지 확인
+            atb_progress = self.atb_gauge - self.casting_start_atb
+            return atb_progress >= self.casting_duration
+        
+        # 폴백: ATB 게이지가 1000에 도달하면 캐스팅 완료
+        return self.atb_gauge >= 1000
+    
+    def get_casting_progress(self):
+        """캐스팅 진행률 반환 (0.0 ~ 1.0)"""
+        if not self.is_casting:
+            return 0.0
+        
+        # 시간 기반 진행률 (더 확실한 방법)
+        if hasattr(self, 'casting_start_time') and hasattr(self, 'casting_duration') and self.casting_start_time:
+            import time
+            elapsed_time = time.time() - self.casting_start_time
+            
+            # casting_duration을 초 단위로 변환
+            # 일반적으로 캐스팅 시간은 1-5초 정도가 적당
+            if self.casting_duration > 100:  # ATB 단위인 경우 (100 이상)
+                duration_seconds = self.casting_duration / 500.0  # ATB를 초로 변환 (더 빠르게)
+            elif self.casting_duration > 10:  # 중간 값
+                duration_seconds = self.casting_duration / 100.0
+            else:  # 이미 초 단위인 경우
+                duration_seconds = max(1.0, self.casting_duration)  # 최소 1초
+            
+            if duration_seconds <= 0:
+                return 1.0
+                
+            progress = elapsed_time / duration_seconds
+            return min(1.0, max(0.0, progress))
+        
+        # ATB 기반 진행률 (폴백)
+        if hasattr(self, 'casting_start_atb') and hasattr(self, 'casting_duration'):
+            if self.casting_duration <= 0:
+                return 1.0  # 즉시 완료
+            
+            atb_progress = (self.atb_gauge - self.casting_start_atb)
+            progress_ratio = atb_progress / self.casting_duration
+            return min(1.0, max(0.0, progress_ratio))
+        
+        return 0.0
     
     def complete_casting(self):
         """캐스팅 완료"""
@@ -4235,3 +5562,290 @@ class PartyManager:
             print(f"❌ Character.from_dict 오류: {e}")
             # 기본 캐릭터 반환
             return cls("Unknown", "전사", 100, 10, 10, 10, 10, 10)
+    
+    def start_turn(self):
+        """턴 시작 시 특성 효과 적용"""
+        if hasattr(self, 'apply_trait_effects'):
+            trait_effects = self.apply_trait_effects("turn_start")
+            
+            # 불굴의 의지: 턴당 체력 회복
+            turn_healing = trait_effects.get("turn_healing", 0)
+            if turn_healing > 0:
+                old_hp = self.current_hp
+                self.current_hp = min(self.max_hp, self.current_hp + turn_healing)
+                healed = self.current_hp - old_hp
+                if healed > 0:
+                    print(f"💚 {self.name}의 불굴의 의지로 {healed} HP 회복!")
+    
+    def end_turn(self):
+        """턴 종료 시 특성 효과 적용"""
+        if hasattr(self, 'apply_trait_effects'):
+            trait_effects = self.apply_trait_effects("turn_end")
+            
+            # 기타 턴 종료 시 효과들을 여기에 추가 가능
+    
+    def _check_guardian_protection(self) -> bool:
+        """수호자 보호 효과 확인 (파티원 중 수호자 자세 전사가 있는지)"""
+        # 게임 인스턴스를 통해 파티원 확인
+        if hasattr(self, 'game_instance') and self.game_instance:
+            if hasattr(self.game_instance, 'party_manager') and self.game_instance.party_manager:
+                party_members = self.game_instance.party_manager.get_all_members()
+                for member in party_members:
+                    if (member != self and member.is_alive and 
+                        member.character_class == "전사" and
+                        hasattr(member, 'current_stance') and
+                        member.current_stance == "guardian"):
+                        # 균형감각 특성도 확인
+                        if hasattr(member, 'apply_trait_effects'):
+                            trait_effects = member.apply_trait_effects("protecting")
+    
+    def _force_initialize_all_mechanics(self, character_class: str):
+        """💨 모든 직업의 기믹을 강제로 초기화 - 확실한 기믹 표시를 위한 강력한 방법"""
+        print(f"💨 [FORCE INIT] {self.name} ({character_class}) 모든 기믹 강제 초기화 시작...")
+        
+        # 기본 기믹들 (모든 직업 공통)
+        if not hasattr(self, 'poison_stacks'):
+            self.poison_stacks = 0
+        if not hasattr(self, 'max_poison_stacks'):
+            self.max_poison_stacks = max(10, int(self.physical_attack * 1.5))
+        
+        # 직업별 특화 기믹 강제 설정
+        if character_class == "전사":
+            if not hasattr(self, 'warrior_stance'):
+                self.warrior_stance = 'balanced'
+            if not hasattr(self, 'warrior_focus'):
+                self.warrior_focus = 0
+        elif character_class == "아크메이지":
+            if not hasattr(self, 'fire_count'):
+                self.fire_count = 0
+            if not hasattr(self, 'ice_count'):
+                self.ice_count = 0
+            if not hasattr(self, 'lightning_count'):
+                self.lightning_count = 0
+        elif character_class == "궁수":
+            if not hasattr(self, 'aim_points'):
+                self.aim_points = 0
+            if not hasattr(self, 'precision_points'):
+                self.precision_points = 0
+        elif character_class == "암살자":
+            if not hasattr(self, 'shadow_count'):
+                self.shadow_count = 0
+            if not hasattr(self, 'shadows'):
+                self.shadows = 0
+        elif character_class == "검성":
+            if not hasattr(self, 'sword_aura'):
+                self.sword_aura = 0
+            if not hasattr(self, 'sword_aura_stacks'):
+                self.sword_aura_stacks = 0
+        elif character_class == "바드":
+            if not hasattr(self, 'melody_stacks'):
+                self.melody_stacks = 0
+            if not hasattr(self, 'song_power'):
+                self.song_power = 0
+        elif character_class == "광전사":
+            if not hasattr(self, 'rage_stacks'):
+                self.rage_stacks = 0
+            if not hasattr(self, 'berserk_level'):
+                self.berserk_level = 0
+        elif character_class == "몽크":
+            if not hasattr(self, 'chi_points'):
+                self.chi_points = 0
+            if not hasattr(self, 'ki_energy'):
+                self.ki_energy = 0
+            if not hasattr(self, 'strike_marks'):
+                self.strike_marks = 0
+    
+    def change_warrior_stance(self, new_stance_id: int) -> bool:
+        """전사 자세 변경 (6단계 완전체 시스템)"""
+        if self.character_class != "전사":
+            return False
+        
+        if not (0 <= new_stance_id <= 5):
+            return False
+        
+        old_stance = getattr(self, 'current_stance', 2)
+        self.current_stance = new_stance_id
+        
+        # 자세 변경 보너스 (적응형 무술 특성)
+        trait_effects = self.apply_trait_effects("stance_change")
+        if trait_effects.get("stance_change_boost"):
+            # 다음 공격 위력 30% 증가 효과 적용
+            self.temp_next_attack_bonus = trait_effects["stance_change_boost"]
+            print(f"🥋 적응형 무술 발동! 다음 공격 위력 {(trait_effects['stance_change_boost']-1)*100:.0f}% 증가!")
+        
+        # 자세별 즉시 효과 적용
+        self._apply_stance_effects(new_stance_id)
+        
+        old_name = self._get_stance_name(old_stance)
+        new_name = self._get_stance_name(new_stance_id)
+        print(f"⚔️ {self.name}이(가) {old_name}에서 {new_name}로 자세를 변경했습니다!")
+        return True
+    
+    def _apply_stance_effects(self, stance_id: int):
+        """6단계 자세별 효과 적용 (6단계 완전체 특성 + 전장의 지배자 누적 효과 반영)"""
+        # 기존 자세 효과 초기화
+        self.temp_attack_bonus = getattr(self, 'temp_attack_bonus', 0)
+        self.temp_defense_bonus = getattr(self, 'temp_defense_bonus', 0)
+        self.temp_speed_bonus = getattr(self, 'temp_speed_bonus', 0)
+        self.temp_crit_bonus = getattr(self, 'temp_crit_bonus', 0)
+        
+        # 특성 효과 확인
+        trait_effects = self.apply_trait_effects("stance_bonus")
+        stance_amplify = trait_effects.get("stance_bonus_amplify", 1.0)  # 구 전장의 지배자
+        mastery_bonus = trait_effects.get("stance_mastery", False)       # 6단계 완전체
+        
+        # 전장의 지배자 누적 효과 처리
+        mastery_stack_config = trait_effects.get("stance_mastery_stack", None)
+        mastery_stack_bonus = 1.0
+        if mastery_stack_config:
+            # 같은 자세 유지 턴 수 추가
+            if not hasattr(self, 'stance_hold_turns'):
+                self.stance_hold_turns = 0
+            if not hasattr(self, 'previous_stance_id'):
+                self.previous_stance_id = stance_id
+            
+            if self.previous_stance_id == stance_id:
+                self.stance_hold_turns += 1
+            else:
+                self.stance_hold_turns = 1
+                self.previous_stance_id = stance_id
+            
+            # 누적 보너스 계산 (턴당 3%, 최대 35%)
+            growth_rate = mastery_stack_config.get("growth_per_turn", 0.03)
+            max_bonus = mastery_stack_config.get("max_bonus", 0.35)
+            accumulated_bonus = min(self.stance_hold_turns * growth_rate, max_bonus)
+            mastery_stack_bonus = 1.0 + accumulated_bonus
+        
+        # 6가지 자세별 효과 (특성으로 증폭)
+        if stance_id == 0:  # 공격 자세
+            attack_boost = int(self.physical_attack * 0.25 * stance_amplify * mastery_stack_bonus)
+            self.temp_attack_bonus += attack_boost
+            if mastery_bonus:
+                self.temp_attack_bonus += int(self.physical_attack * 0.20)  # 6단계 완전체: 공격력 +20%
+                
+        elif stance_id == 1:  # 방어 자세
+            defense_boost = int(self.physical_defense * 0.3 * stance_amplify * mastery_stack_bonus)
+            self.temp_defense_bonus += defense_boost
+            # 마법 방어력도 +25% 추가
+            magic_defense_boost = int(self.magic_defense * 0.25 * stance_amplify * mastery_stack_bonus)
+            if hasattr(self, 'temp_magic_defense_bonus'):
+                self.temp_magic_defense_bonus += magic_defense_boost
+            else:
+                self.temp_magic_defense_bonus = magic_defense_boost
+            if mastery_bonus:
+                self.temp_defense_bonus += int(self.physical_defense * 0.25)  # 6단계 완전체: 방어력 +25%
+                # 마법 방어력도 추가 보너스
+                if hasattr(self, 'temp_magic_defense_bonus'):
+                    self.temp_magic_defense_bonus += int(self.magic_defense * 0.25)
+                else:
+                    self.temp_magic_defense_bonus = int(self.magic_defense * 0.25)
+                
+        elif stance_id == 2:  # 균형 자세
+            balance_boost = int(min(self.physical_attack, self.physical_defense) * 0.15 * stance_amplify * mastery_stack_bonus)
+            self.temp_attack_bonus += balance_boost
+            self.temp_defense_bonus += balance_boost
+            if mastery_bonus:
+                # 6단계 완전체: 모든 능력치 12% 증가 (너프됨)
+                self.temp_attack_bonus += int(self.physical_attack * 0.12)
+                self.temp_defense_bonus += int(self.physical_defense * 0.12)
+                self.temp_speed_bonus += int(self.speed * 0.12)
+                
+        elif stance_id == 3:  # 광전사 자세
+            berserker_boost = int(self.physical_attack * 0.4 * stance_amplify * mastery_stack_bonus)
+            self.temp_attack_bonus += berserker_boost
+            self.temp_speed_bonus += int(self.speed * 0.25 * mastery_stack_bonus)
+            if mastery_bonus:
+                self.temp_crit_bonus += 0.15  # 6단계 완전체: 크리티컬 +15%
+                
+        elif stance_id == 4:  # 수호자 자세
+            guardian_boost = int(self.physical_defense * 0.35 * stance_amplify * mastery_stack_bonus)
+            self.temp_defense_bonus += guardian_boost
+            if mastery_bonus:
+                # 6단계 완전체: 회복량 +30%
+                if hasattr(self, 'healing_multiplier'):
+                    self.healing_multiplier *= 1.30
+                else:
+                    self.healing_multiplier = 1.30
+                
+        elif stance_id == 5:  # 속도 자세
+            speed_boost = int(self.speed * 0.4 * stance_amplify * mastery_stack_bonus)
+            self.temp_speed_bonus += speed_boost
+            self.temp_attack_bonus += int(self.physical_attack * 0.15 * mastery_stack_bonus)
+            if mastery_bonus:
+                # 6단계 완전체: 행동 속도 35% 증가 (너프됨)
+                if hasattr(self, 'atb_speed'):
+                    self.atb_speed = int(self.atb_speed * 1.35)
+                self.temp_speed_bonus += int(self.speed * 0.35)
+    
+    def _get_stance_name(self, stance_id: int) -> str:
+        """자세 이름 반환 (6단계)"""
+        stance_names = {
+            0: '⚔️ 공격 자세',
+            1: '🛡️ 방어 자세', 
+            2: '⚖️ 균형 자세',
+            3: '💀 광전사 자세',
+            4: '🛠️ 수호자 자세',
+            5: '⚡ 속도 자세'
+        }
+        return stance_names.get(stance_id, '❓ 알 수 없는 자세')
+    
+    def get_available_stances(self) -> list:
+        """사용 가능한 자세 목록 반환 (6단계)"""
+        if self.character_class != "전사":
+            return []
+        return [0, 1, 2, 3, 4, 5]  # 숫자 기반 인덱스
+    
+    def get_stance_description(self, stance_id: int) -> str:
+        """자세 설명 반환 (6단계 완전체 포함)"""
+        descriptions = {
+            0: "공격력 25% 증가, 6단계 완전체: 공격력 추가 20% 증가",
+            1: "방어력 30% 증가, 6단계 완전체: 방어력 추가 25% 증가", 
+            2: "균형잡힌 능력치 향상, 6단계 완전체: 모든 스탯 12% 증가",
+            3: "공격력 40% + 속도 25% 증가, 6단계 완전체: 크리티컬 15% 증가",
+            4: "방어력 35% 증가 + 아군 보호, 6단계 완전체: 회복량 30% 증가",
+            5: "속도 40% + 공격력 15% 증가, 6단계 완전체: 행동속도 35% 증가"
+        }
+        return descriptions.get(stance_id, "알 수 없는 자세")
+    
+    # === 바드 전용 멜로디 시스템 ===
+    def _add_melody_note(self, note: int):
+        """멜로디 노트 추가 (0=DO, 1=RE, 2=MI, 3=FA, 4=SO, 5=LA, 6=TI)"""
+        if self.character_class != "바드":
+            return False
+        
+        if 0 <= note <= 6 and len(self.melody_notes) < 7:
+            self.melody_notes.append(note)
+            self._update_melody_display()
+            return True
+        return False
+    
+    def _clear_melody(self):
+        """멜로디 초기화"""
+        if self.character_class != "바드":
+            return
+        self.melody_notes.clear()
+        self.current_melody = ""
+    
+    def _update_melody_display(self):
+        """멜로디 표시 업데이트"""
+        if self.character_class != "바드":
+            return
+        
+        note_names = ["DO", "RE", "MI", "FA", "SO", "LA", "TI"]
+        if self.melody_notes:
+            melody_str = "/".join([note_names[note] for note in self.melody_notes if 0 <= note < len(note_names)])
+            self.current_melody = melody_str
+        else:
+            self.current_melody = ""
+    
+    def _get_current_melody_display(self) -> str:
+        """현재 멜로디 표시 반환"""
+        if self.character_class != "바드":
+            return ""
+        
+        if self.melody_notes:
+            note_names = ["DO", "RE", "MI", "FA", "SO", "LA", "TI"]
+            return "/".join([note_names[note] for note in self.melody_notes if 0 <= note < len(note_names)])
+        return "MELODY:0"
+        
+        print(f"💨 [FORCE INIT] {self.name} ({character_class}) 기믹 강제 초기화 완료!")

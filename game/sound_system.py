@@ -76,15 +76,34 @@ class SoundManager:
         if not self.enabled or name not in self.sounds:
             return
             
+        # 🔇 글리치 모드 체크 - sound_system BGM 차단
+        try:
+            import __main__
+            if hasattr(__main__, 'game'):
+                game = __main__.game
+                # 강제 글리치 모드 체크
+                if hasattr(game, '_force_glitch_mode') and game._force_glitch_mode:
+                    print("🔇 [SOUND SYSTEM BLOCKED] Force glitch mode - Sound system BGM denied")
+                    return
+                # 일반 글리치 모드 체크
+                if hasattr(game, 'story_system') and game.story_system:
+                    if hasattr(game.story_system, 'is_glitch_mode') and game.story_system.is_glitch_mode():
+                        print("🔇 [SOUND SYSTEM BLOCKED] Glitch mode - Sound system BGM denied")
+                        return
+        except:
+            pass
+            
         try:
             sound_data = self.sounds[name]
             if sound_data["type"] == SoundType.BGM:
-                pygame.mixer.music.load(sound_data["path"])
-                if volume is not None:
-                    pygame.mixer.music.set_volume(volume)
-                else:
-                    pygame.mixer.music.set_volume(self.bgm_volume)
-                pygame.mixer.music.play(loops)
+                # 💀 직접 pygame 호출 완전 주석처리 - 밤샌 고생 끝!
+                # pygame.mixer.music.load(sound_data["path"])
+                # if volume is not None:
+                #     pygame.mixer.music.set_volume(volume)
+                # else:
+                #     pygame.mixer.music.set_volume(self.bgm_volume)
+                # pygame.mixer.music.play(loops)
+                print(f"🔇 [BGM BLOCKED] Sound system BGM '{name}' 호출 차단됨")
                 self.current_bgm = name
         except Exception as e:
             print(f"배경음악 재생 실패 ({name}): {e}")
@@ -92,24 +111,32 @@ class SoundManager:
     def stop_bgm(self):
         """배경음악 정지"""
         if self.enabled:
-            pygame.mixer.music.stop()
+            # 💀 직접 pygame 호출 주석처리 - 밤샌 고생 끝!
+            # pygame.mixer.music.stop()
+            print("🔇 [BGM STOP BLOCKED] Sound system BGM stop 차단됨")
             self.current_bgm = None
             
     def pause_bgm(self):
         """배경음악 일시정지"""
         if self.enabled:
-            pygame.mixer.music.pause()
+            # 💀 직접 pygame 호출 주석처리 - 밤샌 고생 끝!
+            # pygame.mixer.music.pause()
+            print("🔇 [BGM PAUSE BLOCKED] Sound system BGM pause 차단됨")
             
     def resume_bgm(self):
         """배경음악 재개"""
         if self.enabled:
-            pygame.mixer.music.unpause()
+            # 💀 직접 pygame 호출 주석처리 - 밤샌 고생 끝!
+            # pygame.mixer.music.unpause()
+            print("🔇 [BGM RESUME BLOCKED] Sound system BGM resume 차단됨")
             
     def set_bgm_volume(self, volume: float):
         """배경음악 볼륨 설정 (0.0 ~ 1.0)"""
         self.bgm_volume = max(0.0, min(1.0, volume))
         if self.enabled:
-            pygame.mixer.music.set_volume(self.bgm_volume)
+            # 💀 직접 pygame 호출 주석처리 - 밤샌 고생 끝!
+            # pygame.mixer.music.set_volume(self.bgm_volume)
+            print("🔇 [BGM VOLUME BLOCKED] Sound system BGM volume 차단됨")
             
     def set_sfx_volume(self, volume: float):
         """효과음 볼륨 설정 (0.0 ~ 1.0)"""
@@ -180,21 +207,21 @@ class GameSounds:
         # 실제 사운드 파일들이 있다면 로드
         sound_files = {
             # 전투 효과음
-            "brave_attack": "sounds/sfx/brave_attack.wav",
-            "hp_attack": "sounds/sfx/hp_attack.wav",
-            "break_sound": "sounds/sfx/break.wav",
-            "critical_hit": "sounds/sfx/critical.wav",
+            "brave_attack": "game/audio/sfx/brave_attack.wav",
+            "hp_attack": "game/audio/sfx/hp_attack.wav",
+            "break_sound": "game/audio/sfx/break.wav",
+            "critical_hit": "game/audio/sfx/critical.wav",
             
             # UI 효과음
-            "menu_select": "sounds/sfx/menu_select.wav",
-            "menu_confirm": "sounds/sfx/menu_confirm.wav",
-            "item_get": "sounds/sfx/item_get.wav",
-            "combat_start": "sounds/sfx/combat_start.wav",
+            "menu_select": "game/audio/sfx/menu_select.wav",
+            "menu_confirm": "game/audio/sfx/menu_confirm.wav",
+            "item_get": "game/audio/sfx/item_get.wav",
+            "combat_start": "game/audio/sfx/combat_start.wav",
             
             # 상태 효과음
-            "heal": "sounds/sfx/heal.wav",
-            "poison": "sounds/sfx/poison.wav",
-            "level_up": "sounds/sfx/level_up.wav",
+            "heal": "game/audio/sfx/heal.wav",
+            "poison": "game/audio/sfx/poison.wav",
+            "level_up": "game/audio/sfx/level_up.wav",
         }
         
         # 실제로는 파일이 없으므로 더미 사운드로 대체

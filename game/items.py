@@ -232,15 +232,15 @@ class Item:
             
         percentage = self.get_durability_percentage()
         if percentage >= 80:
-            return "🟢"
+            return "🔵"  # 최상
         elif percentage >= 50:
-            return "🟡"
+            return "🟢"  # 양호
         elif percentage >= 20:
-            return "🟠"
+            return "🟡"  # 보통
         elif percentage > 0:
-            return "🔴"
+            return "🔴"  # 나쁨
         else:
-            return "💥"
+            return "🤯"  # 파괴됨
     
     def damage_durability(self, amount: int = 1) -> bool:
         """내구도 감소 - 파괴 여부 반환"""
@@ -369,15 +369,15 @@ class Item:
         self.value = int(self.value * stage_bonus * self.stage_scaling["value_multiplier"])
         
     def get_display_char(self) -> str:
-        """표시용 문자 반환"""
+        """표시용 문자 반환 (맵용 기호)"""
         if self.item_type == ItemType.CONSUMABLE:
             return "!"
         elif self.item_type == ItemType.WEAPON:
-            return "/"
+            return "L"  # 맵에서 무기 표시
         elif self.item_type == ItemType.ARMOR:
             return "]"
         elif self.item_type == ItemType.ACCESSORY:
-            return "o"
+            return "Q"  # 맵에서 액세서리 표시
         else:
             return "?"
             
@@ -581,7 +581,24 @@ class Item:
             print(f"💨 {character.name}의 속도가 영구히 {bonus} 증가했습니다!")
             used = True
         
-        # 6. 특수 효과
+        # 6. 공격 아이템 효과 (폭탄 등)
+        if "damage_enemy" in self.effects:
+            damage_amount = self.stats.get("damage_amount", 50)
+            print(f"💥 {self.name} 폭발! 적에게 {damage_amount}의 피해를 가합니다!")
+            # 전투 시스템에서 적 선택은 별도로 처리
+            used = True
+            
+        if "damage_all_enemies" in self.effects:
+            damage_amount = self.stats.get("damage_amount", 40)
+            print(f"💥💥 {self.name} 대폭발! 모든 적에게 {damage_amount}의 피해를 가합니다!")
+            used = True
+            
+        if "blind_enemies" in self.effects:
+            duration = self.stats.get("duration", 3)
+            print(f"💨 {self.name} 사용! 적들을 {duration}턴 동안 실명 상태로 만듭니다!")
+            used = True
+            
+        # 7. 특수 효과
         if "revive" in self.effects:
             if character.current_hp <= 0:
                 revive_hp = self.stats.get("revive_hp", character.max_hp // 2)
@@ -2787,6 +2804,17 @@ class ItemDatabase:
     @staticmethod
     def get_random_item_by_stage(stage: int) -> Optional[Item]:
         """스테이지를 고려한 랜덤 아이템 생성 (레벨 제한 포함)"""
+        # 층수별 아이템 등급 제한
+        if stage <= 5:
+            # 1~5층: UNCOMMON 이하만 허용
+            max_allowed_rarity = ItemRarity.UNCOMMON
+        elif stage <= 12:
+            # 6~12층: RARE까지 허용
+            max_allowed_rarity = ItemRarity.RARE
+        else:
+            # 13층 이상: 모든 등급 허용
+            max_allowed_rarity = None
+        
         # 드롭 확률 체크
         drop_chance = DropRateManager.get_drop_chance(stage)
         if random.random() > drop_chance:
@@ -2795,6 +2823,10 @@ class ItemDatabase:
         # 희귀도 선택
         target_rarity = DropRateManager.select_rarity_by_stage(stage)
         
+        # 층수별 제한 적용
+        if max_allowed_rarity and target_rarity.value > max_allowed_rarity.value:
+            target_rarity = max_allowed_rarity
+        
         # 해당 희귀도의 아이템들 필터링 (레벨 제한 고려)
         all_items = ItemDatabase.get_all_items()
         items_by_rarity = [item for item in all_items 
@@ -2802,20 +2834,14 @@ class ItemDatabase:
         
         # 레벨 제한으로 인해 해당 희귀도 아이템이 없으면 낮은 희귀도로 대체
         if not items_by_rarity:
-            # EPIC이나 LEGENDARY가 레벨 제한에 걸린 경우 RARE로 대체
-            if target_rarity in [ItemRarity.EPIC, ItemRarity.LEGENDARY]:
-                items_by_rarity = [item for item in all_items 
-                                  if item.rarity == ItemRarity.RARE and item.min_level <= stage]
-            
-            # 그래도 없으면 UNCOMMON으로 대체
-            if not items_by_rarity:
-                items_by_rarity = [item for item in all_items 
-                                  if item.rarity == ItemRarity.UNCOMMON and item.min_level <= stage]
-            
-            # 그래도 없으면 COMMON으로 대체
-            if not items_by_rarity:
-                items_by_rarity = [item for item in all_items 
-                                  if item.rarity == ItemRarity.COMMON and item.min_level <= stage]
+            # 단계적으로 낮은 희귀도로 시도
+            fallback_rarities = [ItemRarity.RARE, ItemRarity.UNCOMMON, ItemRarity.COMMON]
+            for fallback_rarity in fallback_rarities:
+                if fallback_rarity.value <= max_allowed_rarity.value:
+                    items_by_rarity = [item for item in all_items 
+                                      if item.rarity == fallback_rarity and item.min_level <= stage]
+                    if items_by_rarity:
+                        break
             
         if not items_by_rarity:
             return None

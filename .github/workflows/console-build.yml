@@ -1,0 +1,157 @@
+name: 🚀 Dawn Of Stellar v3.0.0 - 콘솔 게임 자동 빌드
+
+on:
+  push:
+    branches: [ master, main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: 🧪 테스트 실행
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 소스 체크아웃
+      uses: actions/checkout@v4
+      
+    - name: 🐍 Python 3.10 설정
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: 📦 의존성 설치
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: 🔍 기본 테스트 실행
+      run: |
+        python -c "import game.brave_combat; print('✅ 전투 시스템 로드 성공')"
+        python -c "import game.character; print('✅ 캐릭터 시스템 로드 성공')"
+        python -c "import game.dungeon_system; print('✅ 던전 시스템 로드 성공')"
+        python -c "import config; print('✅ 설정 시스템 로드 성공')"
+
+  build-windows:
+    name: 🏗️ Windows 콘솔 빌드
+    runs-on: windows-latest
+    needs: test
+    
+    steps:
+    - name: 📥 소스 체크아웃
+      uses: actions/checkout@v4
+      
+    - name: 🐍 Python 3.10 설정
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: 📦 의존성 설치
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+        
+    - name: 🎮 콘솔 게임 빌드
+      run: |
+        pyinstaller --console --name "DawnOfStellar_v3.0.0_Console" --icon=dos.png --add-data "sounds;sounds" --add-data "game;game" --hidden-import=game --hidden-import=game.brave_combat --hidden-import=game.character --hidden-import=game.dungeon_system --hidden-import=game.item_system --hidden-import=game.skill_system --hidden-import=game.party_manager --hidden-import=game.save_system --hidden-import=game.audio_system --distpath dist/windows main.py
+        
+    - name: 📋 런처 파일 복사
+      run: |
+        copy "런처실행.bat" "dist/windows/"
+        copy "README.md" "dist/windows/"
+        
+    - name: 📤 Windows 빌드 업로드
+      uses: actions/upload-artifact@v3
+      with:
+        name: DawnOfStellar-v3.0.0-Windows-Console
+        path: dist/windows/
+        
+  build-portable:
+    name: 📦 포터블 배포판 생성
+    runs-on: windows-latest
+    needs: build-windows
+    
+    steps:
+    - name: 📥 소스 체크아웃
+      uses: actions/checkout@v4
+      
+    - name: 📥 Windows 빌드 다운로드
+      uses: actions/download-artifact@v3
+      with:
+        name: DawnOfStellar-v3.0.0-Windows-Console
+        path: portable/
+        
+    - name: 📦 포터블 패키지 생성
+      run: |
+        cd portable
+        echo "🌟 Dawn Of Stellar v3.0.0 - 포터블 버전" > INFO.txt
+        echo "================================" >> INFO.txt
+        echo "" >> INFO.txt
+        echo "📋 실행 방법:" >> INFO.txt
+        echo "1. 런처실행.bat 더블클릭" >> INFO.txt
+        echo "2. 원하는 모드 선택" >> INFO.txt
+        echo "3. 게임 플레이!" >> INFO.txt
+        echo "" >> INFO.txt
+        echo "🎮 조작법:" >> INFO.txt
+        echo "- 키보드로 조작" >> INFO.txt
+        echo "- 메뉴에서 숫자키로 선택" >> INFO.txt
+        echo "- ESC로 이전 메뉴" >> INFO.txt
+        echo "" >> INFO.txt
+        echo "📱 모바일 앱도 지원합니다!" >> INFO.txt
+        
+    - name: 🗜️ ZIP 압축
+      run: |
+        powershell Compress-Archive -Path "portable/*" -DestinationPath "DawnOfStellar-v3.0.0-Portable.zip"
+        
+    - name: 📤 포터블 배포판 업로드
+      uses: actions/upload-artifact@v3
+      with:
+        name: DawnOfStellar-v3.0.0-Portable-Release
+        path: DawnOfStellar-v3.0.0-Portable.zip
+
+  release:
+    name: 🎉 릴리즈 생성
+    runs-on: ubuntu-latest
+    needs: [build-windows, build-portable]
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+    - name: 📥 모든 아티팩트 다운로드
+      uses: actions/download-artifact@v3
+      
+    - name: 🎉 GitHub 릴리즈 생성
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          DawnOfStellar-v3.0.0-Portable-Release/DawnOfStellar-v3.0.0-Portable.zip
+        body: |
+          # 🌟 Dawn Of Stellar v3.0.0 - 정식 릴리즈
+          
+          ## 🎮 주요 특징
+          - ✅ 완전한 콘솔 기반 게임플레이
+          - ✅ Final Fantasy 스타일 Brave 전투 시스템
+          - ✅ 28개 고유 직업군
+          - ✅ 메타 진행 시스템
+          - ✅ 원클릭 실행 가능
+          
+          ## 📥 설치 방법
+          1. `DawnOfStellar-v3.0.0-Portable.zip` 다운로드
+          2. 압축 해제
+          3. `런처실행.bat` 실행
+          4. 게임 플레이!
+          
+          ## 🎯 시스템 요구사항
+          - Windows 10 이상
+          - 콘솔/터미널 지원
+          - 키보드 입력
+          
+          즐거운 게임 플레이 되세요! 🚀
+        name: Dawn Of Stellar v3.0.0 - Console Edition
+        tag_name: ${{ github.ref }}
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

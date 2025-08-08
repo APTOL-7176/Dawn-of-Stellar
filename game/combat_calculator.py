@@ -95,7 +95,7 @@ class CriticalSystem:
     def calculate_total_critical_rate(self, character) -> int:
         """총 크리티컬 확률 계산"""
         # 기본 크리티컬 (직업)
-        base_rate = self.get_base_critical_rate(character.job.value)
+        base_rate = self.get_base_critical_rate(character.character_class.value)
         
         # 캐릭터 크리티컬 스탯
         stat_rate = getattr(character, 'critical', 0)

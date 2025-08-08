@@ -136,15 +136,16 @@ class CombatAction:
 class CombatManager:
     """ATB 전투 관리자 (Brave 시스템 포함)"""
     
-    def __init__(self, audio_system=None, sound_manager=None):
+    def __init__(self, audio_system=None, sound_manager=None, keyboard=None):
         self.party_members: List[Character] = []
         self.enemies: List[Character] = []
         self.combat_active = False
         self.brave_combat = BraveCombatSystem(audio_system, sound_manager)  # Brave 전투 시스템
         self.turn_queue: List[Character] = []
         self.combat_log: List[str] = []
+        self.keyboard = keyboard  # 키보드 입력 시스템
         
-    def start_combat(self, party: List[Character], enemies: List[Character]):
+    def start_battle(self, party: List[Character], enemies: List[Character]):
         """전투 시작 (Brave 시스템 사용)"""
         self.party_members = party
         self.enemies = enemies
@@ -303,7 +304,7 @@ class CombatManager:
         return ready_party + ready_enemies
         
     def process_character_turn(self, character: Character):
-        """캐릭터 턴 처리"""
+        """캐릭터 턴 처리 - ATB 불균형 방지 강화"""
         if not character.is_alive:
             return
             
@@ -320,6 +321,9 @@ class CombatManager:
         print(f"\n{'='*60}")
         print(f"{character.name}의 턴!")
         
+        # 턴 시작 전에 다른 캐릭터들의 ATB 공정하게 증가
+        self._distribute_atb_fairly(character)
+        
         if character in self.party_members:
             # 플레이어 캐릭터 턴
             action = self.get_player_action(character)
@@ -328,13 +332,50 @@ class CombatManager:
             action = self.get_enemy_action(character)
             
         self.execute_action(action)
+        
+        # 강화된 ATB 리셋 - 행동 후 반드시 0으로 초기화
         character.reset_atb()
+        print(f"🔄 {character.name} ATB 리셋: {character.atb_gauge}")
+        
+        # 즉시 다른 캐릭터들의 ATB 상태 확인 및 기회 제공
+        ready_others = self._check_and_boost_other_characters(character)
+        if ready_others:
+            print(f"🎯 다른 캐릭터 {len(ready_others)}명 턴 준비됨: {[c.name for c in ready_others]}")
         
         # 전투 상태 표시
         self.show_combat_status()
         
+    def _distribute_atb_fairly(self, current_character: Character):
+        """다른 캐릭터들에게 ATB 기회를 공정하게 분배"""
+        all_combatants = self.party_members + self.enemies
+        
+        for character in all_combatants:
+            if character != current_character and character.can_act():
+                # 현재 턴이 아닌 캐릭터들의 ATB를 조금씩 증가
+                if character.atb_gauge < 950:  # 거의 준비된 상태가 아니면
+                    bonus_atb = min(100, 950 - character.atb_gauge)
+                    character.atb_gauge += bonus_atb
+                    
+    def _check_and_boost_other_characters(self, current_character: Character):
+        """다른 캐릭터들의 ATB 상태를 확인하고 필요시 부스트"""
+        all_combatants = self.party_members + self.enemies
+        ready_characters = []
+        
+        for character in all_combatants:
+            if character != current_character and character.can_act():
+                # ATB가 부족하면 추가 부스트
+                if character.atb_gauge < 1000:
+                    boost = min(200, 1000 - character.atb_gauge)
+                    character.atb_gauge += boost
+                    
+                # 1000 이상이면 준비됨 목록에 추가
+                if character.atb_gauge >= 1000:
+                    ready_characters.append(character)
+                    
+        return ready_characters
+        
     def get_player_action(self, character: Character) -> CombatAction:
-        """플레이어 액션 입력"""
+        """플레이어 액션 입력 - 키보드 입력 시스템 사용"""
         while True:
             print(f"\n{character.name}의 행동을 선택하세요:")
             print("1. 공격")
@@ -342,7 +383,14 @@ class CombatManager:
             print("3. 스킬")
             print("4. 아이템")
             
-            choice = input("선택 (1-4): ").strip()
+            try:
+                # 키보드 입력 시스템 사용
+                if hasattr(self, 'keyboard') and self.keyboard:
+                    choice = self.keyboard.get_input("선택 (1-4): ")
+                else:
+                    choice = input("선택 (1-4): ").strip()
+            except Exception:
+                choice = input("선택 (1-4): ").strip()
             
             if choice == "1":
                 target = self.select_target(self.enemies, "공격할 대상을 선택하세요:")

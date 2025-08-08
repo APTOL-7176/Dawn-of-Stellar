@@ -53,7 +53,7 @@ def auto_equip_party(party: List, inventory_items: List = None, show_results: bo
     return results
 
 def optimize_all_equipment(party: List, inventory_items: List = None, show_results: bool = True) -> Dict:
-    """전체 장비 최적화 (내구도 고려)"""
+    """전체 장비 최적화 (공평한 분배 시스템) - 개선된 버전"""
     if not inventory_items:
         if show_results:
             print("❌ 최적화할 아이템이 없습니다.")
@@ -62,76 +62,115 @@ def optimize_all_equipment(party: List, inventory_items: List = None, show_resul
     results = {}
     
     if show_results:
-        print("\n🔧 전체 장비 최적화 시작!")
+        print("\n🔧 전체 장비 최적화 시작! (공평한 분배)")
         print("="*50)
-        print("📋 현재 장비 상태 점검 중...")
+        print("📋 1단계: 모든 파티원 장비 해제 중...")
     
+    # 1단계: 모든 파티원의 장비를 해제하고 인벤토리에 반납
+    all_unequipped_items = []
+    for character in party:
+        if not hasattr(character, 'name'):
+            continue
+            
+        # 현재 장착된 장비 모두 해제
+        if hasattr(character, 'equipment'):
+            for slot, item in list(character.equipment.items()):
+                if item:
+                    all_unequipped_items.append(item)
+                    character.equipment[slot] = None
+                    
+        # 다른 장비 시스템도 체크
+        if hasattr(character, 'equipped_items'):
+            for slot, item in list(character.equipped_items.items()):
+                if item:
+                    all_unequipped_items.append(item)
+                    character.equipped_items[slot] = None
+    
+    # 2단계: 전체 아이템 풀 생성 (인벤토리 + 해제된 장비)
+    total_item_pool = inventory_items.copy()  # 복사본 생성
+    total_item_pool.extend(all_unequipped_items)
+    
+    if show_results:
+        print(f"📦 2단계: 아이템 풀 생성 완료 (총 {len(total_item_pool)}개)")
+        print("⚖️ 3단계: 공평한 분배 시작...")
+    
+    # 3단계: 각 파티원에게 직접 장착 (equip_item 메서드 사용)
     for character in party:
         if not hasattr(character, 'name'):
             continue
             
         character_results = {
-            'repaired': 0,
-            'upgraded': 0,
-            'equipped': 0,
-            'durability_issues': []
+            'equipped': 0
         }
         
-        # 1. 현재 장착된 장비의 내구도 점검
-        if hasattr(character, 'equipment'):
-            for slot, item in character.equipment.items():
-                if item and hasattr(item, 'durability'):
-                    current_dur = getattr(item, 'current_durability', item.durability)
-                    max_dur = item.durability
-                    
-                    if current_dur < max_dur * 0.3:  # 30% 이하면 경고
-                        character_results['durability_issues'].append({
-                            'slot': slot,
-                            'item': item.name if hasattr(item, 'name') else str(item),
-                            'durability': f"{current_dur}/{max_dur}"
-                        })
+        equipped_count = 0
+        character_class = getattr(character, 'character_class', '전사')
+        
+        if show_results:
+            print(f"   🧑‍⚔️ {character.name} ({character_class}) 최적화 중...")
+        
+        # 해당 캐릭터가 장착할 수 있는 아이템들 찾기
+        for item in total_item_pool.copy():  # 복사본으로 순회
+            try:
+                # equip_item 메서드로 직접 장착 시도
+                if hasattr(character, 'equip_item'):
+                    success = character.equip_item(item)
+                    if success:
+                        total_item_pool.remove(item)  # 성공하면 풀에서 제거
+                        equipped_count += 1
+                        if show_results:
+                            print(f"      ✅ {item.name} 장착 성공")
+                    elif show_results:
+                        print(f"      ❌ {item.name} 장착 실패")
+                else:
+                    # 기존 방식으로 장착 시도
+                    if hasattr(character, 'equipment'):
+                        # 아이템 타입에 따른 슬롯 결정
+                        slot = None
+                        if hasattr(item, 'item_type'):
+                            if 'WEAPON' in str(item.item_type).upper():
+                                slot = 'weapon'
+                            elif 'ARMOR' in str(item.item_type).upper():
+                                slot = 'armor'
+                            elif 'ACCESSORY' in str(item.item_type).upper():
+                                slot = 'accessory'
                         
-                        # 더 나은 장비가 있는지 확인
-                        better_items = [inv_item for inv_item in inventory_items 
-                                      if hasattr(inv_item, 'equipment_type') and 
-                                      inv_item.equipment_type.lower() == slot.lower() and
-                                      getattr(inv_item, 'current_durability', inv_item.durability) > current_dur]
+                        if slot and slot not in character.equipment:
+                            character.equipment[slot] = None
                         
-                        if better_items:
-                            # 더 나은 장비로 교체
-                            best_item = max(better_items, 
-                                          key=lambda x: getattr(x, 'current_durability', x.durability))
-                            character.equipment[slot] = best_item
-                            inventory_items.remove(best_item)
-                            character_results['upgraded'] += 1
-                            
+                        if slot and not character.equipment.get(slot):
+                            character.equipment[slot] = item
+                            total_item_pool.remove(item)
+                            equipped_count += 1
                             if show_results:
-                                print(f"🔄 {character.name}: {slot} 교체 ({best_item.name if hasattr(best_item, 'name') else '장비'})")
+                                print(f"      ✅ {item.name} -> {slot} 슬롯")
+            except Exception as e:
+                if show_results:
+                    print(f"      ⚠️ {item.name} 장착 중 오류: {e}")
+                continue
         
-        # 2. 자동 장착으로 최적화
-        equipped_items = auto_equip_for_basic_mode(character, inventory_items)
-        character_results['equipped'] = len(equipped_items)
-        
+        character_results['equipped'] = equipped_count
         results[character.name] = character_results
         
         if show_results:
-            total_changes = character_results['upgraded'] + character_results['equipped']
-            if total_changes > 0:
-                print(f"✅ {character.name}: {total_changes}개 최적화 완료")
-                if character_results['durability_issues']:
-                    print(f"   ⚠️  내구도 문제: {len(character_results['durability_issues'])}개")
+            print(f"   📊 {character.name} 결과: {equipped_count}개 장비 장착 완료")
+        results[character.name] = character_results
+        
+        if show_results:
+            if equipped_count > 0:
+                print(f"✅ {character.name}: {equipped_count}개 장비 장착")
             else:
-                print(f"⚪ {character.name}: 최적화 불필요")
+                print(f"⚪ {character.name}: 적합한 장비 없음")
     
     if show_results:
         print("="*50)
         print("🎯 전체 장비 최적화 완료!")
         
         # 요약 정보
-        total_upgrades = sum(r['upgraded'] + r['equipped'] for r in results.values())
-        total_issues = sum(len(r['durability_issues']) for r in results.values())
+        total_equipped = sum(r['equipped'] for r in results.values())
+        remaining_items = len(total_item_pool)
         
-        print(f"📊 결과: {total_upgrades}개 장비 최적화, {total_issues}개 내구도 문제 해결")
+        print(f"📊 결과: {total_equipped}개 장비 분배 완료, {remaining_items}개 아이템 남음")
     
     return results
 

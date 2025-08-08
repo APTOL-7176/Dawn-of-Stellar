@@ -8,7 +8,6 @@ import os
 import sys
 from typing import List, Optional, Callable, Dict, Any
 from enum import Enum
-
 class MenuAction(Enum):
     """메뉴 액션 타입"""
     SELECT = "select"
@@ -35,7 +34,8 @@ class CursorMenu:
     
     def __init__(self, title: str = "", options: List[str] = None, descriptions: List[str] = None, 
                  audio_manager=None, keyboard=None, cancellable: bool = True, extra_content: str = "",
-                 clear_screen: bool = True):
+                 clear_screen: bool = True,
+                 buffered: bool = False):
         """메뉴 초기화"""
         try:
             if not audio_manager:
@@ -43,34 +43,89 @@ class CursorMenu:
                 self.audio_manager = get_audio_manager()
             else:
                 self.audio_manager = audio_manager
-                
+
             if not keyboard:
-                from game.input_utils import KeyboardInput
-                self.keyboard = KeyboardInput()
+                # 게임패드 지원을 위한 통합 입력 관리자 사용
+                from game.input_utils import UnifiedInputManager
+                self.keyboard = UnifiedInputManager()
             else:
                 self.keyboard = keyboard
         except ImportError:
             print("⚠️ 오디오 시스템을 불러올 수 없습니다.")
             self.audio_manager = None
-            self.keyboard = None
-            
+            # 폴백: 기본 키보드 입력
+            try:
+                from game.input_utils import KeyboardInput
+                self.keyboard = KeyboardInput()
+            except:
+                self.keyboard = None
+
+        # 기본 상태값
         self.selected_index = 0
-        self.items = []
+        self.items: List[MenuItem] = []
         self.title = title
         self.extra_content = extra_content  # 추가 콘텐츠 (파티 정보 등)
         self.show_description = True
         self.show_index = True
-        # 쿨다운 시스템 제거 - input_utils.py 중복 제거로 인해 불필요
+        self.show_header = True  # 헤더(==== 장식) 표시 여부
         self.cancellable = cancellable
-        self.clear_screen = clear_screen  # 화면 지우기 옵션
+        self.compact_mode = os.getenv('SUBPROCESS_MODE') == '1'
+        self.clear_screen = clear_screen
+        self.buffered = buffered or self.compact_mode
+        self._last_render_line_count = 0
+        self._ansi_inplace_supported = self._detect_ansi_support()
+        self._menu_displayed = False
         
-        # 옵션들이 제공되면 자동으로 MenuItem 생성
+        # 모바일 환경 감지 (Flutter 클라이언트나 HTTP 모드)
+        self.is_mobile = (os.getenv('MOBILE_MODE') == '1' or 
+                         os.getenv('HTTP_MODE') == '1' or
+                         os.getenv('FLUTTER_MODE') == '1')
+        
+        # 모바일에서는 인플레이스 업데이트 비활성화 (중복 표시 방지)
+        if self.is_mobile:
+            self._ansi_inplace_supported = False
+            self.compact_mode = True
+
+        # 옵션 -> MenuItem 자동 생성
         if options:
-            items = []
+            temp_items: List[MenuItem] = []
             for i, option in enumerate(options):
                 desc = descriptions[i] if descriptions and i < len(descriptions) else ""
-                items.append(MenuItem(option, description=desc))
-            self.set_items(items)
+                temp_items.append(MenuItem(option, description=desc))
+            self.set_items(temp_items)
+
+    def _println(self, text: str = "", normalize_multi: bool = False):
+        """크로스플랫폼 줄바꿈 출력. Windows에서 CRLF 보장.
+        normalize_multi=True일 때는 문자열 내부의 모든 \n을 CRLF로 변환.
+        """
+        try:
+            if os.name == 'nt':
+                t = text or ""
+                if normalize_multi and t:
+                    # 1) 모든 라인 엔딩을 LF로 통일
+                    t = t.replace('\r\n', '\n').replace('\r', '\n')
+                    # 2) 컴팩트 모드에서는 연속 빈 줄을 1줄로 축소
+                    if self.compact_mode:
+                        lines = t.split('\n')
+                        collapsed = []
+                        prev_blank = False
+                        for ln in lines:
+                            blank = (ln.strip() == '')
+                            if blank and prev_blank:
+                                continue
+                            collapsed.append(ln)
+                            prev_blank = blank
+                        t = '\n'.join(collapsed)
+                    # 3) LF를 CRLF로 변환 후 최종 CRLF 추가
+                    t = t.replace('\n', '\r\n')
+                    sys.stdout.write(t + "\r\n")
+                else:
+                    sys.stdout.write(t + "\r\n")
+            else:
+                print(text)
+        except Exception:
+            # 문제가 생기면 일반 print로 폴백
+            print(text)
         
     def set_items(self, items: List[MenuItem]):
         """메뉴 아이템 설정"""
@@ -118,144 +173,274 @@ class CursorMenu:
                 pass  # 사운드 재생 실패해도 계속 진행
     
     def _clear_screen(self):
-        """화면 클리어"""
-        os.system('cls' if os.name == 'nt' else 'clear')
-        
-    def display_menu(self):
-        """메뉴 화면 표시 - 아스키 아트 보존 버전"""
-        # clear_screen이 False인 경우, 아스키 아트 보존을 위해 업데이트 방식 변경
-        if not self.clear_screen:
-            # 첫 표시인 경우에만 메뉴 표시
-            if not hasattr(self, '_menu_displayed') or not self._menu_displayed:
-                # 제목 표시 (간소화)
-                if self.title:
-                    print(f"\n{self.title}\n")
-                
-                # 추가 콘텐츠 표시 (파티 정보 등) - 처음 한 번만
-                if self.extra_content:
-                    print(self.extra_content)
-                    print()
-                
-                # 메뉴 아이템들 표시
-                self._display_menu_items()
-                
-                # 설명과 조작법 표시
-                self._display_menu_footer()
-                
-                # 메뉴가 표시되었음을 표시
-                self._menu_displayed = True
-            else:
-                # 이미 표시된 경우, 현재 선택만 업데이트 (인라인)
-                self._update_selection_inline()
+        """화면 클리어 - 개선된 버전"""
+        # 버퍼 모드에서는 ANSI 클리어 + 홈 커서 토큰만 보냄
+        if self.buffered:
+            try:
+                # ANSI 시퀀스로 화면 완전 클리어
+                print("\x1b[2J\x1b[H", end='', flush=True)
+            except Exception:
+                pass
             return
         
-        # clear_screen이 True인 경우, 기존 방식 유지
-        # 첫 표시가 아닌 경우, 메뉴만 업데이트
-        if hasattr(self, '_menu_displayed') and self._menu_displayed:
+        # 표준 터미널 클리어
+        try:
+            # Windows에서 더 강력한 클리어
+            if os.name == 'nt':
+                # ANSI 시퀀스 시도 (Windows Terminal, ConEmu 등)
+                if 'WT_SESSION' in os.environ or 'ANSICON' in os.environ:
+                    print("\x1b[2J\x1b[H", end='', flush=True)
+                else:
+                    # CMD 기본 cls
+                    os.system('cls')
+                    print("\x1b[H", end='', flush=True)  # 커서 홈으로
+            else:
+                # Unix/Linux
+                print("\x1b[2J\x1b[H", end='', flush=True)
+        except:
+            # 폴백: 기본 시스템 클리어
+            os.system('cls' if os.name == 'nt' else 'clear')
+
+    # ====== 신규: ANSI 지원 감지 & 라인 구성/인플레이스 렌더 ======
+    def _detect_ansi_support(self) -> bool:
+        """터미널이 기본 ANSI 시퀀스를 지원하는지 간단 감지"""
+        if os.name != 'nt':
+            return True
+        # Windows: WT_SESSION(Windows Terminal) 또는 ANSICON / ConEmu 등
+        if 'WT_SESSION' in os.environ or 'ANSICON' in os.environ:
+            return True
+        # colorama 초기화 여부는 여기서 판단 어렵지만 일단 False
+        return False
+
+    def _compose_menu_lines(self) -> List[str]:
+        """현재 메뉴 전체를 라인 배열로 구성 (출력 부작용 없음)"""
+        lines: List[str] = []
+        # 제목
+        if self.title:
+            if not self.compact_mode and self.show_header:
+                lines.append("")
+                lines.append("="*60)
+                lines.append(f"{self.title:^60}")
+                lines.append("="*60)
+            else:
+                lines.append(self.title)
+        # 추가 콘텐츠
+        if self.extra_content:
+            extra = self.extra_content.replace('\r\n','\n').replace('\r','\n')
+            extra_lines = extra.split('\n')
+            if self.compact_mode:
+                # 연속 공백 줄 축소
+                filtered=[]; prev_blank=False
+                for ln in extra_lines:
+                    blank = (ln.strip()=="")
+                    if blank and prev_blank:
+                        continue
+                    filtered.append(ln)
+                    prev_blank=blank
+                extra_lines = filtered
+            lines.extend(extra_lines)
+            if not self.compact_mode:
+                lines.append("")
+        # 아이템
+        if not self.items:
+            lines.append("⚠️ 메뉴 아이템이 없습니다!")
+        else:
+            for i,item in enumerate(self.items):
+                if not item.enabled:
+                    prefix = "   " if i != self.selected_index else "👉 "
+                    line = f"{prefix}🚫 {item.text}"
+                elif i == self.selected_index:
+                    line = f"👉 [{i+1}] {item.text} 👈" if self.show_index else f"👉 {item.text} 👈"
+                else:
+                    line = f"   [{i+1}] {item.text}" if self.show_index else f"   {item.text}"
+                lines.append(line)
+        # 설명
+        if self.show_description and self.items and self.selected_index < len(self.items):
+            current = self.items[self.selected_index]
+            if current.description:
+                if not self.compact_mode:
+                    lines.append("")
+                lines.append(f"💡 {current.description}")
+        # 조작법
+        if not self.compact_mode:
+            lines.append("")
+            lines.append("═"*70)
+        controls=[]
+        if len(self.items)>1:
+            controls.append("🔼🔽 W/S: 위/아래")
+        controls.append("⚡ Enter: 선택")
+        if self.cancellable:
+            controls.append("❌ Q: 취소")
+        controls.append("📋 I: 정보")
+        control_text = " | ".join(controls)
+        if self.compact_mode:
+            lines.append("  "+control_text)
+        else:
+            lines.append(f"{control_text:^70}")
+            lines.append("═"*70)
+            lines.append(f"{'✦':^14} {'✧':^14} {'✦':^14} {'✧':^14} {'✦':^14}")
+        return lines
+
+    def _print_lines(self, lines: List[str]):
+        """라인 배열 출력 (플랫폼별 줄바꿈 정규화)"""
+        win = (os.name=='nt')
+        for ln in lines:
+            if win:
+                sys.stdout.write(ln + "\r\n")
+            else:
+                print(ln)
+        sys.stdout.flush()
+
+    def _redraw_in_place(self):
+        """ANSI 커서 이동을 사용한 인플레이스 갱신 (중복 누적 제거)"""
+        if not self._ansi_inplace_supported or not sys.stdout.isatty():
+            # 폴백: 전체 재표시
             self._update_menu_only()
             return
-            
-        # 첫 표시인 경우에만 전체 화면 처리
-        if self.clear_screen:
-            self._clear_screen()
+        new_lines = self._compose_menu_lines()
+        # 커서를 이전 렌더 줄 수 만큼 위로 이동
+        if self._last_render_line_count > 0:
+            # A: 위로 이동, H: 필요시 홈이지만 여기선 A만
+            sys.stdout.write(f"\x1b[{self._last_render_line_count}F")
+        # 각 줄 지우고 새 내용 출력
+        common = min(self._last_render_line_count, len(new_lines))
+        for i in range(common):
+            sys.stdout.write("\x1b[2K" + new_lines[i] + ("\r\n" if i < len(new_lines)-1 else ""))
+        # 추가 새 줄
+        if len(new_lines) > common:
+            for i in range(common, len(new_lines)):
+                sys.stdout.write("\x1b[2K" + new_lines[i] + ("\r\n" if i < len(new_lines)-1 else ""))
+        # 남은 이전 줄 지우기
+        if self._last_render_line_count > len(new_lines):
+            for _ in range(self._last_render_line_count - len(new_lines)):
+                sys.stdout.write("\x1b[2K\r\n")
+        sys.stdout.flush()
+        self._last_render_line_count = len(new_lines)
+
         
-        # 제목 표시
-        if self.title:
-            print(f"\n{self.title}\n")
-            print()
-        
-        # 추가 콘텐츠 표시 (파티 정보 등) - 처음 한 번만
-        if self.extra_content:
-            print(self.extra_content)
-            print()
-        
-        # 메뉴 아이템들 표시
-        self._display_menu_items()
-        
-        # 설명과 조작법 표시
-        self._display_menu_footer()
-        
-        # 메뉴가 표시되었음을 표시
+    def display_menu(self):
+        """메뉴 화면 표시"""
+        self._clear_screen()
+        lines = self._compose_menu_lines()
+        self._print_lines(lines)
+        self._last_render_line_count = len(lines)
         self._menu_displayed = True
     
     def _update_selection_inline(self):
-        """선택 항목만 인라인으로 업데이트 (아스키 아트 보존용)"""
-        try:
-            # 커서를 메뉴 시작 위치로 이동하여 메뉴 부분만 다시 그리기
-            print("\033[2K", end='')  # 현재 라인 클리어
-            
-            # 메뉴 아이템들만 다시 표시
-            self._display_menu_items()
-            
-            # 설명 부분 업데이트
-            if self.show_description and self.items and self.selected_index < len(self.items):
-                current_item = self.items[self.selected_index]
-                if current_item.description:
-                    print(f"\n💡 {current_item.description}")
-            
-            # 조작법 다시 표시
-            self._display_menu_footer()
-            
-        except Exception as e:
-            # 인라인 업데이트 실패 시 전체 다시 그리기
-            self._display_full_menu()
-    
-    def _display_full_menu(self):
-        """전체 메뉴 다시 표시 (폴백용)"""
-        if not self.clear_screen:
-            # 아스키 아트 보존 모드에서는 메뉴 부분만 다시 그리기
-            print(f"\n{self.title}\n" if self.title else "")
-            self._display_menu_items()
-            self._display_menu_footer()
+        """선택 항목만 인라인으로 표시 (아스키 아트 보존용) - 깜빡임 방지"""
+        # 인플레이스 ANSI 재렌더 (지원시)
+        if self._ansi_inplace_supported:
+            self._redraw_in_place()
         else:
-            # 일반 모드에서는 전체 화면 클리어 후 다시 그리기
-            self.display_menu()
+            self._update_menu_only()
         
+    def _display_menu_footer_inline(self):
+        """메뉴 하단 정보를 인라인으로 표시 (화면 스크롤 방지)"""
+        # 화려한 구분선과 조작법 표시
+        if not self.compact_mode:
+            self._println("")
+            self._println("═" * 70)
+        
+        # 조작법 표시 (더 예쁜 버전)
+        controls = []
+        if len(self.items) > 1:
+            controls.append("🔼🔽 W/S: 위/아래")
+        controls.append("⚡ Enter: 선택")
+        if self.cancellable:
+            controls.append("❌ Q: 취소")
+        controls.append("📋 I: 정보")
+        control_text = f" | ".join(controls)
+        if self.compact_mode:
+            pad = max(0, (70 - len(control_text)) // 4)
+            self._println((" " * pad) + control_text)
+        else:
+            self._println(f"{control_text:^70}")
+            self._println("═" * 70)
+            # 멋진 하단 장식 (일반 모드에서만)
+            self._println(f"{'✦':^14} {'✧':^14} {'✦':^14} {'✧':^14} {'✦':^14}")
+    # 커서를 마지막으로 이동하여 추가 출력 방지 (필요시 확장 가능)
+        
+    def _display_controls(self):
+        """조작법 표시"""
+        controls = []
+        if len(self.items) > 1:
+            controls.append("🔼🔽 W/S: 위/아래")
+        controls.append("⚡ Enter: 선택")
+        if self.cancellable:
+            controls.append("❌ Q: 취소")
+        controls.append("📋 I: 정보")
+        control_text = f" | ".join(controls)
+        self._println(f"{control_text:^70}")
+        self._println(f"{'✦':^14} {'✧':^14} {'✦':^14} {'✧':^14} {'✦':^14}")
+    
     def _get_current_line(self):
         """현재 커서 위치 라인 반환 (추정)"""
         # 간단한 라인 카운터 (정확하지 않지만 대략적인 위치)
         return 0
         
     def _update_menu_only(self):
-        """메뉴 항목만 업데이트 (clear_screen=True인 경우만 사용)"""
-        # 전체 화면 클리어
-        self._clear_screen()
+        """메뉴 항목만 업데이트 (효율적인 화면 업데이트)"""
+        # 인플레이스 업데이트가 가능하면 사용, 아니면 전체 클리어
+        if self._ansi_inplace_supported and hasattr(self, '_menu_displayed') and self._menu_displayed:
+            self._redraw_in_place()
+        else:
+            # 전체 화면 클리어
+            self._clear_screen()
+            
+            # 제목 다시 표시
+            if self.title:
+                if not self.compact_mode:
+                    self._println("")
+                    self._println("="*60)
+                    self._println(f"{self.title:^60}")
+                    self._println("="*60)
+                else:
+                    if not hasattr(self, "_last_title") or self._last_title != self.title:
+                        self._println(self.title)
+                        self._last_title = self.title
+            
+            # 추가 콘텐츠 표시 (아스키 아트 등)
+            if self.extra_content:
+                self._println(self.extra_content, normalize_multi=True)
+                if not self.compact_mode:
+                    self._println("")
+            
+            # 메뉴 아이템들 다시 표시
+            self._display_menu_items()
+            
+            # 설명과 조작법 표시
+            self._display_menu_footer()
+            
+            # 메뉴 표시 상태 설정
+            self._menu_displayed = True
         
-        # 제목 다시 표시
-        if self.title:
-            print(f"\n{self.title}\n")
-            print()
-        
-        # 추가 콘텐츠 표시 (파티 정보 등)
-        if self.extra_content:
-            print(self.extra_content)
-            print()
-        
-        # 메뉴 아이템들 다시 표시
-        self._display_menu_items()
-        
-        # 설명과 조작법 표시
-        self._display_menu_footer()
+        # 강제 플러시
+        import sys
+        sys.stdout.flush()
         
     def _display_menu_items(self):
         """메뉴 아이템들만 표시"""
+        if not self.items:
+            self._println("⚠️ 메뉴 아이템이 없습니다!")
+            return
+            
         for i, item in enumerate(self.items):
             if not item.enabled:
                 # 비활성화된 항목
                 prefix = "   " if i != self.selected_index else "👉 "
-                print(f"{prefix}🚫 {item.text}")
+                self._println(f"{prefix}🚫 {item.text}")
             elif i == self.selected_index:
                 # 선택된 항목
                 if self.show_index:
-                    print(f"👉 [{i+1}] {item.text} 👈")
+                    self._println(f"👉 [{i+1}] {item.text} 👈")
                 else:
-                    print(f"👉 {item.text} 👈")
+                    self._println(f"👉 {item.text} 👈")
             else:
                 # 일반 항목
                 if self.show_index:
-                    print(f"   [{i+1}] {item.text}")
+                    self._println(f"   [{i+1}] {item.text}")
                 else:
-                    print(f"   {item.text}")
+                    self._println(f"   {item.text}")
         
     def _display_menu_footer(self):
         """메뉴 하단 정보 표시 - 화려한 버전"""
@@ -263,10 +448,14 @@ class CursorMenu:
         if self.show_description and self.items and self.selected_index < len(self.items):
             current_item = self.items[self.selected_index]
             if current_item.description:
-                print(f"\n💡 {current_item.description}")
+                if not self.compact_mode:
+                    self._println("")
+                self._println(f"💡 {current_item.description}")
         
         # 화려한 구분선과 조작법 표시
-        print(f"\n{'═' * 70}")
+        if not self.compact_mode:
+            self._println("")
+            self._println("═" * 70)
         
         # 조작법 표시 (더 예쁜 버전)
         controls = []
@@ -278,11 +467,15 @@ class CursorMenu:
         controls.append("📋 I: 정보")
         
         control_text = f" | ".join(controls)
-        print(f"{control_text:^70}")
-        print(f"{'═' * 70}")
-        
-        # 멋진 하단 장식
-        print(f"{'✦':^14} {'✧':^14} {'✦':^14} {'✧':^14} {'✦':^14}")
+        if self.compact_mode:
+            # 컴팩트 모드: 왼쪽 여백을 절반 수준으로만
+            # 기존 70컬럼 센터링 대신 좌측 정렬 + 소폭 패딩
+            self._println("  " + control_text)
+        else:
+            self._println(f"{control_text:^70}")
+            self._println("═" * 70)
+            # 멋진 하단 장식 (일반 모드에서만)
+            self._println(f"{'✦':^14} {'✧':^14} {'✦':^14} {'✧':^14} {'✦':^14}")
         
     def move_cursor(self, direction: int, silent: bool = False):
         """커서 이동 (사운드 중복 방지 강화)"""
@@ -298,18 +491,38 @@ class CursorMenu:
             self.play_cursor_sound()
             
     def handle_input(self) -> MenuAction:
-        """키 입력 처리"""
+        """키 입력 처리 (키보드 + 게임패드 지원)"""
         if not self.keyboard:
             return MenuAction.CANCEL
-            
-        key = self.keyboard.get_key().lower()
         
-        if key == 'w':  # 위로
+        # 통합 입력 관리자에서 입력 받기
+        if hasattr(self.keyboard, 'wait_for_input_with_repeat'):
+            # UnifiedInputManager 사용 - 블로킹 모드로 입력 대기
+            key = self.keyboard.wait_for_input_with_repeat("", timeout=None).lower()
+        elif hasattr(self.keyboard, 'get_input'):
+            # 논블로킹 모드 - 입력이 있을 때까지 대기
+            import time
+            key = ""
+            while not key:
+                key = self.keyboard.get_input().lower()
+                if not key:
+                    time.sleep(0.05)  # 50ms 대기
+        else:
+            # 폴백: 기존 키보드 입력
+            key = self.keyboard.get_key().lower()
+        
+        if key == 'w':  # 위로 (키보드/게임패드)
             self.move_cursor(-1)
             return MenuAction.UP
-        elif key == 's':  # 아래로
+        elif key == 's':  # 아래로 (키보드/게임패드)
             self.move_cursor(1)
             return MenuAction.DOWN
+        elif key == 'a':  # 왼쪽 (게임패드 D-패드)
+            self.move_cursor(-1)
+            return MenuAction.LEFT
+        elif key == 'd':  # 오른쪽 (게임패드 D-패드)
+            self.move_cursor(1)
+            return MenuAction.RIGHT
         elif key == '\r' or key == '\n' or key == ' ':  # 엔터 또는 스페이스 (선택)
             if self.items and self.selected_index < len(self.items):
                 current_item = self.items[self.selected_index]
@@ -320,7 +533,7 @@ class CursorMenu:
                     self.play_error_sound()
                     return MenuAction.SPECIAL
             return MenuAction.SELECT
-        elif key == 'q' and self.cancellable:  # 취소
+        elif key == 'q' and self.cancellable:  # 취소 (키보드/게임패드 B버튼)
             self.play_cancel_sound()
             return MenuAction.CANCEL
         elif key == 'i':  # 정보
@@ -354,8 +567,8 @@ class CursorMenu:
             action = self.handle_input()
             
             if action in [MenuAction.UP, MenuAction.DOWN]:
-                # 커서가 이동한 경우에만 메뉴 업데이트
-                self._update_menu_only()
+                # 커서 이동 -> 인플레이스 갱신 시도
+                self._update_selection_inline()
                 
             elif action == MenuAction.SELECT:
                 current_item = self.items[self.selected_index]

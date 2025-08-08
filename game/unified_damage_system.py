@@ -136,8 +136,9 @@ class UnifiedDamageSystem:
     BRV_LEVEL_BONUS_PER_LEVEL = 0.0  # 레벨당 데미지 보너스 (0%)
 
     # HP 데미지 관련
-    HP_DAMAGE_MULTIPLIER = 0.075   # HP 데미지 기본 배율 (밸런스 조정)
+    HP_DAMAGE_MULTIPLIER = 0.1   # HP 데미지 기본 배율 (밸런스 조정)
     HP_SKILL_POWER_SCALING = 1.5   # HP 스킬 위력 스케일링
+    HP_DEFENSE_REDUCTION = 0.5     # HP 공격의 방어력 영향 비율 (50% 감소)
     
     # 크리티컬 관련
     BASE_CRITICAL_RATE = 0.05      # 기본 크리티컬 확률 (5%)
@@ -284,7 +285,7 @@ class UnifiedDamageSystem:
                           brv_points: Optional[int] = None,
                           hp_power: Optional[float] = None) -> Tuple[DamageResult, int]:
         """
-        통합 HP 데미지 계산
+        통합 HP 데미지 계산 (방어력 영향 포함)
         
         Args:
             attacker: 공격자
@@ -307,15 +308,29 @@ class UnifiedDamageSystem:
         if hp_power is None:
             hp_power = skill.get('hp_power', 1.0)
         
-        # 3. 기본 HP 데미지 계산 (HP_SKILL_POWER_SCALING 적용)
-        base_hp_damage = brv_points * hp_power * self.HP_DAMAGE_MULTIPLIER * self.HP_SKILL_POWER_SCALING
+        # 3. 방어력 적용 (HP 공격은 BRV 공격보다 방어력 영향 적음)
+        damage_type = skill.get('damage_type', 'physical')
+        if damage_type == 'magical':
+            defender_defense = getattr(target, 'magic_defense', 50)
+        else:
+            defender_defense = getattr(target, 'physical_defense', 50)
+        
+        # HP 공격의 방어력 감소 (30% 적용)
+        defense_reduction = defender_defense * self.HP_DEFENSE_REDUCTION
+        defense_multiplier = max(0.2, 1.0 - (defense_reduction / 100))  # 최소 20%는 보장
+
+        # 4. 기본 HP 데미지 계산 (방어력 적용)
+        base_hp_damage = brv_points * hp_power * self.HP_DAMAGE_MULTIPLIER * self.HP_SKILL_POWER_SCALING * defense_multiplier
         result.base_damage = int(base_hp_damage)
         
         result.calculation_steps.append(
-            f"기본 HP 데미지: {brv_points} × {hp_power} × {self.HP_DAMAGE_MULTIPLIER} × {self.HP_SKILL_POWER_SCALING} = {result.base_damage}"
+            f"기본 HP 데미지: {brv_points} × {hp_power} × {self.HP_DAMAGE_MULTIPLIER} × {self.HP_SKILL_POWER_SCALING} × {defense_multiplier:.3f} = {result.base_damage}"
+        )
+        result.calculation_steps.append(
+            f"방어력 적용: {defender_defense} × {self.HP_DEFENSE_REDUCTION} = {defense_reduction:.1f} 감소 (최종 배율: {defense_multiplier:.3f})"
         )
         
-        # 4. 속성 상성 적용
+        # 5. 속성 상성 적용
         result.elemental_bonus = self._calculate_elemental_bonus(skill, attacker, target)
         elemental_damage = int(result.base_damage * result.elemental_bonus)
         if result.elemental_bonus != 1.0:
@@ -323,7 +338,7 @@ class UnifiedDamageSystem:
                 f"속성 보정: {result.base_damage} × {result.elemental_bonus:.2f} = {elemental_damage}"
             )
         
-        # 5. 특성 보정 적용
+        # 6. 특성 보정 적용
         result.trait_bonus = self._calculate_trait_bonus(skill, attacker, target, DamageType.PHYSICAL)
         trait_damage = int(elemental_damage * result.trait_bonus)
         if result.trait_bonus != 1.0:
@@ -331,17 +346,17 @@ class UnifiedDamageSystem:
                 f"특성 보정: {elemental_damage} × {result.trait_bonus:.2f} = {trait_damage}"
             )
         
-        # 6. 최종 HP 데미지
+        # 7. 최종 HP 데미지
         result.final_damage = max(1, trait_damage)
         
-        # 7. 상처 데미지 계산
+        # 8. 상처 데미지 계산
         result.wound_damage = int(result.final_damage * self.WOUND_DAMAGE_RATIO)
         
         result.calculation_steps.append(
             f"상처 데미지: {result.final_damage} × {self.WOUND_DAMAGE_RATIO} = {result.wound_damage}"
         )
         
-        # 8. 디버그 출력
+        # 9. 디버그 출력
         if self.debug_mode:
             self._print_damage_calculation("HP 데미지", result)
             
@@ -655,6 +670,7 @@ def get_damage_constants() -> Dict[str, float]:
         "BRV_BASE_MULTIPLIER": UnifiedDamageSystem.BRV_BASE_MULTIPLIER,
         "BRV_DEFENSE_REDUCTION": UnifiedDamageSystem.BRV_DEFENSE_REDUCTION,
         "HP_DAMAGE_MULTIPLIER": UnifiedDamageSystem.HP_DAMAGE_MULTIPLIER,
+        "HP_DEFENSE_REDUCTION": UnifiedDamageSystem.HP_DEFENSE_REDUCTION,
         "BASE_CRITICAL_RATE": UnifiedDamageSystem.BASE_CRITICAL_RATE,
         "BASE_CRITICAL_MULTIPLIER": UnifiedDamageSystem.BASE_CRITICAL_MULTIPLIER,
         "WOUND_DAMAGE_RATIO": UnifiedDamageSystem.WOUND_DAMAGE_RATIO,

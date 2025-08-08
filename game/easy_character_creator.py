@@ -30,6 +30,13 @@ BLUE = '\033[94m'
 MAGENTA = '\033[95m'
 CYAN = '\033[96m'
 WHITE = '\033[97m'
+BRIGHT_RED = '\033[91m\033[1m'
+BRIGHT_GREEN = '\033[92m\033[1m'
+BRIGHT_YELLOW = '\033[93m\033[1m'
+BRIGHT_BLUE = '\033[94m\033[1m'
+BRIGHT_MAGENTA = '\033[95m\033[1m'
+BRIGHT_CYAN = '\033[96m\033[1m'
+BRIGHT_WHITE = '\033[97m\033[1m'
 
 class EasyCharacterCreator:
     """쉬운 캐릭터 생성 시스템"""
@@ -45,12 +52,54 @@ class EasyCharacterCreator:
         
         # 추천 직업 조합 (사용자가 쉽게 선택할 수 있도록)
         self.recommended_combos = {
-            "균형잡힌 파티": ["전사", "아크메이지", "성기사", "바드"],
-            "물리 특화 파티": ["검성", "궁수", "사무라이", "몽크"],
-            "마법 특화 파티": ["아크메이지", "네크로맨서", "정령술사", "드루이드"],
-            "생존 특화 파티": ["성기사", "신관", "드루이드", "기사"],
-            "속도 특화 파티": ["암살자", "해적", "도적", "바드"],
-            "독특한 조합": ["무당", "용기사", "기계공학자", "철학자"]
+            "균형잡힌 파티": {
+                "classes": ["전사", "아크메이지", "성기사", "바드"],
+                "icon": "⚖️",
+                "description": "탱커, 딜러, 힐러, 서포터의 완벽한 조합",
+                "stats": "공격력: ⭐⭐⭐ | 방어력: ⭐⭐⭐⭐ | 마법력: ⭐⭐⭐ | 속도: ⭐⭐⭐",
+                "strengths": ["안정적인 전투", "모든 상황 대응", "초보자 친화적"],
+                "difficulty": "쉬움"
+            },
+            "물리 특화 파티": {
+                "classes": ["검성", "궁수", "사무라이", "몽크"],
+                "icon": "⚔️",
+                "description": "압도적인 물리 데미지와 크리티컬 특화",
+                "stats": "공격력: ⭐⭐⭐⭐⭐ | 방어력: ⭐⭐⭐ | 마법력: ⭐⭐ | 속도: ⭐⭐⭐⭐",
+                "strengths": ["높은 물리 피해", "크리티컬 연계", "빠른 전투 종료"],
+                "difficulty": "보통"
+            },
+            "마법 특화 파티": {
+                "classes": ["아크메이지", "네크로맨서", "정령술사", "드루이드"],
+                "icon": "🔮",
+                "description": "강력한 마법 공격과 다양한 상태효과",
+                "stats": "공격력: ⭐⭐⭐ | 방어력: ⭐⭐ | 마법력: ⭐⭐⭐⭐⭐ | 속도: ⭐⭐⭐",
+                "strengths": ["광역 마법", "상태이상 특화", "MP 관리 중요"],
+                "difficulty": "보통"
+            },
+            "생존 특화 파티": {
+                "classes": ["성기사", "신관", "드루이드", "기사"],
+                "icon": "🛡️",
+                "description": "최고의 방어력과 회복 능력",
+                "stats": "공격력: ⭐⭐ | 방어력: ⭐⭐⭐⭐⭐ | 마법력: ⭐⭐⭐⭐ | 속도: ⭐⭐",
+                "strengths": ["극강 생존력", "지속적 회복", "장기전 특화"],
+                "difficulty": "쉬움"
+            },
+            "속도 특화 파티": {
+                "classes": ["암살자", "해적", "도적", "바드"],
+                "icon": "💨",
+                "description": "빠른 행동과 크리티컬 위주의 전투",
+                "stats": "공격력: ⭐⭐⭐⭐ | 방어력: ⭐⭐ | 마법력: ⭐⭐⭐ | 속도: ⭐⭐⭐⭐⭐",
+                "strengths": ["초고속 행동", "연속 공격", "크리티컬 폭격"],
+                "difficulty": "어려움"
+            },
+            "독특한 조합": {
+                "classes": ["무당", "용기사", "기계공학자", "철학자"],
+                "icon": "🌟",
+                "description": "특별한 스킬과 유니크한 플레이 스타일",
+                "stats": "공격력: ⭐⭐⭐ | 방어력: ⭐⭐⭐ | 마법력: ⭐⭐⭐⭐ | 속도: ⭐⭐⭐",
+                "strengths": ["독특한 메커니즘", "예측 불가능", "창의적 전술"],
+                "difficulty": "매우 어려움"
+            }
         }
     
     def show_character_creation_menu(self) -> List[Character]:
@@ -60,7 +109,8 @@ class EasyCharacterCreator:
                 while True:
                     options = [
                         "🚀 자동 파티 생성 (추천)",
-                        "🎯 추천 조합 선택",
+                        "🎯 질문 기반 맞춤 파티",
+                        "📋 추천 조합 선택",
                         "🛠️ 커스텀 파티 생성",
                         "👤 단일 캐릭터 생성",
                         "❓ 도움말",
@@ -69,6 +119,7 @@ class EasyCharacterCreator:
                     
                     descriptions = [
                         "밸런스 잡힌 4인 파티를 자동으로 생성합니다",
+                        "질문에 답하여 당신만의 맞춤형 파티를 생성합니다",
                         "미리 준비된 조합 중에서 선택합니다",
                         "직접 캐릭터들을 만들어 파티를 구성합니다",
                         "캐릭터 한 명만 생성합니다",
@@ -79,21 +130,24 @@ class EasyCharacterCreator:
                     menu = CursorMenu("🎭 캐릭터 생성", options, descriptions, cancellable=True)
                     result = menu.run()
                     
-                    if result is None or result == 5:  # 나가기
+                    if result is None or result == 6:  # 나가기
                         return None
                     elif result == 0:  # 자동 파티 생성
                         party = self._auto_party_creation()
                         return party
-                    elif result == 1:  # 추천 조합 선택
+                    elif result == 1:  # 질문 기반 맞춤 파티
+                        party = self._question_based_party_creation()
+                        return party
+                    elif result == 2:  # 추천 조합 선택
                         party = self._recommended_combo_creation()
                         return party
-                    elif result == 2:  # 커스텀 파티 생성
+                    elif result == 3:  # 커스텀 파티 생성
                         party = self._custom_party_creation()
                         return party
-                    elif result == 3:  # 단일 캐릭터 생성
+                    elif result == 4:  # 단일 캐릭터 생성
                         party = self._single_character_creation()
                         return party
-                    elif result == 4:  # 도움말
+                    elif result == 5:  # 도움말
                         self._show_help()
                         
             except Exception:
@@ -201,13 +255,8 @@ class EasyCharacterCreator:
                             return None
                 
                 if party:
-                    confirm_result = self._confirm_party_cursor(party)
-                    if confirm_result is True:
-                        return party
-                    elif confirm_result is False:
-                        return self._auto_party_creation()  # 재생성
-                    else:  # confirm_result is None (취소)
-                        return None
+                    self.last_generated_party = party
+                    return self._offer_party_options(party, "자동 생성 파티")
                 return None
                 
             except Exception:
@@ -220,38 +269,82 @@ class EasyCharacterCreator:
     def _recommended_combo_creation(self) -> List[Character]:
         """추천 조합 선택 - 커서 메뉴 방식"""
         try:
-            # 메뉴 옵션 구성
+            # 메뉴 옵션 구성 - 완전히 새로운 디자인
             options = []
             descriptions = []
             combo_details = []
             
-            for name, classes in self.recommended_combos.items():
-                classes_str = " + ".join(classes)
-                options.append(f"{name}")
-                descriptions.append(f"구성: {classes_str}")
-                combo_details.append(classes)
+            for i, (combo_name, combo_data) in enumerate(self.recommended_combos.items()):
+                # 아이콘과 함께 옵션 생성
+                option_text = f"{combo_data['icon']} {combo_name}"
+                if combo_name == "균형잡힌 파티":
+                    option_text += f" {YELLOW}(추천){RESET}"
+                
+                options.append(option_text)
+                
+                # 상세 설명 생성
+                classes_str = " + ".join(combo_data['classes'])
+                difficulty_color = {
+                    "쉬움": GREEN,
+                    "보통": YELLOW, 
+                    "어려움": RED,
+                    "매우 어려움": BRIGHT_RED
+                }.get(combo_data['difficulty'], WHITE)
+                
+                desc = f"""{combo_data['description']}
+{CYAN}구성:{RESET} {classes_str}
+{combo_data['stats']}
+{GREEN}장점:{RESET} {' | '.join(combo_data['strengths'])}
+{difficulty_color}난이도: {combo_data['difficulty']}{RESET}"""
+                
+                descriptions.append(desc)
+                combo_details.append(combo_data['classes'])
             
             # 랜덤 조합 추가
             options.append("🎲 랜덤 추천 조합")
-            descriptions.append("추천 조합 중 하나를 랜덤하게 선택합니다")
+            descriptions.append(f"""모든 추천 조합 중 하나를 랜덤하게 선택합니다
+{CYAN}재미있는 도전을 원한다면 선택하세요!{RESET}""")
             combo_details.append(None)  # 랜덤은 나중에 처리
             
-            # 추가 정보 텍스트
-            extra_content = f"""{CYAN}💡 추천 파티 조합 가이드:{RESET}
+            # 추가 정보 텍스트 - 완전히 새로운 디자인
+            extra_content = f"""{CYAN}═══════════════════════════════════════════════════════════{RESET}
+{BRIGHT_CYAN}🌟 D A W N   O F   S T E L L A R - 파티 조합 가이드 🌟{RESET}
+{CYAN}═══════════════════════════════════════════════════════════{RESET}
 
-{GREEN}• 균형잡힌 파티{RESET}: 초보자에게 추천, 모든 상황에 대응 가능
-{GREEN}• 물리 특화{RESET}: 높은 물리 데미지와 생존력
-{GREEN}• 마법 특화{RESET}: 강력한 마법 공격과 다양한 상태효과
-{GREEN}• 생존 특화{RESET}: 회복과 방어에 특화된 안정적인 구성
-{GREEN}• 속도 특화{RESET}: 빠른 행동과 크리티컬 위주의 전투
-{GREEN}• 독특한 조합{RESET}: 특별한 스킬과 유니크한 플레이"""
+{BRIGHT_WHITE}💡 각 조합의 특징:{RESET}
+
+{GREEN}⚖️ 균형잡힌 파티{RESET} - 모든 상황에 대응할 수 있는 만능 구성
+   {WHITE}• 처음 플레이하는 분들께 강력 추천!{RESET}
+   {WHITE}• 안정적인 전투와 학습에 최적화{RESET}
+
+{RED}⚔️ 물리 특화 파티{RESET} - 압도적인 화력으로 적을 제압
+   {WHITE}• 높은 데미지와 크리티컬 특화{RESET}
+   {WHITE}• 빠른 전투 종료를 원한다면 선택{RESET}
+
+{BLUE}🔮 마법 특화 파티{RESET} - 다양한 마법과 상태효과 활용
+   {WHITE}• 광역 공격과 상태이상 특화{RESET}
+   {WHITE}• 전략적 사고를 좋아한다면 추천{RESET}
+
+{CYAN}🛡️ 생존 특화 파티{RESET} - 극강의 방어력과 회복력
+   {WHITE}• 절대 죽지 않는 철벽 방어{RESET}
+   {WHITE}• 안전하게 플레이하고 싶다면 선택{RESET}
+
+{YELLOW}💨 속도 특화 파티{RESET} - 번개같은 속도와 연속 공격
+   {WHITE}• 스릴 넘치는 고속 전투{RESET}
+   {WHITE}• 숙련된 플레이어에게 추천{RESET}
+
+{MAGENTA}🌟 독특한 조합{RESET} - 특별한 스킬과 창의적 전술
+   {WHITE}• 예측 불가능한 유니크 플레이{RESET}
+   {WHITE}• 도전적인 플레이를 원한다면 선택{RESET}
+
+{CYAN}═══════════════════════════════════════════════════════════{RESET}"""
 
             if CURSOR_MENU_AVAILABLE:
                 try:
                     from .cursor_menu_system import CursorMenu
                     
                     menu = CursorMenu(
-                        title=f"{CYAN}📋 추천 파티 조합{RESET}",
+                        title=f"{BRIGHT_CYAN}🎯 추천 파티 조합 선택{RESET}",
                         options=options,
                         descriptions=descriptions,
                         extra_content=extra_content,
@@ -266,13 +359,18 @@ class EasyCharacterCreator:
                     
                     # 선택된 조합 처리
                     if choice == len(options) - 1:  # 랜덤 선택
-                        selected_combo = random.choice(list(self.recommended_combos.values()))
-                        combo_name = "랜덤 추천"
+                        random_combo_name = random.choice(list(self.recommended_combos.keys()))
+                        selected_combo = self.recommended_combos[random_combo_name]['classes']
+                        combo_name = f"랜덤 추천 ({random_combo_name})"
+                        print(f"\n{BRIGHT_YELLOW}🎲 랜덤 선택 결과: {random_combo_name}!{RESET}")
                     else:
-                        selected_combo = combo_details[choice]
                         combo_name = list(self.recommended_combos.keys())[choice]
+                        selected_combo = combo_details[choice]
+                        combo_data = self.recommended_combos[combo_name]
+                        print(f"\n{BRIGHT_GREEN}✨ {combo_data['icon']} {combo_name} 선택!{RESET}")
+                        print(f"{WHITE}{combo_data['description']}{RESET}")
                     
-                    print(f"\n{YELLOW}선택된 조합으로 파티 생성 중...{RESET}")
+                    print(f"\n{YELLOW}파티 생성 중...{RESET}")
                     print(f"{CYAN}선택된 조합: {combo_name} ({' + '.join(selected_combo)}){RESET}")
                     
                 except ImportError:
@@ -396,37 +494,40 @@ class EasyCharacterCreator:
         else:
             print(f"{GREEN}✅ 자동 특성 선택 모드{RESET}")
         
-        try:
-            if manual_traits:
-                # 수동 특성 선택을 위해 특성 없이 파티 생성
-                party = self.auto_builder.create_balanced_party(selected_combo, auto_select_traits=False)
-            else:
-                # 자동 특성 선택 포함해서 파티 생성
-                party = self.auto_builder.create_balanced_party(selected_combo, auto_select_traits=True)
-        except Exception as e:
-            print(f"{RED}파티 생성 중 오류 발생: {e}{RESET}")
-            return None
-        
-        # 수동 특성 선택이면 각 캐릭터마다 특성 선택
-        if manual_traits and party:
-            print(f"\n{CYAN}=== 특성 선택 단계 ==={RESET}")
-            for i, character in enumerate(party, 1):
-                print(f"\n{YELLOW}━━━ {i}/4: {character.name} ({character.character_class}) ━━━{RESET}")
-                trait_success = self._manual_trait_selection(character)
-                if not trait_success:  # 특성 선택이 취소된 경우
-                    print(f"{RED}특성 선택이 취소되어 파티 생성을 중단합니다.{RESET}")
-                    return None
-        
-        if party:
-            confirm_result = self._confirm_party_cursor(party)
-            if confirm_result is True:
-                return party
-            elif confirm_result is False:
-                return self._recommended_combo_creation()  # 재생성
-            else:  # confirm_result is None (취소)
+        while True:  # 🔄 재생성 루프
+            try:
+                if manual_traits:
+                    # 수동 특성 선택을 위해 특성 없이 파티 생성
+                    party = self.auto_builder.create_balanced_party(selected_combo, auto_select_traits=False)
+                else:
+                    # 자동 특성 선택 포함해서 파티 생성
+                    party = self.auto_builder.create_balanced_party(selected_combo, auto_select_traits=True)
+            except Exception as e:
+                print(f"{RED}파티 생성 중 오류 발생: {e}{RESET}")
                 return None
-        
-        return None
+            
+            # 수동 특성 선택이면 각 캐릭터마다 특성 선택
+            if manual_traits and party:
+                print(f"\n{CYAN}=== 특성 선택 단계 ==={RESET}")
+                for i, character in enumerate(party, 1):
+                    print(f"\n{YELLOW}━━━ {i}/4: {character.name} ({character.character_class}) ━━━{RESET}")
+                    trait_success = self._manual_trait_selection(character)
+                    if not trait_success:  # 특성 선택이 취소된 경우
+                        print(f"{RED}특성 선택이 취소되어 파티 생성을 중단합니다.{RESET}")
+                        return None
+            
+            if party:
+                confirm_result = self._confirm_party_cursor(party)
+                if confirm_result is True:
+                    return party
+                elif confirm_result is False:
+                    # 🔄 재생성: 루프를 계속하여 새 파티 생성
+                    print(f"{YELLOW}🔄 같은 설정으로 파티를 다시 생성합니다...{RESET}")
+                    continue
+                else:  # confirm_result is None (취소)
+                    return None
+            else:
+                return None
     
     def _custom_party_creation(self) -> List[Character]:
         """커스텀 파티 생성 - 커서 방식"""
@@ -570,40 +671,49 @@ class EasyCharacterCreator:
                     
                 manual_traits = (trait_result == 1)
                 
-                try:
-                    if manual_traits:
-                        # 수동 특성 선택을 위해 특성 없이 파티 생성
-                        party = self.auto_builder.create_balanced_party(selected_classes, auto_select_traits=False)
-                    else:
-                        # 자동 특성 선택 포함해서 파티 생성
-                        party = self.auto_builder.create_balanced_party(selected_classes, auto_select_traits=True)
-                except Exception as e:
-                    print(f"{RED}파티 생성 중 오류 발생: {e}{RESET}")
-                    if self._show_yes_no_menu("🔄 오류 발생", "다시 시도하시겠습니까?", "다시 시도", "취소"):
-                        return self._custom_party_creation()
-                    else:
-                        return None
-                
-                # 수동 특성 선택이면 각 캐릭터마다 특성 선택
-                if manual_traits and party:
-                    print(f"\n{CYAN}=== 특성 선택 단계 ==={RESET}")
-                    for i, character in enumerate(party, 1):
-                        print(f"\n{YELLOW}━━━ {i}/4: {character.name} ({character.character_class}) ━━━{RESET}")
-                        trait_success = self._manual_trait_selection_cursor(character)
-                        if not trait_success:  # 특성 선택이 취소된 경우
-                            print(f"{RED}특성 선택이 취소되어 파티 생성을 중단합니다.{RESET}")
+                # 🔄 파티 생성 루프
+                while True:
+                    try:
+                        if manual_traits:
+                            # 수동 특성 선택을 위해 특성 없이 파티 생성
+                            party = self.auto_builder.create_balanced_party(selected_classes, auto_select_traits=False)
+                        else:
+                            # 자동 특성 선택 포함해서 파티 생성
+                            party = self.auto_builder.create_balanced_party(selected_classes, auto_select_traits=True)
+                    except Exception as e:
+                        print(f"{RED}파티 생성 중 오류 발생: {e}{RESET}")
+                        if self._show_yes_no_menu("🔄 오류 발생", "다시 시도하시겠습니까?", "다시 시도", "취소"):
+                            continue  # 루프 계속
+                        else:
                             return None
-                
-                if party:
-                    confirm_result = self._confirm_party_cursor(party)
-                    if confirm_result is True:
-                        return party
-                    elif confirm_result is False:
-                        return self._custom_party_creation()  # 재생성
-                    else:  # confirm_result is None (취소)
-                        return None
-                else:
-                    return self._custom_party_creation()
+                    
+                    # 수동 특성 선택이면 각 캐릭터마다 특성 선택
+                    if manual_traits and party:
+                        print(f"\n{CYAN}=== 특성 선택 단계 ==={RESET}")
+                        trait_all_success = True
+                        for i, character in enumerate(party, 1):
+                            print(f"\n{YELLOW}━━━ {i}/4: {character.name} ({character.character_class}) ━━━{RESET}")
+                            trait_success = self._manual_trait_selection_cursor(character)
+                            if not trait_success:  # 특성 선택이 취소된 경우
+                                print(f"{RED}특성 선택이 취소되어 파티 생성을 중단합니다.{RESET}")
+                                trait_all_success = False
+                                break
+                        
+                        if not trait_all_success:
+                            return None
+                    
+                    if party:
+                        confirm_result = self._confirm_party_cursor(party)
+                        if confirm_result is True:
+                            return party
+                        elif confirm_result is False:
+                            # 🔄 재생성: 루프를 계속하여 새 파티 생성
+                            print(f"{YELLOW}🔄 같은 설정으로 파티를 다시 생성합니다...{RESET}")
+                            continue
+                        else:  # confirm_result is None (취소)
+                            return None
+                    else:
+                        continue  # 파티 생성 실패 시 재시도
                     
             except Exception:
                 # 폴백: 기존 방식
@@ -782,7 +892,31 @@ class EasyCharacterCreator:
             if self._confirm_party():
                 return party
             else:
-                return self._custom_party_creation_fallback()
+                # 🔄 재생성: 같은 설정으로 파티만 다시 생성
+                print(f"{YELLOW}🔄 같은 설정으로 파티를 다시 생성합니다...{RESET}")
+                # 특성 설정은 유지하고 파티만 재생성
+                try:
+                    if manual_traits:
+                        party = self.auto_builder.create_balanced_party(selected_classes, auto_select_traits=False)
+                        if party:
+                            print(f"\n{CYAN}=== 특성 선택 단계 ==={RESET}")
+                            for i, character in enumerate(party, 1):
+                                print(f"\n{YELLOW}━━━ {i}/4: {character.name} ({character.character_class}) ━━━{RESET}")
+                                trait_success = self._manual_trait_selection(character)
+                                if not trait_success:
+                                    print(f"{RED}특성 선택이 취소되어 파티 생성을 중단합니다.{RESET}")
+                                    return None
+                    else:
+                        party = self.auto_builder.create_balanced_party(selected_classes, auto_select_traits=True)
+                    
+                    if party:
+                        self._show_created_party(party)
+                        if self._confirm_party():
+                            return party
+                except Exception as e:
+                    print(f"{RED}재생성 중 오류 발생: {e}{RESET}")
+                    return None
+                
         return None
     
     def _single_character_creation(self) -> List[Character]:
@@ -999,8 +1133,8 @@ class EasyCharacterCreator:
             "광전사": "분노 상태로 폭발적 화력을 발휘하는 광기의 전사",
             
             # 원거리 딜러
-            "궁수": "바람과 독을 다루는 정밀한 원거리 사격 전문가",
-            "도적": "독과 은신술로 기습하는 빠른 몸놀림의 도둑",
+            "궁수": "조준 포인트와 지원사격으로 팀을 지원하는 전술적 명사수",
+            "도적": "맹독과 침묵으로 적을 서서히 말려죽이는 독의 지배자",
             "해적": "물과 번개를 조합한 자유분방한 바다의 전사",
             "기계공학자": "번개 에너지와 기계술로 전투하는 과학자",
             
@@ -1379,14 +1513,37 @@ class EasyCharacterCreator:
         return True
     
     def _auto_select_traits(self, character: Character):
-        """자동 특성 선택"""
-        self.auto_builder._auto_select_passives(character)
+        """자동 특성 선택 - 2개 선택"""
+        # 개발 모드 확인
+        try:
+            from config import game_config
+            is_dev_mode = hasattr(game_config, 'DEVELOPMENT_MODE') and game_config.DEVELOPMENT_MODE
+        except:
+            is_dev_mode = False
         
-        if character.selected_traits:
-            trait_names = [trait.name for trait in character.selected_traits]
-            print(f"{GREEN}자동 선택된 특성: {', '.join(trait_names)}{RESET}")
+        # 해당 직업의 모든 특성 가져오기
+        available_traits = self.auto_builder._get_available_traits(character.character_class)
+        
+        if not available_traits:
+            print(f"{YELLOW}선택 가능한 특성이 없습니다.{RESET}")
+            return
+        
+        # 개발 모드이거나 특성이 해금되어 있으면 2개 선택
+        if is_dev_mode or len(available_traits) >= 2:
+            # 2개 랜덤 선택 (중복 없이)
+            selected_trait_names = random.sample(available_traits, min(2, len(available_traits)))
+            character.traits = selected_trait_names
+            
+            print(f"{GREEN}자동 선택된 특성 (2개): {', '.join(selected_trait_names)}{RESET}")
         else:
-            print(f"{YELLOW}선택된 특성이 없습니다.{RESET}")
+            # 1개만 선택
+            selected_trait_name = random.choice(available_traits)
+            character.traits = [selected_trait_name]
+            print(f"{GREEN}자동 선택된 특성: {selected_trait_name}{RESET}")
+        
+        # 레거시 호환성을 위해 selected_traits도 설정
+        if hasattr(character, 'selected_traits'):
+            character.selected_traits = getattr(character, 'traits', [])
     
     def _create_single_character(self, class_name: str, index: int) -> Character:
         """단일 캐릭터 생성"""
@@ -1443,18 +1600,84 @@ class EasyCharacterCreator:
         return None
     
     def _show_created_party(self, party: List[Character]):
-        """생성된 파티 표시"""
+        """생성된 파티 표시 - 간략한 버전"""
         # 파티 정보 저장 (특성 상세 보기용)
         self.last_generated_party = party
         
+        print(f"\n{BRIGHT_YELLOW}🎉 질문 기반 맞춤 파티 완성!{RESET}")
+        print(f"{BRIGHT_CYAN}{'='*60}{RESET}")
+        
+        for i, member in enumerate(party, 1):
+            # 직업 색상
+            job_color = self._get_job_color(member.character_class)
+            
+            # 특성 정보 간략하게
+            traits_info = ""
+            if hasattr(member, 'traits') and member.traits:
+                # 특성이 2개 이상이면 첫 번째만 표시
+                primary_trait = member.traits[0]
+                trait_desc = self._get_trait_description(primary_trait, member.character_class)
+                traits_info = f"\n   ✨ {primary_trait}\n      {trait_desc}"
+                
+                # 2개째 특성이 있으면 추가 표시
+                if len(member.traits) > 1:
+                    secondary_trait = member.traits[1]
+                    secondary_desc = self._get_trait_description(secondary_trait, member.character_class)
+                    traits_info += f"\n   ✨ {secondary_trait}\n      {secondary_desc}"
+            
+            print(f"{i}. {job_color}{member.name} ({member.character_class}){RESET}{traits_info}")
+            
+        print(f"{BRIGHT_CYAN}{'='*60}{RESET}")
+        
+        # 파티 전체 밸런스 정보 (간략)
+        roles = self._analyze_party_balance(party)
+        if roles:
+            print(f"{CYAN}파티 구성:{RESET} {' | '.join(roles)}")
+        
+        print()  # 여백 추가
+    
+    def _get_job_color(self, job_name: str) -> str:
+        """직업별 색상 반환"""
+        color_map = {
+            '전사': GREEN, '궁수': YELLOW, '성기사': WHITE, '암흑기사': MAGENTA,
+            '바드': CYAN, '검성': BLUE, '검투사': RED, '광전사': RED,
+            '아크메이지': BLUE, '도적': GREEN, '몽크': YELLOW, '네크로맨서': MAGENTA,
+            '용기사': RED, '정령술사': CYAN, '암살자': MAGENTA, '기계공학자': WHITE,
+            '무당': YELLOW, '해적': BLUE, '사무라이': RED, '드루이드': GREEN,
+            '철학자': WHITE, '시간술사': MAGENTA, '연금술사': YELLOW, '기사': CYAN,
+            '신관': WHITE, '마검사': BLUE, '차원술사': MAGENTA
+        }
+        return color_map.get(job_name, WHITE)
+    
+    def _get_trait_description(self, trait_name: str, job_name: str) -> str:
+        """특성 설명 반환"""
+        descriptions = self._get_trait_descriptions()
+        return descriptions.get(trait_name, "특수 효과")
+    
+    def _analyze_party_balance(self, party: List[Character]) -> List[str]:
+        """파티 구성 분석"""
+        roles = []
+        for member in party:
+            if member.character_class in ['전사', '성기사', '기사', '검투사', '용기사', '광전사']:
+                roles.append(f"🛡️ {member.character_class}")
+            elif member.character_class in ['궁수', '도적', '암살자', '검성', '해적', '사무라이', '마검사']:
+                roles.append(f"⚔️ {member.character_class}")
+            elif member.character_class in ['아크메이지', '네크로맨서', '정령술사', '시간술사', '연금술사', '차원술사']:
+                roles.append(f"🔮 {member.character_class}")
+            elif member.character_class in ['바드', '신관', '드루이드', '무당', '철학자']:
+                roles.append(f"💫 {member.character_class}")
+            else:
+                roles.append(f"🌟 {member.character_class}")
+        return roles
+        
         # 특성 설명 딕셔너리 (모든 클래스 5개씩)
         trait_descriptions = {
-            # 전사 특성
-            "불굴의 의지": "HP가 25% 이하일 때 공격력 50% 증가",
-            "전투 광기": "적을 처치할 때마다 다음 공격의 피해량 20% 증가",
-            "방어 숙련": "방어 시 받는 피해 30% 추가 감소",
-            "위협적 존재": "전투 시작 시 적들의 공격력 10% 감소",
-            "피의 갈증": "HP가 50% 이상일 때 공격속도 25% 증가",
+            # 전사 특성 (적응형 시스템 연계)
+            "적응형 무술": "전투 중 자세 변경 시 다음 공격 위력 30% 증가",
+            "전장의 지배자": "적응형 자세에서 얻는 보너스 효과 50% 증가",
+            "불굴의 의지": "방어형 자세에서 체력 회복량 2배, 다른 자세에서도 턴당 체력 3% 회복",
+            "전투 본능": "공격형/광전사 자세에서 크리티컬 확률 20% 증가",
+            "균형감각": "균형 자세에서 모든 능력치 15% 증가, 수호자 자세에서 아군 보호 효과",
             
             # 아크메이지 특성
             "마나 순환": "스킬 사용 시 30% 확률로 MP 소모량 절반",
@@ -1470,12 +1693,12 @@ class EasyCharacterCreator:
             "사냥꾼의 직감": "적의 약점을 간파해 방어력 무시 확률 15%",
             "바람의 가호": "이동 시 다음 공격의 명중률과 피해량 15% 증가",
             
-            # 도적 특성
-            "그림자 은신": "전투 시작 시 3턴간 은신 상태",
-            "치명적 급소": "크리티컬 시 추가 출혈 효과 부여",
-            "빠른 손놀림": "아이템 사용 시 턴 소모하지 않음",
-            "도적의 직감": "함정과 보물 발견 확률 50% 증가",
-            "독 숙련": "모든 공격에 10% 확률로 독 효과 추가",
+            # 도적 특성 (리메이크)
+            "독술 지배": "모든 공격에 독 효과 부여, 독 피해량 50% 증가",
+            "침묵 술": "공격 시 30% 확률로 적의 스킬 봉인 2턴",
+            "독 촉진": "독에 걸린 적 공격 시 남은 독 피해의 25%를 즉시 피해",
+            "맹독 면역": "모든 독과 상태이상에 완전 면역, 독 공격 받을 때 반사",
+            "독왕의 권능": "적이 독으로 죽을 때 주변 적들에게 독 전파",
             
             # 성기사 특성
             "신성한 가호": "언데드와 악마에게 받는 피해 50% 감소",
@@ -1498,12 +1721,12 @@ class EasyCharacterCreator:
             "기절 공격": "일정 확률로 적을 기절시켜 1턴 행동 불가",
             "참선의 깨달음": "전투 중 매 5턴마다 MP 완전 회복",
             
-            # 광전사 특성
-            "광기 상태": "HP가 낮을수록 공격력과 속도 증가",
-            "무모한 돌진": "방어 무시하고 최대 피해 공격",
-            "고통 무시": "상태이상 무효",
-            "전투 광증": "적 처치 시 즉시 재행동",
-            "불사의 의지": "치명상 시 3턴간 불사 상태",
+            # 광전사 특성 (2025년 8월 6일 완전 개편 + 너프)
+            "혈투의 광기": "HP 15% 이하에서 공격력 100% 증가, 모든 공격이 HP 공격으로 변환",
+            "불굴의 의지": "HP 15% 이하에서 1턴간 무적 상태, 모든 상태이상 면역",
+            "광전사의 분노": "받는 피해의 50%를 다음 공격에 추가 피해로 반영",
+            "최후의 일격": "HP 10% 이하일 때 다음 공격이 치명타 + 200% 추가 피해",
+            "생존 본능": "HP 15% 이하에서 회피율 +50%, 크리티컬 확률 +30%",
             
             # 바드 특성
             "전투 노래": "파티원들의 공격력 15% 증가",
@@ -1630,12 +1853,12 @@ class EasyCharacterCreator:
             "이중 속성": "두 가지 속성 동시 공격",
             "마검 오의": "궁극기 사용 시 모든 적에게 피해",
             
-            # 차원술사 특성
-            "차원 보관": "무제한 아이템 보관",
-            "공간 이동": "위치 변경으로 공격 회피",
-            "차원 절단": "공간을 가르는 강력한 공격",
-            "평행우주": "전투 상황을 리셋할 수 있는 능력",
-            "차원의 문": "아군을 안전한 곳으로 이동"
+            # 차원술사 특성 (2025년 8월 6일 탱커 역할로 완전 전환)
+            "차원 도약": "공격받을 때 30% 확률로 완전 회피, 회피 시 반격 데미지",
+            "공간 왜곡": "모든 공격에 20% 회피율, 회피 시 적에게 반사 피해",
+            "차원의 방패": "아군이 받는 피해를 15% 확률로 대신 받기 (30% 감소)",
+            "시공간 조작": "적의 강력한 공격을 50% 확률로 무효화",
+            "차원술사의 직감": "위험한 적의 행동을 미리 감지하여 파티에게 경고"
         }
         
         print(f"\n{GREEN}{'='*60}{RESET}")
@@ -1660,19 +1883,19 @@ class EasyCharacterCreator:
                 # selected_traits 사용 (최대 2개)
                 for trait in character.selected_traits[:2]:  # 최대 2개만
                     trait_name = trait.name
-                    trait_desc = trait_descriptions.get(trait_name, "특수 효과")
+                    trait_desc = getattr(trait, 'description', trait_descriptions.get(trait_name, "특수 효과"))
                     traits_info.append((trait_name, trait_desc))
             elif hasattr(character, 'active_traits') and character.active_traits:
                 # active_traits 사용 (최대 2개)
                 for trait in character.active_traits[:2]:  # 최대 2개만
                     trait_name = trait.name
-                    trait_desc = trait_descriptions.get(trait_name, "특수 효과")
+                    trait_desc = getattr(trait, 'description', trait_descriptions.get(trait_name, "특수 효과"))
                     traits_info.append((trait_name, trait_desc))
             elif hasattr(character, 'traits') and character.traits:
                 # 기본 traits 사용 (최대 2개)
                 for trait in character.traits[:2]:  # 최대 2개만
                     trait_name = trait.name if hasattr(trait, 'name') else str(trait)
-                    trait_desc = trait_descriptions.get(trait_name, "특수 효과")
+                    trait_desc = getattr(trait, 'description', trait_descriptions.get(trait_name, "특수 효과")) if hasattr(trait, 'description') else "특수 효과"
                     traits_info.append((trait_name, trait_desc))
             
             print(f"{GREEN}{i}.{RESET} {WHITE}{character.name}{RESET} ({class_color}{character.character_class}{RESET})")
@@ -1813,17 +2036,17 @@ class EasyCharacterCreator:
             if hasattr(character, 'selected_traits') and character.selected_traits:
                 for trait in character.selected_traits[:2]:  # 최대 2개만
                     trait_name = trait.name
-                    trait_desc = trait_descriptions.get(trait_name, "특수 효과")
+                    trait_desc = getattr(trait, 'description', trait_descriptions.get(trait_name, "특수 효과"))
                     traits_info.append((trait_name, trait_desc))
             elif hasattr(character, 'active_traits') and character.active_traits:
                 for trait in character.active_traits[:2]:  # 최대 2개만
                     trait_name = trait.name
-                    trait_desc = trait_descriptions.get(trait_name, "특수 효과")
+                    trait_desc = getattr(trait, 'description', trait_descriptions.get(trait_name, "특수 효과"))
                     traits_info.append((trait_name, trait_desc))
             elif hasattr(character, 'traits') and character.traits:
                 for trait in character.traits[:2]:  # 최대 2개만
                     trait_name = trait.name if hasattr(trait, 'name') else str(trait)
-                    trait_desc = trait_descriptions.get(trait_name, "특수 효과")
+                    trait_desc = getattr(trait, 'description', trait_descriptions.get(trait_name, "특수 효과")) if hasattr(trait, 'description') else "특수 효과"
                     traits_info.append((trait_name, trait_desc))
             
             if traits_info:
@@ -1866,12 +2089,12 @@ class EasyCharacterCreator:
     def _get_trait_descriptions(self):
         """특성 설명 딕셔너리 반환 - 실제 존재하는 특성들"""
         return {
-            # 전사 특성
-            "불굴의 의지": "HP가 25% 이하일 때 공격력 50% 증가 (패시브)",
-            "전투 광기": "적을 처치할 때마다 다음 공격의 피해량 20% 증가 (트리거)",
-            "방어 숙련": "방어 시 받는 피해 30% 추가 감소 (패시브)",
-            "위협적 존재": "전투 시작 시 적들의 공격력 10% 감소 (패시브)",
-            "피의 갈증": "HP가 50% 이상일 때 공격속도 25% 증가 (패시브)",
+            # 전사 특성 (적응형 시스템 연계)
+            "적응형 무술": "전투 중 자세 변경 시 다음 공격 위력 30% 증가 (트리거)",
+            "전장의 지배자": "적응형 자세에서 얻는 보너스 효과 50% 증가 (패시브)",
+            "불굴의 의지": "방어형 자세에서 체력 회복량 2배, 다른 자세에서도 턴당 체력 3% 회복 (패시브)",
+            "전투 본능": "공격형/광전사 자세에서 크리티컬 확률 20% 증가 (패시브)",
+            "균형감각": "균형 자세에서 모든 능력치 15% 증가, 수호자 자세에서 아군 보호 효과 (패시브)",
             
             # 아크메이지 특성  
             "마나 순환": "스킬 사용 시 30% 확률로 MP 소모량 절반 (패시브)",
@@ -1887,12 +2110,12 @@ class EasyCharacterCreator:
             "사냥꾼의 직감": "적의 약점을 간파해 방어력 무시 확률 15% (패시브)",
             "바람의 가호": "이동 시 다음 공격의 명중률과 피해량 15% 증가 (패시브)",
             
-            # 도적 특성
-            "그림자 은신": "전투 시작 시 3턴간 은신 상태 (액티브)",
-            "치명적 급소": "크리티컬 시 추가 출혈 효과 부여 (트리거)",
-            "빠른 손놀림": "아이템 사용 시 턴 소모하지 않음 (패시브)",
-            "도적의 직감": "함정과 보물 발견 확률 50% 증가 (패시브)",
-            "독 숙련": "모든 공격에 10% 확률로 독 효과 추가 (패시브)",
+            # 도적 특성 (리메이크)
+            "독술 지배": "모든 공격에 독 효과 부여, 독 피해량 50% 증가 (패시브)",
+            "침묵 술": "공격 시 30% 확률로 적의 스킬 봉인 2턴 (트리거)",
+            "독 촉진": "독에 걸린 적 공격 시 남은 독 피해의 25%를 즉시 피해 (트리거)",
+            "맹독 면역": "모든 독과 상태이상에 완전 면역, 독 공격 받을 때 반사 (패시브)",
+            "독왕의 권능": "적이 독으로 죽을 때 주변 적들에게 독 전파 (트리거)",
             
             # 성기사 특성
             "신성한 가호": "언데드와 악마에게 받는 피해 50% 감소 (패시브)",
@@ -1955,14 +2178,14 @@ class EasyCharacterCreator:
             "치명타 특화": "크리티컬 확률 40% 증가 (패시브)",
             "독날 무기": "모든 공격에 독 효과 (패시브)",
             "은신 공격": "은신 상태에서 공격 시 피해 200% 증가 (트리거)",
-            "연막탄": "전투 도중 은신 상태 진입 가능 (액티브)",
+            "연막술": "공격 시 20% 확률로 회피율 50% 증가 (3턴) (트리거)",
             
             # 기계공학자 특성
-            "자동 포탑": "전투 시작 시 포탑 설치 (물리공격력 비례 피해) (액티브)",
+            "자동 포탑": "전투 시작 시 50% 확률로 포탑 자동 설치 (물리공격력 비례 피해) (트리거)",
             "기계 정비": "전투 후 5턴간 장비 효과 10% 증가 (중첩 가능) (트리거)",
             "폭탄 제작": "소모품 폭탄 무한 사용 (패시브)",
             "강화 장비": "모든 장비 효과 20% 증가 (패시브)",
-            "오버클럭": "일시적으로 모든 능력치 50% 증가 (액티브)",
+            "오버클럭": "HP 50% 이하일 때 모든 능력치 30% 증가 (패시브)",
             
             # 무당 특성
             "시야 확장": "필드 시야 범위 +1 (패시브)",
@@ -2147,6 +2370,108 @@ class EasyCharacterCreator:
                 lines.append("")
         
         return "\n".join(lines)
+    
+    def _question_based_party_creation(self) -> List[Character]:
+        """질문 기반 맞춤 파티 생성"""
+        try:
+            party = self.auto_builder.create_question_based_party()
+            if party is None:  # 사용자가 취소한 경우
+                return None
+            
+            self.last_generated_party = party
+            
+            # 파티 확인 및 재생성 옵션
+            return self._offer_party_options(party, "질문 기반 맞춤 파티")
+            
+        except Exception as e:
+            print(f"{RED}질문 기반 파티 생성 중 오류 발생: {e}{RESET}")
+            print(f"{YELLOW}자동 파티 생성으로 전환합니다...{RESET}")
+            return self._auto_party_creation()
+    
+    def _offer_party_options(self, party: List[Character], party_type: str) -> List[Character]:
+        """파티 확인 및 옵션 제공"""
+        if not CURSOR_MENU_AVAILABLE:
+            return party
+        
+        while True:
+            options = [
+                "✅ 이 파티로 시작",
+                "🔄 파티 재생성",
+                "👀 특성 상세 보기",
+                "🔧 직업별 기믹 보기",
+                "❌ 취소"
+            ]
+            
+            descriptions = [
+                "현재 파티로 게임을 시작합니다",
+                "새로운 파티를 다시 생성합니다",
+                "각 캐릭터의 특성을 자세히 봅니다",
+                "각 직업의 고유 기믹을 확인합니다",
+                "캐릭터 생성을 취소합니다"
+            ]
+            
+            menu = CursorMenu(f"🎉 {party_type} 완성!", options, descriptions, cancellable=True)
+            result = menu.run()
+            
+            if result is None or result == 4:  # 취소
+                return None
+            elif result == 0:  # 이 파티로 시작
+                return party
+            elif result == 1:  # 파티 재생성
+                if party_type == "질문 기반 맞춤 파티":
+                    new_party = self._question_based_party_creation()
+                else:
+                    new_party = self._auto_party_creation()
+                if new_party:
+                    party = new_party
+                    self.last_generated_party = party
+            elif result == 2:  # 특성 상세 보기
+                self._show_party_traits_detail(party)
+            elif result == 3:  # 직업별 기믹 보기
+                self._show_party_mechanics_detail(party)
+    
+    def _show_party_traits_detail(self, party: List[Character]):
+        """파티 특성 상세 보기"""
+        if not party:
+            return
+        
+        print(f"\n{CYAN}🔍 파티 특성 상세 정보{RESET}")
+        print(f"{YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{RESET}")
+        
+        for i, character in enumerate(party, 1):
+            print(f"\n{WHITE}{i}. {character.name} ({character.character_class}){RESET}")
+            
+            # 활성 특성 표시 (실제 description 사용)
+            if hasattr(character, 'active_traits') and character.active_traits:
+                for trait in character.active_traits:
+                    trait_desc = getattr(trait, 'description', "설명 없음")
+                    print(f"   ✨ {GREEN}{trait.name}{RESET}")
+                    print(f"      {BLUE}{trait_desc}{RESET}")
+            elif hasattr(character, 'selected_traits') and character.selected_traits:
+                for trait in character.selected_traits:
+                    trait_desc = getattr(trait, 'description', "설명 없음")
+                    print(f"   ✨ {GREEN}{trait.name}{RESET}")
+                    print(f"      {BLUE}{trait_desc}{RESET}")
+            else:
+                print(f"   {YELLOW}선택된 특성이 없습니다{RESET}")
+        
+        print(f"\n{CYAN}아무 키나 누르면 돌아갑니다...{RESET}")
+        self.keyboard.get_key()
+    
+    def _show_party_mechanics_detail(self, party: List[Character]):
+        """파티 기믹 상세 보기"""
+        if not party:
+            return
+        
+        print(f"\n{CYAN}⚙️ 직업별 고유 기믹 정보{RESET}")
+        print(f"{YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{RESET}")
+        
+        for i, character in enumerate(party, 1):
+            print(f"\n{WHITE}{i}. {character.name} - {character.character_class}{RESET}")
+            self.auto_builder.display_class_mechanics(character.character_class)
+        
+        print(f"\n{CYAN}아무 키나 누르면 돌아갑니다...{RESET}")
+        self.keyboard.get_key()
 
 
 # 전역 인스턴스

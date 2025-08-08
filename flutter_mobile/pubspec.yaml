@@ -1,0 +1,56 @@
+name: dawn_of_stellar_mobile
+description: Dawn of Stellar 모바일 포팅 버전 - 기존 Python 게임을 모바일에서 플레이
+publish_to: 'none'
+version: 3.0.0+300
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # 네트워크 통신 (데스크톱 게임과 연결)
+  http: ^1.1.0
+  
+  # 진동 기능
+  vibration: ^1.8.4
+  
+  # 상태 관리
+  provider: ^6.1.1
+  get: ^4.6.6
+  
+  # 로컬 저장
+  shared_preferences: ^2.2.2
+  
+  # 게스처 및 입력
+  flutter_swipe_detector: ^2.0.0
+  
+  # 사운드
+  audioplayers: ^5.2.1
+  
+  # 스플래시 및 로딩
+  flutter_spinkit: ^5.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true
+  
+  # 에셋 설정
+  assets:
+    - assets/images/
+    - assets/sounds/
+    - assets/fonts/
+  
+  # 폰트 설정
+  fonts:
+    - family: Whitrabt
+      fonts:
+        - asset: assets/fonts/whitrabt.ttf
+    - family: Galmuri
+      fonts:
+        - asset: assets/fonts/galmuri.ttf

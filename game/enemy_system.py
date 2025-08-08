@@ -118,6 +118,9 @@ class EnemyType(Enum):
     # 추가 몬스터들 (다양한 층)
     FIRE_SALAMANDER = "화염도롱뇽"
     ICE_GOLEM = "얼음골렘"
+    
+    # 특수 보스 (고정 층)
+    SEPHIROTH = "세피로스"  # 30층 고정 보스
     STORM_BIRD = "폭풍새"
     EARTH_ELEMENTAL = "대지정령"
     WIND_SPIRIT = "바람정령"
@@ -270,6 +273,11 @@ class Enemy(Character):
     
     def _set_enemy_stats(self):
         """적 전용 스탯 설정 (적응형 밸런스 적용)"""
+        # 세피로스는 특별한 고정 스탯 사용
+        if self.enemy_type == EnemyType.SEPHIROTH:
+            self._set_sephiroth_stats()
+            return
+            
         base_stats = self._get_base_stats_by_type()
         
         # 난이도별 multiplier 적용
@@ -317,28 +325,27 @@ class Enemy(Character):
                 self.element_type = base_value
                 continue
             
-            # 스탯별 성장률 조정 (플레이어 성장 패턴과 유사하게)
-            # 난이도별 적 스탯 배율 적용 - 대폭 완화
+            # 스탯별 성장률 - 원래 밸런스로 완전 복원
             if stat_name in ["max_hp"]:
-                # HP는 1/4로 감소 - 플레이어 성장 대비 약화
-                stat_floor_multiplier = floor_multiplier * 0.3 * enemy_hp_multiplier  # 30% 성장 (1.2→0.3) - 1/4로 감소 + 난이도
-                stat_level_multiplier = 1 + (self.level - 1) * 0.04  # 레벨당 4% (8%→4%) - 절반으로 감소
+                # HP: 원래 밸런스
+                stat_floor_multiplier = floor_multiplier * 0.3 * enemy_hp_multiplier
+                stat_level_multiplier = 1 + (self.level - 1) * 0.04
             elif stat_name in ["attack", "magic_power"]:
-                # 공격력은 절반으로 감소
-                stat_floor_multiplier = floor_multiplier * 0.55 * enemy_damage_multiplier  # 55% 성장 (1.1→0.55) - 절반으로 감소 + 난이도
-                stat_level_multiplier = 1 + (self.level - 1) * 0.035  # 레벨당 3.5% (7%→3.5%) - 절반으로 감소
+                # 공격력과 마법력: 원래 밸런스 + 난이도만 반영
+                stat_floor_multiplier = floor_multiplier * 0.6 * enemy_damage_multiplier
+                stat_level_multiplier = 1 + (self.level - 1) * 0.04
             elif stat_name in ["defense", "magic_defense"]:
-                # 방어력도 절반으로 감소
-                stat_floor_multiplier = floor_multiplier * 0.55  # 55% 성장 (1.1→0.55) - 절반으로 감소
-                stat_level_multiplier = 1 + (self.level - 1) * 0.03  # 레벨당 3% (6%→3%) - 절반으로 감소
+                # 방어력: 원래 밸런스
+                stat_floor_multiplier = floor_multiplier * 0.55
+                stat_level_multiplier = 1 + (self.level - 1) * 0.03
             elif stat_name == "speed":
-                # 속도도 절반으로 감소
-                stat_floor_multiplier = floor_multiplier * 0.5   # 50% 성장 (1.0→0.5) - 절반으로 감소
-                stat_level_multiplier = 1 + (self.level - 1) * 0.02  # 레벨당 2% (4%→2%) - 절반으로 감소
+                # 속도: 원래 밸런스
+                stat_floor_multiplier = floor_multiplier * 0.5
+                stat_level_multiplier = 1 + (self.level - 1) * 0.02
             elif stat_name == "max_mp":
-                # MP도 절반으로 감소
-                stat_floor_multiplier = floor_multiplier * 0.4   # 40% 성장 (0.8→0.4) - 절반으로 감소
-                stat_level_multiplier = 1 + (self.level - 1) * 0.015  # 레벨당 1.5% (3%→1.5%) - 절반으로 감소
+                # MP: 원래 밸런스
+                stat_floor_multiplier = floor_multiplier * 0.4
+                stat_level_multiplier = 1 + (self.level - 1) * 0.03
             else:
                 # 기타 스탯 (BRV 등)
                 stat_floor_multiplier = floor_multiplier
@@ -435,236 +442,238 @@ class Enemy(Character):
         stats_table = {
             # 일반 몬스터 (1-10층) - 50층 적의 절반 수준으로 조정
             EnemyType.GOBLIN: {
-                "max_hp": 200, "max_mp": 80, "attack": 40, "defense": 30,
-                "magic_power": 35, "magic_defense": 28, "speed": 35,
+                "max_hp": 200, "max_mp": 80, "attack": 55, "defense": 45,
+                "magic_power": 48, "magic_defense": 42, "speed": 50,
                 "init_brv": 60, "max_brv": 150, "element": ElementType.NEUTRAL  # 50층의 절반
             },
             EnemyType.ORC: {
-                "max_hp": 225, "max_mp": 90, "attack": 45, "defense": 38,
-                "magic_power": 33, "magic_defense": 35, "speed": 30,
+                "max_hp": 225, "max_mp": 90, "attack": 62, "defense": 55,
+                "magic_power": 46, "magic_defense": 48, "speed": 42,
                 "init_brv": 68, "max_brv": 170, "element": ElementType.NEUTRAL  # 50층의 절반
             },
             EnemyType.SKELETON: {
-                "max_hp": 210, "max_mp": 100, "attack": 43, "defense": 35,
-                "magic_power": 40, "magic_defense": 38, "speed": 33,
+                "max_hp": 210, "max_mp": 100, "attack": 58, "defense": 52,
+                "magic_power": 55, "magic_defense": 55, "speed": 47,
                 "init_brv": 64, "max_brv": 160, "element": ElementType.DARK  # 언데드, 50층의 절반
             },
             EnemyType.ZOMBIE: {
-                "max_hp": 250, "max_mp": 60, "attack": 48, "defense": 33,
-                "magic_power": 25, "magic_defense": 30, "speed": 20,
+                "max_hp": 250, "max_mp": 60, "attack": 65, "defense": 58,
+                "magic_power": 35, "magic_defense": 45, "speed": 28,
                 "init_brv": 75, "max_brv": 190, "element": ElementType.DARK  # 언데드, 50층의 절반
             },
             EnemyType.SPIDER: {
-                "max_hp": 190, "max_mp": 80, "attack": 44, "defense": 29,
-                "magic_power": 38, "magic_defense": 31, "speed": 45,
+                "max_hp": 190, "max_mp": 80, "attack": 59, "defense": 42,
+                "magic_power": 52, "magic_defense": 38, "speed": 62,
                 "init_brv": 66, "max_brv": 165, "element": ElementType.POISON  # 독거미, 50층의 절반
             },
             EnemyType.RAT: {
-                "max_hp": 175, "max_mp": 70, "attack": 38, "defense": 28,
-                "magic_power": 30, "magic_defense": 25, "speed": 50,
+                "max_hp": 175, "max_mp": 70, "attack": 53, "defense": 40,
+                "magic_power": 42, "magic_defense": 35, "speed": 68,
                 "init_brv": 58, "max_brv": 145, "element": ElementType.NEUTRAL  # 50층의 절반
             },
             EnemyType.BAT: {
-                "max_hp": 185, "max_mp": 85, "attack": 41, "defense": 25,
-                "magic_power": 39, "magic_defense": 29, "speed": 55,
+                "max_hp": 185, "max_mp": 85, "attack": 56, "defense": 38,
+                "magic_power": 54, "magic_defense": 42, "speed": 72,
                 "init_brv": 63, "max_brv": 158, "element": ElementType.DARK  # 어둠 속성, 50층의 절반
             },
             EnemyType.WOLF: {
-                "max_hp": 215, "max_mp": 75, "attack": 46, "defense": 34,
-                "magic_power": 28, "magic_defense": 30, "speed": 43,
+                "max_hp": 215, "max_mp": 75, "attack": 63, "defense": 48,
+                "magic_power": 40, "magic_defense": 42, "speed": 58,
                 "init_brv": 70, "max_brv": 175, "element": ElementType.NEUTRAL  # 50층의 절반
             },
             EnemyType.SLIME: {
-                "max_hp": 240, "max_mp": 95, "attack": 35, "defense": 43,
-                "magic_power": 43, "magic_defense": 40, "speed": 23,
+                "max_hp": 240, "max_mp": 95, "attack": 48, "defense": 62,
+                "magic_power": 58, "magic_defense": 58, "speed": 32,
                 "init_brv": 73, "max_brv": 183, "element": ElementType.POISON  # 독성 슬라임, 50층의 절반
             },
             EnemyType.IMP: {
-                "max_hp": 205, "max_mp": 105, "attack": 44, "defense": 31,
-                "magic_power": 48, "magic_defense": 36, "speed": 39,
+                "max_hp": 205, "max_mp": 105, "attack": 59, "defense": 46,
+                "magic_power": 65, "magic_defense": 52, "speed": 55,
                 "init_brv": 69, "max_brv": 173, "element": ElementType.FIRE  # 화염 임프, 50층의 절반
             },
             
             # 중급 몬스터 (11-20층) - 50층의 60-70% 수준
             EnemyType.DARK_ELF: {
-                "max_hp": 240, "max_mp": 120, "attack": 52, "defense": 35,
-                "magic_power": 50, "magic_defense": 42, "speed": 58,
+                "max_hp": 240, "max_mp": 120, "attack": 68, "defense": 48,
+                "magic_power": 65, "magic_defense": 58, "speed": 72,
                 "init_brv": 85, "max_brv": 210, "element": ElementType.DARK  # 어둠 암살자
             },
             EnemyType.TROLL: {
-                "max_hp": 200, "max_mp": 40, "attack": 40, "defense": 35,
-                "magic_power": 15, "magic_defense": 25, "speed": 20,
+                "max_hp": 200, "max_mp": 40, "attack": 58, "defense": 62,
+                "magic_power": 22, "magic_defense": 48, "speed": 35,
                 "init_brv": 160, "max_brv": 360, "element": ElementType.EARTH  # 대지 트롤, 1/10 스케일
             },
             EnemyType.OGRE: {
-                "max_hp": 320, "max_mp": 90, "attack": 62, "defense": 48,
-                "magic_power": 35, "magic_defense": 42, "speed": 28,
+                "max_hp": 320, "max_mp": 90, "attack": 78, "defense": 68,
+                "magic_power": 48, "magic_defense": 58, "speed": 38,
                 "init_brv": 100, "max_brv": 255, "element": ElementType.NEUTRAL  # 50층의 70%
             },
             EnemyType.HOBGOBLIN: {
-                "max_hp": 280, "max_mp": 125, "attack": 52, "defense": 42,
-                "magic_power": 65, "magic_defense": 52, "speed": 48,
+                "max_hp": 280, "max_mp": 125, "attack": 85, "defense": 75,
+                "magic_power": 95, "magic_defense": 80, "speed": 78,
                 "init_brv": 92, "max_brv": 235, "element": ElementType.LIGHTNING  # 번개술사, 50층의 70%
             },
             EnemyType.WIGHT: {
-                "max_hp": 300, "max_mp": 140, "attack": 58, "defense": 45,
-                "magic_power": 72, "magic_defense": 62, "speed": 38,
+                "max_hp": 300, "max_mp": 140, "attack": 88, "defense": 78,
+                "magic_power": 105, "magic_defense": 95, "speed": 65,
                 "init_brv": 95, "max_brv": 245, "element": ElementType.DARK  # 강력한 언데드, 50층의 70%
             },
             EnemyType.WRAITH: {
-                "max_hp": 260, "max_mp": 155, "attack": 48, "defense": 35,
-                "magic_power": 78, "magic_defense": 68, "speed": 58,
+                "max_hp": 260, "max_mp": 155, "attack": 65, "defense": 60,
+                "magic_power": 95, "magic_defense": 100, "speed": 88,
                 "init_brv": 88, "max_brv": 225, "element": ElementType.DARK  # 영체, 50층의 70%
             },
             EnemyType.GARGOYLE: {
-                "max_hp": 340, "max_mp": 105, "attack": 62, "defense": 72,
-                "magic_power": 48, "magic_defense": 65, "speed": 42,
+                "max_hp": 340, "max_mp": 105, "attack": 78, "defense": 105,
+                "magic_power": 62, "magic_defense": 98, "speed": 68,
                 "init_brv": 102, "max_brv": 260, "element": ElementType.EARTH  # 석상, 50층의 75%
             },
             EnemyType.MINOTAUR: {
-                "max_hp": 380, "max_mp": 95, "attack": 72, "defense": 58,
-                "magic_power": 42, "magic_defense": 52, "speed": 38,
+                "max_hp": 380, "max_mp": 95, "attack": 92, "defense": 75,
+                "magic_power": 55, "magic_defense": 65, "speed": 48,
                 "init_brv": 108, "max_brv": 275, "element": ElementType.NEUTRAL  # 50층의 75%
             },
             EnemyType.CENTAUR: {
-                "max_hp": 330, "max_mp": 125, "attack": 68, "defense": 52,
-                "magic_power": 58, "magic_defense": 55, "speed": 62,
+                "max_hp": 330, "max_mp": 125, "attack": 85, "defense": 68,
+                "magic_power": 72, "magic_defense": 68, "speed": 78,
                 "init_brv": 100, "max_brv": 255, "element": ElementType.WIND  # 바람의 궁수, 50층의 75%
             },
             EnemyType.HARPY: {
-                "max_hp": 290, "max_mp": 145, "attack": 62, "defense": 40,
-                "magic_power": 68, "magic_defense": 58, "speed": 75,
+                "max_hp": 290, "max_mp": 145, "attack": 78, "defense": 52,
+                "magic_power": 82, "magic_defense": 70, "speed": 88,
                 "init_brv": 95, "max_brv": 240, "element": ElementType.WIND  # 바람 하피, 50층의 75%
             },
             EnemyType.BASILISK: {
-                "max_hp": 350, "max_mp": 155, "attack": 65, "defense": 62,
-                "magic_power": 72, "magic_defense": 65, "speed": 45,
+                "max_hp": 350, "max_mp": 155, "attack": 82, "defense": 78,
+                "magic_power": 88, "magic_defense": 78, "speed": 58,
                 "init_brv": 105, "max_brv": 270, "element": ElementType.POISON  # 독 바실리스크, 50층의 75%
             },
             EnemyType.FIRE_SALAMANDER: {
-                "max_hp": 320, "max_mp": 135, "attack": 65, "defense": 52,
-                "magic_power": 78, "magic_defense": 62, "speed": 48,
+                "max_hp": 320, "max_mp": 135, "attack": 82, "defense": 68,
+                "magic_power": 95, "magic_defense": 75, "speed": 62,
                 "init_brv": 98, "max_brv": 250, "element": ElementType.FIRE  # 화염 도롱뇽, 50층의 75%
             },
             EnemyType.ICE_GOLEM: {
-                "max_hp": 360, "max_mp": 115, "attack": 58, "defense": 82,
-                "magic_power": 65, "magic_defense": 78, "speed": 32,
+                "max_hp": 360, "max_mp": 115, "attack": 72, "defense": 98,
+                "magic_power": 78, "magic_defense": 92, "speed": 42,
                 "init_brv": 105, "max_brv": 270, "element": ElementType.ICE  # 얼음 골렘, 50층의 80%
             },
             
             # 고급 몬스터 (21-30층) - 50층의 80-85% 수준
             EnemyType.DRAKE: {
-                "max_hp": 400, "max_mp": 160, "attack": 75, "defense": 65,
-                "magic_power": 82, "magic_defense": 68, "speed": 50,
+                "max_hp": 400, "max_mp": 160, "attack": 95, "defense": 82,
+                "magic_power": 102, "magic_defense": 85, "speed": 65,
                 "init_brv": 120, "max_brv": 310, "element": ElementType.FIRE  # 화염 드레이크, 50층의 80%
             },
             EnemyType.CHIMERA: {
-                "max_hp": 320, "max_mp": 140, "attack": 58, "defense": 45,
-                "magic_power": 60, "magic_defense": 50, "speed": 38,
+                "max_hp": 320, "max_mp": 140, "attack": 78, "defense": 62,
+                "magic_power": 82, "magic_defense": 68, "speed": 52,
                 "init_brv": 1160, "max_brv": 2880, "element": ElementType.FIRE  # 화염 키메라
             },
             EnemyType.MANTICORE: {
-                "max_hp": 280, "max_mp": 110, "attack": 55, "defense": 40,
-                "magic_power": 45, "magic_defense": 42, "speed": 45,
+                "max_hp": 280, "max_mp": 110, "attack": 75, "defense": 58,
+                "magic_power": 62, "magic_defense": 58, "speed": 62,
                 "init_brv": 1100, "max_brv": 2520, "element": ElementType.POISON  # 독침 맨티코어
             },
             EnemyType.GRIFFON: {
-                "max_hp": 260, "max_mp": 100, "attack": 52, "defense": 38,
-                "magic_power": 40, "magic_defense": 45, "speed": 55,
+                "max_hp": 260, "max_mp": 100, "attack": 72, "defense": 55,
+                "magic_power": 58, "magic_defense": 62, "speed": 75,
                 "init_brv": 1040, "max_brv": 2400, "element": ElementType.WIND  # 폭풍 그리폰
             },
             EnemyType.WYVERN: {
-                "max_hp": 300, "max_mp": 130, "attack": 56, "defense": 42,
-                "magic_power": 50, "magic_defense": 48, "speed": 48,
+                "max_hp": 300, "max_mp": 130, "attack": 76, "defense": 58,
+                "magic_power": 72, "magic_defense": 65, "speed": 65,
                 "init_brv": 1080, "max_brv": 2700, "element": ElementType.LIGHTNING  # 번개 와이번
             },
             EnemyType.LICH: {
-                "max_hp": 240, "max_mp": 200, "attack": 45, "defense": 35,
-                "magic_power": 80, "magic_defense": 70, "speed": 35,
+                "max_hp": 240, "max_mp": 200, "attack": 62, "defense": 52,
+                "magic_power": 105, "magic_defense": 88, "speed": 48,
                 "init_brv": 960, "max_brv": 2280, "element": ElementType.DARK  # 어둠 리치
             },
             EnemyType.VAMPIRE: {
-                "max_hp": 280, "max_mp": 150, "attack": 54, "defense": 40,
-                "magic_power": 65, "magic_defense": 55, "speed": 50,
+                "max_hp": 280, "max_mp": 150, "attack": 74, "defense": 58,
+                "magic_power": 85, "magic_defense": 72, "speed": 68,
                 "init_brv": 1080, "max_brv": 2520, "element": ElementType.DARK  # 어둠 뱀파이어
             },
             EnemyType.DEMON: {
-                "max_hp": 320, "max_mp": 160, "attack": 58, "defense": 45,
-                "magic_power": 70, "magic_defense": 60, "speed": 42,
+                "max_hp": 320, "max_mp": 160, "attack": 78, "defense": 62,
+                "magic_power": 88, "magic_defense": 75, "speed": 58,
                 "init_brv": 1160, "max_brv": 2880, "element": ElementType.DARK  # 지옥 데몬
             },
             EnemyType.DEVIL: {
-                "max_hp": 340, "max_mp": 180, "attack": 62, "defense": 48,
-                "magic_power": 75, "magic_defense": 65, "speed": 40,
+                "max_hp": 340, "max_mp": 180, "attack": 82, "defense": 65,
+                "magic_power": 92, "magic_defense": 78, "speed": 55,
                 "init_brv": 1220, "max_brv": 3000, "element": ElementType.DARK  # 지옥 데빌
             },
             EnemyType.ARCHLICH: {
-                "max_hp": 280, "max_mp": 250, "attack": 50, "defense": 40,
-                "magic_power": 90, "magic_defense": 80, "speed": 38,
+                "max_hp": 280, "max_mp": 250, "attack": 68, "defense": 58,
+                "magic_power": 115, "magic_defense": 98, "speed": 52,
                 "init_brv": 1120, "max_brv": 2520, "element": ElementType.DARK  # 아치리치
             },
             
             # 최고급 몬스터 (31-40층)
             EnemyType.DRAGON: {
-                "max_hp": 500, "max_mp": 200, "attack": 80, "defense": 70,
-                "magic_power": 85, "magic_defense": 75, "speed": 50,
+                "max_hp": 500, "max_mp": 200, "attack": 105, "defense": 88,
+                "magic_power": 110, "magic_defense": 92, "speed": 65,
                 "init_brv": 1500, "max_brv": 4500, "element": ElementType.FIRE  # 고대 화염룡
             },
             EnemyType.BALROG: {
-                "max_hp": 480, "max_mp": 180, "attack": 85, "defense": 65,
-                "magic_power": 80, "magic_defense": 70, "speed": 45,
+                "max_hp": 480, "max_mp": 180, "attack": 112, "defense": 82,
+                "magic_power": 105, "magic_defense": 88, "speed": 58,
                 "init_brv": 1440, "max_brv": 4200, "element": ElementType.FIRE  # 화염 발록
             },
             EnemyType.KRAKEN: {
-                "max_hp": 450, "max_mp": 220, "attack": 75, "defense": 60,
-                "magic_power": 90, "magic_defense": 80, "speed": 40,
+                "max_hp": 450, "max_mp": 220, "attack": 98, "defense": 78,
+                "magic_power": 118, "magic_defense": 102, "speed": 52,
                 "init_brv": 1350, "max_brv": 3900, "element": ElementType.WATER  # 바다 크라켄
             },
             EnemyType.PHOENIX: {
-                "max_hp": 350, "max_mp": 250, "attack": 70, "defense": 55,
-                "magic_power": 95, "magic_defense": 85, "speed": 60,
+                "max_hp": 350, "max_mp": 250, "attack": 92, "defense": 72,
+                "magic_power": 125, "magic_defense": 108, "speed": 78,
                 "init_brv": 1260, "max_brv": 3300, "element": ElementType.FIRE  # 불사조
             },
             EnemyType.STORM_BIRD: {
-                "max_hp": 380, "max_mp": 200, "attack": 72, "defense": 50,
-                "magic_power": 88, "magic_defense": 75, "speed": 70,
+                "max_hp": 380, "max_mp": 200, "attack": 95, "defense": 68,
+                "magic_power": 115, "magic_defense": 95, "speed": 88,
                 "init_brv": 1320, "max_brv": 3600, "element": ElementType.LIGHTNING  # 폭풍새
             },
             
             # 전설급 몬스터 (41-50층)
             EnemyType.ELDER_DRAGON: {
-                "max_hp": 800, "max_mp": 300, "attack": 120, "defense": 100,
-                "magic_power": 130, "magic_defense": 110, "speed": 60,
+                "max_hp": 800, "max_mp": 300, "attack": 150, "defense": 125,
+                "magic_power": 165, "magic_defense": 138, "speed": 78,
                 "init_brv": 1800, "max_brv": 7500, "element": ElementType.FIRE  # 엘더 드래곤
             },
             EnemyType.TITAN: {
-                "max_hp": 900, "max_mp": 250, "attack": 140, "defense": 120,
-                "magic_power": 100, "magic_defense": 90, "speed": 40,
+                "max_hp": 900, "max_mp": 250, "attack": 175, "defense": 148,
+                "magic_power": 125, "magic_defense": 115, "speed": 52,
                 "init_brv": 1980, "max_brv": 8400, "element": ElementType.EARTH  # 대지 타이탄
             },
             EnemyType.VOID_LORD: {
-                "max_hp": 700, "max_mp": 400, "attack": 100, "defense": 80,
-                "magic_power": 150, "magic_defense": 130, "speed": 55,
+                "max_hp": 700, "max_mp": 400, "attack": 128, "defense": 102,
+                "magic_power": 185, "magic_defense": 162, "speed": 72,
                 "init_brv": 1680, "max_brv": 6600, "element": ElementType.DARK  # 공허 군주
             },
             EnemyType.VOID_EMPEROR: {
-                "max_hp": 1000, "max_mp": 500, "attack": 150, "defense": 120,
-                "magic_power": 180, "magic_defense": 150, "speed": 65,
+                "max_hp": 1000, "max_mp": 500, "attack": 188, "defense": 148,
+                "magic_power": 225, "magic_defense": 188, "speed": 82,
                 "init_brv": 2100, "max_brv": 9000, "element": ElementType.DARK  # 공허 황제
             },
             EnemyType.CHAOS_BEAST: {
-                "max_hp": 850, "max_mp": 350, "attack": 130, "defense": 90,
-                "magic_power": 140, "magic_defense": 100, "speed": 70,
+                "max_hp": 850, "max_mp": 350, "attack": 165, "defense": 115,
+                "magic_power": 175, "magic_defense": 128, "speed": 88,
                 "init_brv": 1890, "max_brv": 7800, "element": ElementType.NEUTRAL  # 혼돈 야수
             },
             
             # 특수 원소형 몬스터들
             EnemyType.ELEMENTAL: {
-                "max_hp": 200, "max_mp": 250, "attack": 35, "defense": 30,
-                "magic_power": 85, "magic_defense": 80, "speed": 38,
+                "max_hp": 200, "max_mp": 250, "attack": 48, "defense": 42,
+                "magic_power": 108, "magic_defense": 98, "speed": 52,
                 "init_brv": 1600, "max_brv": 3600, "element": ElementType.FIRE  # 기본 화염, 소환시 변경됨
             }
         }
+        
+        # 세피로스는 여기에 포함되지 않음 (특별 처리)
         
         # 기본값 (정의되지 않은 몬스터용) - BRV 2배 증가
         default_stats = {
@@ -674,6 +683,41 @@ class Enemy(Character):
         }
         
         return stats_table.get(self.enemy_type, default_stats)
+    
+    def _set_sephiroth_stats(self):
+        """세피로스 전용 고정 스탯 설정"""
+        # 30층 보스로서 압도적인 스탯
+        self.level = 50  # 고정 레벨
+        self.max_hp = 15000  # 매우 높은 HP
+        self.current_hp = self.max_hp
+        self.max_mp = 5000   # 높은 MP
+        self.current_mp = self.max_mp
+        
+        # 공격 스탯 - 강력하지만 균형 잡힌
+        self.physical_attack = 280  # 높은 물리 공격력
+        self.magic_attack = 360     # 더 높은 마법 공격력
+        self.physical_defense = 150 # 높은 물리 방어력
+        self.magic_defense = 180    # 더 높은 마법 방어력
+        self.speed = 190           # 빠른 속도
+        
+        # BRV 시스템 - 브레이브 시스템의 핵심
+        self.current_brv = 2000    # 높은 초기 BRV
+        self.max_brv = 9999        # 매우 높은 최대 BRV
+        
+        # 특수 스탯
+        self.critical_rate = 25.0   # 25% 크리티컬 확률
+        self.accuracy = 90.0        # 90% 명중률
+        self.evasion = 15.0         # 15% 회피율
+        self.dodge = self.evasion
+        
+        # 원소 타입과 특수 능력
+        self.element_type = ElementType.DARK  # 암흑 속성
+        self.rank = EnemyRank.RAID_BOSS      # 레이드 보스급
+        
+        # AI 설정
+        self.ai_type = "boss_sephiroth"      # 전용 AI
+        self.aggression = 10                 # 최대 공격성
+        self.intelligence = 20               # 최대 지능
     
     def _get_rank_multiplier(self) -> float:
         """등급별 스탯 배율 (더 합리적으로 조정)"""
@@ -889,6 +933,7 @@ class Enemy(Character):
             
             # 특수
             EnemyType.ELEMENTAL: "caster",      # 엘리멘탈: 원소 마법
+            EnemyType.SEPHIROTH: "boss_sephiroth",  # 세피로스: 전용 보스 AI
         }
         
         # 기본 AI (없는 경우)
@@ -1697,6 +1742,10 @@ class Enemy(Character):
         """장비 보너스가 포함된 총 최대 MP (Enemy용 호환성 메서드)"""
         # Enemy는 장비가 없으므로 기본 max_mp 반환
         return getattr(self, 'max_mp', getattr(self, '_max_mp', getattr(self, '_base_max_mp', 20)))
+    
+    def _check_guardian_protection(self) -> bool:
+        """수호자 보호 효과 확인 (Enemy는 파티에 속하지 않으므로 항상 False)"""
+        return False
 
 class EnemyManager:
     """적 관리자"""
@@ -1715,9 +1764,12 @@ class EnemyManager:
             **{floor: [EnemyType.TROLL, EnemyType.OGRE, EnemyType.WIGHT, EnemyType.GARGOYLE, EnemyType.FIRE_SALAMANDER]
                for floor in range(11, 21)},
             
-            # 21-30층
+            # 21-29층
             **{floor: [EnemyType.DRAKE, EnemyType.CHIMERA, EnemyType.LICH, EnemyType.DEMON, EnemyType.ICE_GOLEM]
-               for floor in range(21, 31)},
+               for floor in range(21, 30)},
+            
+            # 30층 - 세피로스 고정
+            30: [EnemyType.SEPHIROTH],
             
             # 31-40층
             **{floor: [EnemyType.DRAGON, EnemyType.BALROG, EnemyType.KRAKEN, EnemyType.PHOENIX, EnemyType.STORM_BIRD]

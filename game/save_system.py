@@ -16,8 +16,84 @@ from enum import Enum
 class GameStateEncoder(json.JSONEncoder):
     """게임 상태를 JSON으로 직렬화하기 위한 커스텀 인코더"""
     def default(self, obj):
+        # 🔥 ULTIMATE ItemRarity 처리 (모든 케이스 커버)
+        try:
+            obj_repr = repr(obj)
+            obj_str = str(obj)
+            obj_type = str(type(obj))
+            
+            # ItemRarity 감지 (5가지 방법)
+            if any(keyword in text for keyword in ['ItemRarity', 'UNCOMMON', 'RARE', 'EPIC', 'LEGENDARY', 'COMMON'] 
+                   for text in [obj_repr, obj_str, obj_type]):
+                
+                # 값 추출 시도 (10가지 방법)
+                value = None
+                
+                # 방법 1: .value 속성
+                if hasattr(obj, 'value'):
+                    value = obj.value
+                # 방법 2: .name 속성  
+                elif hasattr(obj, 'name'):
+                    value = obj.name
+                # 방법 3: 문자열 파싱 (ItemRarity.UNCOMMON)
+                elif '.' in obj_str:
+                    value = obj_str.split('.')[-1]
+                # 방법 4: 직접 문자열 값
+                elif obj_str in ['COMMON', 'UNCOMMON', 'RARE', 'EPIC', 'LEGENDARY']:
+                    value = obj_str
+                # 방법 5: repr 파싱
+                elif '.' in obj_repr:
+                    value = obj_repr.split('.')[-1].replace('>', '').replace("'", "")
+                # 방법 6: 숫자 값 (enum 정수값)
+                elif isinstance(obj, int) and 0 <= obj <= 4:
+                    rarity_map = {0: 'COMMON', 1: 'UNCOMMON', 2: 'RARE', 3: 'EPIC', 4: 'LEGENDARY'}
+                    value = rarity_map.get(obj, 'COMMON')
+                # 방법 7: 강제 변환
+                else:
+                    value = 'UNCOMMON'  # 기본값
+                
+                return {"__enum__": "ItemRarity", "value": value}
+        except:
+            # ItemRarity 처리 실패 시 기본값 반환
+            if 'ItemRarity' in str(obj) or 'UNCOMMON' in str(obj):
+                return {"__enum__": "ItemRarity", "value": "UNCOMMON"}
+        
+        # 모든 Enum 타입 처리 (표준)
         if isinstance(obj, Enum):
-            return {"__enum__": obj.__class__.__name__, "value": obj.value}
+            return {
+                "__enum__": obj.__class__.__name__, 
+                "__module__": getattr(obj.__class__, '__module__', 'unknown'),
+                "value": obj.value
+            }
+        
+        # 특별히 ItemRarity 처리 (다중 폴백)
+        try:
+            # 방법 1: 클래스 이름 직접 확인
+            if hasattr(obj, '__class__') and 'ItemRarity' in str(obj.__class__):
+                if hasattr(obj, 'value'):
+                    return {"__enum__": "ItemRarity", "value": obj.value}
+                elif hasattr(obj, 'name'):
+                    return {"__enum__": "ItemRarity", "value": obj.name}
+            
+            # 방법 2: 문자열 표현 파싱
+            obj_str = str(obj)
+            if 'ItemRarity.' in obj_str:
+                # ItemRarity.UNCOMMON -> UNCOMMON
+                parts = obj_str.split('.')
+                if len(parts) >= 2:
+                    return {"__enum__": "ItemRarity", "value": parts[-1]}
+            
+            # 방법 3: 타입 이름 확인
+            type_name = type(obj).__name__
+            if 'ItemRarity' in type_name:
+                # 값 추출 시도
+                for attr in ['value', 'name', '_value_', '_name_']:
+                    if hasattr(obj, attr):
+                        return {"__enum__": "ItemRarity", "value": getattr(obj, attr)}
+                        
+        except Exception as e:
+            # 마지막 폴백: 문자열로 저장
+            return {"__fallback__": "ItemRarity", "string_value": str(obj)}
         
         # Inventory 객체 처리
         if hasattr(obj, '__class__') and obj.__class__.__name__ == 'Inventory':
@@ -28,13 +104,19 @@ class GameStateEncoder(json.JSONEncoder):
                 "max_weight": getattr(obj, 'max_weight', 100.0)
             }
         
+        # 일반 객체 처리
         if hasattr(obj, '__dict__'):
             # 객체의 속성을 딕셔너리로 변환
             return {
                 "__class__": obj.__class__.__name__,
                 **{k: v for k, v in obj.__dict__.items() if not k.startswith('_')}
             }
-        return super().default(obj)
+        
+        # 최종 fallback - 문자열로 변환
+        try:
+            return str(obj)
+        except:
+            return None
 
 
 def decode_game_state(dct):
@@ -403,7 +485,12 @@ class SaveManager:
             
             print(f"📝 파일 쓰기 시작...")
             with open(save_path, 'w', encoding='utf-8') as f:
-                json.dump(game_state, f, indent=2, ensure_ascii=False, cls=GameStateEncoder)
+                try:
+                    json.dump(game_state, f, indent=2, ensure_ascii=False, cls=GameStateEncoder)
+                except TypeError as e:
+                    # JSON 직렬화 실패 시 fallback
+                    print(f"⚠️ JSON 직렬화 오류, fallback 사용: {e}")
+                    json.dump(game_state, f, indent=2, ensure_ascii=False, default=str)
             
             print(f"✅ 게임이 저장되었습니다: {save_name}")
             return True
@@ -563,15 +650,26 @@ class GameStateSerializer:
                         'is_active': trait.get('is_active', False)
                     })
         
-        # 인벤토리 정보 직렬화
+        # 인벤토리 정보 직렬화 (강화된 안전성)
         inventory_data = {}
         if hasattr(character, 'inventory') and character.inventory:
             try:
+                # 인벤토리 items 딕셔너리 안전하게 복사
+                items_dict = {}
+                if hasattr(character.inventory, 'items') and character.inventory.items:
+                    items_dict = character.inventory.items.copy()
+                
                 inventory_data = {
-                    'items': character.inventory.items.copy() if hasattr(character.inventory, 'items') else {},
+                    'items': items_dict,
                     'max_size': getattr(character.inventory, 'max_size', 15),
                     'max_weight': getattr(character.inventory, 'max_weight', 100.0)
                 }
+                
+                # 저장 로그 출력
+                item_count = len(items_dict)
+                total_quantity = sum(items_dict.values()) if items_dict else 0
+                print(f"💾 [SAVE] {character.name} 인벤토리: {item_count}종류, {total_quantity}개 아이템 저장")
+                
             except Exception as e:
                 print(f"⚠️ {character.name} 인벤토리 직렬화 오류: {e}")
                 inventory_data = {'items': {}, 'max_size': 15, 'max_weight': 100.0}
@@ -586,7 +684,8 @@ class GameStateSerializer:
                     'name': equipment.name,
                     'item_type': equipment.item_type.value if hasattr(equipment.item_type, 'value') else str(equipment.item_type),
                     'stats': equipment.stats if hasattr(equipment, 'stats') else {},
-                    'rarity': getattr(equipment, 'rarity', 'common'),
+                    # Enum을 안전하게 문자열로 저장
+                    'rarity': (getattr(equipment, 'rarity').name.lower() if hasattr(getattr(equipment, 'rarity', None), 'name') else str(getattr(equipment, 'rarity', 'common'))),
                     'description': getattr(equipment, 'description', ''),
                     'effects': getattr(equipment, 'effects', {}),
                     'durability': getattr(equipment, 'durability', 100),
@@ -601,6 +700,12 @@ class GameStateSerializer:
             'equipped_armor': serialize_equipment(getattr(character, 'equipped_armor', None)),
             'equipped_accessory': serialize_equipment(getattr(character, 'equipped_accessory', None))
         }
+        
+        # 장비 저장 로그
+        print(f"🎒 [SAVE LOG] {character.name} 장비 저장:")
+        print(f"🎒 [SAVE LOG] - Weapon: {getattr(character, 'equipped_weapon', None)}")
+        print(f"🎒 [SAVE LOG] - Armor: {getattr(character, 'equipped_armor', None)}")
+        print(f"🎒 [SAVE LOG] - Accessory: {getattr(character, 'equipped_accessory', None)}")
         
         # 골드 정보
         gold = getattr(character, 'gold', 0)
@@ -633,6 +738,53 @@ class GameStateSerializer:
         ]
         for attr in status_attributes:
             status_effects_data[attr] = getattr(character, attr, False)
+        
+        # 상태 효과 딕셔너리 저장 (독 등의 복잡한 상태 효과용)
+        if hasattr(character, 'status_effects') and character.status_effects:
+            status_effects_data['complex_effects'] = character.status_effects.copy()
+        
+        # 베놈 파워 (도적 전용)
+        venom_data = {
+            'venom_power': getattr(character, 'venom_power', 0),
+            'venom_power_max': getattr(character, 'venom_power_max', 100)
+        }
+        
+        # 직업별 특수 시스템 데이터
+        class_specific_data = {}
+        
+        # 전사 스탠스 시스템
+        if getattr(character, 'character_class', '') == "전사":
+            class_specific_data['current_stance'] = getattr(character, 'current_stance', 'balanced')
+        
+        # 암살자 그림자 시스템
+        if getattr(character, 'character_class', '') == "암살자":
+            class_specific_data['shadow_count'] = getattr(character, 'shadow_count', 0)
+            class_specific_data['shadow_max'] = getattr(character, 'shadow_max', 5)
+        
+        # 몽크 기 에너지 시스템
+        if getattr(character, 'character_class', '') == "몽크":
+            class_specific_data['ki_energy'] = getattr(character, 'ki_energy', 0)
+            class_specific_data['ki_max'] = getattr(character, 'ki_max', 100)
+        
+        # 바드 영감 시스템
+        if getattr(character, 'character_class', '') == "바드":
+            class_specific_data['inspiration_stacks'] = getattr(character, 'inspiration_stacks', 0)
+            class_specific_data['inspiration_max'] = getattr(character, 'inspiration_max', 10)
+        
+        # 검성 검기 시스템
+        if getattr(character, 'character_class', '') == "검성":
+            class_specific_data['sword_spirit'] = getattr(character, 'sword_spirit', 0)
+            class_specific_data['sword_spirit_max'] = getattr(character, 'sword_spirit_max', 100)
+        
+        # 용기사 드래곤 파워 시스템
+        if getattr(character, 'character_class', '') == "용기사":
+            class_specific_data['dragon_power'] = getattr(character, 'dragon_power', 0)
+            class_specific_data['dragon_power_max'] = getattr(character, 'dragon_power_max', 100)
+        
+        # 철학자 지혜 스택 시스템
+        if getattr(character, 'character_class', '') == "철학자":
+            class_specific_data['wisdom_stacks'] = getattr(character, 'wisdom_stacks', 0)
+            class_specific_data['wisdom_max'] = getattr(character, 'wisdom_max', 10)
         
         # 속성 시스템 관련
         element_data = {
@@ -696,6 +848,8 @@ class GameStateSerializer:
             'casting_data': casting_data,
             'status_effects': status_effects_data,
             'element_data': element_data,
+            'venom_data': venom_data,  # 베놈 파워 데이터 추가
+            'class_specific_data': class_specific_data,  # 직업별 특수 데이터 추가
             # ATB 시스템 관련
             'atb_gauge': getattr(character, 'atb_gauge', 0),
             'atb_speed': getattr(character, 'atb_speed', character.speed),
@@ -791,6 +945,54 @@ class GameStateSerializer:
         for attr in status_attributes:
             setattr(character, attr, status_effects.get(attr, False))
         
+        # 복잡한 상태 효과 딕셔너리 복원 (독 등)
+        if 'complex_effects' in status_effects:
+            character.status_effects = status_effects['complex_effects'].copy()
+        elif not hasattr(character, 'status_effects'):
+            character.status_effects = {}
+        
+        # 베놈 파워 복원 (도적 전용)
+        venom_data = char_data.get('venom_data', {})
+        character.venom_power = venom_data.get('venom_power', 0)
+        character.venom_power_max = venom_data.get('venom_power_max', 100)
+        
+        # 직업별 특수 시스템 복원
+        class_specific_data = char_data.get('class_specific_data', {})
+        
+        # 전사 스탠스 복원
+        if getattr(character, 'character_class', '') == "전사":
+            character.current_stance = class_specific_data.get('current_stance', 'balanced')
+        
+        # 암살자 그림자 복원
+        if getattr(character, 'character_class', '') == "암살자":
+            character.shadow_count = class_specific_data.get('shadow_count', 0)
+            character.shadow_max = class_specific_data.get('shadow_max', 5)
+        
+        # 몽크 기 에너지 복원
+        if getattr(character, 'character_class', '') == "몽크":
+            character.ki_energy = class_specific_data.get('ki_energy', 0)
+            character.ki_max = class_specific_data.get('ki_max', 100)
+        
+        # 바드 영감 복원
+        if getattr(character, 'character_class', '') == "바드":
+            character.inspiration_stacks = class_specific_data.get('inspiration_stacks', 0)
+            character.inspiration_max = class_specific_data.get('inspiration_max', 10)
+        
+        # 검성 검기 복원
+        if getattr(character, 'character_class', '') == "검성":
+            character.sword_spirit = class_specific_data.get('sword_spirit', 0)
+            character.sword_spirit_max = class_specific_data.get('sword_spirit_max', 100)
+        
+        # 용기사 드래곤 파워 복원
+        if getattr(character, 'character_class', '') == "용기사":
+            character.dragon_power = class_specific_data.get('dragon_power', 0)
+            character.dragon_power_max = class_specific_data.get('dragon_power_max', 100)
+        
+        # 철학자 지혜 스택 복원
+        if getattr(character, 'character_class', '') == "철학자":
+            character.wisdom_stacks = class_specific_data.get('wisdom_stacks', 0)
+            character.wisdom_max = class_specific_data.get('wisdom_max', 10)
+        
         # 속성 시스템 관련 복원
         element_data = char_data.get('element_data', {})
         character.element_affinity = element_data.get('element_affinity', 'neutral')
@@ -802,27 +1004,56 @@ class GameStateSerializer:
         character.atb_speed = char_data.get('atb_speed', character.speed)
         character.steps_taken = char_data.get('steps_taken', 0)
         
-        # 인벤토리 복원
+        # 인벤토리 복원 (강화된 안전성)
         if 'inventory' in char_data and char_data['inventory']:
             try:
                 from .items import Inventory
                 inventory_data = char_data['inventory']
+                
+                # 새 인벤토리 객체 생성
                 character.inventory = Inventory(
                     max_size=inventory_data.get('max_size', 15),
                     max_weight=inventory_data.get('max_weight', 100.0)
                 )
-                # 아이템들 복원
-                if 'items' in inventory_data:
-                    character.inventory.items = inventory_data['items'].copy()
-                print(f"✅ {character.name} 인벤토리 복원 완료: {len(inventory_data.get('items', {}))}개 아이템")
+                
+                # 아이템들 복원 - 안전한 복사
+                if 'items' in inventory_data and inventory_data['items']:
+                    restored_items = {}
+                    for item_name, quantity in inventory_data['items'].items():
+                        if isinstance(quantity, (int, float)) and quantity > 0:
+                            restored_items[str(item_name)] = int(quantity)
+                    
+                    character.inventory.items = restored_items
+                    
+                    # 복원 로그 출력
+                    item_count = len(restored_items)
+                    total_quantity = sum(restored_items.values())
+                    print(f"📥 [LOAD] {character.name} 인벤토리: {item_count}종류, {total_quantity}개 아이템 복원")
+                else:
+                    character.inventory.items = {}
+                    print(f"📥 [LOAD] {character.name} 인벤토리: 빈 인벤토리로 복원")
+                    
             except Exception as e:
                 print(f"⚠️ {character.name} 인벤토리 복원 실패: {e}")
+                import traceback
+                traceback.print_exc()
                 # 기본 인벤토리 생성
                 try:
                     from .items import Inventory
                     character.inventory = Inventory(max_size=15, max_weight=100.0)
+                    character.inventory.items = {}
+                    print(f"🔧 {character.name} 기본 인벤토리 생성")
                 except ImportError:
                     pass
+        else:
+            # 인벤토리 데이터가 없는 경우 기본 인벤토리 생성
+            try:
+                from .items import Inventory
+                character.inventory = Inventory(max_size=15, max_weight=100.0)
+                character.inventory.items = {}
+                print(f"🆕 {character.name} 새 인벤토리 생성 (저장 데이터 없음)")
+            except ImportError:
+                pass
         
         # 장비 복원
         def deserialize_equipment(equipment_data):
@@ -872,8 +1103,31 @@ class GameStateSerializer:
             character.equipped_armor = deserialize_equipment(equipment_data.get('equipped_armor'))
             character.equipped_accessory = deserialize_equipment(equipment_data.get('equipped_accessory'))
             
+            # 🎯 장비 복원 후 인벤토리에 장비 아이템 자동 추가 (중요!)
+            equipped_items = []
+            if character.equipped_weapon:
+                equipped_items.append(character.equipped_weapon)
+                character.inventory.add_item(character.equipped_weapon.name, 1)
+                print(f"🔧 {character.equipped_weapon.name} 인벤토리에 자동 추가 (장착됨)")
+            
+            if character.equipped_armor:
+                equipped_items.append(character.equipped_armor)
+                character.inventory.add_item(character.equipped_armor.name, 1)
+                print(f"🔧 {character.equipped_armor.name} 인벤토리에 자동 추가 (장착됨)")
+            
+            if character.equipped_accessory:
+                equipped_items.append(character.equipped_accessory)
+                character.inventory.add_item(character.equipped_accessory.name, 1)
+                print(f"🔧 {character.equipped_accessory.name} 인벤토리에 자동 추가 (장착됨)")
+            
+            # 장비 복원 로그
+            print(f"🎒 [LOAD LOG] {character.name} 장비 복원:")
+            print(f"🎒 [LOAD LOG] - Weapon: {character.equipped_weapon}")
+            print(f"🎒 [LOAD LOG] - Armor: {character.equipped_armor}")
+            print(f"🎒 [LOAD LOG] - Accessory: {character.equipped_accessory}")
+            
             equipped_count = sum(1 for eq in [character.equipped_weapon, character.equipped_armor, character.equipped_accessory] if eq is not None)
-            print(f"✅ {character.name} 장비 복원 완료: {equipped_count}개 장비")
+            print(f"✅ {character.name} 장비 복원 완료: {equipped_count}개 장비 + 인벤토리 동기화")
         
         # 🎯 장비 복원 후 ATB 속도 재계산 (장비 보너스 포함)
         try:
@@ -938,6 +1192,9 @@ class GameStateSerializer:
                 'items_collected': getattr(game, 'items_collected', 0),
                 'floors_cleared': getattr(game, 'floors_cleared', 0),
                 'steps_since_last_encounter': getattr(game, 'steps_since_last_encounter', 0),
+                'gathering_cooldown': getattr(game, 'gathering_cooldown', 0),
+                'steps_since_last_gather': getattr(game, 'steps_since_last_gather', 0),
+                'random_encounters_this_floor': getattr(game, 'random_encounters_this_floor', 0),
                 'player_position': game.world.player_pos,
                 'party_characters': [
                     GameStateSerializer.serialize_character(char) 
@@ -1041,7 +1298,7 @@ def show_save_menu(save_manager: SaveManager) -> Optional[str]:
             file_menu = create_simple_menu("기존 저장 파일 선택", file_options, file_descriptions)
             file_result = file_menu.run()
             
-            if file_result == -1 or file_result >= len(saves):
+            if file_result is None or file_result == -1 or file_result >= len(saves):
                 return None
             else:
                 return saves[file_result]['filename']
@@ -1121,7 +1378,7 @@ def _show_save_menu_fallback(save_manager: SaveManager) -> Optional[str]:
 
 
 def show_load_menu(save_manager: SaveManager) -> Optional[str]:
-    """불러오기 메뉴 표시 - 커서 방식"""
+    """불러오기 메뉴 표시 - 페이지 방식"""
     saves = save_manager.list_saves()
     
     if not saves:
@@ -1133,36 +1390,81 @@ def show_load_menu(save_manager: SaveManager) -> Optional[str]:
     try:
         from .cursor_menu_system import create_simple_menu
         
-        # 저장 파일 목록을 커서 메뉴로 생성
-        options = []
-        descriptions = []
+        # 페이지당 항목 수 (화면에 맞게 조정)
+        items_per_page = 10
+        total_pages = (len(saves) + items_per_page - 1) // items_per_page
+        current_page = 0
         
-        for save_info in saves:
-            save_time = save_info['save_time']
-            if save_time != '알 수 없음':
-                try:
-                    dt = datetime.datetime.fromisoformat(save_time)
-                    save_time = dt.strftime("%Y-%m-%d %H:%M:%S")
-                except:
-                    pass
+        while True:
+            # 현재 페이지의 저장 파일들
+            start_idx = current_page * items_per_page
+            end_idx = min(start_idx + items_per_page, len(saves))
+            page_saves = saves[start_idx:end_idx]
             
-            party_str = ", ".join(save_info['party_names'][:2])
-            if len(save_info['party_names']) > 2:
-                party_str += "..."
+            # 메뉴 옵션 생성
+            options = []
+            descriptions = []
             
-            options.append(f"📁 {save_info['filename']}")
-            descriptions.append(f"레벨 {save_info['level']}, 점수 {save_info['score']} | 파티: {party_str} | {save_time}")
-        
-        options.append("❌ 취소")
-        descriptions.append("불러오기를 취소하고 돌아갑니다")
-        
-        menu = create_simple_menu("📁 게임 불러오기", options, descriptions)
-        result = menu.run()
-        
-        if result == -1 or result >= len(saves):  # 취소
-            return None
-        else:
-            return saves[result]['filename']
+            for i, save_info in enumerate(page_saves):
+                save_time = save_info['save_time']
+                if save_time != '알 수 없음':
+                    try:
+                        dt = datetime.datetime.fromisoformat(save_time)
+                        save_time = dt.strftime("%Y-%m-%d %H:%M:%S")
+                    except:
+                        pass
+                
+                party_str = ", ".join(save_info['party_names'][:2])
+                if len(save_info['party_names']) > 2:
+                    party_str += "..."
+                
+                file_number = start_idx + i + 1
+                options.append(f"📁 [{file_number:2d}] {save_info['filename']}")
+                descriptions.append(f"레벨 {save_info['level']}, 점수 {save_info['score']} | 파티: {party_str} | {save_time}")
+            
+            # 페이지 네비게이션 옵션 추가
+            if total_pages > 1:
+                if current_page > 0:
+                    options.append("◀️ 이전 페이지")
+                    descriptions.append(f"페이지 {current_page}/{total_pages}로 이동")
+                
+                if current_page < total_pages - 1:
+                    options.append("▶️ 다음 페이지")
+                    descriptions.append(f"페이지 {current_page + 2}/{total_pages}로 이동")
+            
+            options.append("❌ 취소")
+            descriptions.append("불러오기를 취소하고 돌아갑니다")
+            
+            # 페이지 정보가 포함된 제목
+            title = f"📁 게임 불러오기 (페이지 {current_page + 1}/{total_pages}) - 총 {len(saves)}개 파일"
+            
+            menu = create_simple_menu(title, options, descriptions)
+            result = menu.run()
+            
+            if result is None or result == -1:  # ESC 또는 잘못된 입력
+                return None
+            
+            # 선택 처리
+            if result < len(page_saves):
+                # 세이브 파일 선택
+                selected_save = page_saves[result]
+                return selected_save['filename']
+            else:
+                # 네비게이션 옵션 처리
+                nav_start = len(page_saves)
+                nav_option = result - nav_start
+                
+                if total_pages > 1:
+                    if current_page > 0 and nav_option == 0:  # 이전 페이지
+                        current_page -= 1
+                        continue
+                    elif current_page < total_pages - 1:
+                        if (current_page > 0 and nav_option == 1) or (current_page == 0 and nav_option == 0):  # 다음 페이지
+                            current_page += 1
+                            continue
+                
+                # 취소 선택
+                return None
             
     except ImportError:
         # 폴백: 기존 텍스트 메뉴

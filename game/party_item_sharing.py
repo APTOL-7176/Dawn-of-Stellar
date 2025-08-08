@@ -190,7 +190,115 @@ class PartyItemSharingSystem:
             print(msg)
     
     def handle_pending_requests(self) -> bool:
-        """대기 중인 아이템 사용 요청 처리"""
+        """대기 중인 아이템 사용 요청 처리 - 커서 메뉴 방식"""
+        if not self.pending_requests:
+            return False
+        
+        try:
+            from .cursor_menu_system import create_simple_menu
+            
+            print(f"\n💬 AI 동료들의 아이템 사용 요청 ({len(self.pending_requests)}개):")
+            print("="*60)
+            
+            # 요청별로 개별 승인/거절 처리
+            for i, request in enumerate(self.pending_requests[:]):  # 복사본으로 안전하게 순회
+                emergency_mark = "🚨 긴급! " if request["emergency"] else ""
+                
+                print(f"\n📋 요청 {i+1}/{len(self.pending_requests)}")
+                print(f"🤖 요청자: {request['ai_name']}")
+                print(f"🧪 아이템: {request['item_name']}")
+                print(f"💭 이유: {emergency_mark}{request['reason']}")
+                
+                # 승인/거절 메뉴
+                options = ["✅ 승인", "❌ 거절", "⏭️ 다음에 결정"]
+                descriptions = [
+                    f"{request['ai_name']}의 {request['item_name']} 사용을 허가합니다",
+                    f"{request['ai_name']}의 요청을 거절합니다",
+                    "이 요청을 나중에 처리하고 다음 요청으로 넘어갑니다"
+                ]
+                
+                menu = create_simple_menu(
+                    f"💬 {request['ai_name']}의 요청",
+                    options,
+                    descriptions
+                )
+                
+                result = menu.run()
+                
+                if result == 0:  # 승인
+                    success = self._execute_item_usage(
+                        request["ai_name"], 
+                        request["item_name"], 
+                        request["reason"], 
+                        request["emergency"]
+                    )
+                    if success:
+                        print(f"✅ {request['ai_name']}의 요청이 승인되었습니다!")
+                    else:
+                        print(f"❌ 아이템 사용에 실패했습니다.")
+                    self.pending_requests.remove(request)
+                    
+                elif result == 1:  # 거절
+                    print(f"❌ {request['ai_name']}의 요청이 거절되었습니다.")
+                    self.pending_requests.remove(request)
+                    
+                elif result == 2 or result == -1:  # 다음에 결정 또는 ESC
+                    print(f"⏭️ {request['ai_name']}의 요청을 나중에 처리합니다.")
+                    continue
+            
+            # 남은 요청이 있는지 확인
+            if self.pending_requests:
+                print(f"\n📋 {len(self.pending_requests)}개의 요청이 아직 대기 중입니다.")
+                
+                # 일괄 처리 메뉴
+                batch_options = ["✅ 모든 요청 승인", "❌ 모든 요청 거절", "📋 개별 검토 계속", "🚪 나가기"]
+                batch_descriptions = [
+                    "남은 모든 요청을 한번에 승인합니다",
+                    "남은 모든 요청을 한번에 거절합니다", 
+                    "남은 요청들을 하나씩 다시 검토합니다",
+                    "요청 처리를 종료합니다"
+                ]
+                
+                batch_menu = create_simple_menu(
+                    "📋 남은 요청 일괄 처리",
+                    batch_options,
+                    batch_descriptions
+                )
+                
+                batch_result = batch_menu.run()
+                
+                if batch_result == 0:  # 모든 요청 승인
+                    for request in self.pending_requests[:]:
+                        self._execute_item_usage(
+                            request["ai_name"], 
+                            request["item_name"], 
+                            request["reason"], 
+                            request["emergency"]
+                        )
+                    print(f"✅ 모든 요청({len(self.pending_requests)}개)이 승인되었습니다!")
+                    self.pending_requests.clear()
+                    
+                elif batch_result == 1:  # 모든 요청 거절
+                    rejected_count = len(self.pending_requests)
+                    self.pending_requests.clear()
+                    print(f"❌ 모든 요청({rejected_count}개)이 거절되었습니다.")
+                    
+                elif batch_result == 2:  # 개별 검토 계속
+                    return self.handle_pending_requests()  # 재귀 호출로 다시 처리
+                    
+                # batch_result == 3 또는 -1: 나가기
+            
+            return True
+            
+        except ImportError:
+            # 폴백: 기존 텍스트 방식
+            return self._handle_pending_requests_fallback()
+        except Exception as e:
+            print(f"⚠️ 요청 처리 중 오류: {e}")
+            return self._handle_pending_requests_fallback()
+    
+    def _handle_pending_requests_fallback(self) -> bool:
+        """대기 중인 아이템 사용 요청 처리 - 폴백 방식"""
         if not self.pending_requests:
             return False
         

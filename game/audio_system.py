@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """
-BGM 및 SFX 시스템 - FFVII 스타일
+BGM 및 SFX 시스템 - FFVII 스타일 (시작 시 완전 차단됨)
 층별 다른 BGM, 다양한 효과음
 """
 
-import pygame
+# pygame import - main.py에서 조건부 차단된 pygame 사용
+import pygame  # main.py에서 ConditionalPygameModule로 관리됨
+
 import random
 import os
 import sys
@@ -14,6 +16,8 @@ from enum import Enum
 class BGMType(Enum):
     """BGM 타입"""
     MENU = "메인메뉴"
+    MAIN_MENU_OPENING = "메인메뉴_오프닝"  # 02-Opening ~ Bombing Mission.mp3 전용
+    DIFFICULTY_SELECT = "난이도선택"  # 난이도 선택 화면용
     FLOOR_1_3 = "1-3층"
     FLOOR_4_6 = "4-6층"
     FLOOR_7_9 = "7-9층"
@@ -94,7 +98,39 @@ class SFXType(Enum):
     TRAP_ACTIVATE = "함정발동"
     STAIRS_UP = "계단오르기"
     STAIRS_DOWN = "계단내려가기"
+    
+    # 글리치 모드 전용 공포 효과음
+    GLITCH_STATIC = "글리치_정적음"
+    GLITCH_DISTORTION = "글리치_왜곡음"
+    GLITCH_CORRUPTION = "글리치_손상음"
+    GLITCH_ERROR = "글리치_에러음"
+    GLITCH_SCREAM = "글리치_비명"
+    GLITCH_WHISPER = "글리치_속삭임"
+    GLITCH_HEARTBEAT = "글리치_심장박동"
+    GLITCH_BREATH = "글리치_호흡음"
+    GLITCH_CRACK = "글리치_균열음"
+    GLITCH_VOID = "글리치_공허음"
+    SEPHIROTH_LAUGH = "세피로스_웃음"
+    SEPHIROTH_WHISPER = "세피로스_속삭임"
+    HORROR_AMBIENT = "공포_분위기"
+    SYSTEM_CORRUPTION = "시스템_손상"
+    REALITY_BREAK = "현실_붕괴"
     BATTLE_SWIRL = "전투시작소용돌이"
+    
+    # 상호작용 효과음 (FFVII 기반 매핑)
+    INTERACT_SUCCESS = "아이템획득"        # 성공적인 상호작용 -> FFVII 아이템 획득음
+    INTERACT_FAIL = "메뉴에러"              # 실패한 상호작용 -> FFVII 에러음
+    ALTAR_ACTIVATE = "치유"                 # 제단 활성화 -> FFVII 회복마법음
+    LEVER_PULL = "장비장착"                 # 레버 작동 -> FFVII 장비 장착음 (기계음)
+    BOOKSHELF_READ = "스킬습득"             # 지식 습득 -> FFVII 스킬 학습음
+    FORGE_USE = "장비장착"                  # 대장간 사용 -> FFVII 장비 관련음
+    FOUNTAIN_DRINK = "포션"                 # 분수 치유 -> FFVII 포션 사용음
+    CRYSTAL_TOUCH = "마법시전"              # 수정 터치 -> FFVII 마법 시전음
+    SECRET_FOUND = "아이템픽업"             # 비밀 발견 -> FFVII 특별 아이템 발견음
+    LOCK_PICK = "문열림"                    # 잠금해제 -> FFVII 문 열림음
+    TRAP_DISARM = "버프적용"                # 함정해제 -> FFVII 버프 적용음 (성공음)
+    CURSED_ACTIVATE = "디버프적용"          # 저주 발동 -> FFVII 디버프 적용음
+    MAGIC_SEAL = "마법시전"                 # 마법 봉인 -> FFVII 마법 시전음
     
     # 특수 효과음
     SUMMON = "소환"
@@ -110,23 +146,60 @@ class AudioManager:
     def __init__(self, debug_mode: bool = False):
         # 디버그 모드 설정
         self.debug_mode = debug_mode
+        self.mixer_available = False
         
-        # pygame mixer 초기화
+        # pygame mixer 초기화 (조용하게)
         try:
-            pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=512)
-            pygame.mixer.init()
+            # 먼저 기존 mixer 정리
+            try:
+                if pygame.mixer.get_init():
+                    pygame.mixer.quit()
+            except:
+                pass
+            
+            # pygame 초기화 (mixer만)
+            try:
+                pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=2048)
+                pygame.mixer.init()
+                
+                # 초기화 확인
+                if pygame.mixer.get_init():
+                    self.mixer_available = True
+                    if debug_mode:
+                        print(f"✅ pygame mixer 초기화 성공: {pygame.mixer.get_init()}")
+                    
+                    # 초기화 직후 즉시 정지
+                    pygame.mixer.stop()
+                    pygame.mixer.music.stop()
+                    pygame.mixer.music.set_volume(0.0)
+                else:
+                    raise Exception("mixer 초기화 실패")
+                    
+            except Exception as init_error:
+                if debug_mode:
+                    print(f"⚠️ pygame mixer 초기화 실패: {init_error}")
+                self.mixer_available = False
+                
         except Exception as e:
-            print(f"⚠️ pygame mixer 초기화 실패: {e}")
+            if debug_mode:
+                print(f"⚠️ pygame 전체 초기화 실패: {e}")
             self.mixer_available = False
+        
+        # mixer가 사용 불가능하면 여기서 종료
+        if not self.mixer_available:
+            if debug_mode:
+                print("🔇 오디오 시스템 비활성화 모드로 실행")
+            self._init_fallback_mode()
             return
         
-        self.mixer_available = True
-        
-        # 볼륨 설정
+        # 정상 모드 초기화
+        self._init_normal_mode()
+    
+    def _init_normal_mode(self):
+        """정상 오디오 모드 초기화"""
+        # 기본값들 설정
         self.bgm_volume = 0.7
         self.sfx_volume = 0.8
-        
-        # 현재 재생 중인 BGM
         self.current_bgm = None
         self.current_bgm_type = None
         self.current_track_index = 0  # 필드 BGM 순환용 인덱스
@@ -151,12 +224,74 @@ class AudioManager:
         # 디렉토리 생성
         self._ensure_audio_directories()
         
-        # FFVII 스타일 BGM 매핑
-        self._initialize_bgm_mapping()
-        self._initialize_sfx_mapping()
+        # BGM/SFX 매핑 초기화
+        try:
+            self._initialize_bgm_mapping()
+            self._initialize_sfx_mapping()
+        except Exception as e:
+            if self.debug_mode:
+                print(f"⚠️ 매핑 초기화 실패: {e}")
+        
+        # 🔇 초기화 중 BGM 자동 재생 완전 차단
+        if self.mixer_available:
+            try:
+                # 모든 mixer 채널 정지
+                pygame.mixer.stop()
+                pygame.mixer.music.stop()
+                pygame.mixer.music.unload()
+                # 볼륨도 0으로 설정
+                pygame.mixer.music.set_volume(0.0)
+                self.current_bgm = None
+                self.current_bgm_type = None
+                # 약간의 지연 후 볼륨 복구
+                import time
+                time.sleep(0.1)
+                pygame.mixer.music.set_volume(self.bgm_volume)
+                if self.debug_mode:
+                    print("🔇 초기화 완료 - BGM 자동 재생 차단됨")
+            except Exception as e:
+                if self.debug_mode:
+                    print(f"⚠️ 초기화 정지 실패: {e}")
+    
+    def _init_fallback_mode(self):
+        """오디오 시스템이 사용 불가능할 때의 fallback 초기화"""
+        # 기본값들 설정
+        self.bgm_volume = 0.7
+        self.sfx_volume = 0.8
+        self.current_bgm = None
+        self.current_bgm_type = None
+        self.current_track_index = 0  # 필드 BGM 순환용 인덱스
+        
+        # BGM 및 SFX 딕셔너리
+        self.bgm_tracks = {}
+        self.sfx_sounds = {}
+        
+        # 로드된 파일 추적
+        self.loaded_bgm = set()
+        self.loaded_sfx = set()
+        
+        # SFX 쿨다운 시스템 (중복 재생 방지)
+        self.last_sfx_time = {}
+        self.sfx_cooldown = 0.1  # 100ms 쿨다운
+        
+        # 🔧 안전한 경로 처리 시스템
+        self.sounds_base_path = self._get_sounds_path()
+        self.bgm_base_path = os.path.join(self.sounds_base_path, "bgm")
+        self.sfx_base_path = os.path.join(self.sounds_base_path, "sfx")
+        
+        # 디렉토리 생성
+        self._ensure_audio_directories()
+        
+        # 빈 매핑 초기화 (fallback 모드에서는 실제 파일 로드하지 않음)
+        try:
+            self._initialize_bgm_mapping()
+            self._initialize_sfx_mapping()
+        except:
+            # 매핑 초기화 실패해도 계속 진행
+            pass
     
     def _get_sounds_path(self) -> str:
-        """실행 파일 위치에 관계없이 sounds 폴더 경로를 안전하게 찾기"""
+        """실행 파일 위치에 관계없이 game/audio 폴더 경로를 안전하게 찾기"""
         # 실행 중인 스크립트의 디렉토리 찾기
         if getattr(sys, 'frozen', False):
             # PyInstaller로 패키징된 실행 파일
@@ -167,36 +302,36 @@ class AudioManager:
             current_dir = os.path.dirname(os.path.abspath(__file__))
             base_dir = os.path.dirname(current_dir)  # game/ 폴더의 상위로
         
-        sounds_path = os.path.join(base_dir, "sounds")
+        audio_path = os.path.join(base_dir, "game", "audio")
         
-        # sounds 폴더가 없으면 현재 디렉토리에서 찾기
-        if not os.path.exists(sounds_path):
+        # game/audio 폴더가 없으면 현재 디렉토리에서 찾기
+        if not os.path.exists(audio_path):
             # 현재 작업 디렉토리에서 찾기
-            current_sounds = os.path.join(os.getcwd(), "sounds")
-            if os.path.exists(current_sounds):
-                sounds_path = current_sounds
+            current_audio = os.path.join(os.getcwd(), "game", "audio")
+            if os.path.exists(current_audio):
+                audio_path = current_audio
             else:
                 # 스크립트가 있는 디렉토리의 상위에서 찾기
                 script_dir = os.path.dirname(os.path.abspath(__file__))
-                parent_sounds = os.path.join(os.path.dirname(script_dir), "sounds")
-                if os.path.exists(parent_sounds):
-                    sounds_path = parent_sounds
+                parent_audio = os.path.join(os.path.dirname(script_dir), "game", "audio")
+                if os.path.exists(parent_audio):
+                    audio_path = parent_audio
                 else:
                     # 마지막 시도: 여러 경로 시도
                     possible_paths = [
-                        os.path.join(os.getcwd(), "sounds"),
-                        os.path.join(os.path.dirname(sys.executable), "sounds"),
-                        os.path.join(os.path.dirname(sys.argv[0]), "sounds"),
-                        "sounds"  # 상대 경로
+                        os.path.join(os.getcwd(), "game", "audio"),
+                        os.path.join(os.path.dirname(sys.executable), "game", "audio"),
+                        os.path.join(os.path.dirname(sys.argv[0]), "game", "audio"),
+                        os.path.join("game", "audio")  # 상대 경로
                     ]
                     
                     for path in possible_paths:
                         if os.path.exists(path):
-                            sounds_path = path
+                            audio_path = path
                             break
         
-        print(f"🎵 사운드 폴더 경로: {sounds_path}")
-        return sounds_path
+        # print(f"🎵 사운드 폴더 경로: {sounds_path}")  # 조용히
+        return audio_path
     
     def _ensure_audio_directories(self):
         """오디오 디렉토리 생성 및 확인"""
@@ -231,13 +366,21 @@ class AudioManager:
         """FFVII BGM 매핑 초기화"""
         self.bgm_files = {
             BGMType.MENU: [
-                "01-The Prelude.mp3",           # FF7 프렐루드
-                "25-Main Theme of Final Fantasy VII.mp3"      # FF7 오프닝 테마
+                                "01-The Prelude.mp3",           # FF7 프렐루드 (보조)
+                "25-Main Theme of Final Fantasy VII.mp3",     # FF7 메인 테마 (우선)
+            ],
+            BGMType.MAIN_MENU_OPENING: [
+                "02-Opening ~ Bombing Mission.mp3"     # 오프닝 전용 BGM
+            ],
+            BGMType.DIFFICULTY_SELECT: [
+                "15-Underneath the Rotting Pizza.mp3",  # 썩은 피자 아래서 (선택의 긴장감)
+                "19-Don of the Slums.mp3",              # 돈 코를레오네 (중후한 선택)
+                "23-Tifa's Theme.mp3"                   # 티파의 테마 (부드러운 선택)
             ],
             BGMType.FLOOR_1_3: [
+                "03-Bombing Mission.mp3",   # 필드용 폭파 임무 (03번 사용)
                 "15-Underneath the Rotting Pizza.mp3",  # 썩은 피자 아래서
-                "04-Mako Reactor.mp3",      # 마코로 1호기 (1층에 적합)
-                "03-Bombing Mission.mp3"    # 폭파 임무
+                "04-Mako Reactor.mp3"       # 마코로 1호기 (1층에 적합)
             ],
             BGMType.FLOOR_4_6: [
                 "26-Ahead on Our Way.mp3",      # 그 길에서
@@ -355,6 +498,7 @@ class AudioManager:
                 "75-Off the Edge of Despair.mp3"    # 슬픈 테마
             ],
             BGMType.SPECIAL_EVENT: [
+                "02-Opening ~ Bombing Mission.mp3",       # 오프닝/스토리용 (02번 오프닝)
                 "13-Flowers Blooming in the Church.mp3",  # 꽃이 피는 교회
                 "62-Interrupted by Fireworks.mp3",        # 불꽃에 가로막혀서
                 "60-Tango of Tears.mp3"                   # 데이트 테마
@@ -499,7 +643,7 @@ class AudioManager:
         return False
     
     def play_bgm(self, bgm_type_or_name, loop: bool = True, fade_in: int = 1000):
-        """BGM 재생 - BGMType 또는 문자열 모두 지원"""
+        """BGM 재생"""
         # 문자열이면 BGMType으로 변환
         if isinstance(bgm_type_or_name, str):
             self.play_bgm_by_name(bgm_type_or_name, loop=loop, fade_in=fade_in)
@@ -629,7 +773,10 @@ class AudioManager:
             
             sfx_type = sfx_mapping.get(sfx_type_or_name.lower())
             if not sfx_type:
-                print(f"⚠️ 알 수 없는 SFX: {sfx_type_or_name}")
+                # 직접 파일명인 경우 (예: "012.wav") 바로 재생 시도
+                if sfx_type_or_name.endswith('.wav'):
+                    return self._play_direct_sfx_file(sfx_type_or_name, volume_multiplier)
+                # 알 수 없는 SFX는 조용히 무시
                 return
         else:
             sfx_type = sfx_type_or_name
@@ -637,6 +784,17 @@ class AudioManager:
         # SFXType으로 재생
         if not self.mixer_available:
             # pygame mixer를 사용할 수 없으면 조용히 처리
+            return
+        
+        # mixer 초기화 상태 재확인
+        try:
+            if not pygame.mixer.get_init():
+                if self.debug_mode:
+                    print("⚠️ SFX 재생 실패: mixer not initialized")
+                return
+        except Exception as e:
+            if self.debug_mode:
+                print(f"⚠️ SFX 재생 실패: {e}")
             return
             
         if self.load_sfx(sfx_type):
@@ -651,11 +809,37 @@ class AudioManager:
                     selected_sound.play()
                     
                 except Exception as e:
-                    print(f"⚠️ SFX 재생 실패: {e}")
+                    if self.debug_mode:
+                        print(f"⚠️ SFX 재생 실패: {e}")
             else:
-                print(f"🔇 SFX 로드되지 않음: {sfx_type.value}")
+                if self.debug_mode:
+                    print(f"🔇 SFX 로드되지 않음: {sfx_type.value}")
         else:
-            print(f"🔇 SFX 파일 없음으로 {sfx_type.value} 재생을 건너뜁니다")
+            if self.debug_mode:
+                print(f"🔇 SFX 파일 없음으로 {sfx_type.value} 재생을 건너뜁니다")
+    
+    def _play_direct_sfx_file(self, filename: str, volume_multiplier: float = 1.0):
+        """직접 SFX 파일명으로 재생 (예: "012.wav")"""
+        if not self.mixer_available:
+            return False
+            
+        try:
+            # 파일 경로 구성
+            file_path = os.path.join(self.sfx_base_path, filename)
+            
+            # 파일 존재 확인
+            if not os.path.exists(file_path):
+                return False
+            
+            # 사운드 로드 및 재생
+            sound = pygame.mixer.Sound(file_path)
+            volume = min(1.0, self.sfx_volume * volume_multiplier)
+            sound.set_volume(volume)
+            sound.play()
+            return True
+            
+        except Exception as e:
+            return False
     
     def stop_bgm(self, fade_out: int = 0):
         """BGM 정지 - 안전한 처리"""
@@ -731,7 +915,7 @@ class AudioManager:
             self.ensure_bgm_continuity(bgm_type)
     
     def play_bgm_by_name(self, bgm_name: str, loop: bool = True, fade_in: int = 500):
-        """문자열 이름으로 BGM 재생 (하위 호환성)"""
+        """문자열 이름으로 BGM 재생"""
         # 문자열을 BGMType으로 매핑
         bgm_mapping = {
             "main theme of ffvii": BGMType.MENU,
@@ -761,19 +945,31 @@ class AudioManager:
         
         bgm_type = bgm_mapping.get(bgm_name.lower(), BGMType.FLOOR_1_3)
         
-        # 디버그: 매핑 정보 출력
+        # 디버그: 매핑 정보 조용히
         if self.debug_mode:
             if bgm_name.lower() in bgm_mapping:
-                print(f"🎵 BGM 매핑: '{bgm_name}' → {bgm_type.name}")
+                pass  # BGM 매핑 조용히
             else:
-                print(f"⚠️ BGM 매핑 없음: '{bgm_name}' → 기본값 {bgm_type.name} 사용")
+                pass  # BGM 매핑 없음 조용히
         
         self._play_bgm_internal(bgm_type, loop=loop, fade_in=fade_in)
     
     def _play_bgm_internal(self, bgm_type: BGMType, loop: bool = True, fade_in: int = 1000):
-        """내부 BGM 재생 로직 - 안전한 처리"""
+        """내부 BGM 재생 로직"""
         if not self.mixer_available:
-            print(f"🔇 pygame mixer를 사용할 수 없어 BGM을 재생하지 않습니다")
+            if self.debug_mode:
+                print(f"🔇 pygame mixer를 사용할 수 없어 BGM을 재생하지 않습니다")
+            return
+        
+        # mixer 초기화 상태 재확인
+        try:
+            if not pygame.mixer.get_init():
+                if self.debug_mode:
+                    print("⚠️ BGM 재생 실패: mixer not initialized")
+                return
+        except Exception as e:
+            if self.debug_mode:
+                print(f"⚠️ BGM 재생 실패: {e}")
             return
             
         # 전투 BGM은 항상 새로 선택하도록 (랜덤 재생을 위해)
@@ -786,7 +982,7 @@ class AudioManager:
                 if (self.current_bgm_type == bgm_type and 
                     pygame.mixer.music.get_busy()):
                     if hasattr(self, 'debug_mode') and self.debug_mode:
-                        print(f"🎵 같은 BGM이 재생 중이므로 스킵: {bgm_type}")
+                        print(f"🔄 이미 재생 중인 BGM: {bgm_type.value}")
                     return  # 이미 같은 BGM이 재생 중
             except Exception:
                 # pygame.mixer.music.get_busy() 오류 시 재생 진행
@@ -808,17 +1004,21 @@ class AudioManager:
                     selected_track = tracks[self.current_track_index % len(tracks)]
                     self.current_track_index += 1  # 다음 트랙을 위해 인덱스 증가
                     if hasattr(self, 'debug_mode') and self.debug_mode:
-                        print(f"🎵 필드 BGM 순환 재생: {os.path.basename(selected_track)}")
+                        pass  # 필드 BGM 순환 재생 조용히
                 else:
                     # 전투/보스/기타 BGM: 랜덤 선택
                     selected_track = random.choice(tracks)
                     # 승리 BGM은 조용히 재생
                     if bgm_type == BGMType.BATTLE and (hasattr(self, 'debug_mode') and self.debug_mode):
-                        print(f"🔥 전투 BGM 랜덤 선택: {os.path.basename(selected_track)}")
+                        pass  # 전투 BGM 조용히 재생
                     elif bgm_type == BGMType.VICTORY:
                         pass  # 승리 BGM은 조용히 재생
                 
                 try:
+                    # 🎵 정상 BGM 재생 모드 - 글리치 모드 체크 비활성화
+                    # (BGM 차단 로직 완전 제거)
+                    
+                    # 🎵 pygame BGM 재생 (정상 모드)
                     pygame.mixer.music.load(selected_track)
                     pygame.mixer.music.set_volume(self.bgm_volume)
                     loops = -1 if loop else 0
@@ -992,15 +1192,18 @@ class AudioManager:
                 self.play_sfx(SFXType.DEBUFF_OFF)
     
     def play_dungeon_bgm(self, floor: int):
-        """던전 층수에 맞는 BGM 재생 (FFVII 호환)"""
+        """던전 층수에 맞는 BGM 재생"""
         if self.debug_mode:
-            print(f"🎵 AudioManager.play_dungeon_bgm 호출: {floor}층")
+            pass  # 던전 BGM 호출 조용히
         
         # 층수에 맞는 BGM 타입 가져오기
         bgm_type = self.get_bgm_for_floor(floor)
         
         if self.debug_mode:
-            print(f"🎵 {floor}층 → {bgm_type.value} BGM 타입")
+            pass  # 층수별 BGM 타입 조용히
+        
+        # BGM 재생
+        self._play_bgm_internal(bgm_type)
         
         # BGM 재생
         self.play_bgm(bgm_type, loop=True, fade_in=500)
@@ -1087,8 +1290,8 @@ class DummyAudioManager:
 def create_audio_directories():
     """오디오 디렉토리 생성"""
     try:
-        os.makedirs("sounds/bgm", exist_ok=True)
-        os.makedirs("sounds/sfx", exist_ok=True)
+        os.makedirs("game/audio/bgm", exist_ok=True)
+        os.makedirs("game/audio/sfx", exist_ok=True)
         print("오디오 디렉토리 생성 완료")
     except Exception as e:
         print(f"디렉토리 생성 실패: {e}")
