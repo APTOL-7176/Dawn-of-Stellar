@@ -336,6 +336,7 @@ __pycache__/
 *_check.py
 debug_*.*
 test_*.*
+!test_basic.py          # CI용 기본 테스트는 포함
 display_simulation.py
 battle_simulation.py
 combat_*_test.py
