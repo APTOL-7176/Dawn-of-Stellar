@@ -276,7 +276,9 @@ class BraveCombatSystem:
             start_time = time_module.time()
             while time_module.time() - start_time < seconds:
                 if select.select([sys.stdin], [], [], 0.1)[0]:
-                    input()  # Enter 입력 소비
+                    # 키 버퍼 클리어 후 키 대기
+                    self.keyboard.clear_input_buffer()
+                    self.keyboard.wait_for_key()  # Enter 입력 소비
                     return
                 time_module.sleep(0.1)
         
@@ -976,7 +978,7 @@ class BraveCombatSystem:
                 if attempts == 0:
                     # 안정화를 위한 짧은 대기 - 더욱 빠르게
                     import time as time_module
-                    time_module.sleep(0.01)  # 10ms로 단축 (30ms→10ms, 매우 빠른 응답)
+                    time_module.sleep(0.05)  # 10ms에서 50ms로 증가 (화면 안정성)
                     first_character = next((c for c in valid_party if c.is_alive), None)
                     if first_character:
                         self.show_battle_status(first_character, valid_party, valid_enemies)
@@ -992,7 +994,7 @@ class BraveCombatSystem:
                 if action_order:
                     break
                 attempts += 1
-                time_module.sleep(0.02)  # ATB 업데이트 간 딜레이 단축 (60ms→20ms, 매우 부드럽게)
+                time_module.sleep(0.1)  # ATB 업데이트 간 딜레이 (20ms→100ms, 화면 안정성)
             
             if not action_order:
                 # ATB 강제 증가로 교착 상태 해결
@@ -1020,21 +1022,33 @@ class BraveCombatSystem:
             if character in valid_party:
                 print(f"🎮 {character.name}의 턴이 시작됩니다!")
                 
-                # AI 모드 확인 - 더 정확한 체크
+                # AI 모드 확인 - 조건부 처리 (AI 게임모드가 활성화된 경우에만)
                 ai_controlled = False
                 try:
-                    from game.ai_game_mode import ai_game_mode_manager
-                    if hasattr(ai_game_mode_manager, 'is_ai_controlled'):
-                        ai_controlled = ai_game_mode_manager.is_ai_controlled(character)
-                        if ai_controlled:
-                            print(f"🤖 {character.name}은(는) AI가 제어합니다.")
-                            result = self.ai_turn(character, valid_party, valid_enemies)
+                    # 메인 모듈에서 AI 게임모드 활성화 여부 확인
+                    import sys
+                    main_module = sys.modules.get('__main__')
+                    ai_game_mode_enabled = getattr(main_module, 'ai_game_mode_enabled', False) if main_module else False
+                    
+                    # AI 게임모드가 활성화된 경우에만 AI 제어 체크
+                    if ai_game_mode_enabled:
+                        from game.ai_game_mode import ai_game_mode_manager
+                        if hasattr(ai_game_mode_manager, 'is_ai_controlled'):
+                            ai_controlled = ai_game_mode_manager.is_ai_controlled(character)
+                            if ai_controlled:
+                                print(f"🤖 {character.name}은(는) AI가 제어합니다.")
+                                result = self.ai_turn(character, valid_party, valid_enemies)
+                            else:
+                                print(f"🎯 {character.name}은(는) 플레이어가 제어합니다.")
+                                result = self.player_turn(character, valid_party, valid_enemies)
                         else:
-                            print(f"🎯 {character.name}은(는) 플레이어가 제어합니다.")
+                            print(f"🎯 {character.name} 플레이어 턴으로 처리 (AI 함수 없음)")
                             result = self.player_turn(character, valid_party, valid_enemies)
                     else:
-                        print(f"🎯 {character.name} 플레이어 턴으로 처리 (AI 함수 없음)")
+                        # AI 게임모드가 비활성화된 경우 모든 파티원을 플레이어가 제어
+                        print(f"🎯 {character.name}은(는) 플레이어가 제어합니다. (AI 모드 비활성화)")
                         result = self.player_turn(character, valid_party, valid_enemies)
+                        
                 except ImportError:
                     print(f"🎯 {character.name} 플레이어 턴으로 처리 (AI 모드 없음)")
                     result = self.player_turn(character, valid_party, valid_enemies)
@@ -1203,18 +1217,20 @@ class BraveCombatSystem:
                 if hasattr(character, 'is_casting_ready_atb') and character.is_casting_ready_atb():
                     print(f"✨ {character.name}의 캐스팅이 완료되어 자동으로 스킬을 시전합니다!")
                     self.complete_casting(character)
-                    # 캐스팅 완료 후 효과 확인 시간 제공
+                    # 캐스팅 완료 후 효과 확인 시간 제공 (단축)
                     import time
-                    time.sleep(2.0)
+                    time.sleep(0.5)  # 2초에서 0.5초로 단축
                     # 캐스팅 완료 후 턴 종료
-                    return None
+                    self._last_action_completed = True  # 액션 완료 플래그 설정
+                    return "action_completed"
                 elif hasattr(character, 'atb_gauge') and character.atb_gauge >= 1000:
                     # 강제 캐스팅 완료 (ATB가 1000에 도달했을 때)
                     print(f"🔮 {character.name}의 ATB가 충전되어 강제로 캐스팅을 완료합니다!")
                     self.complete_casting(character)
                     import time
-                    time.sleep(2.0)
-                    return None
+                    time.sleep(0.5)  # 2초에서 0.5초로 단축
+                    self._last_action_completed = True  # 액션 완료 플래그 설정
+                    return "action_completed"
                 else:
                     # 캐스팅 진행률 표시
                     if hasattr(character, 'get_casting_progress'):
@@ -1226,7 +1242,7 @@ class BraveCombatSystem:
                     else:
                         print(f"🔮 {character.name}은(는) 스킬을 캐스팅 중입니다...")
                     import time
-                    time.sleep(1.0)
+                    time.sleep(0.2)  # 1초에서 0.2초로 단축
                     # 캐스팅 중이므로 턴 종료
                     return None
             except Exception as casting_error:
@@ -1486,12 +1502,27 @@ class BraveCombatSystem:
                 print("─" * 50)
                 
                 try:
-                    choice_input = input("선택 (1-9): ").strip()
+                    # 더 안전한 입력 처리 (키 홀드 방지)
+                    print("선택 (1-9): ", end="", flush=True)
+                    
+                    # 여러 번 시도하여 유효한 입력 받기
+                    for attempt in range(5):  # 최대 5번 시도
+                        choice_input = input().strip()
+                        if choice_input:  # 빈 입력이 아니면
+                            break
+                        print("다시 입력하세요: ", end="", flush=True)
+                    
+                    if not choice_input:  # 모든 시도 후에도 빈 입력이면
+                        print("⚠️ 유효한 입력이 필요합니다. 다시 시도해주세요.")
+                        continue  # 메뉴로 돌아가기
+                        
                     choice = int(choice_input) - 1
                     if choice < 0 or choice >= len(action_options):
-                        return None
+                        print(f"잘못된 선택입니다. (1-{len(action_options)} 범위)")
+                        continue  # 다시 메뉴로
                 except (ValueError, KeyboardInterrupt):
-                    return None
+                    print("⚠️ 올바른 숫자를 입력해주세요.")
+                    continue  # 메뉴로 돌아가기
             
             if choice == 0:  # Brave 공격
                 if self.brave_attack_menu(character, enemies):
@@ -1638,7 +1669,11 @@ class BraveCombatSystem:
                         gauge_bar = gauge_bar.ljust(10, " ")
                         print(f"  {char.name}: [{gauge_bar}] {atb_percent}%")
                 
-                input(f"\n{Color.YELLOW.value}엔터를 눌러 계속...{Color.RESET.value}")
+                # 키 버퍼 클리어 후 키 대기
+                self.keyboard.clear_input_buffer()
+                self.keyboard.wait_for_key(f"\n{Color.YELLOW.value}엔터를 눌러 계속...{Color.RESET.value}")
+                # 전투 후 키 버퍼 클리어 (키 홀드 방지)
+                self.keyboard.clear_input_buffer()
                 
                 # 그 다음에 상세 메뉴 표시
                 self.show_detailed_combat_status(character, party, enemies)
@@ -1671,10 +1706,10 @@ class BraveCombatSystem:
             print("• 턴이 완료되었습니다.")
         print("="*70)
         
-        # 전투 로그 확인 시간 제공
+        # 전투 로그 확인 시간 제공 (매우 단축)
         import time
-        print("\n⏰ 전투 로그 확인 중... (2초)")
-        time.sleep(2.0)
+        print("\n⏰ 전투 로그 확인 중... (0.5초)")
+        time.sleep(0.5)  # 2초에서 0.5초로 단축
         
         # 🎯 중요: 실제 행동 완료 여부 확인 후 반환
         if getattr(self, '_last_action_completed', False):
@@ -2310,7 +2345,9 @@ class BraveCombatSystem:
             gauge_animator = get_gauge_animator()
             gauge_animator.pause_animations()
             if not self.ai_game_mode:  # AI 모드가 아닐 때만 입력 대기
-                input("아무 키나 눌러 계속...")
+                # 키 버퍼 클리어 후 키 대기
+                self.keyboard.clear_input_buffer()
+                self.keyboard.wait_for_key("아무 키나 눌러 계속...")
             else:
                 time.sleep(0.3)  # AI 모드에서는 짧은 대기
             gauge_animator.resume_animations()
@@ -2343,7 +2380,8 @@ class BraveCombatSystem:
             gauge_animator = get_gauge_animator()
             gauge_animator.pause_animations()
             if not self.ai_game_mode:  # AI 모드가 아닐 때만 입력 대기
-                input("아무 키나 눌러 계속...")
+                self.keyboard.clear_input_buffer()  # 키 홀드 방지
+                self.keyboard.wait_for_key("아무 키나 눌러 계속...")
             else:
                 time.sleep(0.3)  # AI 모드에서는 짧은 대기
             gauge_animator.resume_animations()
@@ -2955,7 +2993,9 @@ class BraveCombatSystem:
                     
                     try:
                         print("\n번호를 입력하세요:", end=" ")
-                        choice_str = input().strip()
+                        # 키 버퍼 클리어 후 키 대기
+                        self.keyboard.clear_input_buffer()
+                        choice_str = self.keyboard.get_input().strip()
                         choice = int(choice_str)
                         
                         if choice == 0:
@@ -3079,7 +3119,9 @@ class BraveCombatSystem:
                     
                     try:
                         print("\n번호를 입력하세요:", end=" ")
-                        choice_str = input().strip()
+                        # 키 버퍼 클리어 후 키 대기
+                        self.keyboard.clear_input_buffer()
+                        choice_str = self.keyboard.get_input().strip()
                         choice = int(choice_str)
                         
                         if choice == 0:
@@ -8072,7 +8114,9 @@ class BraveCombatSystem:
         else:
             print(f"  ⚠️ 시뮬레이션 결과와 이론치에 차이가 있습니다 (확률의 오차)")
         
-        input(f"\n{Color.BRIGHT_GREEN.value}⏎ 계속하려면 Enter를 누르세요...{Color.RESET.value}")
+        # 키 버퍼 클리어 후 키 대기
+        self.keyboard.clear_input_buffer()
+        self.keyboard.wait_for_key(f"\n{Color.BRIGHT_GREEN.value}⏎ 계속하려면 Enter를 누르세요...{Color.RESET.value}")
     
     def _show_all_hit_rates(self, party: List[Character], enemies: List[Character]):
         """모든 캐릭터 간 명중률 매트릭스 표시"""
@@ -8108,7 +8152,9 @@ class BraveCombatSystem:
                     
                     print(f"{attacker_name:<12} {'→':<3} {target_name:<12} {hit_chance:>6.1f}% {100-hit_chance:>6.1f}%")
         
-        input(f"\n{Color.BRIGHT_GREEN.value}⏎ 계속하려면 Enter를 누르세요...{Color.RESET.value}")
+        # 키 버퍼 클리어 후 키 대기
+        self.keyboard.clear_input_buffer()
+        self.keyboard.wait_for_key(f"\n{Color.BRIGHT_GREEN.value}⏎ 계속하려면 Enter를 누르세요...{Color.RESET.value}")
     
     def _get_fallback_sfx(self, skill_type):
         """SFX 폴백 매핑"""

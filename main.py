@@ -339,11 +339,13 @@ class DawnOfStellarGame:
         # 화면 클리어 디바운싱 변수
         self._last_clear_time = 0
         
-        # 키 입력 디바운싱 변수 (키 반복 방지) - 완화된 설정
+        # 키 입력 디바운싱 변수 (키 반복 방지) - 강화된 설정
         self._last_key_time = {}
         self._key_debounce_delay = 0.12  # 120ms (초당 8회 허용)
         self._key_sequence_count = {}  # 키 연속 입력 카운터
         self._max_key_sequence = 3  # 최대 연속 입력 허용 횟수 (3회로 증가)
+        self._key_hold_state = {}  # 키 홀드 상태 추적
+        self._key_hold_threshold = 0.5  # 500ms 이상 같은 키면 홀드로 판정
         
         # 게임 메시지 버퍼 시스템 초기화
         self.message_buffer = []
@@ -566,6 +568,9 @@ class DawnOfStellarGame:
             self.item_database = None
         self.running = True
         self.character_db = CharacterDatabase()
+        
+        # AI 게임모드 기본값 설정 (기본적으로 비활성화)
+        self.ai_game_mode_enabled = False
         
         # 키보드 입력 초기화 (게임패드 지원)
         self.keyboard = UnifiedInputManager()
@@ -803,7 +808,7 @@ class DawnOfStellarGame:
         print("\033[2J\033[H", end='', flush=True)
     
     def is_key_debounced(self, key: str) -> bool:
-        """강화된 키 디바운싱 체크 - 키 홀드 및 빠른 반복 방지"""
+        """강화된 키 디바운싱 체크 - 키 홀드 및 빠른 반복 방지 + 실시간 홀드 감지"""
         import time
         
         current_time = time.time()
@@ -820,6 +825,24 @@ class DawnOfStellarGame:
         # 기본 디바운싱 체크
         if current_time - last_time < debounce_time:
             return False  # 너무 빨리 눌림, 무시
+        
+        # 키 홀드 상태 감지 (새로운 로직)
+        if key not in self._key_hold_state:
+            self._key_hold_state[key] = {'count': 0, 'first_time': current_time}
+        
+        hold_info = self._key_hold_state[key]
+        time_since_first = current_time - hold_info['first_time']
+        
+        # 키 홀드 패턴 감지
+        if time_since_first < self._key_hold_threshold:
+            hold_info['count'] += 1
+            # 500ms 이내에 5회 이상 같은 키가 입력되면 홀드로 판정
+            if hold_info['count'] > 5:
+                print(f"🚫 키 홀드 감지: '{key}' (차단됨)")
+                return False
+        else:
+            # 시간이 충분히 지났으면 카운터 리셋
+            self._key_hold_state[key] = {'count': 1, 'first_time': current_time}
         
         # 키 연속 입력 카운터 체크 (완화된 키 홀드 방지)
         if key not in self._key_sequence_count:
@@ -5311,9 +5334,13 @@ class DawnOfStellarGame:
             try:
                 loop_count += 1
                 
-                # 주기적으로 키 버퍼 클리어 (키 홀드 방지) - 빈도 감소
-                if loop_count % 200 == 0:  # 200번 루프마다 (50번에서 증가)
+                # 주기적으로 키 버퍼 클리어 (키 홀드 방지) - 더 적극적으로
+                if loop_count % 100 == 0:  # 100번 루프마다 (200번에서 감소)
                     self.clear_key_buffer()
+                    # 키 홀드 상태도 주기적으로 리셋
+                    if loop_count % 500 == 0:  # 500번마다 상태 리셋
+                        self._key_hold_state = {}
+                        self._key_sequence_count = {}
                 
                 # 층 변경 시 BGM 업데이트
                 if self.current_floor != previous_floor:
@@ -5425,18 +5452,18 @@ class DawnOfStellarGame:
                 # 빈 입력이나 무효한 입력은 처리하지 않음 (화면 복사 방지)
                 if not action or action == '' or len(action.strip()) == 0:
                     import time
-                    time.sleep(0.05)  # 딜레이 감소 (50ms)
+                    time.sleep(0.1)  # 50ms에서 100ms로 증가 (안정성)
                     continue  # 다시 입력 대기
                 
                 # 특수 키 체크 (키 홀드로 인한 특수 문자 방지)
-                if ord(action[0]) < 32 and action not in ['\r', '\n', '\t']:
+                if len(action) > 0 and ord(action[0]) < 32 and action not in ['\r', '\n', '\t']:
                     continue  # 제어 문자는 무시
                 
-                # 키 디바운싱 체크 (빠른 키 반복 및 키 홀드 방지) - 완화
+                # 키 디바운싱 체크 (빠른 키 반복 및 키 홀드 방지) - 더 강화
                 if not self.is_key_debounced(action.lower()):
-                    # 키 홀드가 감지되면 짧은 대기 시간
+                    # 키 홀드가 감지되면 더 긴 대기 시간
                     import time
-                    time.sleep(0.03)  # 30ms로 단축
+                    time.sleep(0.15)  # 30ms에서 150ms로 증가 (키 홀드 방지 강화)
                     continue  # 너무 빨리 눌린 키는 무시
                 
                 # 액션 처리
@@ -6729,13 +6756,38 @@ class DawnOfStellarGame:
             # 간단한 입력 프롬프트만 표시
             print(f"\n{bright_yellow('명령 입력:')} ", end="", flush=True)
             
-            # 블로킹 입력으로 확실한 키 입력만 받음 (빈 입력 방지)
-            while True:
-                key = self.keyboard.get_input()
-                if key and key.strip():  # 유효한 입력만 반환
-                    return key
-                import time
-                time.sleep(0.05)  # 딜레이를 50ms로 단축 (반응성 향상)
+            # 더 안전한 입력 처리 (키 홀드 및 빈 입력 방지)
+            retry_count = 0
+            max_retries = 10
+            while retry_count < max_retries:
+                try:
+                    # 입력 버퍼 클리어
+                    self.keyboard.clear_input_buffer()
+                    
+                    # 논블로킹 입력 시도
+                    key = self.keyboard.get_input()
+                    
+                    # 유효한 입력 체크 (문자열이고 비어있지 않음)
+                    if key and isinstance(key, str) and key.strip():
+                        # 키 홀드 방지를 위한 딜레이
+                        import time
+                        time.sleep(0.1)  # 100ms 딜레이로 키 홀드 방지
+                        return key.strip()
+                    
+                    # 빈 입력이면 짧은 대기
+                    import time
+                    time.sleep(0.05)
+                    retry_count += 1
+                    
+                except Exception as input_error:
+                    print(f"입력 오류: {input_error}")
+                    import time
+                    time.sleep(0.1)
+                    retry_count += 1
+            
+            # 최대 재시도 후에도 입력이 없으면 기본값
+            print("입력 시간 초과, 대기 모드...")
+            return 'h'  # 도움말 표시
         except Exception as e:
             print(f"⚠️ 입력 처리 오류: {e}")
             return 'q'  # 오류 시 종료
@@ -7488,7 +7540,18 @@ class DawnOfStellarGame:
             self.keyboard.wait_for_key("아무 키나 눌러 계속...")
     
     def handle_player_movement(self, direction):
-        """플레이어 이동 처리 - 개선된 오류 처리와 아이템 획득 + 20걸음 턴 시스템"""
+        """플레이어 이동 처리 - 개선된 오류 처리와 아이템 획득 + 20걸음 턴 시스템 + 키 홀드 방지"""
+        # 키 홀드 방지: 이동 명령 간 최소 딜레이
+        import time
+        if not hasattr(self, '_last_movement_time'):
+            self._last_movement_time = 0
+        
+        current_time = time.time()
+        if current_time - self._last_movement_time < 0.15:  # 150ms 최소 간격
+            return  # 너무 빠른 이동 명령 무시
+        
+        self._last_movement_time = current_time
+        
         direction_map = {
             'w': (0, -1),   # 위
             's': (0, 1),    # 아래

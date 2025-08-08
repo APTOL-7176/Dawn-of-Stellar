@@ -710,11 +710,15 @@ class UnifiedInputManager:
         """키보드 또는 게임패드 입력 받기 - 논블로킹 모드 + 키 홀드 방지"""
         import time
         
-        # 키 홀드 방지를 위한 이전 키 상태 추적 (완화된 설정)
+        # 키 홀드 방지를 위한 이전 키 상태 추적 (강화된 설정)
         if not hasattr(self, '_last_key_time'):
             self._last_key_time = {}
         if not hasattr(self, '_key_hold_delay'):
             self._key_hold_delay = 0.08  # 80ms로 단축 (초당 12회 허용)
+        if not hasattr(self, '_key_burst_count'):
+            self._key_burst_count = {}  # 키 버스트 카운터
+        if not hasattr(self, '_key_burst_threshold'):
+            self._key_burst_threshold = 8  # 연속 8회 이상은 홀드로 판정
         
         # 게임패드 입력 우선 체크 (활성화된 경우에만)
         if self.enable_gamepad and self.gamepad and self.gamepad.is_available():
@@ -742,15 +746,41 @@ class UnifiedInputManager:
                                 msvcrt.getch()
                             return ''  # 빈 문자열 반환으로 무시
                     
+                    # 키 버스트 감지 (새로운 로직)
+                    if key_lower not in self._key_burst_count:
+                        self._key_burst_count[key_lower] = {'count': 0, 'start_time': current_time}
+                    
+                    burst_info = self._key_burst_count[key_lower]
+                    time_diff = current_time - burst_info['start_time']
+                    
+                    if time_diff < 1.0:  # 1초 이내
+                        burst_info['count'] += 1
+                        if burst_info['count'] > self._key_burst_threshold:
+                            # 키 버스트 감지 - 모든 키 제거
+                            while msvcrt.kbhit():
+                                msvcrt.getch()
+                            print(f"\n🚫 키 홀드 감지 차단: '{key_lower}'")
+                            # 잠시 대기 후 카운터 리셋
+                            time.sleep(0.2)
+                            self._key_burst_count[key_lower] = {'count': 0, 'start_time': current_time + 0.2}
+                            return ''
+                    else:
+                        # 1초가 지났으면 카운터 리셋
+                        self._key_burst_count[key_lower] = {'count': 1, 'start_time': current_time}
+                    
                     self._last_key_time[key_lower] = current_time
                     
                     # 버퍼에 남은 같은 키 모두 제거 (키 홀드 방지)
+                    removed_count = 0
                     while msvcrt.kbhit():
                         next_key = msvcrt.getch()
                         if isinstance(next_key, bytes):
                             next_key = next_key.decode('utf-8', errors='ignore')
                         if next_key.lower() == key_lower:
-                            continue  # 같은 키는 계속 제거
+                            removed_count += 1
+                            if removed_count > 3:  # 3개 이상 같은 키가 버퍼에 있으면 홀드로 판정
+                                print(f"\n🚫 키 버퍼 홀드 감지: '{key_lower}' (제거됨)")
+                                continue
                         else:
                             # 다른 키가 나오면 다시 버퍼에 넣을 수 없으므로 처리 종료
                             break
