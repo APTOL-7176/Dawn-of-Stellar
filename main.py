@@ -5432,7 +5432,12 @@ class DawnOfStellarGame:
         except Exception as e:
             pass  # 조용히 처리
         
-        input("아무 키나 눌러 메인 메뉴로 돌아가기...")
+        print("\n3초 후 메인 메뉴로 돌아갑니다...")
+        try:
+            import time
+            time.sleep(3)
+        except:
+            pass
     
     def update_permanent_progression(self, floors_cleared: int, enemies_defeated: int, died: bool):
         """영구 진행상황 업데이트 - 성과 기반 통합 보상 시스템"""
@@ -14150,7 +14155,12 @@ class DawnOfStellarGame:
                 print("H키를 눌러 간단한 도움말을 확인하세요.")
             except Exception as e:
                 print(f"❌ 통합 초보자 가이드 실행 오류: {e}")
-                input("아무 키나 눌러 메인 메뉴로...")
+                print("\n3초 후 메인 메뉴로 돌아갑니다...")
+                try:
+                    import time
+                    time.sleep(3)
+                except:
+                    pass
 
     def _handle_equipment_optimize(self):
         """모든 파티원의 장비를 최적화하여 재장착"""
@@ -15029,7 +15039,13 @@ def main():
                 pygame.quit()
         except:
             pass
-        sys.exit(0)
+        
+        # 강제 종료 시도
+        try:
+            import os
+            os._exit(0)
+        except:
+            sys.exit(0)
     
     # 시그널 핸들러 등록
     signal.signal(signal.SIGINT, cleanup_and_exit)
@@ -15163,11 +15179,19 @@ def main():
             
             os._exit(0)
         else:
-            # 콘솔 모드에서는 엔터 대기
+            # 콘솔 모드에서는 자동 종료
             try:
-                input("\n아무 키나 누르면 종료됩니다...")
+                print("\n게임이 종료되었습니다. 3초 후 자동으로 창이 닫힙니다...")
+                import time
+                time.sleep(3)
             except:
                 pass
+            
+            # 강제 종료
+            try:
+                sys.exit(0)
+            except:
+                os._exit(0)
 
 
 if __name__ == "__main__":
