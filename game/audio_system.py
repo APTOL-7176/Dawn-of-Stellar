@@ -988,9 +988,16 @@ class AudioManager:
                 # pygame.mixer.music.get_busy() 오류 시 재생 진행
                 pass
         
-        # 🎯 BGM 중단 최소화: 같은 BGM이 아닐 때만 정지
+        # 🎯 BGM 부드러운 전환: fadeout을 통해 자연스럽게 전환
         if self.current_bgm_type != bgm_type:
-            self.stop_bgm(fade_out=300)  # 다른 BGM으로 변경할 때만 정지
+            # 기존 BGM이 재생 중이면 fadeout으로 자연스럽게 전환
+            try:
+                if pygame.mixer.music.get_busy():
+                    pygame.mixer.music.fadeout(500)  # 0.5초 fade out
+                    import time
+                    time.sleep(0.1)  # 짧은 대기로 자연스러운 전환
+            except Exception:
+                pass
         
         # 새 BGM 로드 및 재생
         if self.load_bgm(bgm_type):

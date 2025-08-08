@@ -5034,20 +5034,13 @@ class DawnOfStellarGame:
         
     def select_difficulty(self):
         """난이도 선택 메뉴"""
-        # 메인 메뉴 BGM 즉시 정지 후 난이도 선택 BGM 재생
+        # 난이도 선택 BGM으로 자연스럽게 전환
         try:
             if hasattr(self, 'audio_system') and self.audio_system:
-                # 현재 BGM을 즉시 정지
-                import pygame
-                pygame.mixer.music.stop()
-                
-                # 잠시 대기 후 난이도 선택 BGM 재생
-                import time
-                time.sleep(0.5)
-                
                 from game.audio_system import BGMType
-                self.audio_system.play_bgm(BGMType.DIFFICULTY_SELECT, loop=True)
+                self.audio_system.play_bgm(BGMType.DIFFICULTY_SELECT, loop=True, fade_in=500)
         except Exception:
+            pass
             pass
             
         try:
@@ -5117,15 +5110,11 @@ class DawnOfStellarGame:
             
             if confirm_result == 0:  # 확인
                 self.config.set_difficulty(selected_difficulty)
-                # 난이도 선택 완료 후 메인 메뉴 BGM으로 복원 (스마트 처리)
+                # 난이도 선택 완료 후 메인 메뉴 BGM으로 자연스럽게 복원
                 try:
                     if hasattr(self, 'audio_system') and self.audio_system:
                         from game.audio_system import BGMType
-                        # 이미 메인 메뉴 BGM이 재생 중이 아닌 경우에만 재생
-                        if not (hasattr(self.audio_system, 'current_bgm_type') and 
-                                self.audio_system.current_bgm_type == BGMType.MENU and 
-                                self.audio_system.is_bgm_playing()):
-                            self.audio_system.play_bgm(BGMType.MENU, loop=True)
+                        self.audio_system.play_bgm(BGMType.MENU, loop=True, fade_in=500)
                 except Exception:
                     pass
                 return selected_difficulty
@@ -10354,11 +10343,11 @@ class DawnOfStellarGame:
             # 게임 시작 (난이도 선택 후 캐릭터 선택) - 즉시 BGM 정지
             self.safe_play_sfx("menu_select")
             
-            # 메인 메뉴 BGM 즉시 정지
+            # 메인 메뉴 BGM을 부드럽게 전환 (완전 정지하지 않음)
             if self.sound_manager:
                 try:
-                    self.sound_manager.stop_bgm()
-                    self._menu_bgm_playing = False  # BGM 플래그 리셋
+                    # BGM을 완전히 정지하지 않고 볼륨만 줄임
+                    pass  # 난이도 선택에서 자연스럽게 전환되도록 함
                 except:
                     pass
             
@@ -10533,10 +10522,11 @@ class DawnOfStellarGame:
             # 게임 시작 (난이도 선택 후 캐릭터 선택) - 즉시 BGM 정지
             self.safe_play_sfx("menu_select")
             
-            # 메인 메뉴 BGM 즉시 정지
+            # 메인 메뉴 BGM을 부드럽게 전환 (완전 정지하지 않음)
             if hasattr(self, 'sound_manager') and self.sound_manager:
                 try:
-                    self.sound_manager.stop_bgm()
+                    # BGM을 완전히 정지하지 않고 난이도 선택에서 자연스럽게 전환
+                    pass
                 except:
                     pass
             
