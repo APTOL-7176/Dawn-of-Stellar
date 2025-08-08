@@ -603,7 +603,7 @@ def run_mobile_app():
     
     # Flutter 설치 확인
     flutter_check = subprocess.run(["flutter", "--version"], 
-                                 capture_output=True, text=True)
+                                 capture_output=True, text=True, shell=True)
     
     if flutter_check.returncode != 0:
         print("❌ Flutter SDK가 설치되지 않았습니다.")
@@ -635,7 +635,7 @@ def run_mobile_app():
             # 의존성 설치
             print("📦 Flutter 패키지 설치 중...")
             pub_get = subprocess.run(["flutter", "pub", "get"], 
-                                   capture_output=True, text=True)
+                                   capture_output=True, text=True, shell=True)
             
             if pub_get.returncode == 0:
                 print("✅ Flutter 패키지 설치 완료")
@@ -663,32 +663,32 @@ def run_mobile_app():
         
         if choice == "1":
             print("\n📱 Android 에뮬레이터로 실행 중...")
-            subprocess.run(["flutter", "run", "-d", "android"])
+            subprocess.run(["flutter", "run", "-d", "android"], shell=True)
             
         elif choice == "2":
             print("\n� 연결된 Android 기기로 실행 중...")
             # 연결된 기기 확인
             devices = subprocess.run(["flutter", "devices"], 
-                                   capture_output=True, text=True)
+                                   capture_output=True, text=True, shell=True)
             print("🔍 연결된 기기:")
             print(devices.stdout)
-            subprocess.run(["flutter", "run"])
+            subprocess.run(["flutter", "run"], shell=True)
             
         elif choice == "3":
             print("\n📱 iOS 시뮬레이터로 실행 중...")
-            subprocess.run(["flutter", "run", "-d", "ios"])
+            subprocess.run(["flutter", "run", "-d", "ios"], shell=True)
             
         elif choice == "4":
             print("\n🌐 웹 브라우저로 실행 중...")
-            subprocess.run(["flutter", "run", "-d", "chrome"])
+            subprocess.run(["flutter", "run", "-d", "chrome"], shell=True)
             
         elif choice == "5":
             print("\n🖥️ Windows 데스크톱 앱으로 실행 중...")
-            subprocess.run(["flutter", "run", "-d", "windows"])
+            subprocess.run(["flutter", "run", "-d", "windows"], shell=True)
             
         elif choice == "6":
             print("\n🖥️ Linux 데스크톱 앱으로 실행 중...")
-            subprocess.run(["flutter", "run", "-d", "linux"])
+            subprocess.run(["flutter", "run", "-d", "linux"], shell=True)
             
         elif choice == "0":
             print("실행이 취소되었습니다.")
