@@ -31,7 +31,7 @@ jobs:
       run: |
         python -c "import game.brave_combat; print('✅ 전투 시스템 로드 성공')"
         python -c "import game.character; print('✅ 캐릭터 시스템 로드 성공')"
-        python -c "import game.dungeon_system; print('✅ 던전 시스템 로드 성공')"
+        python -c "import game.world; print('✅ 월드 시스템 로드 성공')"
         python -c "import config; print('✅ 설정 시스템 로드 성공')"
 
   build-windows:
@@ -56,7 +56,7 @@ jobs:
         
     - name: 🎮 콘솔 게임 빌드
       run: |
-        pyinstaller --console --name "DawnOfStellar_v3.0.0_Console" --icon=dos.png --add-data "sounds;sounds" --add-data "game;game" --hidden-import=game --hidden-import=game.brave_combat --hidden-import=game.character --hidden-import=game.dungeon_system --hidden-import=game.item_system --hidden-import=game.skill_system --hidden-import=game.party_manager --hidden-import=game.save_system --hidden-import=game.audio_system --distpath dist/windows main.py
+        pyinstaller --console --name "DawnOfStellar_v3.0.0_Console" --icon=dos.png --add-data "sounds;sounds" --add-data "game;game" --hidden-import=game --hidden-import=game.brave_combat --hidden-import=game.character --hidden-import=game.world --hidden-import=game.item_system --hidden-import=game.skill_system --hidden-import=game.party_manager --hidden-import=game.save_system --hidden-import=game.audio_system --distpath dist/windows main.py
         
     - name: 📋 런처 파일 복사
       run: |

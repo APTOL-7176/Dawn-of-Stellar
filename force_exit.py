@@ -22,8 +22,8 @@ def force_exit():
     except:
         pass
     
+    # 프로세스 정리 (psutil이 있는 경우에만)
     try:
-        # 모든 Python 프로세스 정리
         import psutil
         current_pid = os.getpid()
         parent = psutil.Process(current_pid)
@@ -34,15 +34,18 @@ def force_exit():
                 child.terminate()
             except:
                 pass
-        
+                
         # 좀비 프로세스 정리
         try:
             psutil.wait_procs(parent.children(), timeout=3)
         except:
             pass
-            
+                
     except ImportError:
-        # psutil이 없으면 기본 방법 사용
+        # psutil이 없어도 정상 동작하도록 함
+        pass
+    except Exception:
+        # 기타 오류 무시
         pass
     
     # 강제 종료

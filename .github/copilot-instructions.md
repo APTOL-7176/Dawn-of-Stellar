@@ -358,7 +358,7 @@ game/
 ├── brave_combat.py    # 전투 시스템 핵심
 ├── character.py       # 캐릭터 클래스
 ├── party_manager.py   # 파티 관리
-├── dungeon_system.py  # 던전 생성/관리
+├── world.py           # 월드/던전 생성/관리
 ├── skill_system.py    # 스킬 데이터베이스
 ├── item_system.py     # 아이템 관리
 ├── ai_game_mode.py    # AI 시스템

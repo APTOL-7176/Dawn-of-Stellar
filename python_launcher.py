@@ -380,7 +380,7 @@ def show_main_menu():
         # 🎮 게임 실행 섹션
         ("1", "⚡ EXE 게임 실행", "빌드된 실행파일로 게임 시작 (최고 성능, 권장)"),
         ("2", "🎮 Python 게임 실행", "소스코드로 직접 게임 실행 (개발자 모드 지원)"),
-        ("3", "📱 Flutter 모바일 앱", "Flutter로 개발된 모바일/웹/데스크톱 크로스플랫폼 앱"),
+        ("3", "📱 Flutter 크로스플랫폼", "모바일/웹/데스크톱 멀티플랫폼 앱 (통합 메뉴)"),
         
         # 🔧 개발 도구 섹션  
         ("4", "📦 게임 빌드", "EXE 파일 생성 및 패키징"),
@@ -579,11 +579,11 @@ def run_exe_game(audio_system=None):
         print("\n계속하려면 아무 키나 누르세요...")
         input()
 
-def run_mobile_app():
-    """Flutter 모바일 앱 실행"""
+def run_flutter_app():
+    """Flutter 크로스플랫폼 앱 실행 (통합 메뉴)"""
     clear_screen()
     print()
-    print("📱 Dawn of Stellar v3.0.0 - Flutter 모바일 앱")
+    print("📱 Dawn of Stellar v3.0.0 - Flutter 크로스플랫폼")
     print("=" * 60)
     print()
     
@@ -599,19 +599,20 @@ def run_mobile_app():
         input("\n아무 키나 누르세요...")
         return
     
-    print("� Flutter 환경 확인 중...")
+    print("Flutter 환경 확인 중...")
     
     # Flutter 설치 확인
     flutter_check = subprocess.run(["flutter", "--version"], 
                                  capture_output=True, text=True, shell=True)
     
     if flutter_check.returncode != 0:
-        print("❌ Flutter SDK가 설치되지 않았습니다.")
-        print("\n📥 Flutter 설치가 필요합니다:")
-        print("   1. https://flutter.dev/docs/get-started/install")
-        print("   2. Flutter SDK 다운로드 및 설치")
-        print("   3. PATH 환경변수 설정")
-        print("\n� 또는 기존 설치된 Flutter를 사용하시겠습니까?")
+        print("Flutter SDK가 PATH에서 찾을 수 없습니다.")
+        print("\n 해결 방법을 선택하세요:")
+        print("   [1] Flutter SDK 설치 가이드 보기")
+        print("   [2] Flutter 경로 직접 지정")
+        print("   [3] 웹 브라우저로 미리보기")
+        print("   [0] 취소")
+        print("\n 또는 기존 설치된 Flutter를 사용하시겠습니까?")
         
         choice = input("Y: 계속 진행 / N: 취소 (Y/N): ").strip().upper()
         if choice != 'Y':
@@ -642,12 +643,69 @@ def run_mobile_app():
             else:
                 print("⚠️ 패키지 설치 중 오류 발생:")
                 print(pub_get.stderr)
+        # 웹 플랫폼 활성화
+        web_enable = subprocess.run(["flutter", "config", "--enable-web"], 
+                                  capture_output=True, text=True, shell=True)
         
-        print("\n🎮 실행 방법을 선택하세요:")
+        print("\n🎮 실행 플랫폼을 선택하세요:")
         print()
-        print("📱 모바일 옵션:")
-        print("   [1] Android 에뮬레이터 (Android Studio)")
-        print("   [2] 연결된 Android 기기")
+        print("🌐 웹 플랫폼:")
+        print("   [1] 🌐 웹 브라우저 (Chrome) - 빠른 테스트")
+        print("   [2] 🌐 웹 서버 모드 - 로컬 서버")
+        print()
+        print("📱 모바일 플랫폼:")
+        print("   [3] 📱 Android 에뮬레이터")
+        print("   [4] 📱 연결된 Android 기기")
+        print("   [5] 📱 iOS 시뮬레이터 (macOS 전용)")
+        print()
+        print("🖥️ 데스크톱 플랫폼:")
+        print("   [6] 🖥️ Windows 데스크톱 앱")
+        print("   [7] 🖥️ Linux 데스크톱 앱")
+        print()
+        print("🔙 기타:")
+        print("   [0] 취소")
+        print()
+        
+        try:
+            choice = input("선택하세요 (0-7): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\n취소되었습니다.")
+            return
+        
+        if choice == "1":
+            print("\n🌐 Chrome 브라우저로 웹 실행 중...")
+            print("   🚀 빠른 테스트 모드 - 브라우저가 자동으로 열립니다!")
+            subprocess.run(["flutter", "run", "--device-id", "chrome", "--web-browser-flag", "--disable-web-security"], shell=True)
+            
+        elif choice == "2":
+            print("\n🌐 웹 서버 모드로 실행 중...")
+            print("   📡 로컬 서버에서 실행됩니다.")
+            subprocess.run(["flutter", "run", "-d", "web-server"], shell=True)
+            
+        elif choice == "3":
+            print("\n📱 Android 에뮬레이터로 실행 중...")
+            subprocess.run(["flutter", "run", "-d", "android"], shell=True)
+            
+        elif choice == "4":
+            print("\n📱 연결된 Android 기기로 실행 중...")
+            # 연결된 기기 확인
+            devices = subprocess.run(["flutter", "devices"], 
+                                   capture_output=True, text=True, shell=True)
+            print("🔍 연결된 기기:")
+            print(devices.stdout)
+            subprocess.run(["flutter", "run"], shell=True)
+            
+        elif choice == "5":
+            print("\n📱 iOS 시뮬레이터로 실행 중...")
+            subprocess.run(["flutter", "run", "-d", "ios"], shell=True)
+            
+        elif choice == "6":
+            print("\n🖥️ Windows 데스크톱 앱으로 실행 중...")
+            subprocess.run(["flutter", "run", "-d", "windows"], shell=True)
+            
+        elif choice == "7":
+            print("\n🖥️ Linux 데스크톱 앱으로 실행 중...")
+            subprocess.run(["flutter", "run", "-d", "linux"], shell=True)
         print("   [3] iOS 시뮬레이터 (macOS 전용)")
         print()
         print("🌐 데스크톱 옵션:")
@@ -703,7 +761,10 @@ def run_mobile_app():
         # 원래 디렉토리로 복귀
         os.chdir(original_dir)
     
-    input("\n아무 키나 누르세요...")
+    try:
+        input("\n아무 키나 누르세요...")
+    except (EOFError, KeyboardInterrupt):
+        pass
 
 def build_game():
     """게임 빌드 (EXE 생성)"""
@@ -1549,7 +1610,7 @@ def main():
                 if audio:
                     audio.play_sfx('confirm')
                     audio.fade_out_bgm()
-                run_mobile_app()
+                run_flutter_app()
                 if audio:
                     audio.play_bgm(fade_in=True)
             

@@ -209,28 +209,6 @@ except ImportError as e:
             except Exception as e:
                 print(f"⚠️ 탐험 타일 직렬화 오류: {e}")
                 return []
-        
-        @staticmethod
-        def restore_explored_tiles(world, tiles_data):
-            """탐험된 타일 정보를 복원 (explored, visible 상태 포함)"""
-            try:
-                if not tiles_data or not hasattr(world, 'tiles') or not world.tiles:
-                    return
-                
-                restored_count = 0
-                for tile_info in tiles_data:
-                    x, y = tile_info.get('x'), tile_info.get('y')
-                    if (x is not None and y is not None and 
-                        0 <= y < len(world.tiles) and 0 <= x < len(world.tiles[y])):
-                        tile = world.tiles[y][x]
-                        if hasattr(tile, 'explored'):
-                            tile.explored = tile_info.get('explored', False)
-                            tile.visible = tile_info.get('visible', False)
-                            restored_count += 1
-                
-                print(f"🗺️ 탐험된 타일 복원: {restored_count}개")
-            except Exception as e:
-                print(f"⚠️ 탐험 타일 복원 오류: {e}")
     
 try:
     from game.ui_system import get_ui_manager, UIManager
@@ -390,6 +368,17 @@ class DawnOfStellarGame:
         except Exception:
             pass  # 오류도 조용히 처리
         
+        # 🎵 오디오 시스템 초기화 (최우선)
+        try:
+            from game.audio_system import get_audio_manager
+            import config as game_config
+            debug_mode = getattr(game_config, 'DEBUG_MODE', False)
+            self.audio_system = get_audio_manager(debug_mode=debug_mode)
+            self.sound_manager = self.audio_system
+        except Exception as e:
+            self.audio_system = None
+            self.sound_manager = None
+        
         # 기존 시스템들
         self.display = GameDisplay()
         self.party_manager = PartyManager()
@@ -412,50 +401,10 @@ class DawnOfStellarGame:
             self.party_manager.add_member = enhanced_add_member
             self.party_manager.remove_member = enhanced_remove_member
         
-        # 🎵 오디오 시스템 초기화 (디버그 모드 확인)
-        try:
-            from game.audio_system import get_audio_manager
-            import config as game_config
-            debug_mode = getattr(game_config, 'DEBUG_MODE', False)
-            self.audio_system = get_audio_manager(debug_mode=debug_mode)
-            self.sound_manager = self.audio_system
-        except Exception as e:
-            print(f"⚠️ 오디오 시스템 초기화 실패: {e}")
-            self.audio_system = None
-            self.sound_manager = None
-        
-        # 나머지 시스템들 초기화
-        self.cleanup()
-    
-    def __del__(self):
-        """소멸자 - 오디오 시스템 강제 정리"""
-        try:
-            if hasattr(self, 'audio_system') and self.audio_system:
-                self.audio_system.cleanup()
-            import pygame
-            if pygame.get_init():
-                pygame.mixer.quit()
-                pygame.quit()
-        except:
-            pass
-    
-    def cleanup(self):
-        """수동 정리 메서드"""
-        try:
-            if hasattr(self, 'audio_system') and self.audio_system:
-                self.audio_system.cleanup()
-            import pygame
-            if pygame.get_init():
-                pygame.mixer.quit()
-                pygame.quit()
-        except:
-            pass
-        
         # 자동 저장 시스템 초기화
         if AUTO_SAVE_AVAILABLE:
             try:
                 self.auto_save_manager = configure_auto_save_system(self)
-                # print("💾 자동 저장 시스템이 초기화되었습니다.")  # 숨김
             except Exception as e:
                 print(f"⚠️ 자동 저장 시스템 초기화 실패: {e}")
                 self.auto_save_manager = None
@@ -632,6 +581,52 @@ class DawnOfStellarGame:
         # 🎵 메인 메뉴 BGM은 메인 메뉴에서만 재생하도록 함
         
         self.encounter_rate_increase = 0.002  # 걸음당 0.2% 증가로 감소 (0.01 → 0.002)
+    
+    def __del__(self):
+        """소멸자 - 오디오 시스템 강제 정리"""
+        try:
+            if hasattr(self, 'audio_system') and self.audio_system:
+                self.audio_system.cleanup()
+            import pygame
+            if pygame.get_init():
+                pygame.mixer.quit()
+                pygame.quit()
+        except:
+            pass
+    
+    def cleanup(self):
+        """수동 정리 메서드"""
+        try:
+            if hasattr(self, 'audio_system') and self.audio_system:
+                self.audio_system.cleanup()
+            import pygame
+            if pygame.get_init():
+                pygame.mixer.quit()
+                pygame.quit()
+        except:
+            pass
+    
+    @staticmethod
+    def restore_explored_tiles(world, tiles_data):
+        """탐험된 타일 정보를 복원 (explored, visible 상태 포함)"""
+        try:
+            if not tiles_data or not hasattr(world, 'tiles') or not world.tiles:
+                return
+            
+            restored_count = 0
+            for tile_info in tiles_data:
+                x, y = tile_info.get('x'), tile_info.get('y')
+                if (x is not None and y is not None and 
+                    0 <= y < len(world.tiles) and 0 <= x < len(world.tiles[y])):
+                    tile = world.tiles[y][x]
+                    if hasattr(tile, 'explored'):
+                        tile.explored = tile_info.get('explored', False)
+                        tile.visible = tile_info.get('visible', False)
+                        restored_count += 1
+            
+            print(f"🗺️ 탐험된 타일 복원: {restored_count}개")
+        except Exception as e:
+            print(f"⚠️ 탐험 타일 복원 오류: {e}")
     
     def safe_play_bgm(self, bgm_name_or_type, **kwargs):
         """안전한 BGM 재생 헬퍼 - 글리치 모드에서는 BGM 차단"""
@@ -5225,6 +5220,7 @@ class DawnOfStellarGame:
 
     def main_game_loop(self):
         """실제 게임 플레이 루프 - AI 게임모드 통합"""
+        import time  # time 모듈 import 추가
         floors_cleared = 0
         enemies_defeated = 0
         
@@ -5288,6 +5284,10 @@ class DawnOfStellarGame:
                 
                 # 화면 갱신이 필요한 경우에만 표시
                 if need_screen_refresh:
+                    # 화면 클리어 (UI 겹침 방지)
+                    import os
+                    os.system('cls' if os.name == 'nt' else 'clear')
+                    
                     try:
                         display_success = False
                         
@@ -7393,6 +7393,10 @@ class DawnOfStellarGame:
             }
             if action in direction_map:
                 self.handle_player_movement(direction_map[action])
+        # 빈 문자열이나 엔터키 처리
+        elif action.strip() == '' or action == '\n':
+            # 빈 입력은 무시하고 다시 입력 받음
+            return
         else:
             print(f"⚠️ 알 수 없는 명령: '{action}' (도움말: H)")
             self.keyboard.wait_for_key("아무 키나 눌러 계속...")
@@ -9503,17 +9507,13 @@ class DawnOfStellarGame:
                 print(f"⚠️ 오프닝 스토리 표시 중 오류: {e}")
                 print("메뉴로 진행합니다...")
         
-        print(f"🔍 DEBUG: game_manager = {self.game_manager}")  # 디버그 출력
-        
         # 🎮 게임 매니저가 없으면 직접 메뉴 처리
         if not self.game_manager:
-            print("🎯 DEBUG: 게임 매니저가 없음 - 직접 메뉴 처리 시작!")  # 디버그 출력
             # 메뉴 표시 전 화면 클리어 보장
             print("\033[2J\033[H")
             # 간단한 메뉴 루프 - 오프닝 후 메뉴가 표시되도록 보장
             while self.running:
                 try:
-                    print("🔄 DEBUG: _handle_menu_state() 호출 시도...")  # 디버그 출력
                     self._handle_menu_state()
                     if not self.running:
                         break
@@ -9938,9 +9938,6 @@ class DawnOfStellarGame:
         import sys
         sys.stdout.flush()
         
-        print("🔥🔥🔥 _handle_menu_state 호출됨!")  # 디버그 출력
-        sys.stdout.flush()
-        
         # 메인 메뉴 BGM 재생 (한 번만)
         try:
             if hasattr(self, 'audio_system') and self.audio_system:
@@ -9952,9 +9949,6 @@ class DawnOfStellarGame:
                     self._menu_bgm_playing = True
         except Exception:
             pass
-        
-        print("🎵 BGM 설정 완료!")  # 디버그 출력
-        sys.stdout.flush()
         
         # 색상 함수 임포트 확인
         try:
