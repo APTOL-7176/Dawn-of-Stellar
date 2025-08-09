@@ -1565,32 +1565,45 @@ class GameDisplay:
         self._last_clear_time = 0  # 화면 클리어 디바운싱
         
     def clear_screen(self):
-        """화면 지우기 - 간단하고 안정적인 버전 + 디바운싱"""
+        """화면 지우기 - 텍스트 스택 방지 강화"""
         import time
         
-        # 디바운싱: 0.2초 이내 중복 클리어 방지 (맵 화면용으로 더 길게)
+        # 디바운싱: 빠른 이동 시에도 화면 클리어 허용 (0.025초로 단축)
         current_time = time.time()
-        if current_time - self._last_clear_time < 0.2:
-            return  # 너무 빈번한 클리어 방지
+        if current_time - self._last_clear_time < 0.025:
+            # 너무 빈번한 클리어 시에도 소프트 클리어는 수행
+            try:
+                print("\n" * 2)  # 최소한의 공간 확보
+            except:
+                pass
+            return
         self._last_clear_time = current_time
         
-        # 파이프/모바일 모드에서는 화면 깜빡임 방지를 위해 하드 클리어 금지
+        # 파이프/모바일 모드에서도 텍스트 스택 방지
         if os.getenv('SUBPROCESS_MODE') == '1':
             try:
-                # 소프트 클리어: 몇 줄만 내려 새 영역 확보
-                print("\n" * 3)
+                # 강화된 소프트 클리어: 더 많은 줄로 이전 텍스트 밀어내기
+                print("\n" * 10)
+                # 구분선으로 명확한 화면 분리
+                print("=" * 80)
                 return
             except Exception:
                 return
-        # 일반 모드에서는 OS 명령어 사용
+                
+        # 일반 모드에서는 강력한 화면 클리어
         try:
             if platform.system() == "Windows":
+                # Windows에서 더 확실한 클리어
                 os.system('cls')
+                # 클리어 후 약간의 지연으로 안정성 확보
+                time.sleep(0.05)
             else:
                 os.system('clear')
+                time.sleep(0.05)
         except Exception:
-            # OS 명령어 실패 시 새 라인으로 대체
-            print("\n" * 50)
+            # OS 명령어 실패 시 강력한 새 라인으로 대체
+            print("\n" * 60)
+            print("=" * 80)  # 구분선 추가
             
     def show_title(self):
         """타이틀 화면 표시 (글꼴 호환성 개선)"""
@@ -1623,40 +1636,177 @@ class GameDisplay:
         print("게임을 시작합니다...")
         input("Enter 키를 눌러 계속...")
         
-    def show_game_screen(self, party_manager: PartyManager, world: GameWorld, cooking_system=None):
-        """메인 게임 화면 표시 - 간소화된 버전 (클리어 제거)"""
-        # 화면 클리어를 메인 루프에서 관리하므로 여기서는 제거
-        # self.clear_screen()
+    def show_game_screen_backup(self, party_manager: PartyManager, world: GameWorld, cooking_system=None):
+        """메인 게임 화면 표시 - 안정화된 단일 경로 버전"""
         
+        # 화면 크기 안전하게 설정 (더 넓게)
+        safe_width = min(120, max(80, self.screen_width))  # 최소 80, 최대 120자
+        
+        # 화면 클리어 (한 번만)
+        os.system('cls' if os.name == 'nt' else 'clear')
+        
+        # 상단 정보 표시
+        title = f"던전 {world.current_level}층 - Dawn Of Stellar"
+        title_padding = max(0, (safe_width - len(title)) // 2)
+        print(f"{' ' * title_padding}{bright_cyan(title)}")
+        print()
+        print()
+        print()
+        
+        # 던전 맵 표시 (개선된 크기)
         try:
-            # 안전한 너비 설정
-            safe_width = min(80, self.screen_width)
-            
-            # 상단 정보 표시
-            title = f"던전 {world.current_level}층 - Dawn Of Stellar"
-            title_padding = (safe_width - len(title)) // 2
-            print(f"{' ' * title_padding}{bright_cyan(title)}")
-            print()
-            
-            # 던전 맵 표시 (색상 적용)
-            try:
-                map_display = world.get_colored_map_display(min(30, safe_width - 4), 15)  # 색상 맵 사용
-                for line in map_display:
-                    # 줄 길이 제한 (색상 코드 때문에 실제 길이와 표시 길이가 다를 수 있음)
-                    print(f"  {line}")
-            except Exception as map_error:
-                print(f"  맵 표시 오류: {map_error}")
-                print(f"  기본 맵 정보: 현재 위치 {world.player_pos}")
+            if hasattr(world, 'get_colored_map_display'):
+                # 맵 크기를 더 넓게 설정
+                map_width = min(50, safe_width - 10)  # 맵 너비 증가
+                map_height = 20  # 맵 높이 증가
+                map_display = world.get_colored_map_display(map_width, map_height)
                 
-            print()
+                if map_display and isinstance(map_display, list):
+                    for line in map_display:
+                        if line and isinstance(line, str):
+                            # 맵 라인을 중앙 정렬하지 않고 왼쪽 정렬로 출력
+                            print(line)
+                else:
+                    # 백업 맵 표시
+                    print("맵 로딩 중...")
+                    print(f"위치: {getattr(world, 'player_pos', '?')}")
+            else:
+                print("맵을 불러올 수 없습니다")
+        except Exception as map_error:
+            print(f"맵 표시 오류 - 위치: {getattr(world, 'player_pos', '?')}")
+        
+        print()
+        print()
+        print()
+        print()
+        
+        # 파티 상태 정보
+        alive_count = len(party_manager.get_alive_members())
+        total_count = len(party_manager.members)
+        
+        party_info = f"파티: {alive_count}/{total_count}명 생존 | 층: {world.current_level}"
+        
+        # 골드 정보 안전하게 표시
+        try:
+            gold_info = f" | 골드: {party_manager.party_gold}G"
+        except Exception:
+            gold_info = " | 골드: 0G"
+        
+        # 가방 정보 안전하게 표시
+        try:
+            if cooking_system:
+                total_weight = cooking_system.get_total_inventory_weight()
+                max_weight = cooking_system.get_max_inventory_weight()
+                weight_info = f" | 가방: {total_weight:.1f}/{max_weight:.1f}kg"
+            else:
+                weight_info = ""
+        except Exception:
+            weight_info = ""
+        
+        print(f"  {party_info}{gold_info}{weight_info}")
+        print("+" + "-" * (safe_width - 2) + "+")
+        
+        # 파티원 상태 표시 (최대 4명)
+        for member in party_manager.members[:4]:
+            if member.is_alive:
+                # HP/MP 비율 계산
+                hp_ratio = member.current_hp / member.max_hp if member.max_hp > 0 else 0
+                mp_ratio = member.current_mp / member.max_mp if member.max_mp > 0 else 0
+                
+                # HP 색상 결정
+                if hp_ratio >= 0.8:
+                    hp_color = bright_green; hp_emoji = "💚"
+                elif hp_ratio >= 0.6:
+                    hp_color = green; hp_emoji = "💛"
+                elif hp_ratio >= 0.4:
+                    hp_color = yellow; hp_emoji = "🧡"
+                elif hp_ratio >= 0.2:
+                    hp_color = bright_red; hp_emoji = "❤️"
+                else:
+                    hp_color = red; hp_emoji = "💔"
+                
+                mp_color = bright_cyan if mp_ratio >= 0.8 else cyan
+                mp_emoji = "💙"
+                
+                # 직업 이모지
+                class_emoji = {
+                        "전사": "⚔️", "마법사": "🔮", "도둑": "🗡️", "성직자": "✨",
+                        "궁수": "🏹", "사무라이": "🗾", "드루이드": "🌿", "정령술사": "💫",
+                        "네크로맨서": "💀", "팔라딘": "🛡️", "어쌔신": "🥷", "바드": "🎵",
+                        "성기사": "🛡️", "암흑기사": "🖤", "몽크": "👊", "용기사": "🐉",
+                        "검성": "⚡", "암살자": "🗡️", "기계공학자": "🔧", "무당": "🔯",
+                        "해적": "☠️", "철학자": "📚", "시간술사": "⏰", "연금술사": "⚗️",
+                        "검투사": "🏟️", "기사": "🐎", "신관": "⛪", "마검사": "🌟",
+                        "차원술사": "🌀", "광전사": "😤"
+                }.get(member.character_class, "👤")
+                
+                name_class = f"{class_emoji} {member.name[:10]:10} ({member.character_class[:8]:8})"
+                hp_text = f"{hp_emoji}HP:{hp_color(f'{member.current_hp:3}/{member.max_hp:3}')}"
+                mp_text = f"{mp_emoji}MP:{mp_color(f'{member.current_mp:2}/{member.max_mp:2}')}"
+                print(f"    {name_class} {hp_text} {mp_text}")
+            else:
+                name_class = f"💀 {member.name[:10]:10} ({member.character_class[:8]:8})"
+                print(f"    {name_class} {red('사망')}")
+        
+        print("+" + "-" * (safe_width - 2) + "+")
+        print()
+        print(f"🎮 조작키 | WASD:이동 | I:인벤토리 | F:스킬 | P:파티 | H:도움말")
+        print()
+        
+        # 게임 정보 표시
+        try:
+            print(f"📊 {bright_cyan('게임 정보')}")
             
-            # 파티 상태 정보 - 간소화 (중복 제거)
-            alive_count = len(party_manager.get_alive_members())
-            total_count = len(party_manager.members)
+            # 파티 전투력 계산
+            alive_members = party_manager.get_alive_members()
+            if alive_members:
+                combat_powers = [calculate_combat_power(char) for char in alive_members]
+                avg_combat_power = sum(combat_powers) // len(combat_powers)
+                
+                # 전투력 색상 평가
+                expected_power = world.current_level * 15
+                if avg_combat_power >= expected_power * 1.2:
+                    power_status = green("강력함 💪")
+                elif avg_combat_power >= expected_power:
+                    power_status = yellow("적정함 ⚖️")
+                elif avg_combat_power >= expected_power * 0.8:
+                    power_status = yellow("약함 ⚠️")
+                else:
+                    power_status = red("위험함 💀")
+            else:
+                avg_combat_power = 0
+                power_status = red("파티 전멸")
             
-            party_info = f"파티: {alive_count}/{total_count}명 생존 | 층: {world.current_level}"
+            total_gold = sum(getattr(char, 'gold', 0) for char in party_manager.members)
+            print(f"│ 파티: {alive_count}/{len(party_manager.members)}명 생존 | 전투력: {avg_combat_power} ({power_status}) | 골드: {total_gold}")
             
-            # 골드 정보 안전하게 표시
+            # AI 추천 행동 (로-바트)
+            ai_recommendation = get_ai_recommendation(party_manager, world)
+            print(f"│   로-바트: {ai_recommendation}")
+            
+            # 진행도
+            progress = min(100, (world.current_level / 10) * 100)
+            progress_bar = "█" * int(progress // 10) + "░" * (10 - int(progress // 10))
+            print(f"│ 진행도: [{progress_bar}] {progress:.1f}%")
+            
+            # 위치 정보
+            if hasattr(world, 'player_pos') and world.player_pos:
+                pos_x, pos_y = world.player_pos
+                print(f"📍 위치: ({pos_x}, {pos_y}) | 🗺️ 층: {world.current_level} | 🎯 목표: 계단 찾아 다음 층으로!")
+            
+        except Exception as e:
+            print(f"│ 게임 정보 표시 오류: {e}")
+        
+        # 메시지 버퍼 표시
+        if hasattr(world, 'game') and world.game and hasattr(world.game, 'get_recent_messages'):
+            try:
+                messages = world.game.get_recent_messages()
+                if messages:
+                    print("\n📢 최근 상황:")
+                    for message in messages[-2:]:  # 최근 2개 메시지만 표시
+                        print(f"  {message}")
+            except:
+                pass
             try:
                 gold_info = f" | 골드: {party_manager.party_gold}G"
             except:
@@ -1858,6 +2008,87 @@ class GameDisplay:
                     for message in messages[-3:]:  # 최근 3개 메시지만 표시
                         print(f"  {message}")
                     print()
+
+
+
+        
+    def show_game_screen(self, party_manager: PartyManager, world: GameWorld, cooking_system=None):
+        """메인 게임 화면 표시 - 안정화된 단일 경로 버전"""
+        
+        try:
+            # 화면 크기 안전하게 설정 (더 넓게)
+            safe_width = min(120, max(80, self.screen_width))  # 최소 80, 최대 120자
+            
+            # 화면 클리어 (한 번만)
+            os.system('cls' if os.name == 'nt' else 'clear')
+            
+            # 상단 정보 표시
+            title = f"던전 {world.current_level}층 - Dawn Of Stellar"
+            title_padding = max(0, (safe_width - len(title)) // 2)
+            print(f"{' ' * title_padding}{bright_cyan(title)}")
+            print()
+            
+            # 던전 맵 표시 (개선된 크기)
+            if hasattr(world, 'get_colored_map_display'):
+                # 맵 크기를 더 넓게 설정
+                map_width = min(50, safe_width - 10)  # 맵 너비 증가
+                map_height = 20  # 맵 높이 증가
+                map_display = world.get_colored_map_display(map_width, map_height)
+                
+                if map_display and isinstance(map_display, list):
+                    for line in map_display:
+                        if line and isinstance(line, str):
+                            # 맵 라인을 왼쪽 정렬로 출력
+                            print(line)
+                else:
+                    # 백업 맵 표시
+                    print("🗺️  던전 지도를 불러올 수 없습니다")
+            else:
+                print("🗺️  던전 탐험 중...")
+            
+            print()  # 맵과 파티 상태 사이 여백
+            
+            # 파티 상태 표시 (간단한 버전)
+            if party_manager and hasattr(party_manager, 'members'):
+                alive_members = [m for m in party_manager.members if m.is_alive]
+                if alive_members:
+                    print(f"👥 파티원 ({len(alive_members)}/{len(party_manager.members)}명 생존)")
+                    for i, member in enumerate(alive_members[:4], 1):  # 최대 4명만
+                        hp_percent = int((member.current_hp / member.limited_max_hp) * 100) if member.limited_max_hp > 0 else 0
+                        mp_percent = int((member.current_mp / member.max_mp) * 100) if member.max_mp > 0 else 0
+                        
+                        # 상태 색상
+                        hp_color = bright_green if hp_percent >= 70 else yellow if hp_percent >= 30 else red
+                        mp_color = bright_cyan if mp_percent >= 50 else yellow
+                        
+                        print(f"  [{i}] {member.name} ({member.character_class}) - HP: {hp_color(f'{hp_percent}%')} | MP: {mp_color(f'{mp_percent}%')}")
+            
+            print()  # 여백
+            
+            # 게임 정보 표시
+            if hasattr(world, 'player_pos'):
+                x, y = world.player_pos
+                print(f"📍 현재 위치: ({x}, {y})")
+            
+            # 층수별 정보
+            if world.current_level == 1:
+                print(f"🎯 목표: 계단을 찾아 다음 층으로!")
+            elif world.current_level % 10 == 0:
+                print(f"🔥 보스층! 강력한 적이 기다립니다")
+            elif world.current_level % 5 == 0:
+                print(f"💎 특수층: 귀중한 보상 획득 기회")
+            else:
+                print(f"⬇️ 계단을 찾아 {world.current_level + 1}층으로 이동")
+            
+            # 게임 메시지 표시
+            if hasattr(world, 'game') and world.game and hasattr(world.game, 'message_buffer'):
+                messages = world.game.get_recent_messages()
+                if messages:
+                    print("\n📢 최근 상황:")
+                    for message in messages[-3:]:  # 최근 3개 메시지만 표시
+                        print(f"  {message}")
+            
+            print(f"\n🎮 {bright_yellow('H:도움말')} | WASD:이동 | I:인벤토리 | Q:메뉴")
             
         except Exception as e:
             # 최종 폴백: 최소한의 정보
@@ -1867,9 +2098,6 @@ class GameDisplay:
             print("게임은 계속 진행됩니다.")
             print(f"🎮 {bright_yellow('H:도움말')} | WASD:이동 | I:인벤토리")
 
-
-
-        
     def show_party_status(self, party_manager: PartyManager):
         """상세 파티 상태 표시"""
         print("\n" + bright_cyan("="*90, True))

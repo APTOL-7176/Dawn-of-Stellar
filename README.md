@@ -24,6 +24,20 @@ Final Fantasy 스타일의 혁신적인 Brave 전투 시스템과
 Dawn Of Stellar v3.0.0은 클래식한 로그라이크의 재미와 현대적인 전투 시스템, 그리고 **메타 진행 시스템**을 결합한 혁신적인 ASCII 콘솔 RPG입니다. 
 28개의 개성 넘치는 직업군으로 구성된 파티와 함께 무작위 생성되는 던전을 탐험하며, 전략적인 BRV/HP 전투 시스템으로 강력한 적들을 물리쳐보세요!
 
+## 📚 문서 & 위키
+
+- 로컬 개발 위키: docs/wiki/Home.md
+- 추천 항목 바로가기:
+  - 전투 시스템: docs/wiki/Combat-System.md
+  - 스킬 & 캐스팅: docs/wiki/Skills-and-Casting.md
+  - 인벤토리 & 장비: docs/wiki/Inventory-and-Equipment.md
+  - 저장 시스템: docs/wiki/Save-System.md
+  - 오디오 & UI: docs/wiki/Audio-and-UI.md
+  - AI 게임 모드: docs/wiki/AI-Game-Mode.md
+  - 모바일 클라이언트: docs/wiki/Mobile-Client.md
+
+GitHub Wiki로 이전 시, 위 링크를 GitHub Wiki URL로 치환하면 됩니다.
+
 ### ✨ v3.0.0 핵심 특징
 
 🎯 **혁신적인 Brave 전투 시스템**

@@ -1107,17 +1107,27 @@ class GameStateSerializer:
             equipped_items = []
             if character.equipped_weapon:
                 equipped_items.append(character.equipped_weapon)
-                character.inventory.add_item(character.equipped_weapon.name, 1)
+                # Inventory.add_item은 Item 객체를 기대하므로 객체 자체를 추가
+                try:
+                    character.inventory.add_item(character.equipped_weapon, 1)
+                except Exception as _e:
+                    print(f"⚠️ 무기 인벤토리 추가 실패: {getattr(character.equipped_weapon, 'name', 'unknown')} - {_e}")
                 print(f"🔧 {character.equipped_weapon.name} 인벤토리에 자동 추가 (장착됨)")
             
             if character.equipped_armor:
                 equipped_items.append(character.equipped_armor)
-                character.inventory.add_item(character.equipped_armor.name, 1)
+                try:
+                    character.inventory.add_item(character.equipped_armor, 1)
+                except Exception as _e:
+                    print(f"⚠️ 방어구 인벤토리 추가 실패: {getattr(character.equipped_armor, 'name', 'unknown')} - {_e}")
                 print(f"🔧 {character.equipped_armor.name} 인벤토리에 자동 추가 (장착됨)")
             
             if character.equipped_accessory:
                 equipped_items.append(character.equipped_accessory)
-                character.inventory.add_item(character.equipped_accessory.name, 1)
+                try:
+                    character.inventory.add_item(character.equipped_accessory, 1)
+                except Exception as _e:
+                    print(f"⚠️ 액세서리 인벤토리 추가 실패: {getattr(character.equipped_accessory, 'name', 'unknown')} - {_e}")
                 print(f"🔧 {character.equipped_accessory.name} 인벤토리에 자동 추가 (장착됨)")
             
             # 장비 복원 로그

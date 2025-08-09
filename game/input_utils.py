@@ -24,6 +24,11 @@ class KeyboardInput:
         self.key_last_repeat = {}
         self.initial_delay = 0.5      # 처음 입력 후 0.5초 대기
         self.repeat_delay = 0.1       # 이후 0.1초마다 반복 (1초에 10번)
+        
+        # 디바운싱을 위한 변수들
+        self.last_key = ""
+        self.last_key_time = 0
+        self.debounce_time = 0.1      # 100ms 디바운싱
             
         # 오디오 매니저 자동 설정
         if not sound_manager:
@@ -73,57 +78,89 @@ class KeyboardInput:
             return 'q'  # 종료 신호
     
     def get_key(self) -> str:
-        """키 입력 받기"""
+        """키 입력 받기 (디바운싱 적용)"""
+        import time
+        
         try:
             # subprocess 모드에서는 항상 input() 사용
             if self.use_subprocess_mode:
                 return self.getch_func()
-                
+            
+            # 입력 버퍼를 먼저 클리어
+            self.clear_input_buffer()
+            
             if os.name == 'nt':
                 # Windows: bytes를 string으로 변환
                 key = self.getch_func()
                 if isinstance(key, bytes):
                     key = key.decode('utf-8', errors='ignore')
-                    
-                # 키 입력 효과음 비활성화 (중복 방지 - cursor_menu_system에서 처리)
-                # if self.sound_manager:
-                #     self.sound_manager.play_sfx("menu_select")
-                    
-                return key.lower()
             else:
                 # Unix 계열
-                key = self.getch_func().lower()
-                
-                # 키 입력 효과음 비활성화 (중복 방지 - cursor_menu_system에서 처리)
-                # if self.sound_manager:
-                #     self.sound_manager.play_sfx("menu_select")
+                key = self.getch_func()
+            
+            key = key.lower()
+            current_time = time.time()
+            
+            # 디바운싱 적용 - 같은 키가 너무 빨리 반복되면 무시
+            if (key == self.last_key and 
+                current_time - self.last_key_time < self.debounce_time):
+                # 너무 빨리 반복된 키는 무시하고 다시 입력 받기
+                return self.get_key()
+            
+            # 키 입력 시간 기록
+            self.last_key = key
+            self.last_key_time = current_time
+            
+            # 특별히 Q 키의 경우 추가 확인
+            if key == 'q':
+                # Q 키가 연속으로 눌리는 것을 방지하기 위해 조금 더 긴 디바운싱 적용
+                if hasattr(self, 'last_q_time'):
+                    if current_time - self.last_q_time < 0.3:  # 300ms 내 Q 키 반복 방지
+                        print("⚠️ Q 키 반복 입력이 감지되어 무시됩니다.")
+                        return self.get_key()
+                self.last_q_time = current_time
                     
-                return key
+            return key
+            
         except:
             # 에러 발생시 백업으로 input() 사용
             prompt = "" if self.use_subprocess_mode else "명령: "
             result = input(prompt).lower().strip()[:1]
-            
-            # 키 입력 효과음 비활성화 (중복 방지 - cursor_menu_system에서 처리)
-            # if self.sound_manager:
-            #     self.sound_manager.play_sfx("menu_select")
-                
             return result
     
     def clear_input_buffer(self):
-        """입력 버퍼 클리어 - 선입력 방지"""
+        """입력 버퍼 클리어 - 선입력 방지 (강화된 버전)"""
         try:
             if os.name == 'nt':
-                # Windows
+                # Windows - 키 버퍼 완전히 클리어 (Q키 문제 해결)
                 import msvcrt
-                while msvcrt.kbhit():
-                    msvcrt.getch()
+                import time
+                # 더 강력한 클리어링 - Q키 자동 입력 방지
+                clear_attempts = 0
+                while clear_attempts < 20:  # 최대 20번 시도
+                    if not msvcrt.kbhit():
+                        break
+                    key = msvcrt.getch()
+                    if isinstance(key, bytes):
+                        key = key.decode('utf-8', errors='ignore')
+                    # Q키가 연속으로 들어오는 경우 로그
+                    if key.lower() == 'q':
+                        print(f"🚨 버퍼에서 Q키 제거됨 (시도 {clear_attempts + 1})")
+                    clear_attempts += 1
+                    time.sleep(0.005)  # 5ms 대기
             else:
                 # Unix 계열
-                import sys, select
-                while select.select([sys.stdin], [], [], 0.0)[0]:
-                    sys.stdin.read(1)
-        except:
+                import sys, select, time
+                for attempt in range(20):  # 최대 20번 시도
+                    ready, _, _ = select.select([sys.stdin], [], [], 0.0)
+                    if not ready:
+                        break
+                    char = sys.stdin.read(1)
+                    if char.lower() == 'q':
+                        print(f"🚨 버퍼에서 Q키 제거됨 (시도 {attempt + 1})")
+                    time.sleep(0.005)  # 5ms 대기
+        except Exception as e:
+            print(f"⚠️ 입력 버퍼 클리어 중 오류: {e}")
             pass  # 실패해도 무시
     
     def wait_for_key(self, message: str = "아무 키나 누르세요...") -> str:
@@ -790,6 +827,30 @@ class UnifiedInputManager:
                 pass
         
         return ''  # 입력 없음
+
+    def get_blocking_key(self) -> str:
+        """블로킹 방식으로 키 하나를 받습니다.
+        - 게임패드가 활성화되어 있으면 게임패드 입력을 우선 시도하되,
+          없으면 키보드 블로킹 입력(KeyboardInput.get_key)을 사용합니다.
+        - 버퍼 클리어는 호출자에서 필요 시 수행합니다.
+        """
+        # 게임패드에서 즉시 입력이 가능하면 반환
+        try:
+            if self.enable_gamepad and self.gamepad and self.gamepad.is_available():
+                key = self.gamepad.get_input()
+                if key:
+                    return key
+        except Exception:
+            pass
+        # 키보드 블로킹 입력
+        try:
+            return self.keyboard.get_key()
+        except Exception:
+            # 폴백: KeyboardInput 내부에서 input()을 사용할 수 있음
+            try:
+                return self.keyboard.get_key()
+            except Exception:
+                return ''
     
     def wait_for_input_with_repeat(self, message: str = "입력 대기 중...", timeout: float = None) -> str:
         """키 반복을 지원하는 입력 대기"""

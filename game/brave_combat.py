@@ -166,6 +166,46 @@ class BraveCombatSystem:
         # AI 게임 모드 플래그 추가
         self.ai_game_mode = False  # AI 게임 모드 여부
         
+    def is_ai_game_mode_enabled(self) -> bool:
+        """AI 게임모드 활성화 여부 확인 (다중 소스 체크)"""
+        try:
+            # 1. 클래스 내부 플래그 확인
+            if hasattr(self, 'ai_game_mode') and self.ai_game_mode:
+                return True
+            
+            # 2. 메인 모듈 확인
+            import sys
+            main_module = sys.modules.get('__main__')
+            if main_module:
+                ai_enabled = getattr(main_module, 'ai_game_mode_enabled', False)
+                if ai_enabled:
+                    return True
+            
+            # 3. config 모듈 확인
+            try:
+                import config
+                if hasattr(config, 'ai_game_mode_enabled') and config.ai_game_mode_enabled:
+                    return True
+            except ImportError:
+                pass
+                
+            # 4. AI 매니저 존재 여부 확인
+            try:
+                from game.ai_game_mode import ai_game_mode_manager
+                if hasattr(ai_game_mode_manager, 'is_enabled'):
+                    return ai_game_mode_manager.is_enabled()
+            except ImportError:
+                pass
+                
+            return False
+        except Exception:
+            return False
+    
+    def set_ai_game_mode(self, enabled: bool):
+        """AI 게임모드 활성화/비활성화 설정"""
+        self.ai_game_mode = enabled
+        print(f"🤖 AI 게임모드: {'활성화' if enabled else '비활성화'}")
+        
         # 🌑 그림자 시스템 초기화
         if SHADOW_SYSTEM_AVAILABLE:
             self.shadow_system = get_shadow_system()
@@ -173,13 +213,18 @@ class BraveCombatSystem:
         else:
             self.shadow_system = None
             
-        # 전투 로그 시스템 초기화
+    # 전투 로그 시스템 초기화
         self._recent_combat_logs = []
         self._max_log_entries = 10  # 최대 로그 저장 개수
         self._turn_count = 0  # 턴 카운터
         self._last_action_completed = False  # 액션 완료 플래그
-        
-        # 🎯 적 아이콘 시스템 초기화
+    # 취소 스팸 완화: 캐릭터별 취소 카운터/타임스탬프
+        self._cancel_counters = {}
+        self._cancel_last_time = {}
+    # 취소 후 즉시 재선택을 막는 쿨다운 타이머 (character id -> timestamp)
+        self._cancel_cooldown_until = {}
+
+    # 🎯 적 아이콘 시스템 초기화
         self.enemy_icons = {
             # 동물 몬스터
             "쥐": "🐭", "고양이": "🐱", "개": "🐕", "늑대": "🐺", "곰": "🐻", 
@@ -619,6 +664,13 @@ class BraveCombatSystem:
         # 전투 상태 활성화
         from .character import set_combat_active
         set_combat_active(True)
+        
+        # AI 게임모드 상태 확인 및 표시
+        ai_mode_enabled = self.is_ai_game_mode_enabled()
+        if ai_mode_enabled:
+            print(f"🤖 {Color.BRIGHT_CYAN.value}AI 게임모드 활성화{Color.RESET.value} - 일부 파티원이 AI로 제어될 수 있습니다")
+        else:
+            print(f"🎯 {Color.BRIGHT_GREEN.value}플레이어 제어 모드{Color.RESET.value} - 모든 파티원을 직접 제어합니다")
 
         # ✅ 간단 렌더링 모드 감지 (Electron/비 TTY 환경에서 커서 제어 실패 시)
         try:
@@ -975,13 +1027,7 @@ class BraveCombatSystem:
                 
                 # ATB 업데이트 후 화면 상태 갱신
                 # 첫 번째 업데이트에서만, 그리고 의미있는 변화가 있을 때만 갱신
-                if attempts == 0:
-                    # 안정화를 위한 짧은 대기 - 더욱 빠르게
-                    import time as time_module
-                    time_module.sleep(0.05)  # 10ms에서 50ms로 증가 (화면 안정성)
-                    first_character = next((c for c in valid_party if c.is_alive), None)
-                    if first_character:
-                        self.show_battle_status(first_character, valid_party, valid_enemies)
+                # 첫 루프에서의 잦은 상태 출력은 화면 깜빡임을 유발하므로 제거
                 
                 # ATB 업데이트 후 전투 종료 체크
                 if self.check_battle_end(valid_party, valid_enemies):
@@ -997,16 +1043,19 @@ class BraveCombatSystem:
                 time_module.sleep(0.1)  # ATB 업데이트 간 딜레이 (20ms→100ms, 화면 안정성)
             
             if not action_order:
-                # ATB 강제 증가로 교착 상태 해결
-                print("⚠️ ATB 교착 상태 - 모든 캐릭터의 ATB를 증가시킵니다.")
+                # ATB 강제 증가로 교착 상태 해결 (조용히 1회 시도)
                 for combatant in valid_party + valid_enemies:
                     if combatant.is_alive and hasattr(combatant, 'atb_gauge'):
-                        combatant.atb_gauge = min(self.ATB_MAX, combatant.atb_gauge + 1000)
-                # 다시 시도
+                        combatant.atb_gauge = min(self.ATB_MAX, max(combatant.atb_gauge, self.ATB_READY_THRESHOLD))
                 action_order = self.get_action_order(valid_party + valid_enemies)
                 if not action_order:
-                    print("❌ ATB 시스템 복구 실패 - 전투를 강제 종료합니다.")
-                    return "draw"
+                    # 그래도 실패하면 한 번 더 소폭 증가
+                    for combatant in valid_party + valid_enemies:
+                        if combatant.is_alive and hasattr(combatant, 'atb_gauge'):
+                            combatant.atb_gauge = min(self.ATB_MAX, combatant.atb_gauge + 500)
+                    action_order = self.get_action_order(valid_party + valid_enemies)
+                    if not action_order:
+                        return "draw"
             
             # 선택된 캐릭터의 턴 처리
             character = action_order[0]
@@ -1022,38 +1071,71 @@ class BraveCombatSystem:
             if character in valid_party:
                 print(f"🎮 {character.name}의 턴이 시작됩니다!")
                 
-                # AI 모드 확인 - 조건부 처리 (AI 게임모드가 활성화된 경우에만)
-                ai_controlled = False
+                # 아군 판별 안정성 강화 - 더 확실한 검증
+                is_ally = False
                 try:
-                    # 메인 모듈에서 AI 게임모드 활성화 여부 확인
-                    import sys
-                    main_module = sys.modules.get('__main__')
-                    ai_game_mode_enabled = getattr(main_module, 'ai_game_mode_enabled', False) if main_module else False
+                    # 1차: 파티 리스트에 직접 포함되는지 확인
+                    is_ally = character in valid_party
+                    
+                    # 2차: 원본 파티에도 포함되는지 확인 (백업)
+                    if not is_ally:
+                        is_ally = character in party
+                    
+                    # 3차: 플레이어 캐릭터인지 확인
+                    if not is_ally and hasattr(character, 'is_player_character'):
+                        is_ally = character.is_player_character
+                    
+                    # 4차: 적군 속성이 없으면 아군으로 처리
+                    if not is_ally and not hasattr(character, 'is_enemy'):
+                        is_ally = True
+                    
+                    # 5차: 이름 기반 매칭 (최종 백업)
+                    if not is_ally:
+                        party_names = [p.name for p in valid_party]
+                        is_ally = character.name in party_names
+                        
+                except Exception as e:
+                    print(f"⚠️ 아군 판별 오류: {e}")
+                    is_ally = True  # 안전을 위해 아군으로 처리
+                
+                # 강제 아군 전환 로그 (필요시에만)
+                if not is_ally:
+                    print(f"⚠️ {character.name}을 아군으로 강제 변경합니다.")
+                    is_ally = True
+                
+                # AI 모드 확인 - 조건부 처리 (안정화된 AI 게임모드 판별)
+                ai_controlled = False
+                
+                try:
+                    ai_game_mode_enabled = self.is_ai_game_mode_enabled()
+                    print(f"🔍 AI 게임모드 상태: {ai_game_mode_enabled}")
                     
                     # AI 게임모드가 활성화된 경우에만 AI 제어 체크
                     if ai_game_mode_enabled:
-                        from game.ai_game_mode import ai_game_mode_manager
-                        if hasattr(ai_game_mode_manager, 'is_ai_controlled'):
-                            ai_controlled = ai_game_mode_manager.is_ai_controlled(character)
-                            if ai_controlled:
-                                print(f"🤖 {character.name}은(는) AI가 제어합니다.")
-                                result = self.ai_turn(character, valid_party, valid_enemies)
+                        try:
+                            from game.ai_game_mode import ai_game_mode_manager
+                            if hasattr(ai_game_mode_manager, 'is_ai_controlled'):
+                                ai_controlled = ai_game_mode_manager.is_ai_controlled(character)
+                                if ai_controlled:
+                                    print(f"🤖 {character.name}은(는) AI가 제어합니다.")
+                                    result = self.ai_turn(character, valid_party, valid_enemies)
+                                else:
+                                    print(f"🎯 {character.name}은(는) 플레이어가 직접 제어합니다.")
+                                    result = self.player_turn(character, valid_party, valid_enemies)
                             else:
-                                print(f"🎯 {character.name}은(는) 플레이어가 제어합니다.")
+                                print(f"🎯 {character.name} 플레이어 턴으로 처리 (AI 매니저 기능 없음)")
                                 result = self.player_turn(character, valid_party, valid_enemies)
-                        else:
-                            print(f"🎯 {character.name} 플레이어 턴으로 처리 (AI 함수 없음)")
+                        except ImportError:
+                            print(f"🎯 {character.name} 플레이어 턴으로 처리 (AI 모듈 없음)")
                             result = self.player_turn(character, valid_party, valid_enemies)
                     else:
-                        # AI 게임모드가 비활성화된 경우 모든 파티원을 플레이어가 제어
-                        print(f"🎯 {character.name}은(는) 플레이어가 제어합니다. (AI 모드 비활성화)")
+                        # AI 게임모드가 비활성화된 경우 모든 파티원을 플레이어가 직접 제어
+                        print(f"🎯 {character.name}은(는) 플레이어가 직접 제어합니다. (AI 모드 OFF)")
                         result = self.player_turn(character, valid_party, valid_enemies)
                         
-                except ImportError:
-                    print(f"🎯 {character.name} 플레이어 턴으로 처리 (AI 모드 없음)")
-                    result = self.player_turn(character, valid_party, valid_enemies)
                 except Exception as e:
-                    print(f"🎯 {character.name} 플레이어 턴으로 처리 (AI 오류: {e})")
+                    # 오류 발생 시 안전하게 플레이어 제어로 폴백
+                    print(f"⚠️ AI 모드 판별 오류 ({e}), {character.name} 플레이어 턴으로 처리")
                     result = self.player_turn(character, valid_party, valid_enemies)
                     
                 # 도망 성공 처리
@@ -1087,8 +1169,29 @@ class BraveCombatSystem:
                 old_atb = character.atb_gauge
                 character.atb_gauge = max(0, character.atb_gauge - action_cost)
                 print(f"🔄 {character.name} ATB: {old_atb} → {character.atb_gauge} (행동 비용: {action_cost})")
+                # 행동 완료 시 취소 카운터와 쿨다운 리셋
+                cid = id(character)
+                self._cancel_counters[cid] = 0
+                if cid in self._cancel_last_time:
+                    del self._cancel_last_time[cid]
+                if cid in self._cancel_cooldown_until:
+                    del self._cancel_cooldown_until[cid]
             elif not action_taken:
-                print(f"⏸️ {character.name}의 턴이 취소되어 ATB를 유지합니다 (ATB: {getattr(character, 'atb_gauge', 0)})")
+                # 취소 스팸 완화: 같은 캐릭터의 반복 취소 출력은 2초에 1회로 제한, 3회 이상 연속 시 조용히 유지
+                cid = id(character)
+                now = time_module.time()
+                cnt = self._cancel_counters.get(cid, 0) + 1
+                last = self._cancel_last_time.get(cid, 0)
+                if (now - last) > 2.0 and cnt <= 3:
+                    print(f"⏸️ {character.name}의 턴이 취소되어 ATB를 유지합니다 (ATB: {getattr(character, 'atb_gauge', 0)})")
+                    self._cancel_last_time[cid] = now
+                self._cancel_counters[cid] = cnt
+                # 즉시 재선택 방지: 짧은 쿨다운과 ATB 살짝 하향(임계치-1)
+                # 2회 이상 연속 취소 시 0.5초 쿨다운 부여
+                if cnt >= 2:
+                    self._cancel_cooldown_until[cid] = now + 0.5
+                    if hasattr(character, 'atb_gauge') and character.atb_gauge >= getattr(self, 'ATB_READY_THRESHOLD', 1000):
+                        character.atb_gauge = getattr(self, 'ATB_READY_THRESHOLD', 1000) - 1
                 
             # 상태이상 턴 종료 처리
             if hasattr(character, 'status_manager'):
@@ -1196,7 +1299,7 @@ class BraveCombatSystem:
         if WARRIOR_SYSTEM_AVAILABLE and (character.character_class == "전사" or "전사" in character.character_class):
             try:
                 warrior_system = get_warrior_system()
-                other_allies = [ally for ally in party if ally != character and ally.hp > 0]
+                other_allies = [ally for ally in party if ally != character and ally.current_hp > 0]
                 if warrior_system.analyze_situation_and_adapt(character, other_allies, enemies):
                     pass  # 메시지는 이미 출력됨
             except Exception as e:
@@ -1291,18 +1394,25 @@ class BraveCombatSystem:
         if self.auto_battle:
             return self._auto_battle_action(character, party, enemies)
         
-        # AI 게임모드 체크 - 전체 시스템 연동
+        # AI 게임모드 체크 - 조건부 처리 (안정화된 버전)
         try:
-            import sys
-            if hasattr(sys.modules.get('__main__'), 'ai_game_mode_enabled'):
-                ai_mode_enabled = getattr(sys.modules['__main__'], 'ai_game_mode_enabled', False)
-                if ai_mode_enabled:
+            ai_mode_enabled = self.is_ai_game_mode_enabled()
+            
+            if ai_mode_enabled:
+                print(f"🤖 AI 게임모드 활성화 - {character.name} AI 처리 시도")
+                try:
                     from .ai_game_mode import process_character_turn
                     action_type, action_data = process_character_turn(character, party, enemies)
                     return self._execute_ai_action(character, action_type, action_data, party, enemies)
+                except ImportError:
+                    print(f"⚠️ AI 모듈 로드 실패, {character.name} 플레이어 제어로 전환")
+                except Exception as ai_error:
+                    print(f"⚠️ AI 처리 오류 ({ai_error}), {character.name} 플레이어 제어로 전환")
+            else:
+                print(f"🎯 AI 게임모드 비활성화 - {character.name} 플레이어 직접 제어")
         except Exception as e:
             # AI 모드 처리 실패시 기본 플레이어 모드로 진행
-            pass
+            print(f"⚠️ AI 모드 체크 오류 ({e}), {character.name} 플레이어 제어로 진행")
         
         while True:
             # 전투 상태 표시
@@ -1440,7 +1550,7 @@ class BraveCombatSystem:
                         status_lines.append("─" * 50)
                         
                         for member in alive_party:
-                            status_line = f"🔮 {member.name}({member.character_class}) - HP: {member.hp}/{member.max_hp} MP: {member.mp}/{member.max_mp} BRV: {member.brave_points}"
+                            status_line = f"🔮 {member.name}({member.character_class}) - HP: {member.current_hp}/{member.max_hp} MP: {member.current_mp}/{member.max_mp} BRV: {member.brave_points}"
                             status_lines.append(status_line)
                         
                         # 적 상태 표시 (폴백)
@@ -1449,7 +1559,7 @@ class BraveCombatSystem:
                         status_lines.append("─" * 50)
                         
                         for enemy in alive_enemies:
-                            status_line = f"👹 {enemy.name} - HP: {enemy.hp}/{enemy.max_hp} BRV: {enemy.brave_points}"
+                            status_line = f"👹 {enemy.name} - HP: {enemy.current_hp}/{enemy.max_hp} BRV: {enemy.brave_points}"
                             status_lines.append(status_line)
                     
                         # 메뉴 생성 (컬러풀한 상태 정보 포함)
@@ -1480,7 +1590,7 @@ class BraveCombatSystem:
                     status_lines.append("─" * 50)
                     
                     for enemy in alive_enemies:
-                        status_line = f"👹 {enemy.name} - HP: {enemy.hp}/{enemy.max_hp} BRV: {enemy.brave_points}"
+                        status_line = f"👹 {enemy.name} - HP: {enemy.current_hp}/{enemy.max_hp} BRV: {enemy.brave_points}"
                         status_lines.append(status_line)
                     
                     # 메뉴 생성 (기본 상태 정보 포함)
@@ -1494,35 +1604,37 @@ class BraveCombatSystem:
                     return None
                     
             except ImportError:
-                # 폴백: 기존 메뉴 시스템 (간소화)
-                print("⚔️ 전투 메뉴")
+                # 폴백: 커서 메뉴 없이 직접 키보드 입력
+                print("⚔️ 전투 메뉴 (폴백 모드)")
                 print("─" * 50)
                 for i, (option, desc) in enumerate(zip(action_options, action_descriptions)):
                     print(f"[{i+1}] {option}")
                 print("─" * 50)
+                print("선택 (1-9, 0=취소): ", end="", flush=True)
                 
+                # 키보드 시스템 사용
                 try:
-                    # 더 안전한 입력 처리 (키 홀드 방지)
-                    print("선택 (1-9): ", end="", flush=True)
-                    
-                    # 여러 번 시도하여 유효한 입력 받기
-                    for attempt in range(5):  # 최대 5번 시도
-                        choice_input = input().strip()
-                        if choice_input:  # 빈 입력이 아니면
-                            break
-                        print("다시 입력하세요: ", end="", flush=True)
-                    
-                    if not choice_input:  # 모든 시도 후에도 빈 입력이면
-                        print("⚠️ 유효한 입력이 필요합니다. 다시 시도해주세요.")
-                        continue  # 메뉴로 돌아가기
-                        
-                    choice = int(choice_input) - 1
-                    if choice < 0 or choice >= len(action_options):
-                        print(f"잘못된 선택입니다. (1-{len(action_options)} 범위)")
-                        continue  # 다시 메뉴로
-                except (ValueError, KeyboardInterrupt):
-                    print("⚠️ 올바른 숫자를 입력해주세요.")
-                    continue  # 메뉴로 돌아가기
+                    if hasattr(self, 'keyboard') and self.keyboard:
+                        key = self.keyboard.get_blocking_key()
+                        if key == '0':
+                            return None  # 취소
+                        choice = int(key) - 1
+                        if 0 <= choice < len(action_options):
+                            print(f"선택: {action_options[choice]}")
+                        else:
+                            print("잘못된 선택입니다.")
+                            choice = 0  # 기본값으로 설정
+                    else:
+                        print("키보드 시스템 오류. 자동으로 첫 번째 옵션 선택.")
+                        choice = 0
+                except (ValueError, AttributeError):
+                    print("입력 오류. 자동으로 첫 번째 옵션 선택.")
+                    choice = 0
+            except Exception as e:
+                # 완전한 폴백: 메뉴 시스템 오류 시 자동으로 첫 번째 행동 선택
+                print(f"⚠️ 메뉴 시스템 오류: {e}")
+                print("🔄 자동으로 Brave 공격을 선택합니다.")
+                choice = 0
             
             if choice == 0:  # Brave 공격
                 if self.brave_attack_menu(character, enemies):
@@ -1711,13 +1823,32 @@ class BraveCombatSystem:
         print("\n⏰ 전투 로그 확인 중... (0.5초)")
         time.sleep(0.5)  # 2초에서 0.5초로 단축
         
-        # 🎯 중요: 실제 행동 완료 여부 확인 후 반환
-        if getattr(self, '_last_action_completed', False):
+        # 🎯 중요: 실제 행동 완료 여부 확인 후 반환 (취소 카운터 리셋/출력 제한 포함)
+        action_completed_flag = getattr(self, '_last_action_completed', False)
+        
+        if action_completed_flag:
             self._last_action_completed = False  # 플래그 리셋
+            # 취소 카운터 리셋
+            try:
+                cid = id(character)
+                if cid in self._cancel_counters:
+                    del self._cancel_counters[cid]
+                if cid in self._cancel_last_time:
+                    del self._cancel_last_time[cid]
+            except Exception:
+                pass
             print(f"✅ {character.name}의 행동이 완료되었습니다!")
             return "action_completed"  # 행동 완료 신호
         else:
-            print(f"❌ {character.name}의 행동이 취소되었습니다.")
+            # 출력 빈도 제한: 2초 내 반복 취소는 메시지 생략
+            cid = id(character)
+            now = time_module.time()
+            last = self._cancel_last_time.get(cid, 0)
+            if (now - last) > 2.0:
+                print(f"❌ {character.name}의 행동이 취소되었습니다.")
+                self._cancel_last_time[cid] = now
+            # 취소 카운터 증가
+            self._cancel_counters[cid] = self._cancel_counters.get(cid, 0) + 1
             return None  # 행동 취소 신호
     
     def _auto_battle_action(self, character: Character, party: List[Character], enemies: List[Character]):
@@ -4799,6 +4930,10 @@ class BraveCombatSystem:
                     if attacker.venom_power >= attacker.venom_power_max:
                         print(f"💀 [VENOM MAX] 도적의 독액이 최고조에 달했습니다!")
         
+        # 🎯 중요: Brave 공격 완료 시 행동 완료 플래그 설정
+        self._last_action_completed = True
+        print(f"✅ {attacker.name}의 Brave 공격이 완료되었습니다!")
+        
     def _get_class_specific_hp_attack(self, character: Character):
         """직업별 특화된 HP 공격 반환 (28개 직업 완전 지원)"""
         from .brave_system import BraveSkill
@@ -5548,6 +5683,10 @@ class BraveCombatSystem:
         
         # 🏹 궁수 지원사격 트리거 (아군이 공격할 때)
         self._trigger_support_fire(attacker, target, "ally_attacking")
+        
+        # 🎯 중요: HP 공격 완료 시 행동 완료 플래그 설정
+        self._last_action_completed = True
+        print(f"✅ {attacker.name}의 HP 공격이 완료되었습니다!")
         
         return result
             
@@ -9259,7 +9398,13 @@ class BraveCombatSystem:
                 # StatusManager 같은 잘못된 객체 감지
                 print(f"⚠️ 경고: 잘못된 객체가 전투 리스트에 포함됨: {type(c).__name__}")
         
-        ready_combatants = [c for c in valid_combatants if c.is_alive and c.atb_gauge >= self.ATB_READY_THRESHOLD]
+        # 취소 직후의 짧은 쿨다운 동안은 선택 대상에서 제외
+        now_ts = time_module.time()
+        def not_in_cooldown(c):
+            cid = id(c)
+            until = self._cancel_cooldown_until.get(cid, 0)
+            return now_ts >= until
+        ready_combatants = [c for c in valid_combatants if c.is_alive and c.atb_gauge >= self.ATB_READY_THRESHOLD and not_in_cooldown(c)]
         
         if not ready_combatants:
             return []

@@ -194,6 +194,9 @@ class GameWorld:
         self.actions_taken = 0            # 총 액션 수 (AFK 방지)
         self.combat_count = 0             # 전투 횟수
         
+        # 현재 층의 시드 저장 (세이브 파일에 포함)
+        self.current_level_seed = None
+        
         # 성과 기반 보상 시스템
         self.performance_metrics = {
             'floors_cleared': 0,           # 클리어한 층수
@@ -228,12 +231,19 @@ class GameWorld:
                 row.append(Tile(TileType.WALL, x, y))
             self.tiles.append(row)
             
-    def generate_level(self):
+    def generate_level(self, saved_seed=None):
         """레벨 생성 (던전 생성) - 고정 씨드 사용"""
         # 층수 기반 고정 씨드 설정 (같은 층은 항상 같은 결과)
-        level_seed = hash(f"level_{self.current_level}") % (2**32)
+        if saved_seed is not None:
+            level_seed = saved_seed
+            print(f"레벨 {self.current_level} 던전 복원 (저장된 씨드: {level_seed})")
+        else:
+            level_seed = hash(f"level_{self.current_level}") % (2**32)
+            print(f"레벨 {self.current_level} 던전 생성 (새 씨드: {level_seed})")
+        
+        # 현재 층의 씨드 저장
+        self.current_level_seed = level_seed
         random.seed(level_seed)
-        print(f"레벨 {self.current_level} 던전 생성 (씨드: {level_seed})")
         
         self.rooms = []
         self.enemies_positions = []
@@ -745,54 +755,63 @@ class GameWorld:
             new_x = self.player_pos[0] + dx
             new_y = self.player_pos[1] + dy
             
-            if self.can_move(dx, dy):
-                # 이동하려는 위치에 적이 있는지 먼저 확인
-                if (new_x, new_y) in self.enemies_positions:
-                    # 적과 충돌 - 주변 적들도 함께 전투에 참여
-                    nearby_enemies = self.get_nearby_enemies_for_combat(new_x, new_y)
-                    return {"type": "combat", "enemies": nearby_enemies}
-                
-                # 플레이어 위치 업데이트 및 이동거리 추적
-                self.player_pos = (new_x, new_y)
-                
-                # 이동거리 추가 (맨하탄 거리)
-                movement_distance = abs(dx) + abs(dy)
-                self.total_movement_distance += movement_distance
-                self.current_run_movement += movement_distance
-                self.actions_taken += 1  # 액션 수 증가
-                
-                # 탐험 추적
-                self.track_exploration(new_x, new_y)
-                
-                self.update_visibility()
-                
-                # 아이템 획득 체크
-                if (new_x, new_y) in self.items_positions:
-                    item = self.floor_items.get((new_x, new_y))
-                    if item:
-                        # 아이템 제거
-                        self.items_positions.remove((new_x, new_y))
-                        del self.floor_items[(new_x, new_y)]
-                        self.tiles[new_y][new_x].has_item = False
-                        
-                        # 아이템 수집 추적
-                        self.track_item_collection()
-                        
-                        return item  # 아이템 반환
-                
-                # 계단 체크 (다음 층으로 이동)
-                if self.tiles[new_y][new_x].type == TileType.STAIRS_DOWN:
-                    # 층 완료 시 통계 계산
-                    self.track_floor_completion()
-                    return "next_floor"
+            # 이동 가능한지 확인
+            if not self.can_move(dx, dy):
+                return None  # 이동 불가
+            
+            # 이동하려는 위치에 적이 있는지 먼저 확인
+            if (new_x, new_y) in self.enemies_positions:
+                print(f"⚔️ 적과 충돌! 위치: ({new_x}, {new_y})")
+                # 적과 충돌 - 주변 적들도 함께 전투에 참여
+                nearby_enemies = self.get_nearby_enemies_for_combat(new_x, new_y)
+                print(f"🎯 전투 대상: {len(nearby_enemies)}개 위치의 적들")
+                return {"type": "combat", "enemies": nearby_enemies, "trigger_pos": (new_x, new_y)}
+            
+            # 플레이어 위치 업데이트 및 이동거리 추적
+            old_pos = self.player_pos
+            self.player_pos = (new_x, new_y)
+            print(f"🚶 플레이어 이동: {old_pos} → {self.player_pos}")
+            
+            # 이동거리 추가 (맨하탄 거리)
+            movement_distance = abs(dx) + abs(dy)
+            self.total_movement_distance += movement_distance
+            self.current_run_movement += movement_distance
+            self.actions_taken += 1  # 액션 수 증가
+            
+            # 탐험 추적
+            self.track_exploration(new_x, new_y)
+            
+            self.update_visibility()
+            
+            # 아이템 획득 체크
+            if (new_x, new_y) in self.items_positions:
+                item = self.floor_items.get((new_x, new_y))
+                if item:
+                    print(f"💎 아이템 발견: {item.name}")
+                    # 아이템 제거
+                    self.items_positions.remove((new_x, new_y))
+                    del self.floor_items[(new_x, new_y)]
+                    self.tiles[new_y][new_x].has_item = False
                     
-                # 일반 이동 성공
-                return "moved"
+                    # 아이템 수집 추적
+                    self.track_item_collection()
+                    
+                    return {"type": "item", "item": item}  # 아이템 반환
+            
+            # 계단 체크 (다음 층으로 이동)
+            if self.tiles[new_y][new_x].type == TileType.STAIRS_DOWN:
+                print("🪜 계단 발견! 다음 층으로 이동합니다.")
+                # 층 완료 시 통계 계산
+                self.track_floor_completion()
+                return {"type": "stairs", "direction": "down"}
                 
-            return None  # 이동 실패
+            # 일반 이동 성공
+            return {"type": "move", "success": True}
             
         except Exception as e:
-            print(f"move_player 오류: {e}")
+            print(f"❌ move_player 오류: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def get_nearby_enemies_for_combat(self, target_x: int, target_y: int) -> List[Tuple[int, int]]:
@@ -2017,6 +2036,7 @@ class GameWorld:
             'actions_taken': self.actions_taken,
             'combat_count': self.combat_count,
             'performance_metrics': self.performance_metrics,
+            'current_level_seed': self.current_level_seed,  # 현재 층 시드 저장
             'current_floor_stats': {
                 'enemies_on_floor': self.current_floor_stats['enemies_on_floor'],
                 'enemies_defeated_on_floor': self.current_floor_stats['enemies_defeated_on_floor'],
@@ -2046,6 +2066,9 @@ class GameWorld:
         self.actions_taken = data['actions_taken']
         self.combat_count = data['combat_count']
         self.performance_metrics = data['performance_metrics']
+        
+        # 시드 정보 복원 (호환성 확인)
+        self.current_level_seed = data.get('current_level_seed', None)
         
         # 타일 복원
         self.tiles = []

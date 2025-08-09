@@ -3009,6 +3009,16 @@ class Inventory:
         else:
             self.items[item.name] = quantity
         return True
+
+    def add_item_by_name(self, item_name: str, quantity: int = 1) -> bool:
+        """아이템 이름으로 추가 (ItemDatabase 조회 후 add_item 사용)"""
+        if not item_name:
+            return False
+        db = ItemDatabase()
+        item = db.get_item(item_name)
+        if not item:
+            return False
+        return self.add_item(item, quantity)
         
     def remove_item(self, item_name: str, quantity: int = 1) -> bool:
         """아이템 제거"""

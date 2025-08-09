@@ -238,7 +238,7 @@ def get_buffered_display() -> BufferedDisplay:
     """전역 버퍼링 디스플레이 인스턴스 반환"""
     global _buffered_display
     if _buffered_display is None:
-        _buffered_display = BufferedDisplay(width=80, height=30)
+        _buffered_display = BufferedDisplay(width=80, height=40)  # 높이를 40으로 증가
     return _buffered_display
 
 def cleanup_display():
