@@ -270,10 +270,10 @@ class RobotAIMaster:
             if hasattr(party_manager, 'cooking_system') and party_manager.cooking_system:
                 cooking_system = party_manager.cooking_system
                 
-                # 가방 무게 분석
+                # 가방 무게 분석 (실제 파티 매니저 방식 사용)
                 try:
-                    current_weight = cooking_system.get_total_inventory_weight()
-                    max_weight = cooking_system.get_max_inventory_weight()
+                    current_weight = party_manager.get_current_carry_weight()
+                    max_weight = party_manager.get_total_carry_capacity()
                     weight_ratio = current_weight / max_weight if max_weight > 0 else 0
                     
                     analysis["weight_ratio"] = weight_ratio
@@ -289,7 +289,7 @@ class RobotAIMaster:
                         analysis["recommendations"].append("📦 가방 점검 - 무게 60% 초과")
                     else:
                         analysis["weight_status"] = "good"
-                except:
+                except Exception as e:
                     pass
                 
                 # 재료 균형 분석
@@ -1166,11 +1166,11 @@ def get_ai_recommendation(party_manager, world):
             return analysis["message"]
         elif analysis["status"] in ["FIELD_ANALYSIS", "BOSS_PREP", "SPECIAL_FLOOR", "NORMAL_EXPLORATION", "FIELD_OPTIMIZED"]:
             if "actions" in analysis and analysis["actions"]:
-                return f"� 로-바트: {analysis['actions'][0]} (내 말을 믿어!)"
+                return f" 로-바트: {analysis['actions'][0]} (내 말을 믿어!)"
             elif "checklist" in analysis:
-                return f"� 로-바트: {analysis['checklist'][0]} (역시 내가 최고야!)"
+                return f" 로-바트: {analysis['checklist'][0]} (역시 내가 최고야!)"
             else:
-                return f"� 로-바트: {analysis.get('message', '신중한 탐험 권장')} (흠... 당연한 얘기지?)"
+                return f" 로-바트: {analysis.get('message', '신중한 탐험 권장')} (흠... 당연한 얘기지?)"
         
         return "🤖 로-바트: 잠깐... 계산 중... (천재도 시간이 필요해!)"
     except Exception as e:
@@ -1641,7 +1641,8 @@ class GameDisplay:
         
         # 화면 크기 안전하게 설정 (더 넓게)
         safe_width = min(120, max(80, self.screen_width))  # 최소 80, 최대 120자
-        
+        safe_height = min(60, max(30, self.screen_height))  # 최소 30, 최대 60줄
+
         # 화면 클리어 (한 번만)
         os.system('cls' if os.name == 'nt' else 'clear')
         
@@ -1658,7 +1659,7 @@ class GameDisplay:
             if hasattr(world, 'get_colored_map_display'):
                 # 맵 크기를 더 넓게 설정
                 map_width = min(50, safe_width - 10)  # 맵 너비 증가
-                map_height = 20  # 맵 높이 증가
+                map_height = max(20, safe_height - 30)  # 맵 높이: safe_height - 30과 20 중 최댓값
                 map_display = world.get_colored_map_display(map_width, map_height)
                 
                 if map_display and isinstance(map_display, list):
@@ -1814,27 +1815,29 @@ class GameDisplay:
             
             # 가방 무게 정보 추가 (색깔 포함)
             try:
-                if cooking_system:
-                    total_weight = cooking_system.get_total_inventory_weight()
-                    max_weight = cooking_system.get_max_inventory_weight()
-                    weight_ratio = total_weight / max_weight if max_weight > 0 else 0
-                    
-                    # 무게 비율에 따른 색깔 결정
-                    if weight_ratio < 0.5:  # 50% 미만: 초록색
-                        weight_color = "\033[92m"  # 밝은 초록
-                    elif weight_ratio < 0.8:  # 80% 미만: 노란색
-                        weight_color = "\033[93m"  # 노란색
-                    elif weight_ratio < 0.95:  # 95% 미만: 주황색
-                        weight_color = "\033[91m"  # 빨간색
-                    else:  # 95% 이상: 깜빡이는 빨간색
-                        weight_color = "\033[91m\033[5m"  # 깜빡이는 빨간색
-                    
-                    reset_color = "\033[0m"
-                    weight_info = f" | 가방: {weight_color}{total_weight:.1f}/{max_weight:.1f}kg{reset_color}"
-                else:
-                    weight_info = ""
-            except:
-                weight_info = ""
+                # 파티 매니저의 실제 무게 계산 방법 사용
+                total_weight = party_manager.get_current_carry_weight()
+                max_weight = party_manager.get_total_carry_capacity()
+                weight_ratio = total_weight / max_weight if max_weight > 0 else 0
+                
+                # 무게 비율에 따른 색깔 결정 (더 명확한 색상)
+                if weight_ratio < 0.4:  # 40% 미만: 청록색 (매우 여유)
+                    weight_color = "\033[96m"  # 밝은 청록색
+                elif weight_ratio < 0.7:  # 70% 미만: 초록색 (여유)
+                    weight_color = "\033[92m"  # 밝은 초록
+                elif weight_ratio < 0.85:  # 85% 미만: 노란색 (주의)
+                    weight_color = "\033[93m"  # 노란색
+                elif weight_ratio < 0.95:  # 95% 미만: 주황색 (경고)
+                    weight_color = "\033[38;5;208m"  # 주황색 (256색)
+                else:  # 95% 이상: 깜빡이는 빨간색 (위험)
+                    weight_color = "\033[91m\033[5m"  # 깜빡이는 빨간색
+                
+                reset_color = "\033[0m"
+                percentage = int(weight_ratio * 100)
+                weight_info = f" | 가방: {weight_color}{total_weight:.1f}/{max_weight:.1f}kg ({percentage}%){reset_color}"
+            except Exception as e:
+                # 오류 시 기본 표시
+                weight_info = " | 가방: ?/?kg"
             
             print(f"  {party_info}{gold_info}{weight_info}")
             print("+" + "-" * (safe_width - 2) + "+")
@@ -2013,12 +2016,13 @@ class GameDisplay:
 
         
     def show_game_screen(self, party_manager: PartyManager, world: GameWorld, cooking_system=None):
-        """메인 게임 화면 표시 - 안정화된 단일 경로 버전"""
+        """메인 게임 화면 표시 - 풍부한 파티 정보 포함 버전"""
         
         try:
             # 화면 크기 안전하게 설정 (더 넓게)
-            safe_width = min(120, max(80, self.screen_width))  # 최소 80, 최대 120자
-            
+            safe_width = min(120, max(60, self.screen_width))  # 최소 60, 최대 120자
+            safe_height = min(60, max(30, self.screen_height))  # 최소 30, 최대 60줄
+
             # 화면 클리어 (한 번만)
             os.system('cls' if os.name == 'nt' else 'clear')
             
@@ -2030,9 +2034,9 @@ class GameDisplay:
             
             # 던전 맵 표시 (개선된 크기)
             if hasattr(world, 'get_colored_map_display'):
-                # 맵 크기를 더 넓게 설정
-                map_width = min(50, safe_width - 10)  # 맵 너비 증가
-                map_height = 20  # 맵 높이 증가
+                # 맵 크기를 적절하게 설정
+                map_width = min(40, safe_width - 10)  # 맵 너비 축소 (50 -> 30)
+                map_height = min(28, safe_height - 22)  # 맵 높이: safe_height - 30과 28 중 최솟값
                 map_display = world.get_colored_map_display(map_width, map_height)
                 
                 if map_display and isinstance(map_display, list):
@@ -2048,47 +2052,143 @@ class GameDisplay:
             
             print()  # 맵과 파티 상태 사이 여백
             
-            # 파티 상태 표시 (간단한 버전)
+            # 메인 게임 화면의 파티 상태 정보 표시
             if party_manager and hasattr(party_manager, 'members'):
                 alive_members = [m for m in party_manager.members if m.is_alive]
                 if alive_members:
-                    print(f"👥 파티원 ({len(alive_members)}/{len(party_manager.members)}명 생존)")
-                    for i, member in enumerate(alive_members[:4], 1):  # 최대 4명만
-                        hp_percent = int((member.current_hp / member.limited_max_hp) * 100) if member.limited_max_hp > 0 else 0
-                        mp_percent = int((member.current_mp / member.max_mp) * 100) if member.max_mp > 0 else 0
+                    # 파티 상태 정보
+                    alive_count = len(party_manager.get_alive_members())
+                    total_count = len(party_manager.members)
+                    
+                    party_info = f"파티: {alive_count}/{total_count}명 생존 | 층: {world.current_level}"
+                    
+                    # 골드 정보 안전하게 표시
+                    try:
+                        gold_info = f" | 골드: {party_manager.party_gold}G"
+                    except Exception:
+                        gold_info = " | 골드: 0G"
+                    
+                    # 가방 정보 안전하게 표시
+                    try:
+                        if cooking_system:
+                            total_weight = cooking_system.get_total_inventory_weight()
+                            max_weight = cooking_system.get_max_inventory_weight()
+                            weight_info = f" | 가방: {total_weight:.1f}/{max_weight:.1f}kg"
+                        else:
+                            weight_info = ""
+                    except Exception:
+                        weight_info = ""
+                    
+                    print(f"  {party_info}{gold_info}{weight_info}")
+                    print("+" + "-" * (safe_width - 10) + "+")
+                    
+                    # 파티원 상태 표시 (최대 4명)
+                    for member in party_manager.members[:4]:
+                        if member.is_alive:
+                            # HP/MP 비율 계산
+                            hp_ratio = member.current_hp / member.max_hp if member.max_hp > 0 else 0
+                            mp_ratio = member.current_mp / member.max_mp if member.max_mp > 0 else 0
+                            
+                            # HP 색상 결정
+                            if hp_ratio >= 0.8:
+                                hp_color = bright_green; hp_emoji = "💚"
+                            elif hp_ratio >= 0.6:
+                                hp_color = green; hp_emoji = "💛"
+                            elif hp_ratio >= 0.4:
+                                hp_color = yellow; hp_emoji = "🧡"
+                            elif hp_ratio >= 0.2:
+                                hp_color = bright_red; hp_emoji = "❤️"
+                            else:
+                                hp_color = red; hp_emoji = "💔"
+                            
+                            mp_color = bright_cyan if mp_ratio >= 0.8 else cyan
+                            mp_emoji = "💙"
+                            
+                            # 직업 이모지
+                            class_emoji = {
+                                    "전사": "⚔️", "마법사": "🔮", "도둑": "🗡️", "성직자": "✨",
+                                    "궁수": "🏹", "사무라이": "🗾", "드루이드": "🌿", "정령술사": "💫",
+                                    "네크로맨서": "💀", "팔라딘": "🛡️", "어쌔신": "🥷", "바드": "🎵",
+                                    "성기사": "🛡️", "암흑기사": "🖤", "몽크": "👊", "용기사": "🐉",
+                                    "검성": "⚡", "암살자": "🗡️", "기계공학자": "🔧", "무당": "🔯",
+                                    "해적": "☠️", "철학자": "📚", "시간술사": "⏰", "연금술사": "⚗️",
+                                    "검투사": "🏟️", "기사": "🐎", "신관": "⛪", "마검사": "🌟",
+                                    "차원술사": "🌀", "광전사": "😤"
+                            }.get(member.character_class, "👤")
+                            
+                            name_class = f"{class_emoji} {member.name[:10]:10} ({member.character_class[:8]:8})"
+                            hp_text = f"{hp_emoji}HP:{hp_color(f'{member.current_hp:3}/{member.max_hp:3}')}"
+                            mp_text = f"{mp_emoji}MP:{mp_color(f'{member.current_mp:2}/{member.max_mp:2}')}"
+                            print(f"    {name_class} {hp_text} {mp_text}")
+                        else:
+                            name_class = f"💀 {member.name[:10]:10} ({member.character_class[:8]:8})"
+                            print(f"    {name_class} {red('사망')}")
+
+                    print("+" + "-" * (safe_width - 10) + "+")
+                    print()
+                    print(f"🎮 조작키 | WASD:이동 | I:인벤토리 | F:스킬 | P:파티 | H:도움말")
+                    print()
+                    
+                    # 게임 정보 표시
+                    try:
+                        print(f"📊 {bright_cyan('게임 정보')}")
                         
-                        # 상태 색상
-                        hp_color = bright_green if hp_percent >= 70 else yellow if hp_percent >= 30 else red
-                        mp_color = bright_cyan if mp_percent >= 50 else yellow
+                        # 파티 전투력 계산
+                        alive_members = party_manager.get_alive_members()
+                        if alive_members:
+                            combat_powers = [calculate_combat_power(char) for char in alive_members]
+                            avg_combat_power = sum(combat_powers) // len(combat_powers)
+                            
+                            # 전투력 색상 평가
+                            expected_power = world.current_level * 15
+                            if avg_combat_power >= expected_power * 1.2:
+                                power_status = green("강력함 💪")
+                            elif avg_combat_power >= expected_power:
+                                power_status = yellow("적정함 ⚖️")
+                            elif avg_combat_power >= expected_power * 0.8:
+                                power_status = yellow("약함 ⚠️")
+                            else:
+                                power_status = red("위험함 💀")
+                        else:
+                            avg_combat_power = 0
+                            power_status = red("파티 전멸")
                         
-                        print(f"  [{i}] {member.name} ({member.character_class}) - HP: {hp_color(f'{hp_percent}%')} | MP: {mp_color(f'{mp_percent}%')}")
+                        total_gold = sum(getattr(char, 'gold', 0) for char in party_manager.members)
+                        print(f"│ 파티: {alive_count}/{len(party_manager.members)}명 생존 | 전투력: {avg_combat_power} ({power_status}) | 골드: {total_gold}")
+                        
+                        # AI 추천 행동 (로-바트)
+                        ai_recommendation = get_ai_recommendation(party_manager, world)
+                        print(f"│   로-바트: {ai_recommendation}")
+                        
+                        # 진행도
+                        progress = min(100, (world.current_level / 10) * 100)
+                        progress_bar = "█" * int(progress // 10) + "░" * (10 - int(progress // 10))
+                        print(f"│ 진행도: [{progress_bar}] {progress:.1f}%")
+                        
+                        # 위치 정보
+                        if hasattr(world, 'player_pos') and world.player_pos:
+                            pos_x, pos_y = world.player_pos
+                            print(f"📍 위치: ({pos_x}, {pos_y}) | 🗺️ 층: {world.current_level} | 🎯 목표: 계단 찾아 다음 층으로!")
+                        
+                    except Exception as e:
+                        print(f"│ 게임 정보 표시 오류: {e}")
+                    
+                    # 메시지 버퍼 표시
+                    if hasattr(world, 'game') and world.game and hasattr(world.game, 'get_recent_messages'):
+                        try:
+                            messages = world.game.get_recent_messages()
+                            if messages:
+                                print("\n📢 최근 상황:")
+                                for message in messages[-2:]:  # 최근 2개 메시지만 표시
+                                    print(f"  {message}")
+                        except:
+                            pass
+                else:
+                    print(f"💀 파티 전멸")
+            else:
+                print("❌ 파티 정보 없음")
             
             print()  # 여백
-            
-            # 게임 정보 표시
-            if hasattr(world, 'player_pos'):
-                x, y = world.player_pos
-                print(f"📍 현재 위치: ({x}, {y})")
-            
-            # 층수별 정보
-            if world.current_level == 1:
-                print(f"🎯 목표: 계단을 찾아 다음 층으로!")
-            elif world.current_level % 10 == 0:
-                print(f"🔥 보스층! 강력한 적이 기다립니다")
-            elif world.current_level % 5 == 0:
-                print(f"💎 특수층: 귀중한 보상 획득 기회")
-            else:
-                print(f"⬇️ 계단을 찾아 {world.current_level + 1}층으로 이동")
-            
-            # 게임 메시지 표시
-            if hasattr(world, 'game') and world.game and hasattr(world.game, 'message_buffer'):
-                messages = world.game.get_recent_messages()
-                if messages:
-                    print("\n📢 최근 상황:")
-                    for message in messages[-3:]:  # 최근 3개 메시지만 표시
-                        print(f"  {message}")
-            
-            print(f"\n🎮 {bright_yellow('H:도움말')} | WASD:이동 | I:인벤토리 | Q:메뉴")
             
         except Exception as e:
             # 최종 폴백: 최소한의 정보
@@ -2105,201 +2205,25 @@ class GameDisplay:
         print(bright_cyan("="*90, True))
         
         for i, member in enumerate(party_manager.members, 1):
-            # 직업별 이모지
+            # 직업 이모지
             class_emoji = {
-                # 기본 직업
-                "전사": "⚔️", "마법사": "🔮", "도둑": "🗡️", "성직자": "✨",
-                "궁수": "🏹", "사무라이": "🗾", "드루이드": "🌿", "정령술사": "💫",
-                "네크로맨서": "💀", "팔라딘": "🛡️", "어쌔신": "🥷", "바드": "🎵",
-                
-                # 확장 직업
-                "성기사": "🛡️", "암흑기사": "🖤", "몽크": "👊", "용기사": "🐉",
-                "검성": "⚡", "암살자": "🗡️", "기계공학자": "🔧", "무당": "🔯",
-                "해적": "☠️", "철학자": "📚", "시간술사": "⏰", "연금술사": "⚗️",
-                "검투사": "🏟️", "기사": "🐎", "신관": "⛪", "마검사": "🌟",
-                "차원술사": "🌀", "시인": "📜", "학자": "🎓", "상인": "💰",
-                "광전사": "😤", "무희": "💃", "점성술사": "🔮", "영매": "👻",
-                "흑기사": "⚫", "현자": "🧙"
+                "전사": "⚔️", "아크메이지": "🔮", "성기사": "�️", "바드": "🎵",
+                "궁수": "🏹", "도적": "�️", "암살자": "🥷", "몽크": "👊"
             }.get(member.character_class, "👤")
             
-            # 생존 상태에 따른 표시
             if member.is_alive:
-                print(f"\n[{bright_yellow(str(i))}] {class_emoji} {bright_white(member.name)} - {green(member.character_class)}")
-                
-                # HP/MP 비율과 색상
+                # HP/MP 간단 표시
                 hp_ratio = member.current_hp / member.max_hp if member.max_hp > 0 else 0
                 mp_ratio = member.current_mp / member.max_mp if member.max_mp > 0 else 0
                 
-                # HP 상태
-                if hp_ratio >= 0.8:
-                    hp_display = f"💚 HP {bright_green(f'{member.current_hp}/{member.max_hp}')}"
-                elif hp_ratio >= 0.6:
-                    hp_display = f"💛 HP {yellow(f'{member.current_hp}/{member.max_hp}')}"
-                elif hp_ratio >= 0.4:
-                    hp_display = f"🧡 HP {yellow(f'{member.current_hp}/{member.max_hp}')}"
-                elif hp_ratio >= 0.2:
-                    hp_display = f"❤️ HP {bright_red(f'{member.current_hp}/{member.max_hp}')}"
-                else:
-                    hp_display = f"💔 HP {red(f'{member.current_hp}/{member.max_hp}')}"
+                hp_color = bright_green if hp_ratio >= 0.8 else yellow if hp_ratio >= 0.5 else red
+                mp_color = bright_cyan if mp_ratio >= 0.8 else cyan if mp_ratio >= 0.5 else yellow
                 
-                # MP 색상과 이모지 계산
-                if mp_ratio >= 0.8:
-                    mp_display = f"💙 MP {bright_cyan(f'{member.current_mp}/{member.max_mp}')}"
-                elif mp_ratio >= 0.6:
-                    mp_display = f"💙 MP {cyan(f'{member.current_mp}/{member.max_mp}')}"
-                elif mp_ratio >= 0.4:
-                    mp_display = f"💙 MP {blue(f'{member.current_mp}/{member.max_mp}')}"
-                elif mp_ratio >= 0.2:
-                    mp_display = f"💜 MP {magenta(f'{member.current_mp}/{member.max_mp}')}"
-                else:
-                    mp_display = f"❤️ MP {red(f'{member.current_mp}/{member.max_mp}')}"
-                
-                print(f"    HP: {hp_display}  |  MP: {mp_display}")
-                
-                # 전투력 표시
-                combat_power = calculate_combat_power(member)
-                level_power = member.level * 15  # 레벨 기준 권장 전투력
-                
-                if combat_power >= level_power * 1.2:
-                    power_color = green(f"전투력: {combat_power} 💪")
-                elif combat_power >= level_power:
-                    power_color = yellow(f"전투력: {combat_power} ⚖️")
-                elif combat_power >= level_power * 0.8:
-                    power_color = yellow(f"전투력: {combat_power} ⚠️")
-                else:
-                    power_color = red(f"전투력: {combat_power} 💀")
-                
-                print(f"    레벨: {bright_white(str(member.level))}  |  {power_color}")
-                
-                # 상처 정보
-                if hasattr(member, 'wounds') and member.wounds > 0:
-                    wounds_ratio = member.wounds / member.max_hp if member.max_hp > 0 else 0
-                    if wounds_ratio >= 0.5:
-                        wound_color = red(f"🩸 WOUND: {member.wounds} (심각)")
-                    elif wounds_ratio >= 0.3:
-                        wound_color = yellow(f"🩸 WOUND: {member.wounds} (보통)")
-                    else:
-                        wound_color = white(f"🩸 WOUND: {member.wounds} (경미)")
-                    print(f"    {wound_color}")
+                print(f"{i}. {class_emoji} {member.name} ({member.character_class}) Lv.{member.level}")
+                print(f"   HP: {hp_color(f'{member.current_hp}/{member.max_hp}')} | "
+                      f"MP: {mp_color(f'{member.current_mp}/{member.max_mp}')}")
             else:
-                print(f"\n[{bright_yellow(str(i))}] {class_emoji} {red(member.name)} - {red(member.character_class)} {red('💀 사망')}")
-            
-            # 상세 정보 (색상 적용)
-            atk_color = bright_green if member.physical_attack >= 50 else green if member.physical_attack >= 30 else white
-            def_color = bright_blue if member.physical_defense >= 50 else blue if member.physical_defense >= 30 else white
-            mag_atk_color = bright_magenta if member.magic_attack >= 50 else magenta if member.magic_attack >= 30 else white
-            mag_def_color = bright_cyan if member.magic_defense >= 50 else cyan if member.magic_defense >= 30 else white
-            
-            print(f"    ⚔️ 물리: ATK {atk_color(str(member.physical_attack))} / DEF {def_color(str(member.physical_defense))} | "
-                  f"🔮 마법: ATK {mag_atk_color(str(member.magic_attack))} / DEF {mag_def_color(str(member.magic_defense))} | "
-                  f"✨ 경험치: {bright_yellow(str(member.experience))}")
-            
-            # 통합 인벤토리 정보 (첫 번째 멤버에게만 표시)
-            if i == 1 and hasattr(party_manager, 'shared_inventory'):
-                current_weight = party_manager.get_current_carry_weight()
-                max_weight = party_manager.get_total_carry_capacity()
-                weight_ratio = current_weight / max_weight if max_weight > 0 else 0
-                
-                if weight_ratio >= 0.9:
-                    weight_display = f"🧳 {red(f'{current_weight:.1f}/{max_weight:.1f}kg')} {red('과부하!')}"
-                elif weight_ratio >= 0.7:
-                    weight_display = f"🎒 {yellow(f'{current_weight:.1f}/{max_weight:.1f}kg')} {yellow('무거움')}"
-                else:
-                    weight_display = f"🎒 {green(f'{current_weight:.1f}/{max_weight:.1f}kg')} {green('양호')}"
-                
-                item_count = len(party_manager.shared_inventory.items) if hasattr(party_manager.shared_inventory, 'items') else 0
-                print(f"    💼 파티 인벤토리: {weight_display} | 📦 아이템: {bright_cyan(str(item_count))}개")
-                  
-            # 특성 정보
-            if hasattr(member, 'active_traits') and member.active_traits:
-                print(f"    🌟 특성:")
-                for trait in member.active_traits[:3]:  # 최대 3개까지 표시
-                    if hasattr(trait, 'name') and hasattr(trait, 'description'):
-                        # 특성 이름을 청록색으로, 설명을 흰색으로 표시
-                        print(f"      • {bright_cyan(trait.name)}: {white(trait.description)}")
-                    elif hasattr(trait, 'name'):
-                        print(f"      • {bright_cyan(trait.name)}")
-                    else:
-                        print(f"      • {white(str(trait))}")
-                
-                # 3개 초과시 추가 특성 개수 표시
-                if len(member.active_traits) > 3:
-                    remaining = len(member.active_traits) - 3
-                    print(f"      {bright_black(f'... 외 {remaining}개 특성 보유')}")
-                
-            # HP 상태 세부사항
-            if member.is_alive:
-                hp_percentage = (member.current_hp / member.limited_max_hp * 100) if member.limited_max_hp > 0 else 0
-                wound_percentage = (member.wounds / member.max_hp * 100) if member.max_hp > 0 else 0
-                
-                if hp_percentage >= 80:
-                    hp_status = bright_green(f"{hp_percentage:.1f}%")
-                elif hp_percentage >= 60:
-                    hp_status = yellow(f"{hp_percentage:.1f}%")
-                elif hp_percentage >= 40:
-                    hp_status = yellow(f"{hp_percentage:.1f}%")
-                else:
-                    hp_status = bright_red(f"{hp_percentage:.1f}%")
-                
-                print(f"    💗 HP 상태: {hp_status}", end="")
-                
-                if member.wounds > 0:
-                    if wound_percentage >= 50:
-                        wound_status = red(f" | 🩸 중상: {wound_percentage:.1f}%")
-                    elif wound_percentage >= 30:
-                        wound_status = yellow(f" | 🩸 경상: {wound_percentage:.1f}%")
-                    else:
-                        wound_status = bright_red(f" | 🩸 상처: {wound_percentage:.1f}%")
-
-                    print(wound_status)
-                    print(f"      상처로 인한 최대 HP 감소: {red(str(member.wounds))} ({member.max_hp} → {bright_red(str(member.limited_max_hp))})")
-                else:
-                    print(f" | 🌟 {bright_green('상처 없음')}")
-                
-        # === 고급 AI 파티 분석 (쉬움/보통 난이도만) ===
-        try:
-            world_difficulty = getattr(party_manager, 'world_difficulty', '쉬움')  # 임시로 쉬움 설정
-            if world_difficulty not in ['어려움', '지옥', 'HARD', 'NIGHTMARE']:
-                print(f"\n{bright_cyan('� 로-바트 파티 분석 (내가 직접 해봤어!)', True)}")
-                print(bright_cyan("="*90, True))
-                
-                # 장비 분석 (로-바트 전문 분야)
-                equipment_analysis = analyze_equipment_deficiencies(party_manager.get_alive_members())
-                if equipment_analysis:
-                    print(f"🤖 장비: {yellow(equipment_analysis + ' (로-바트 진단 완료!)')}")
-                else:
-                    print(f"🤖 장비: {green('최적 상태 (역시 내 눈이 정확해!)')}")
-                
-                # 요리/재료 분석 (로-바트는 요리도 잘해!)
-                cooking_analysis = analyze_cooking_materials(party_manager, None)
-                if cooking_analysis:
-                    print(f"🍳 요리: {yellow(cooking_analysis + ' (로-바트 요리 팁!)')}")
-                else:
-                    print(f"🍳 요리: {green('재료 충분 (로-바트 승인!)')}")
-                
-                # 스킬/MP 분석 (로-바트 계산)
-                skill_analysis = analyze_skill_usage(party_manager.get_alive_members())
-                if skill_analysis:
-                    print(f"✨ 스킬: {yellow(skill_analysis + ' (로-바트 관찰 결과)')}")
-                else:
-                    print(f"✨ 스킬: {green('MP 상태 양호 (로-바트 확인 완료!)')}")
-                
-                # 전투력 분석
-                alive_members = party_manager.get_alive_members()
-                if alive_members:
-                    combat_powers = [calculate_combat_power(char) for char in alive_members]
-                    avg_power = sum(combat_powers) // len(combat_powers)
-                    weakest = min(alive_members, key=lambda x: calculate_combat_power(x))
-                    strongest = max(alive_members, key=lambda x: calculate_combat_power(x))
-                    
-                    print(f"⚔️ 로-바트 전투력 측정: 평균 {bright_white(str(avg_power))} | 최강: {green(strongest.name + ' (짱!)')} | 최약: {red(weakest.name + ' (분발!)')}")
-                
-                print(bright_cyan("="*90, True))
-            else:
-                print(f"\n{bright_red('🚫 고난이도라서 로-바트 분석 비활성화 (너무 어려워!)', True)}")
-                
-        except Exception as e:
-            print(f"\n{red('로-바트 분석 오류:')} {e} (어? 뭔가 이상한데?)")
+                print(f"{i}. {class_emoji} {red(member.name)} - {red('사망')}")
         
         print("\n" + bright_cyan("="*90, True))
         input(bright_white("Enter 키를 눌러 계속...", True))

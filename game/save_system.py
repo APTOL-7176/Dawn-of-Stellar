@@ -1215,6 +1215,8 @@ class GameStateSerializer:
                 'party_gold': getattr(game.party_manager, 'party_gold', 0),
                 'party_shared_inventory': shared_inventory_data,
                 'party_total_steps': getattr(game.party_manager, 'total_steps', 0),
+                'party_passive_effects': getattr(game, 'party_passive_effects', []),
+                'passive_states': getattr(game, 'passive_states', {}),
                 'world_state': {
                     'current_level': game.world.current_level,
                     'enemies_positions': getattr(game.world, 'enemies_positions', {}),

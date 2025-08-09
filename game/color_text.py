@@ -183,6 +183,12 @@ def bright_cyan(text: str, bold: bool = False) -> str:
 def bright_blue(text: str, bold: bool = False) -> str:
     return colored(text, Color.BRIGHT_BLUE, bold)
 
+def dim(text: str) -> str:
+    """어두운 (dim) 텍스트"""
+    if not ColorText.is_color_supported():
+        return text
+    return f"{Color.DIM.value}{text}{Color.RESET.value}"
+
 def bright_magenta(text: str, bold: bool = False) -> str:
     return colored(text, Color.BRIGHT_MAGENTA, bold)
 

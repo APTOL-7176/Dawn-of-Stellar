@@ -1589,8 +1589,9 @@ def main():
                 if audio:
                     audio.play_sfx('confirm')
                 run_exe_game(audio)
-                if audio:
-                    audio.play_bgm(fade_in=True)
+                # 게임 시작 후 런처 종료
+                print("👋 런처를 종료합니다.")
+                sys.exit(0)
             
             elif choice == "2":
                 # Python 게임 시작 - 모드 선택
@@ -1602,7 +1603,10 @@ def main():
                         audio.fade_out_bgm()
                     time.sleep(1)
                     run_game_in_new_process("normal", dev_mode=dev_mode)
-                # 게임 종료 후 BGM 재시작
+                    # 게임 시작 후 런처 종료
+                    print("👋 런처를 종료합니다.")
+                    sys.exit(0)
+                # 취소한 경우에만 BGM 재시작
                 if audio:
                     audio.play_bgm(fade_in=True)
             
@@ -1611,16 +1615,18 @@ def main():
                     audio.play_sfx('confirm')
                     audio.fade_out_bgm()
                 run_flutter_app()
-                if audio:
-                    audio.play_bgm(fade_in=True)
+                # Flutter 앱 시작 후 런처 종료
+                print("👋 런처를 종료합니다.")
+                sys.exit(0)
             
             elif choice == "4":
                 if audio:
                     audio.play_sfx('confirm')
                     audio.fade_out_bgm()
                 build_game()
-                if audio:
-                    audio.play_bgm(fade_in=True)
+                # 빌드 완료 후 런처 종료
+                print("👋 런처를 종료합니다.")
+                sys.exit(0)
             
             elif choice == "5":
                 if audio:

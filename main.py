@@ -434,6 +434,7 @@ class DawnOfStellarGame:
         self.world.game = self
         
         self.party_passive_effects = []  # 파티 패시브 효과 저장
+        self.passive_states = {}  # 패시브 효과 상태 추적 (스택, 사용 횟수 등)
         self.current_floor = 1  # 현재 층 정보 추가
         
         # 필드 자동 회복 시스템을 위한 걸음 수 추적
@@ -1453,21 +1454,21 @@ class DawnOfStellarGame:
             
             # 🌟 완전 리메이크된 창의적 패시브 시스템 (1-10 코스트, 최대 6개 제한)
             all_passive_effects = [
-                # === 1코스트 패시브 (기초 효과) ===
+                # === 1코스트 패시브 (기초 생존) ===
                 {
-                    "name": "첫걸음의 용기", 
-                    "description": "모든 능력치 고정 +8 (물리공격, 마법공격, 방어력, 마법방어력, 스피드)",
-                    "effect_type": "permanent_stats_boost",
-                    "effect_value": {"all_stats": 8},
+                    "name": "생명의 씨앗", 
+                    "description": "20걸음당 HP 2% 회복, 상처 1% 치료",
+                    "effect_type": "life_seed",
+                    "effect_value": {"hp_regen_per_turn": 0.02, "wound_heal_per_turn": 0.01},
                     "cost": 1,
                     "unlock_cost": 0,
                     "rarity": "common"
                 },
                 {
-                    "name": "미니멀리스트", 
-                    "description": "인벤토리 50% 이하일 때 SPD +15%, 회피율 +10%",
-                    "effect_type": "minimalist",
-                    "effect_value": {"speed_bonus": 0.15, "dodge_bonus": 0.10, "inventory_threshold": 0.50},
+                    "name": "굳건한 의지", 
+                    "description": "HP 50% 이하일 때 상태이상 저항 +15%",
+                    "effect_type": "strong_will",
+                    "effect_value": {"status_resist": 0.15, "hp_threshold": 0.50},
                     "cost": 1,
                     "unlock_cost": 0,
                     "rarity": "common"
@@ -1491,169 +1492,223 @@ class DawnOfStellarGame:
                     "rarity": "common"
                 },
                 {
-                    "name": "행운의 동전", 
-                    "description": "골드 습득 시 10% 확률로 2배",
-                    "effect_type": "lucky_coin",
-                    "effect_value": {"double_chance": 0.10},
+                    "name": "행운의 발견", 
+                    "description": "숨겨진 아이템 발견 시 25% 확률로 추가 아이템 1개",
+                    "effect_type": "lucky_find",
+                    "effect_value": {"extra_item_chance": 0.25},
+                    "cost": 1,
+                    "unlock_cost": 0,
+                    "rarity": "common"
+                },
+                {
+                    "name": "걸음마다 힘", 
+                    "description": "100걸음마다 다음 공격 데미지 +15% (5회 중첩)",
+                    "effect_type": "step_power",
+                    "effect_value": {"damage_per_100steps": 0.15, "max_stacks": 5},
                     "cost": 1,
                     "unlock_cost": 0,
                     "rarity": "common"
                 },
                 
-                # === 2코스트 패시브 (응용 효과) ===
+                # === 2코스트 패시브 (응용 생존) ===
                 {
-                    "name": "역전의 명수", 
-                    "description": "HP 30% 이하일 때 크리티컬 확률 +30%, 피해 감소 +25%",
-                    "effect_type": "comeback_master",
-                    "effect_value": {"crit_bonus": 0.30, "damage_reduction": 0.25, "hp_threshold": 0.30},
+                    "name": "생명력 순환", 
+                    "description": "20걸음당 HP 4% 회복, MP 소모 시 HP도 1% 회복",
+                    "effect_type": "life_circulation",
+                    "effect_value": {"hp_regen_per_turn": 0.04, "mp_to_hp": 0.01},
+                    "cost": 2,
+                    "unlock_cost": 15,
+                    "rarity": "common"
+                },
+                {
+                    "name": "위기의 본능", 
+                    "description": "HP 30% 이하일 때 회피율 +30%, 다음 공격 크리티컬 확률 +25%",
+                    "effect_type": "crisis_instinct",
+                    "effect_value": {"dodge_bonus": 0.30, "crit_bonus": 0.25, "hp_threshold": 0.30},
+                    "cost": 2,
+                    "unlock_cost": 20,
+                    "rarity": "common"
+                },
+                {
+                    "name": "혈액 재생", 
+                    "description": "적 처치 시 HP 6% 회복, 상처 3% 치료",
+                    "effect_type": "blood_regen",
+                    "effect_value": {"hp_restore": 0.06, "wound_heal": 0.03},
+                    "cost": 2,
+                    "unlock_cost": 25,
+                    "rarity": "common"
+                },
+                {
+                    "name": "모험가의 감각", 
+                    "description": "함정 감지 +40%, 함정 무력화 시 MP 5% 회복",
+                    "effect_type": "adventurer_sense",
+                    "effect_value": {"trap_detect": 0.40, "trap_mp_restore": 0.05},
                     "cost": 2,
                     "unlock_cost": 0,
                     "rarity": "common"
                 },
                 {
-                    "name": "모험가의 직감", 
-                    "description": "숨겨진 문 발견율 +40%, 함정 감지 +25%",
-                    "effect_type": "adventurer_instinct",
-                    "effect_value": {"secret_find": 0.40, "trap_detect": 0.25},
-                    "cost": 2,
-                    "unlock_cost": 0,
-                    "rarity": "common"
-                },
-                {
-                    "name": "연쇄 반응", 
-                    "description": "크리티컬 히트 시 다음 공격 데미지 +20% (3회 중첩)",
-                    "effect_type": "chain_reaction",
-                    "effect_value": {"damage_boost": 0.20, "max_stacks": 3},
-                    "cost": 2,
-                    "unlock_cost": 0,
-                    "rarity": "common"
-                },
-                {
-                    "name": "수집가의 눈", 
-                    "description": "레어 아이템 발견율 +20%, 중복 아이템 시 골드 보너스 +50%",
-                    "effect_type": "collector_eye",
-                    "effect_value": {"rare_find": 0.20, "duplicate_bonus": 0.50},
-                    "cost": 2,
-                    "unlock_cost": 0,
-                    "rarity": "common"
-                },
-                {
-                    "name": "일사천리", 
-                    "description": "같은 스킬 연속 사용 시 MP 소모 -10% (최대 -50%)",
-                    "effect_type": "momentum",
-                    "effect_value": {"mp_reduction": 0.10, "max_reduction": 0.50},
+                    "name": "연쇄 치유", 
+                    "description": "아군 치유 시 자신도 치유량의 15% 회복",
+                    "effect_type": "chain_heal",
+                    "effect_value": {"heal_share": 0.15},
                     "cost": 2,
                     "unlock_cost": 30,
+                    "rarity": "common"
+                },
+                {
+                    "name": "파괴의 충동", 
+                    "description": "크리티컬 히트 시 다음 3턴간 공격력 +8% (중첩 가능)",
+                    "effect_type": "destruction_urge",
+                    "effect_value": {"damage_boost": 0.08, "duration": 3, "max_stacks": 10},
+                    "cost": 2,
+                    "unlock_cost": 35,
                     "rarity": "uncommon"
                 },
                 {
-                    "name": "위기 대응", 
-                    "description": "상태이상 걸릴 때 즉시 HP 15% 회복",
-                    "effect_type": "crisis_response",
-                    "effect_value": {"heal_percent": 0.15},
+                    "name": "수집의 달인", 
+                    "description": "같은 타입 아이템 보유 시 효과 +20% (최대 3개)",
+                    "effect_type": "collection_master",
+                    "effect_value": {"effect_bonus_per_item": 0.20, "max_items": 3},
+                    "cost": 2,
+                    "unlock_cost": 0,
+                    "rarity": "common"
+                },
+                {
+                    "name": "정신 집중", 
+                    "description": "같은 스킬 연속 사용 시 MP 소모 -8% (최대 -40%)",
+                    "effect_type": "mental_focus",
+                    "effect_value": {"mp_reduction": 0.08, "max_reduction": 0.40},
                     "cost": 2,
                     "unlock_cost": 40,
-                    "rarity": "uncommon"
-                },
-                {
-                    "name": "최후의 방어막", 
-                    "description": "HP 30% 이하일 때 받는 피해 40% 감소, 보호막 생성",
-                    "effect_type": "last_defense",
-                    "effect_value": {"damage_reduction": 0.40, "hp_threshold": 0.30, "shield_bonus": True},
-                    "cost": 3,
-                    "unlock_cost": 50,
                     "rarity": "uncommon"
                 },
                 
                 # === 3코스트 패시브 (전략적 효과) ===
                 {
-                    "name": "완벽주의자", 
-                    "description": "풀 HP/MP일 때 모든 행동 효과 +25%",
-                    "effect_type": "perfectionist",
-                    "effect_value": {"effect_boost": 0.25},
+                    "name": "자연의 축복", 
+                    "description": "20걸음당 HP 6% 회복, MP 4% 회복, 독/화상 면역",
+                    "effect_type": "nature_blessing",
+                    "effect_value": {"hp_regen_per_turn": 0.06, "mp_regen_per_turn": 0.04, "poison_immune": True, "burn_immune": True},
                     "cost": 3,
                     "unlock_cost": 50,
                     "rarity": "uncommon"
                 },
                 {
-                    "name": "도박꾼의 심리", 
-                    "description": "공격/스킬 사용 시 10% 확률로 2배 효과, 5% 확률로 실패",
-                    "effect_type": "gambler_mind",
-                    "effect_value": {"double_chance": 0.10, "fail_chance": 0.05},
+                    "name": "영혼의 치유사", 
+                    "description": "20걸음당 HP 8% 회복, 상처 4% 치료, 아군 죽음 시 즉시 HP 15% 회복",
+                    "effect_type": "soul_healer",
+                    "effect_value": {"hp_regen_per_turn": 0.08, "wound_heal_per_turn": 0.04, "death_heal": 0.15},
                     "cost": 3,
                     "unlock_cost": 60,
                     "rarity": "uncommon"
                 },
                 {
-                    "name": "시너지 마스터", 
-                    "description": "파티원과 같은 타겟 공격 시 데미지 +35%",
-                    "effect_type": "synergy_master",
-                    "effect_value": {"synergy_damage": 0.35},
+                    "name": "전투 재생", 
+                    "description": "전투 중 매 턴 HP 5% 회복, 스킬 사용 시 HP 2% 추가 회복",
+                    "effect_type": "combat_regeneration",
+                    "effect_value": {"combat_regen": 0.05, "skill_heal": 0.02},
+                    "cost": 3,
+                    "unlock_cost": 65,
+                    "rarity": "uncommon"
+                },
+                {
+                    "name": "생존 본능", 
+                    "description": "HP 15% 이하일 때 치명상 받을 시 즉시 HP 15% 회복, 1턴간 피해 -20% (층당 1회)",
+                    "effect_type": "survival_instinct",
+                    "effect_value": {"emergency_heal": 0.15, "damage_reduction": 0.20, "duration": 1, "hp_threshold": 0.15, "uses_per_floor": 1},
                     "cost": 3,
                     "unlock_cost": 70,
                     "rarity": "uncommon"
                 },
                 {
-                    "name": "변화의 달인", 
-                    "description": "매 5턴마다 랜덤 능력치 +50% (1턴 지속)",
-                    "effect_type": "change_master",
-                    "effect_value": {"stat_boost": 0.50, "interval": 5, "duration": 1},
+                    "name": "공격적 치유", 
+                    "description": "적에게 피해를 줄 때마다 피해량의 12% HP 회복",
+                    "effect_type": "aggressive_healing",
+                    "effect_value": {"damage_to_heal": 0.12},
                     "cost": 3,
-                    "unlock_cost": 80,
+                    "unlock_cost": 65,
                     "rarity": "uncommon"
                 },
                 {
-                    "name": "역학 관계", 
-                    "description": "아군이 죽을 때마다 생존 파티원 모든 능력치 +10% (최대 +30%)",
-                    "effect_type": "dynamic_relationship",
-                    "effect_value": {"stat_per_death": 0.10, "max_bonus": 0.30},
+                    "name": "운명의 도박", 
+                    "description": "공격 시 15% 확률로 2배 데미지, 5% 확률로 실패",
+                    "effect_type": "fate_gamble",
+                    "effect_value": {"double_chance": 0.15, "fail_chance": 0.05},
                     "cost": 3,
-                    "unlock_cost": 90,
+                    "unlock_cost": 75,
+                    "rarity": "uncommon"
+                },
+                {
+                    "name": "시너지 증폭", 
+                    "description": "파티원 수만큼 모든 능력치 +6% (최대 +18%)",
+                    "effect_type": "synergy_amplify",
+                    "effect_value": {"stat_per_member": 0.06, "max_members": 3},
+                    "cost": 3,
+                    "unlock_cost": 80,
                     "rarity": "uncommon"
                 },
                 
                 # === 4코스트 패시브 (전문가 효과) ===
                 {
-                    "name": "뱀파이어 본능", 
-                    "description": "적 처치 시 최대 HP의 15% 회복, 상처도 10% 치료",
-                    "effect_type": "vampire_instinct",
-                    "effect_value": {"hp_restore": 0.15, "wound_heal": 0.10},
+                    "name": "전투 치유술", 
+                    "description": "20걸음당 HP 8% 회복, 상처 3% 치료, 전투 시작 시 즉시 HP 10% 회복",
+                    "effect_type": "combat_healing_art",
+                    "effect_value": {"hp_regen_per_turn": 0.08, "wound_heal_per_turn": 0.03, "battle_start_heal": 0.10},
                     "cost": 4,
                     "unlock_cost": 100,
                     "rarity": "rare"
                 },
                 {
-                    "name": "카멜레온 적응", 
-                    "description": "전투마다 적의 속성에 저항 +40%, 약점 속성은 데미지 +30%",
-                    "effect_type": "chameleon_adapt",
-                    "effect_value": {"resist_bonus": 0.40, "weakness_damage": 0.30},
-                    "cost": 4,
-                    "unlock_cost": 120,
-                    "rarity": "rare"
-                },
-                {
-                    "name": "기계적 정밀", 
-                    "description": "연속 공격 시 명중률과 크리티컬 +10% (최대 50%)",
-                    "effect_type": "mechanical_precision",
-                    "effect_value": {"accuracy_per_hit": 0.10, "crit_per_hit": 0.10, "max_bonus": 0.50},
+                    "name": "흡혈 본능", 
+                    "description": "모든 공격에 생명력 흡수 18% 추가, 크리티컬 시 30%",
+                    "effect_type": "vampiric_instinct",
+                    "effect_value": {"normal_drain": 0.18, "crit_drain": 0.30},
                     "cost": 4,
                     "unlock_cost": 110,
                     "rarity": "rare"
                 },
                 {
-                    "name": "원소 순환", 
-                    "description": "서로 다른 속성 스킬 사용 시 다음 스킬 위력 +40%",
-                    "effect_type": "elemental_cycle",
-                    "effect_value": {"damage_bonus": 0.40},
+                    "name": "생명 공유", 
+                    "description": "HP 회복 시 주변 아군도 회복량의 20% 회복",
+                    "effect_type": "life_sharing",
+                    "effect_value": {"heal_share": 0.20},
+                    "cost": 4,
+                    "unlock_cost": 105,
+                    "rarity": "rare"
+                },
+                {
+                    "name": "적응 학습", 
+                    "description": "같은 적과 전투할 때마다 받는 피해 -8% (최대 -32%, 5번까지)",
+                    "effect_type": "adaptive_learning",
+                    "effect_value": {"damage_reduction_per_fight": 0.08, "max_reduction": 0.32, "max_encounters": 5},
+                    "cost": 4,
+                    "unlock_cost": 120,
+                    "rarity": "rare"
+                },
+                {
+                    "name": "완벽한 타이밍", 
+                    "description": "연속 명중 시 명중률과 크리티컬 +12% (최대 60%)",
+                    "effect_type": "perfect_timing",
+                    "effect_value": {"accuracy_per_hit": 0.12, "crit_per_hit": 0.12, "max_bonus": 0.60},
+                    "cost": 4,
+                    "unlock_cost": 115,
+                    "rarity": "rare"
+                },
+                {
+                    "name": "원소 마스터", 
+                    "description": "서로 다른 원소 스킬 사용 시 다음 스킬 위력 +50%",
+                    "effect_type": "elemental_mastery",
+                    "effect_value": {"damage_bonus": 0.50},
                     "cost": 4,
                     "unlock_cost": 130,
                     "rarity": "rare"
                 },
                 {
-                    "name": "보물 자석", 
-                    "description": "적 처치 후 2칸 내 숨겨진 아이템 자동 발견",
-                    "effect_type": "treasure_magnet",
-                    "effect_value": {"auto_find_range": 2},
+                    "name": "보물 탐지기", 
+                    "description": "적 처치 후 3칸 내 숨겨진 아이템 자동 발견 + 골드 +25%",
+                    "effect_type": "treasure_detector",
+                    "effect_value": {"auto_find_range": 3, "gold_bonus": 0.25},
                     "cost": 4,
                     "unlock_cost": 140,
                     "rarity": "rare"
@@ -1661,46 +1716,55 @@ class DawnOfStellarGame:
                 
                 # === 5코스트 패시브 (마스터 효과) ===
                 {
-                    "name": "분신술", 
-                    "description": "치명타 시 15% 확률로 즉시 한 번 더 행동",
-                    "effect_type": "shadow_clone",
-                    "effect_value": {"extra_action_chance": 0.15},
-                    "cost": 5,
-                    "unlock_cost": 150,
-                    "rarity": "rare"
-                },
-                {
-                    "name": "시공간 왜곡", 
-                    "description": "스킬 사용 시 30% 확률로 쿨다운 초기화",
-                    "effect_type": "spacetime_distort",
-                    "effect_value": {"cooldown_reset_chance": 0.30},
-                    "cost": 5,
-                    "unlock_cost": 170,
-                    "rarity": "epic"
-                },
-                {
-                    "name": "생명 순환", 
-                    "description": "아군 죽음 시 생존자들 최대 HP +10% (최대 +30%, 영구)",
-                    "effect_type": "life_cycle",
-                    "effect_value": {"hp_gain_per_death": 0.10, "max_bonus": 0.30},
+                    "name": "불멸의 재생력", 
+                    "description": "전투 종료 후 HP/MP가 30% 이하일 때 30%로 자동 회복",
+                    "effect_type": "immortal_regeneration",
+                    "effect_value": {"post_battle_threshold": 0.30, "restore_to": 0.30},
                     "cost": 5,
                     "unlock_cost": 160,
                     "rarity": "epic"
                 },
                 {
-                    "name": "운명 조작", 
-                    "description": "1% 확률 이벤트가 10%로, 10% 확률 이벤트가 20%로 증가",
-                    "effect_type": "fate_manipulation",
-                    "effect_value": {"low_prob_mult": 10, "high_prob_mult": 2},
+                    "name": "시간 조작자", 
+                    "description": "스킬 사용 시 35% 확률로 쿨다운 즉시 리셋",
+                    "effect_type": "time_manipulator",
+                    "effect_value": {"cooldown_reset_chance": 0.35},
+                    "cost": 5,
+                    "unlock_cost": 170,
+                    "rarity": "epic"
+                },
+                {
+                    "name": "분신술", 
+                    "description": "크리티컬 시 20% 확률로 즉시 한 번 더 행동",
+                    "effect_type": "shadow_clone",
+                    "effect_value": {"extra_action_chance": 0.20},
+                    "cost": 5,
+                    "unlock_cost": 150,
+                    "rarity": "epic"
+                },
+                {
+                    "name": "생명 순환", 
+                    "description": "아군 사망 시 생존자들 최대 HP +15% (최대 +45%, 영구)",
+                    "effect_type": "life_circulation_master",
+                    "effect_value": {"hp_gain_per_death": 0.15, "max_bonus": 0.45},
+                    "cost": 5,
+                    "unlock_cost": 165,
+                    "rarity": "epic"
+                },
+                {
+                    "name": "확률 조작", 
+                    "description": "모든 확률 이벤트의 성공률 +15% (최대 95%까지)",
+                    "effect_type": "probability_control",
+                    "effect_value": {"prob_bonus": 0.15, "max_prob": 0.95},
                     "cost": 5,
                     "unlock_cost": 180,
                     "rarity": "epic"
                 },
                 {
-                    "name": "마법 회로", 
-                    "description": "MP 0일 때 HP를 MP로 변환하여 스킬 사용 가능 (1:2 비율)",
-                    "effect_type": "magic_circuit",
-                    "effect_value": {"hp_to_mp_ratio": 2},
+                    "name": "생명-마력 변환", 
+                    "description": "MP 부족 시 HP를 MP로 변환 가능 (1HP = 2MP), MP 넘칠 시 HP로 전환",
+                    "effect_type": "hp_mp_conversion",
+                    "effect_value": {"hp_to_mp_ratio": 2, "mp_to_hp_ratio": 0.5},
                     "cost": 5,
                     "unlock_cost": 190,
                     "rarity": "epic"
@@ -2240,187 +2304,418 @@ class DawnOfStellarGame:
             effect_type = passive['effect_type']
             effect_value = passive['effect_value']
             
-            # 파티 전체에 적용되는 효과들
-            if effect_type == "permanent_stats_boost":
-                # 영구 스탯 부스트 (첫걸음의 용기)
+            # 패시브 상태 초기화
+            if effect_type not in self.passive_states:
+                self.passive_states[effect_type] = {
+                    'uses_per_battle': 0,
+                    'uses_per_floor': 0,
+                    'stacks': 0,
+                    'combo_count': 0,
+                    'last_skill': None,
+                    'mp_reduction_stacks': 0,
+                    'hit_streak': 0,
+                    'last_elements': [],
+                    'emotion_stacks': 0,
+                    'hp_bonuses': 0,
+                    'encounters': {}
+                }
+            
+            # 즉시 적용되는 영구 효과들
+            if effect_type == "synergy_amplify":
+                # 시너지 증폭 - 파티원 수에 따른 능력치 보너스
+                party_size = len(self.party_manager.members)
+                stat_bonus_per_member = effect_value.get("stat_per_member", 0.06)
+                max_members = effect_value.get("max_members", 3)
+                
+                actual_bonus_members = min(party_size - 1, max_members)  # 자신 제외
+                total_bonus = stat_bonus_per_member * actual_bonus_members
+                
                 for member in self.party_manager.members:
-                    stat_boost = effect_value.get("all_stats", 0)
-                    if stat_boost > 0:
-                        member.physical_attack += stat_boost
-                        member.magic_attack += stat_boost
-                        member.physical_defense += stat_boost
-                        member.magic_defense += stat_boost
-                        member.speed += stat_boost
-                        if not hasattr(member, 'permanent_boost_applied'):
-                            member.permanent_boost_applied = True
-                            print(f"🌟 {member.name}의 첫걸음의 용기가 적용되었습니다! (모든 능력치 +{stat_boost})")
-                        
-            elif effect_type == "first_battle_boost":
-                # 첫 전투 부스트는 전투 시스템에서 처리
-                for member in self.party_manager.members:
-                    if not hasattr(member, 'first_battle_used'):
-                        member.first_battle_used = False
-                        member.first_battle_boost = effect_value.get("all_stats", 0)
-                        
-            elif effect_type == "minimalist":
-                # 미니멀리스트는 인벤토리 체크 시 처리
-                for member in self.party_manager.members:
-                    member.minimalist_bonus = effect_value
+                    base_stats = [member.physical_attack, member.magic_attack, 
+                                member.physical_defense, member.magic_defense]
+                    bonus_amount = int(sum(base_stats) * total_bonus / 4)
                     
+                    member.physical_attack += bonus_amount
+                    member.magic_attack += bonus_amount
+                    member.physical_defense += bonus_amount
+                    member.magic_defense += bonus_amount
+                    
+                print(f"🤝 시너지 증폭: 파티원 수에 따라 모든 능력치 +{total_bonus*100:.1f}%")
+                
+            elif effect_type == "nature_blessing":
+                # 자연의 축복 - 독/화상 면역
+                for member in self.party_manager.members:
+                    if not hasattr(member, 'status_immunities'):
+                        member.status_immunities = []
+                    if effect_value.get("poison_immune"):
+                        member.status_immunities.append("독")
+                    if effect_value.get("burn_immune"):
+                        member.status_immunities.append("화상")
+                        
+                print(f"🌿 자연의 축복: 독/화상 면역 효과 적용")
+    
+    def process_passive_effects_field_turn(self):
+        """필드에서 걸음 수에 따른 패시브 효과 처리"""
+        if not hasattr(self, 'party_passive_effects') or not hasattr(self, 'step_count'):
+            return
+            
+        # 20걸음마다 발동하는 효과들
+        if self.step_count % 20 == 0 and self.step_count > 0:
+            for passive in self.party_passive_effects:
+                effect_type = passive['effect_type']
+                effect_value = passive['effect_value']
+                
+                # HP 회복 효과들
+                hp_regen = effect_value.get("hp_regen_per_turn", 0)
+                mp_regen = effect_value.get("mp_regen_per_turn", 0)
+                wound_heal = effect_value.get("wound_heal_per_turn", 0)
+                
+                if hp_regen > 0 or mp_regen > 0 or wound_heal > 0:
+                    for member in self.party_manager.members:
+                        if member.current_hp > 0:  # 살아있는 멤버만
+                            # HP 회복
+                            if hp_regen > 0:
+                                heal_amount = int(member.max_hp * hp_regen)
+                                member.heal(heal_amount)
+                                
+                            # MP 회복
+                            if mp_regen > 0:
+                                mp_amount = int(member.max_mp * mp_regen)
+                                member.current_mp = min(member.max_mp, member.current_mp + mp_amount)
+                                
+                            # 상처 치료
+                            if wound_heal > 0 and hasattr(member, 'wounds'):
+                                wound_heal_amount = int(member.max_hp * wound_heal)
+                                member.wounds = max(0, member.wounds - wound_heal_amount)
+                    
+                    passive_name = passive['name']
+                    print(f"💚 {passive_name}: 파티 전체가 치유되었습니다!")
+        
+        # 100걸음마다 발동하는 효과들
+        if self.step_count % 100 == 0 and self.step_count > 0:
+            for passive in self.party_passive_effects:
+                effect_type = passive['effect_type']
+                effect_value = passive['effect_value']
+                
+                if effect_type == "step_power":
+                    # 걸음마다 힘 - 공격력 증가 스택
+                    damage_bonus = effect_value.get("damage_per_100steps", 0.15)
+                    max_stacks = effect_value.get("max_stacks", 5)
+                    
+                    current_stacks = self.passive_states[effect_type].get('stacks', 0)
+                    if current_stacks < max_stacks:
+                        self.passive_states[effect_type]['stacks'] = current_stacks + 1
+                        print(f"⚡ 걸음마다 힘: 다음 공격 데미지 +{damage_bonus*100:.0f}% (스택: {current_stacks + 1}/{max_stacks})")
+    
+    def process_passive_effects_combat_start(self):
+        """전투 시작 시 패시브 효과 처리"""
+        if not hasattr(self, 'party_passive_effects'):
+            return
+            
+        for passive in self.party_passive_effects:
+            effect_type = passive['effect_type']
+            effect_value = passive['effect_value']
+            
+            # 전투 시작 시 회복 효과
+            if effect_type == "combat_healing_art":
+                battle_start_heal = effect_value.get("battle_start_heal", 0)
+                if battle_start_heal > 0:
+                    for member in self.party_manager.members:
+                        if member.current_hp > 0:
+                            heal_amount = int(member.max_hp * battle_start_heal)
+                            member.heal(heal_amount)
+                    print(f"⚔️ 전투 치유술: 전투 시작 시 파티 전체 HP 회복!")
+            
+            # 첫 턴 속도 증가
             elif effect_type == "dawn_focus":
-                # 새벽의 집중은 ATB 시스템에서 처리
+                first_turn_speed = effect_value.get("first_turn_speed", 1.0)
                 for member in self.party_manager.members:
-                    member.dawn_focus_bonus = effect_value.get("first_turn_speed", 0)
-                    
-            elif effect_type == "conservation":
-                # 절약 정신은 아이템 사용 시 처리
+                    if hasattr(member, 'speed'):
+                        member.speed *= (1 + first_turn_speed)
+                print(f"🌅 새벽의 집중: 첫 턴 행동속도 +{first_turn_speed*100:.0f}%!")
+            
+            # 전투별 사용 횟수 초기화
+            if 'uses_per_battle' in effect_value:
+                self.passive_states[effect_type]['uses_per_battle'] = 0
+    
+    def process_passive_effects_combat_end(self):
+        """전투 종료 시 패시브 효과 처리"""
+        if not hasattr(self, 'party_passive_effects'):
+            return
+            
+        for passive in self.party_passive_effects:
+            effect_type = passive['effect_type']
+            effect_value = passive['effect_value']
+            
+            # 불멸의 재생력 - 전투 후 HP/MP 자동 회복
+            if effect_type == "immortal_regeneration":
+                threshold = effect_value.get("post_battle_threshold", 0.30)
+                restore_to = effect_value.get("restore_to", 0.30)
+                
                 for member in self.party_manager.members:
-                    member.conservation_chance = effect_value.get("save_chance", 0)
-                    
-            elif effect_type == "lucky_coin":
-                # 행운의 동전은 골드 획득 시 처리
-                for member in self.party_manager.members:
-                    member.lucky_coin_chance = effect_value.get("double_chance", 0)
-                    
-            elif effect_type == "comeback_master":
-                # 역전의 명수는 전투 중 HP 체크 시 처리
-                for member in self.party_manager.members:
-                    member.comeback_bonus = effect_value
-                    
-            elif effect_type == "adventurer_instinct":
-                # 모험가의 직감은 던전 탐험 시 처리
-                for member in self.party_manager.members:
-                    member.secret_find_bonus = effect_value.get("secret_find", 0)
-                    member.trap_detect_bonus = effect_value.get("trap_detect", 0)
-                    
-            elif effect_type == "chain_reaction":
-                # 연쇄 반응은 크리티컬 히트 시 처리
-                for member in self.party_manager.members:
-                    member.chain_reaction = effect_value
-                    if not hasattr(member, 'chain_stacks'):
-                        member.chain_stacks = 0
+                    if member.current_hp > 0:  # 살아있는 멤버만
+                        # HP 체크 및 회복
+                        hp_ratio = member.current_hp / member.max_hp
+                        if hp_ratio <= threshold:
+                            restore_hp = int(member.max_hp * restore_to)
+                            member.current_hp = restore_hp
+                            print(f"💫 불멸의 재생력: {member.name}의 HP가 {restore_to*100:.0f}%로 회복!")
                         
-            elif effect_type == "collector_eye":
-                # 수집가의 눈은 아이템 발견/판매 시 처리
+                        # MP 체크 및 회복
+                        mp_ratio = member.current_mp / member.max_mp
+                        if mp_ratio <= threshold:
+                            restore_mp = int(member.max_mp * restore_to)
+                            member.current_mp = restore_mp
+                            print(f"💫 불멸의 재생력: {member.name}의 MP가 {restore_to*100:.0f}%로 회복!")
+            
+            # 속도 효과 리셋 (새벽의 집중)
+            elif effect_type == "dawn_focus":
+                first_turn_speed = effect_value.get("first_turn_speed", 1.0)
                 for member in self.party_manager.members:
-                    member.rare_find_bonus = effect_value.get("rare_find", 0)
-                    member.duplicate_bonus = effect_value.get("duplicate_bonus", 0)
-                    
-            elif effect_type == "momentum":
-                # 일사천리는 연속 스킬 사용 시 처리
-                for member in self.party_manager.members:
-                    member.momentum_effect = effect_value
-                    if not hasattr(member, 'last_skill_used'):
-                        member.last_skill_used = None
-                        member.momentum_stacks = 0
+                    if hasattr(member, 'speed'):
+                        member.speed /= (1 + first_turn_speed)
                         
-            elif effect_type == "crisis_response":
-                # 위기 대응은 상태이상 걸릴 때 처리
-                for member in self.party_manager.members:
-                    member.crisis_response_heal = effect_value.get("heal_percent", 0)
+    def check_passive_damage_taken(self, member, damage_amount):
+        """피해를 받을 때 패시브 효과 체크"""
+        if not hasattr(self, 'party_passive_effects'):
+            return damage_amount
+            
+        modified_damage = damage_amount
+        
+        for passive in self.party_passive_effects:
+            effect_type = passive['effect_type']
+            effect_value = passive['effect_value']
+            
+            # 생존 본능 - 응급 회복 + 피해 감소
+            if effect_type == "survival_instinct":
+                hp_threshold = effect_value.get("hp_threshold", 0.15)
+                current_hp_ratio = member.current_hp / member.max_hp
+                
+                # HP가 임계점 이하이고, 아직 이번 층에서 사용하지 않았을 때
+                if (current_hp_ratio <= hp_threshold and 
+                    self.passive_states[effect_type].get('uses_per_floor', 0) == 0):
                     
-            elif effect_type == "perfectionist":
-                # 완벽주의자는 매 턴 HP/MP 체크 시 처리
-                for member in self.party_manager.members:
-                    member.perfectionist_bonus = effect_value.get("effect_boost", 0)
+                    # 응급 회복
+                    emergency_heal = effect_value.get("emergency_heal", 0.15)
+                    heal_amount = int(member.max_hp * emergency_heal)
+                    member.heal(heal_amount)
                     
-            elif effect_type == "gambler_mind":
-                # 도박꾼의 심리는 액션 실행 시 처리
-                for member in self.party_manager.members:
-                    member.gambler_effect = effect_value
+                    # 피해 감소 버프 적용 (다음 몇 턴간)
+                    damage_reduction = effect_value.get("damage_reduction", 0.20)
+                    duration = effect_value.get("duration", 1)
                     
-            elif effect_type == "synergy_master":
-                # 시너지 마스터는 타겟 공격 시 처리
-                for member in self.party_manager.members:
-                    member.synergy_damage_bonus = effect_value.get("synergy_damage", 0)
+                    modified_damage = int(modified_damage * (1 - damage_reduction))
                     
-            elif effect_type == "change_master":
-                # 변화의 달인은 턴 카운트로 처리
+                    # 사용 횟수 증가
+                    self.passive_states[effect_type]['uses_per_floor'] = 1
+                    
+                    print(f"🛡️ 생존 본능 발동! {member.name}이 응급 회복하고 피해 감소!")
+        
+        return modified_damage
+    
+    def process_field_turn(self):
+        """20걸음마다 호출되는 필드 턴 처리 - 패시브 효과 적용"""
+        # 새로운 패시브 효과 시스템 사용
+        self.process_passive_effects_field_turn()
+        
+        # 기존 패시브 효과들 (하위 호환성을 위해 유지)
+        if not hasattr(self, 'party_passive_effects'):
+            return
+            
+        # 패시브 상태 초기화
+        if not hasattr(self, 'passive_states'):
+            self.passive_states = {}
+        
+        for passive in self.party_passive_effects:
+            effect_type = passive['effect_type']
+            effect_value = passive['effect_value']
+            
+            # 생명의 씨앗: 20걸음당 HP 2% 회복, 상처 1% 치료
+            if effect_type == "life_seed":
+                hp_regen = effect_value.get("hp_regen_per_turn", 0.02)
+                wound_heal = effect_value.get("wound_heal_per_turn", 0.01)
                 for member in self.party_manager.members:
-                    member.change_master_effect = effect_value
-                    if not hasattr(member, 'change_master_counter'):
-                        member.change_master_counter = 0
+                    if member.is_alive:
+                        # HP 회복
+                        heal_amount = int(member.max_hp * hp_regen)
+                        if heal_amount > 0:
+                            member.heal(heal_amount)
+                        # 상처 치료 (구현되어 있다면)
+                        if hasattr(member, 'wounds') and member.wounds > 0:
+                            wound_heal_amount = int(member.max_hp * wound_heal)
+                            member.wounds = max(0, member.wounds - wound_heal_amount)
+                
+            # 생명력 순환: HP 4% 회복
+            elif effect_type == "life_circulation":
+                hp_regen = effect_value.get("hp_regen_per_turn", 0.04)
+                for member in self.party_manager.members:
+                    if member.is_alive:
+                        heal_amount = int(member.max_hp * hp_regen)
+                        if heal_amount > 0:
+                            member.heal(heal_amount)
+            
+            # 자연의 축복: HP 6% 회복, MP 4% 회복
+            elif effect_type == "nature_blessing":
+                hp_regen = effect_value.get("hp_regen_per_turn", 0.06)
+                mp_regen = effect_value.get("mp_regen_per_turn", 0.04)
+                for member in self.party_manager.members:
+                    if member.is_alive:
+                        # HP 회복
+                        heal_amount = int(member.max_hp * hp_regen)
+                        if heal_amount > 0:
+                            member.heal(heal_amount)
+                        # MP 회복
+                        mp_amount = int(member.max_mp * mp_regen)
+                        if mp_amount > 0:
+                            member.mp = min(member.max_mp, member.mp + mp_amount)
+            
+            # 영혼의 치유사: HP 8% 회복, 상처 4% 치료
+            elif effect_type == "soul_healer":
+                hp_regen = effect_value.get("hp_regen_per_turn", 0.08)
+                wound_heal = effect_value.get("wound_heal_per_turn", 0.04)
+                for member in self.party_manager.members:
+                    if member.is_alive:
+                        heal_amount = int(member.max_hp * hp_regen)
+                        if heal_amount > 0:
+                            member.heal(heal_amount)
+                        if hasattr(member, 'wounds') and member.wounds > 0:
+                            wound_heal_amount = int(member.max_hp * wound_heal)
+                            member.wounds = max(0, member.wounds - wound_heal_amount)
+            
+            # 전투 치유술: HP 8% 회복, 상처 3% 치료
+            elif effect_type == "combat_healing_art":
+                hp_regen = effect_value.get("hp_regen_per_turn", 0.08)
+                wound_heal = effect_value.get("wound_heal_per_turn", 0.03)
+                for member in self.party_manager.members:
+                    if member.is_alive:
+                        heal_amount = int(member.max_hp * hp_regen)
+                        if heal_amount > 0:
+                            member.heal(heal_amount)
+                        if hasattr(member, 'wounds') and member.wounds > 0:
+                            wound_heal_amount = int(member.max_hp * wound_heal)
+                            member.wounds = max(0, member.wounds - wound_heal_amount)
+            
+            # 불멸의 재생력: HP 30% 이하일 때만 HP 15% 회복
+            elif effect_type == "immortal_regeneration":
+                hp_threshold = effect_value.get("hp_threshold", 0.30)
+                hp_regen = effect_value.get("hp_regen_per_turn", 0.15)
+                wound_heal = effect_value.get("wound_heal_per_turn", 0.08)
+                uses_per_floor = effect_value.get("uses_per_floor", 3)
+                
+                # 사용 횟수 체크
+                if effect_type not in self.passive_states:
+                    self.passive_states[effect_type] = {"uses_this_floor": 0}
+                
+                if self.passive_states[effect_type]["uses_this_floor"] < uses_per_floor:
+                    for member in self.party_manager.members:
+                        if member.is_alive and member.hp <= (member.max_hp * hp_threshold):
+                            heal_amount = int(member.max_hp * hp_regen)
+                            if heal_amount > 0:
+                                member.heal(heal_amount)
+                                self.passive_states[effect_type]["uses_this_floor"] += 1
+                                self.add_game_message(f"💚 {member.name}의 불멸의 재생력 발동!")
+                                if hasattr(member, 'wounds') and member.wounds > 0:
+                                    wound_heal_amount = int(member.max_hp * wound_heal)
+                                    member.wounds = max(0, member.wounds - wound_heal_amount)
+                                break  # 한 번에 한 명만
+            
+            # 걸음마다 힘: 100걸음마다 공격력 증가
+            elif effect_type == "step_power":
+                if not hasattr(self, 'step_count'):
+                    self.step_count = 0
+                if self.step_count % 100 == 0 and self.step_count > 0:
+                    damage_boost = effect_value.get("damage_per_100steps", 0.15)
+                    max_stacks = effect_value.get("max_stacks", 5)
+                    
+                    if effect_type not in self.passive_states:
+                        self.passive_states[effect_type] = {"stacks": 0}
+                    
+                    if self.passive_states[effect_type]["stacks"] < max_stacks:
+                        self.passive_states[effect_type]["stacks"] += 1
+                        self.add_game_message(f"💪 걸음마다 힘 발동! 다음 공격 데미지 +{int(damage_boost*100)}% (스택: {self.passive_states[effect_type]['stacks']})")
+    
+    def apply_post_battle_passive_effects(self):
+        """전투 후 패시브 효과 적용"""
+        if not hasattr(self, 'party_passive_effects'):
+            return
+            
+        for passive in self.party_passive_effects:
+            effect_type = passive['effect_type']
+            effect_value = passive['effect_value']
+            
+            # 불멸의 재생력: 전투 후 HP/MP가 30% 이하면 30%로 회복
+            if effect_type == "immortal_regeneration":
+                threshold = effect_value.get("post_battle_threshold", 0.30)
+                restore_to = effect_value.get("restore_to", 0.30)
+                
+                for member in self.party_manager.members:
+                    if member.is_alive:
+                        # HP 체크 및 회복
+                        if member.hp < (member.max_hp * threshold):
+                            new_hp = int(member.max_hp * restore_to)
+                            member.hp = new_hp
+                            self.add_game_message(f"💚 {member.name}의 불멸의 재생력으로 HP가 {int(restore_to*100)}%로 회복되었습니다!")
                         
-            elif effect_type == "dynamic_relationship":
-                # 역학 관계는 아군 사망 시 처리
+                        # MP 체크 및 회복
+                        if member.mp < (member.max_mp * threshold):
+                            new_mp = int(member.max_mp * restore_to)
+                            member.mp = new_mp
+                            self.add_game_message(f"💙 {member.name}의 불멸의 재생력으로 MP가 {int(restore_to*100)}%로 회복되었습니다!")
+            
+            # 혈액 재생: 적 처치 시 HP 6% 회복, 상처 3% 치료
+            elif effect_type == "blood_regen":
+                hp_restore = effect_value.get("hp_restore", 0.06)
+                wound_heal = effect_value.get("wound_heal", 0.03)
+                
                 for member in self.party_manager.members:
-                    member.dynamic_relationship = effect_value
-                    if not hasattr(member, 'relationship_stacks'):
-                        member.relationship_stacks = 0
+                    if member.is_alive:
+                        heal_amount = int(member.max_hp * hp_restore)
+                        if heal_amount > 0:
+                            member.heal(heal_amount)
+                            self.add_game_message(f"🩸 {member.name}의 혈액 재생으로 HP {heal_amount} 회복!")
                         
-            elif effect_type == "vampire_instinct":
-                # 뱀파이어 본능은 적 처치 시 처리
+                        if hasattr(member, 'wounds') and member.wounds > 0:
+                            wound_heal_amount = int(member.max_hp * wound_heal)
+                            member.wounds = max(0, member.wounds - wound_heal_amount)
+    
+    def get_passive_bonus(self, effect_type: str, bonus_type: str = None):
+        """특정 패시브 효과의 보너스 값 반환"""
+        if not hasattr(self, 'party_passive_effects'):
+            return 0
+            
+        for passive in self.party_passive_effects:
+            if passive['effect_type'] == effect_type:
+                effect_value = passive['effect_value']
+                if bonus_type:
+                    return effect_value.get(bonus_type, 0)
+                return effect_value
+        return 0
+    
+    def apply_battle_start_passive_effects(self):
+        """전투 시작 시 패시브 효과 적용"""
+        if not hasattr(self, 'party_passive_effects'):
+            return
+            
+        for passive in self.party_passive_effects:
+            effect_type = passive['effect_type']
+            effect_value = passive['effect_value']
+            
+            # 전투 치유술: 전투 시작 시 HP 10% 회복
+            if effect_type == "combat_healing_art":
+                battle_start_heal = effect_value.get("battle_start_heal", 0.10)
                 for member in self.party_manager.members:
-                    member.vampire_heal = effect_value
-                    
-            elif effect_type == "life_cycle":
-                # 생명 순환은 아군 사망 시 처리
-                for member in self.party_manager.members:
-                    member.life_cycle_effect = effect_value
-                    if not hasattr(member, 'life_cycle_bonus'):
-                        member.life_cycle_bonus = 0
-                        
-            # 기타 모든 패시브 효과들을 멤버에 저장
-            for member in self.party_manager.members:
-                if not hasattr(member, 'passive_effects'):
-                    member.passive_effects = []
-                member.passive_effects.append(passive)
-                    
-            # 특수 효과들 추가 처리
-            if effect_type == "legendary_hero":
-                # 모든 능력치 증가
-                if isinstance(effect_value, dict):
-                    stats_bonus = effect_value.get("all_stats", 0)
-                else:
-                    stats_bonus = effect_value  # effect_value가 직접 숫자인 경우
-                    
-                for member in self.party_manager.members:
-                    member.physical_attack = int(member.physical_attack * (1 + stats_bonus))
-                    member.magic_attack = int(member.magic_attack * (1 + stats_bonus))
-                    member.physical_defense = int(member.physical_defense * (1 + stats_bonus))
-                    member.magic_defense = int(member.magic_defense * (1 + stats_bonus))
-                    member.speed = int(member.speed * (1 + stats_bonus))
-                    
-            elif effect_type == "elemental_affinity":
-                # 원소 친화력 - 속성 공격력 증가 (멤버의 속성에 따라)
-                if isinstance(effect_value, dict):
-                    damage_bonus = effect_value.get("damage", 0)
-                else:
-                    damage_bonus = effect_value  # effect_value가 직접 숫자인 경우
-                    
-                for member in self.party_manager.members:
-                    if hasattr(member, 'magic_attack'):
-                        member.magic_attack = int(member.magic_attack * (1 + damage_bonus))
-                        
-            elif effect_type == "mana_cycle":
-                # 마나 순환 효과
-                for member in self.party_manager.members:
-                    member.mana_cycle_chance = effect_value.get("no_cost_chance", 0)
-                    
-            elif effect_type == "healing_aura":
-                # 치유의 기운 효과
-                for member in self.party_manager.members:
-                    member.healing_aura_effect = effect_value
-                    
-            elif effect_type == "scholar_wisdom":
-                # 학자의 지혜 효과
-                for member in self.party_manager.members:
-                    member.scholar_wisdom = effect_value
-                    if not hasattr(member, 'scholar_stacks'):
-                        member.scholar_stacks = 0
-                        
-            elif effect_type == "absolute_rule":
-                # 절대 법칙 효과들
-                for member in self.party_manager.members:
-                    if "rule_of_three" in effect_value:
-                        member.rule_of_three = effect_value["rule_of_three"]
-                    if "rule_of_seven" in effect_value:
-                        member.rule_of_seven = effect_value["rule_of_seven"]
-                    if "rule_of_thirteen" in effect_value:
-                        member.rule_of_thirteen = effect_value["rule_of_thirteen"]
-                        
-            # 다른 효과들은 게임 진행 중에 동적으로 적용됨
-            # (exp_bonus, gold_bonus, cooking_master, explorer_instinct 등)
+                    if member.is_alive:
+                        heal_amount = int(member.max_hp * battle_start_heal)
+                        if heal_amount > 0:
+                            member.heal(heal_amount)
+                            self.add_game_message(f"⚔️ {member.name}의 전투 치유술 발동! HP {heal_amount} 회복!")
+    
+    def reset_floor_passive_states(self):
+        """새 층 시작 시 층별 패시브 상태 리셋"""
+        if hasattr(self, 'passive_states'):
+            for effect_type in self.passive_states:
+                if 'uses_this_floor' in self.passive_states[effect_type]:
+                    self.passive_states[effect_type]['uses_this_floor'] = 0
     
     def get_passive_bonus(self, effect_type: str, bonus_type: str = None):
         """패시브 효과에서 특정 보너스 값 가져오기"""
@@ -2952,7 +3247,7 @@ class DawnOfStellarGame:
                 self.apply_healing_aura_effects()
                 print("치유의 기운 효과 적용 완료")
             
-            input("\n계속하려면 Enter를 누르세요...")
+            # 효과 완료 표시만 하고 바로 넘어감
     
     def show_party_with_passives(self):
         """패시브 효과가 적용된 파티 상태 표시"""
@@ -4280,6 +4575,7 @@ class DawnOfStellarGame:
             
             # 패시브 효과 복원
             self.party_passive_effects = game_state.get('party_passive_effects', [])
+            self.passive_states = game_state.get('passive_states', {})
             if self.party_passive_effects:
                 print(f"🌟 파티 패시브 효과 {len(self.party_passive_effects)}개를 복원했습니다.")
                 try:
@@ -6947,7 +7243,6 @@ class DawnOfStellarGame:
                     except Exception as e:
                         print(f"📦 인벤토리 표시 중 오류: {e}")
                         print("인벤토리를 표시할 수 없습니다.")
-                    self.keyboard.wait_for_key("아무 키나 눌러 계속...")
             
         elif action.lower() == 'p':
             # 파티 상태 메뉴 - 커서 시스템
@@ -7411,7 +7706,11 @@ class DawnOfStellarGame:
                         
                         print(f"\n⚔️ {bright_red(f'{len(enemy_positions)}개 위치의 적들과 교전 시작!')}")
                         print(f"🎯 충돌 위치: {trigger_pos}")
-                        self.keyboard.wait_for_key("아무 키나 눌러 전투 시작...")
+                        try:
+                            self.keyboard.wait_for_key("아무 키나 눌러 전투 시작...")
+                        except Exception as e:
+                            print(f"⚠️ 키 입력 오류: {e}")
+                            input("아무 키나 눌러 전투 시작...")  # 폴백
                         
                         try:
                             # 다중 적 전투 실행
@@ -7460,7 +7759,11 @@ class DawnOfStellarGame:
                 elif result == "combat":
                     # 기존 단일 적 전투 (호환성 유지)
                     print(f"\n⚔️ {bright_red('적과 마주쳤습니다!')}")
-                    self.keyboard.wait_for_key("아무 키나 눌러 전투 시작...")
+                    try:
+                        self.keyboard.wait_for_key("아무 키나 눌러 전투 시작...")
+                    except Exception as e:
+                        print(f"⚠️ 키 입력 오류: {e}")
+                        input("아무 키나 눌러 전투 시작...")  # 폴백
                     self.start_battle()
                     return  # handle_player_movement 종료하여 main_game_loop로 돌아감
                 elif result == "moved":
@@ -7713,6 +8016,82 @@ class DawnOfStellarGame:
                 old_hp = member.current_hp
                 # 기존 자연회복량 사용 (최대 HP의 5%)
                 hp_regen = max(1, member.max_hp // 20)  # 최대 HP의 5%
+                
+                # 📍 특성에 의한 추가 회복 처리
+                if hasattr(member, 'active_traits') and member.active_traits:
+                    for trait in member.active_traits:
+                        if hasattr(trait, 'effects') and trait.effects:
+                            # "불굴의 의지" - 매 턴 HP 8% 회복
+                            if 'universal_regeneration' in trait.effects:
+                                trait_heal_rate = trait.effects['universal_regeneration']
+                                trait_heal = max(1, int(member.max_hp * trait_heal_rate))
+                                hp_regen += trait_heal
+                                print(f"💪 {member.name}의 '{trait.name}' 특성으로 {trait_heal} HP 추가 회복!")
+                            
+                            # 기타 턴당 회복 특성들 처리
+                            if 'passive_hp_regen' in trait.effects:
+                                trait_heal_rate = trait.effects['passive_hp_regen']
+                                trait_heal = max(1, int(member.max_hp * trait_heal_rate))
+                                hp_regen += trait_heal
+                                print(f"🌟 {member.name}의 '{trait.name}' 특성으로 {trait_heal} HP 추가 회복!")
+                
+                # 📍 패시브에 의한 추가 회복 처리
+                # 자연 친화
+                if hasattr(member, 'nature_affinity_regen') and member.nature_affinity_regen:
+                    nature_hp_regen = max(1, int(member.max_hp * member.nature_affinity_regen.get('hp_regen_per_turn', 0)))
+                    hp_regen += nature_hp_regen
+                    if nature_hp_regen > 0:
+                        print(f"🌿 {member.name}의 '자연 친화' 패시브로 {nature_hp_regen} HP 추가 회복!")
+                
+                # 생명의 샘
+                if hasattr(member, 'life_spring_regen') and member.life_spring_regen:
+                    spring_hp_regen = max(1, int(member.max_hp * member.life_spring_regen.get('hp_regen_per_turn', 0)))
+                    hp_regen += spring_hp_regen
+                    if spring_hp_regen > 0:
+                        print(f"⛲ {member.name}의 '생명의 샘' 패시브로 {spring_hp_regen} HP 추가 회복!")
+                
+                # 영혼의 치유사
+                if hasattr(member, 'soul_healer_regen') and member.soul_healer_regen:
+                    soul_hp_regen = max(1, int(member.max_hp * member.soul_healer_regen.get('hp_regen_per_turn', 0)))
+                    hp_regen += soul_hp_regen
+                    if soul_hp_regen > 0:
+                        print(f"👻 {member.name}의 '영혼의 치유사' 패시브로 {soul_hp_regen} HP 추가 회복!")
+                        # 상처도 치료
+                        wound_heal = max(1, int(member.max_hp * member.soul_healer_regen.get('wound_heal_per_turn', 0)))
+                        if hasattr(member, 'wounds') and member.wounds > 0 and wound_heal > 0:
+                            old_wounds = member.wounds
+                            member.wounds = max(0, member.wounds - wound_heal)
+                            healed_wounds = old_wounds - member.wounds
+                            print(f"🩹 {member.name}의 상처가 {healed_wounds}만큼 치료되었습니다!")
+                
+                # 재생의 대가
+                if hasattr(member, 'regeneration_master_effect') and member.regeneration_master_effect:
+                    master_hp_regen = max(1, int(member.max_hp * member.regeneration_master_effect.get('hp_regen_per_turn', 0)))
+                    hp_regen += master_hp_regen
+                    if master_hp_regen > 0:
+                        print(f"🌟 {member.name}의 '재생의 대가' 패시브로 {master_hp_regen} HP 추가 회복!")
+                        # 상처도 치료
+                        wound_heal = max(1, int(member.max_hp * member.regeneration_master_effect.get('wound_heal_per_turn', 0)))
+                        if hasattr(member, 'wounds') and member.wounds > 0 and wound_heal > 0:
+                            old_wounds = member.wounds
+                            member.wounds = max(0, member.wounds - wound_heal)
+                            healed_wounds = old_wounds - member.wounds
+                            print(f"🩹 {member.name}의 상처가 {healed_wounds}만큼 치료되었습니다!")
+                
+                # 불멸의 재생
+                if hasattr(member, 'immortal_regeneration_effect') and member.immortal_regeneration_effect:
+                    immortal_hp_regen = max(1, int(member.max_hp * member.immortal_regeneration_effect.get('hp_regen_per_turn', 0)))
+                    hp_regen += immortal_hp_regen
+                    if immortal_hp_regen > 0:
+                        print(f"💫 {member.name}의 '불멸의 재생' 패시브로 {immortal_hp_regen} HP 추가 회복!")
+                        # 상처도 치료
+                        wound_heal = max(1, int(member.max_hp * member.immortal_regeneration_effect.get('wound_heal_per_turn', 0)))
+                        if hasattr(member, 'wounds') and member.wounds > 0 and wound_heal > 0:
+                            old_wounds = member.wounds
+                            member.wounds = max(0, member.wounds - wound_heal)
+                            healed_wounds = old_wounds - member.wounds
+                            print(f"🩹 {member.name}의 상처가 {healed_wounds}만큼 치료되었습니다!")
+                
                 member.current_hp = min(member.max_hp, member.current_hp + hp_regen)
                 hp_recovered = member.current_hp - old_hp
                 
@@ -7720,6 +8099,46 @@ class DawnOfStellarGame:
                 old_mp = member.current_mp
                 # 기존 자연회복량 사용 (최대 MP의 3%)
                 mp_regen = max(1, member.max_mp // 33)  # 최대 MP의 3%
+                
+                # 📍 특성에 의한 MP 추가 회복 처리
+                if hasattr(member, 'active_traits') and member.active_traits:
+                    for trait in member.active_traits:
+                        if hasattr(trait, 'effects') and trait.effects:
+                            # MP 회복 특성들 처리
+                            if 'universal_mp_regeneration' in trait.effects:
+                                trait_mp_heal_rate = trait.effects['universal_mp_regeneration']
+                                trait_mp_heal = max(1, int(member.max_mp * trait_mp_heal_rate))
+                                mp_regen += trait_mp_heal
+                                print(f"🔮 {member.name}의 '{trait.name}' 특성으로 {trait_mp_heal} MP 추가 회복!")
+                            
+                            if 'passive_mp_regen' in trait.effects:
+                                trait_mp_heal_rate = trait.effects['passive_mp_regen']
+                                trait_mp_heal = max(1, int(member.max_mp * trait_mp_heal_rate))
+                                mp_regen += trait_mp_heal
+                                print(f"🌟 {member.name}의 '{trait.name}' 특성으로 {trait_mp_heal} MP 추가 회복!")
+                
+                # 📍 패시브에 의한 MP 추가 회복 처리
+                # 자연 친화
+                if hasattr(member, 'nature_affinity_regen') and member.nature_affinity_regen:
+                    nature_mp_regen = max(1, int(member.max_mp * member.nature_affinity_regen.get('mp_regen_per_turn', 0)))
+                    mp_regen += nature_mp_regen
+                    if nature_mp_regen > 0:
+                        print(f"🌿 {member.name}의 '자연 친화' 패시브로 {nature_mp_regen} MP 추가 회복!")
+                
+                # 생명의 샘
+                if hasattr(member, 'life_spring_regen') and member.life_spring_regen:
+                    spring_mp_regen = max(1, int(member.max_mp * member.life_spring_regen.get('mp_regen_per_turn', 0)))
+                    mp_regen += spring_mp_regen
+                    if spring_mp_regen > 0:
+                        print(f"⛲ {member.name}의 '생명의 샘' 패시브로 {spring_mp_regen} MP 추가 회복!")
+                
+                # 재생의 대가
+                if hasattr(member, 'regeneration_master_effect') and member.regeneration_master_effect:
+                    master_mp_regen = max(1, int(member.max_mp * member.regeneration_master_effect.get('mp_regen_per_turn', 0)))
+                    mp_regen += master_mp_regen
+                    if master_mp_regen > 0:
+                        print(f"🌟 {member.name}의 '재생의 대가' 패시브로 {master_mp_regen} MP 추가 회복!")
+                
                 member.current_mp = min(member.max_mp, member.current_mp + mp_regen)
                 mp_recovered = member.current_mp - old_mp
                 
@@ -7788,7 +8207,11 @@ class DawnOfStellarGame:
                 import random
                 if random.random() < 0.03:  # 3% 확률
                     print(f"\n⚔️ {bright_red('적과 마주쳤습니다!')}")
-                    self.keyboard.wait_for_key("아무 키나 눌러 전투 시작...")
+                    try:
+                        self.keyboard.wait_for_key("아무 키나 눌러 전투 시작...")
+                    except Exception as e:
+                        print(f"⚠️ 키 입력 오류: {e}")
+                        input("아무 키나 눌러 전투 시작...")  # 폴백
                     self.start_battle()
                     
         except Exception as e:
@@ -9810,7 +10233,10 @@ class DawnOfStellarGame:
             lines.append("")
             lines.append(f"{bright_red('█'):^20} {bright_yellow('▓'):^20} {bright_magenta('█'):^20} {bright_red('▓'):^20} {bright_yellow('█'):^20}")
         else:
-            # 일반 아스키 아트
+            # 일반 아스키 아트 - 3줄 간격 추가
+            lines.append("")
+            lines.append("")
+            lines.append("")
             lines.append(f"{bright_yellow('         ██████╗  █████╗ ██╗    ██╗███╗   ██╗    ██████╗ ███████╗'):^20}")
             lines.append(f"{bright_yellow('         ██╔══██╗██╔══██╗██║    ██║████╗  ██║   ██╔═══██╗██╔════╝'):^20}")
             lines.append(f"{bright_cyan('         ██║  ██║███████║██║ █╗ ██║██╔██╗ ██║   ██║   ██║█████╗  '):^20}")
@@ -9881,7 +10307,10 @@ class DawnOfStellarGame:
             print()
             print(f"{bright_red('█'):^20} {bright_yellow('▓'):^20} {bright_magenta('█'):^20} {bright_red('▓'):^20} {bright_yellow('█'):^20}")
         else:
-            # 일반 아스키 아트 (원래 코드)
+            # 일반 아스키 아트 (원래 코드) - 3줄 간격 추가
+            print()
+            print()
+            print()
             print(f"{bright_yellow('         ██████╗  █████╗ ██╗    ██╗███╗   ██╗    ██████╗ ███████╗'):^20}")
             print(f"{bright_yellow('         ██╔══██╗██╔══██╗██║    ██║████╗  ██║   ██╔═══██╗██╔════╝'):^20}")
             print(f"{bright_cyan('         ██║  ██║███████║██║ █╗ ██║██╔██╗ ██║   ██║   ██║█████╗  '):^20}")
@@ -12343,14 +12772,21 @@ class DawnOfStellarGame:
             from game.brave_combat import BraveCombatSystem
             
             if not enemy_positions:
+                print("❌ 전투할 적이 없습니다.")
                 return "no_enemies"
             
+            # 전투 시작 시 패시브 효과 적용
+            self.process_passive_effects_combat_start()
+            
             enemies_for_combat = []
+            
+            print(f"🔍 적 위치 확인: {enemy_positions}")
             
             # 각 위치의 적들을 전투용 캐릭터로 변환
             for enemy_pos in enemy_positions:
                 if hasattr(self.world, 'floor_enemies') and enemy_pos in self.world.floor_enemies:
                     enemy_data = self.world.floor_enemies[enemy_pos]
+                    print(f"📊 적 데이터 발견: {enemy_pos} -> {type(enemy_data)}")
                     
                     # dict 객체인 경우 Character 객체로 변환
                     if isinstance(enemy_data, dict):
@@ -12359,6 +12795,8 @@ class DawnOfStellarGame:
                             enemy_manager = EnemyManager()
                             enemy_level = enemy_data.get('level', 1)
                             enemy_type = enemy_data.get('type', '고블린')
+                            
+                            print(f"🎯 적 생성: {enemy_type} (레벨 {enemy_level})")
                             
                             # spawn_enemy는 floor 인자를 받음
                             enemy_character = enemy_manager.spawn_enemy(self.world.current_level)
@@ -12372,31 +12810,59 @@ class DawnOfStellarGame:
                             
                             if hasattr(enemy_character, 'name'):
                                 enemies_for_combat.append(enemy_character)
+                                print(f"✅ 적 추가됨: {enemy_character.name}")
                         except Exception as e:
+                            print(f"❌ 적 생성 오류: {e}")
                             continue
                     elif hasattr(enemy_data, 'name'):
                         # 이미 Character 객체인 경우
                         enemies_for_combat.append(enemy_data)
+                        print(f"✅ 기존 적 추가됨: {enemy_data.name}")
+                else:
+                    print(f"❌ 위치에 적이 없음: {enemy_pos}")
             
             if not enemies_for_combat:
+                print("❌ 전투 가능한 적이 없습니다.")
                 return "no_enemies"
+            
+            print(f"⚔️ 전투 준비 완료: {len(enemies_for_combat)}마리 적")
             
             # Brave Combat System으로 전투 실행
             combat_system = BraveCombatSystem(self.audio_system, self.audio_system)
             
-            party_members = [member for member in self.party_manager.party_members if member.is_alive]
-            
-            if not party_members:
+            # 파티 멤버 가져오기 (수정된 방식)
+            if hasattr(self.party_manager, 'members'):
+                party_members = [member for member in self.party_manager.members if member.is_alive]
+            elif hasattr(self.party_manager, 'party_members'):
+                party_members = [member for member in self.party_manager.party_members if member.is_alive]
+            else:
+                print("❌ 파티 멤버를 찾을 수 없습니다.")
                 return "no_party"
             
-            # 전투 시작
-            result = combat_system.start_battle(party_members, enemies_for_combat)
+            if not party_members:
+                print("❌ 생존한 파티 멤버가 없습니다.")
+                return "no_party"
             
-            # 전투 후 월드에서 적 위치 제거는 호출한 곳에서 처리
+            print(f"👥 파티 준비 완료: {len(party_members)}명")
+            
+            # 전투 시작
+            print("🎬 전투 시작!")
+            result = combat_system.start_battle(party_members, enemies_for_combat)
+            print(f"🏁 전투 결과: {result}")
+            
+            # 전투 후 패시브 효과 적용
+            if result == "victory":
+                self.apply_post_battle_passive_effects()
+            
             return result
             
         except Exception as e:
-            print(f"⚠️ 다중 적 전투 오류: {type(e).__name__}")
+            print(f"⚠️ 다중 적 전투 오류: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+            return "error"
+            import traceback
+            traceback.print_exc()
             return "error"
             
             if not enemies_at_position:
@@ -12480,6 +12946,9 @@ class DawnOfStellarGame:
                 except Exception as e:
                     print(f"⚠️ 드롭 시스템 오류: {e}")
                     print("드롭 시스템을 사용할 수 없습니다.")
+                
+                # 전투 종료 시 패시브 효과 적용
+                self.process_passive_effects_combat_end()
                 
                 print("아무 키나 눌러 계속...")
                 self.keyboard.wait_for_key()

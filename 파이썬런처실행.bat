@@ -100,11 +100,13 @@ echo.
 
 :: Prevent auto-close (for debugging)
 if "%1"=="/auto" (
-    echo [AUTO] Auto mode - closing in 3 seconds
-    timeout /t 3 > nul
+    echo [AUTO] Auto mode - closing automatically
+    timeout /t 1 > nul
 ) else (
-    echo [WAIT] Press any key to close window...
-    pause > nul
+    echo [SUCCESS] Python launcher exited normally.
+    echo [COMPLETE] Hope this helped with game development!
+    echo [AUTO] Closing window automatically...
+    timeout /t 2 > nul
 )
 
 exit /b %exit_code%

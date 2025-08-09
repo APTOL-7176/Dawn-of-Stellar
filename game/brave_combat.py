@@ -1029,13 +1029,6 @@ class BraveCombatSystem:
                 # 첫 번째 업데이트에서만, 그리고 의미있는 변화가 있을 때만 갱신
                 # 첫 루프에서의 잦은 상태 출력은 화면 깜빡임을 유발하므로 제거
                 
-                # ATB 업데이트 후 전투 종료 체크
-                if self.check_battle_end(valid_party, valid_enemies):
-                    result = self.determine_winner(valid_party, valid_enemies)
-                    print(f"\n{Color.BRIGHT_CYAN.value}전투가 종료되었습니다!{Color.RESET.value}")
-                    self._wait_for_user_input_or_timeout(5.0)
-                    return result
-                
                 action_order = self.get_action_order(valid_party + valid_enemies)
                 if action_order:
                     break
@@ -1200,8 +1193,12 @@ class BraveCombatSystem:
             # 🏹 궁수 지원사격 지속시간 감소
             self._process_support_fire_duration(character)
                 
-            # 전투 종료 조건은 메인 루프에서만 확인
-            # (중복 승리 메시지 방지)
+            # 행동 처리 후 전투 종료 조건 확인
+            if self.check_battle_end(valid_party, valid_enemies):
+                result = self.determine_winner(valid_party, valid_enemies)
+                print(f"\n{Color.BRIGHT_CYAN.value}전투가 종료되었습니다!{Color.RESET.value}")
+                self._wait_for_user_input_or_timeout(5.0)
+                return result
                         
                         # 1순위: audio_system 사용
             
@@ -1562,12 +1559,13 @@ class BraveCombatSystem:
                             status_line = f"👹 {enemy.name} - HP: {enemy.current_hp}/{enemy.max_hp} BRV: {enemy.brave_points}"
                             status_lines.append(status_line)
                     
-                        # 메뉴 생성 (컬러풀한 상태 정보 포함)
-                        choice = create_simple_menu(
-                            title="⚔️ 전투 - 행동 선택",
-                            options=action_options,
-                            extra_content=status_lines
-                        )
+                    # 메뉴 생성 (컬러풀한 상태 정보 포함)
+                    menu = create_simple_menu(
+                        title="⚔️ 전투 - 행동 선택",
+                        options=action_options,
+                        extra_content=status_lines
+                    )
+                    choice = menu.run()  # 메뉴 실행하여 선택값 받기
                         
                 except Exception as e:
                     gauge_system_available = False
@@ -1594,11 +1592,12 @@ class BraveCombatSystem:
                         status_lines.append(status_line)
                     
                     # 메뉴 생성 (기본 상태 정보 포함)
-                    choice = create_simple_menu(
+                    menu = create_simple_menu(
                         title="⚔️ 전투 - 행동 선택 (기본 모드)",
                         options=action_options,
                         extra_content=status_lines
                     )
+                    choice = menu.run()  # 메뉴 실행하여 선택값 받기
                 
                 if choice is None or choice == -1:  # 취소
                     return None

@@ -2133,6 +2133,13 @@ class StorySystem:
             return
         self.display_story_with_typing_effect(segments)
         
+        # 스토리 완료 후 Enter 키 입력 대기
+        try:
+            # 이미 스토리에 메시지가 포함되어 있으므로 빈 입력 대기만 수행
+            input()
+        except KeyboardInterrupt:
+            pass
+        
         # 스토리 완료 후 BGM 복구
         self._restore_normal_bgm()
         
