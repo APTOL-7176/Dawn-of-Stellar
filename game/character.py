@@ -56,7 +56,7 @@ class StatusManager:
                     name=status_effect,
                     status_type=status_type,
                     duration=duration or 3,
-                    intensity=intensity or 1
+                    effect_value=intensity or 1
                 )
             else:
                 return False
@@ -2094,6 +2094,10 @@ class Character(BraveMixin):
             physical_defense = defaults["p_def"]
             magic_defense = defaults["m_def"]
             speed = defaults["speed"]
+        elif skip_class_modifiers:
+            # 🚨 스킵 모드에서는 전달받은 값을 그대로 사용 (기본값 적용 X)
+            # save_system에서 정확한 스탯값을 넘겨주므로 덮어쓰지 않음
+            pass
         
         # 클래스 특화 정보 항상 가져오기 (스킵 여부와 상관없이)
         specialization = CharacterClassManager.get_class_specialization(character_class)
@@ -2487,7 +2491,10 @@ class Character(BraveMixin):
         self.equipment_attack_bonus = 0
         self.equipment_defense_bonus = 0
         self.equipment_magic_bonus = 0
+        self.equipment_magic_defense_bonus = 0  # 마법방어 보너스
         self.equipment_speed_bonus = 0
+        self.equipment_hp_bonus = 0  # HP 보너스 추가
+        self.equipment_mp_bonus = 0  # MP 보너스 추가
         
         # 초기화 완료 후 애니메이션 활성화
         self._animation_enabled = True
@@ -3343,20 +3350,22 @@ class Character(BraveMixin):
         try:
             from game.cursor_menu_system import CursorMenu
             from game.color_text import bright_cyan, bright_yellow, yellow, green, red, bright_white, cyan, white
+            import os
+            import time
+            import sys
             
-            # 캐릭터 정보 헤더 표시
-            print(f"\n{bright_cyan('='*60)}")
-            print(f"{bright_cyan(f'🎭 {self.name} ({self.character_class}) - 특성 선택')}")
-            print(f"{bright_cyan('='*60)}")
-            
-            # 캐릭터 기본 능력치 표시
-            print(f"{cyan('📊 기본 능력치:')}")
-            print(f"  💪 물리공격: {self.physical_attack:3d}  🔮 마법공격: {self.magic_attack:3d}")
-            print(f"  🛡️  물리방어: {self.physical_defense:3d}  🛡️ 마법방어: {self.magic_defense:3d}")
-            print(f"  ❤️  H  P: {self.max_hp:3d}  💙 M  P: {self.max_mp:3d}")
-            print(f"  ⚡ 초기BRV: {self.initial_brave:3d}  🔥 최대BRV: {self.max_brave:3d}")
-            print(f"  🏃 속  도: {self.speed:3d}")
-            print()
+            # 화면 지우기 (캐릭터 정보 겹침 방지)
+            try:
+                sys.stdout.flush()
+                time.sleep(0.05)
+                if os.name == 'nt':
+                    print("\x1b[2J\x1b[3J\x1b[H", end='', flush=True)
+                else:
+                    print("\x1b[2J\x1b[3J\x1b[H", end='', flush=True)
+                time.sleep(0.05)
+                sys.stdout.flush()
+            except:
+                print('\n' * 50, flush=True)
             
             print(f"{bright_yellow('💡 0-2개의 특성을 선택할 수 있습니다 (패시브 없이도 게임 가능)')}")
             print(f"{yellow('❓ 특성을 선택하면 게임에서 자동으로 발동됩니다')}")
@@ -3412,10 +3421,14 @@ class Character(BraveMixin):
                 # 현재 선택 상태 표시
                 selected_names = [trait.name for trait in selected_traits]
                 current_selection = ", ".join(selected_names) if selected_names else "없음"
-                title = f"🎮 특성 선택 ({len(selected_traits)}/2)\n현재 선택: {current_selection}"
+                
+                # 캐릭터 기본 정보가 포함된 title
+                title = (f"🎮 특성 선택 ({len(selected_traits)}/2)\n"
+                        f"캐릭터: {self.name} ({self.character_class})\n"
+                        f"현재 선택: {current_selection}")
                 
                 # 커서 메뉴 생성 및 실행 (취소 가능하도록 설정)
-                menu = CursorMenu(title, options, descriptions, cancellable=True)
+                menu = CursorMenu(title, options, descriptions, cancellable=True, clear_screen=True)
                 result = menu.run()
                 
                 if result is None or result == -1:  # 취소 (Q키)
@@ -4013,6 +4026,9 @@ class Character(BraveMixin):
                 print(f"⚠️ 장착 시점에 {item.name}이(가) 인벤토리에 없습니다.")
                 return False
         
+        # 🔧 장비 효과 재계산 (중요!)
+        self._apply_equipment_effects()
+        
         return True
     
     def unequip_item(self, slot: str) -> Optional[Item]:
@@ -4028,6 +4044,10 @@ class Character(BraveMixin):
         elif slot == "장신구" or slot == "accessory":
             unequipped_item = self.equipped_accessory
             self.equipped_accessory = None
+        
+        # 🔧 장비 효과 재계산 (중요!)
+        if unequipped_item:
+            self._apply_equipment_effects()
         
         return unequipped_item
     
@@ -4520,6 +4540,98 @@ class Character(BraveMixin):
         if self._player_skill_system is None:
             return "스킬 정보 없음"
         return self._player_skill_system.get_skill_description(skill)
+    
+    def _apply_equipment_effects(self):
+        """착용 중인 장비의 효과 적용"""
+        # 장비 보너스 초기화
+        self.equipment_attack_bonus = 0
+        self.equipment_defense_bonus = 0
+        self.equipment_magic_bonus = 0
+        self.equipment_magic_defense_bonus = 0  # 마법방어 보너스 추가
+        self.equipment_speed_bonus = 0
+        self.equipment_hp_bonus = 0
+        self.equipment_mp_bonus = 0
+        
+        # 착용 중인 장비들의 효과 적용
+        equipped_items = [item for item in [self.equipped_weapon, self.equipped_armor, self.equipped_accessory] if item]
+        
+        for item in equipped_items:
+            if hasattr(item, 'stats'):
+                stats = item.stats
+                self.equipment_attack_bonus += stats.get('physical_attack', 0)
+                self.equipment_defense_bonus += stats.get('physical_defense', 0)
+                self.equipment_magic_bonus += stats.get('magic_attack', 0)
+                self.equipment_magic_defense_bonus += stats.get('magic_defense', 0)  # 마법방어 적용
+                self.equipment_speed_bonus += stats.get('speed', 0)
+                
+                # HP/MP 보너스 적용 및 로깅
+                hp_bonus = stats.get('max_hp', 0)
+                mp_bonus = stats.get('max_mp', 0)
+                self.equipment_hp_bonus += hp_bonus
+                self.equipment_mp_bonus += mp_bonus
+                
+                # 장비 효과 로깅
+                if hp_bonus > 0 or mp_bonus > 0:
+                    from .error_logger import log_debug
+                    log_debug("장비효과", f"장비 보너스 적용", {
+                        "캐릭터": self.name,
+                        "장비명": item.name,
+                        "HP보너스": hp_bonus,
+                        "MP보너스": mp_bonus,
+                        "현재HP보너스합계": self.equipment_hp_bonus,
+                        "현재MP보너스합계": self.equipment_mp_bonus
+                    })
+        
+        # ATB 속도도 장비 보너스 반영
+        self.atb_speed = self.get_total_speed()
+        
+        # 🔧 장비 변경 후 현재 HP/MP 조정
+        # 새로운 최대값을 초과하지 않도록 조정
+        if hasattr(self, 'current_hp') and self.current_hp > self.max_hp:
+            self.current_hp = self.max_hp
+        if hasattr(self, 'current_mp') and self.current_mp > self.max_mp:
+            self.current_mp = self.max_mp
+            
+        # 장비 변경 로깅
+        from .error_logger import log_debug
+        log_debug("장비변경", f"장비 효과 재계산 완료", {
+            "캐릭터": self.name,
+            "최대HP": self.max_hp,
+            "현재HP": getattr(self, 'current_hp', 0),
+            "최대MP": self.max_mp,
+            "현재MP": getattr(self, 'current_mp', 0),
+            "HP보너스": self.equipment_hp_bonus,
+            "MP보너스": self.equipment_mp_bonus
+        })
+    
+    def calculate_total_stats(self):
+        """전체 스탯 재계산 (장비 보너스 포함)"""
+        # 기본 스탯을 기반으로 장비 보너스 적용
+        # 장비 효과가 이미 apply_equipment_effects에서 처리되므로
+        # 여기서는 간단한 검증 및 조정만 수행
+        
+        # HP/MP가 최대치를 초과하지 않도록 조정
+        if hasattr(self, 'current_hp') and hasattr(self, 'max_hp'):
+            if self.current_hp > self.max_hp:
+                self.current_hp = self.max_hp
+        
+        if hasattr(self, 'current_mp') and hasattr(self, 'max_mp'):
+            if self.current_mp > self.max_mp:
+                self.current_mp = self.max_mp
+        
+        # ATB 속도 업데이트
+        if hasattr(self, 'get_total_speed'):
+            self.atb_speed = self.get_total_speed()
+        
+        # 로깅
+        from .error_logger import log_debug
+        log_debug("스탯계산", f"총 스탯 재계산 완료", {
+            "캐릭터": self.name,
+            "직업": self.character_class,
+            "레벨": self.level,
+            "최대HP": self.max_hp,
+            "최대MP": self.max_mp
+        })
 
 
 class PartyManager:
@@ -4545,8 +4657,16 @@ class PartyManager:
         return base_capacity + attack_bonus
         
     def get_current_carry_weight(self) -> float:
-        """현재 파티 하중 계산 (식재료 포함)"""
+        """현재 파티 하중 계산 (모든 파티원 인벤토리 + 식재료 포함)"""
         weight = self.shared_inventory.get_total_weight()
+        
+        # 모든 파티원의 개별 인벤토리 무게 추가
+        for member in self.members:
+            if hasattr(member, 'inventory') and member.inventory:
+                try:
+                    weight += member.inventory.get_total_weight()
+                except Exception:
+                    pass  # 오류 발생 시 무시하고 계속
         
         # 식재료 무게 추가
         try:
@@ -4787,6 +4907,171 @@ class PartyManager:
                 healed = member.heal(heal_amount)
                 print(f"{member.name}: {healed} HP 회복")
     
+    def redistribute_equipment(self):
+        """파티 전체 장비 재배치 시스템"""
+        print("\n🔄 파티 장비 재배치를 시작합니다...")
+        
+        # 1단계: 모든 장비 해제하여 공용 인벤토리로 이동
+        all_equipment = []
+        for member in self.members:
+            if member.is_alive:
+                # 무기 해제
+                if hasattr(member, 'equipped_weapon') and member.equipped_weapon:
+                    all_equipment.append(member.equipped_weapon)
+                    self.shared_inventory.add_item(member.equipped_weapon)
+                    member.equipped_weapon = None
+                    
+                # 방어구 해제
+                if hasattr(member, 'equipped_armor') and member.equipped_armor:
+                    all_equipment.append(member.equipped_armor)
+                    self.shared_inventory.add_item(member.equipped_armor)
+                    member.equipped_armor = None
+                    
+                # 액세서리 해제
+                if hasattr(member, 'equipped_accessory') and member.equipped_accessory:
+                    all_equipment.append(member.equipped_accessory)
+                    self.shared_inventory.add_item(member.equipped_accessory)
+                    member.equipped_accessory = None
+                    
+                # 스탯 재계산
+                member.calculate_total_stats()
+        
+        print(f"✅ 총 {len(all_equipment)}개 장비를 공용 인벤토리로 이동했습니다.")
+        
+        # 2단계: 직업별 우선순위에 따라 최적 장비 재배치
+        print("\n🎯 각 멤버에게 최적 장비 배정 중...")
+        
+        # 각 멤버에게 최적 장비 배정
+        for member in self.members:
+            if member.is_alive:
+                print(f"\n⚔️ {member.name} ({member.character_class}) 장비 최적화 중...")
+                
+                # 무기 찾기
+                best_weapon = self._find_best_equipment_for_member(member, "weapon")
+                if best_weapon:
+                    member.equipped_weapon = best_weapon
+                    self.shared_inventory.remove_item(best_weapon)
+                    print(f"   🗡️ 무기 장착: {best_weapon.name}")
+                    from game.error_logger import log_system
+                    log_system("장비재배치", f"{member.name}에게 {best_weapon.name} 무기 장착 완료")
+                else:
+                    from game.error_logger import log_system  
+                    log_system("장비재배치", f"{member.name}에게 적합한 무기 없음")
+                
+                # 방어구 찾기
+                best_armor = self._find_best_equipment_for_member(member, "armor")
+                if best_armor:
+                    member.equipped_armor = best_armor
+                    self.shared_inventory.remove_item(best_armor)
+                    print(f"   🛡️ 방어구 장착: {best_armor.name}")
+                    from game.error_logger import log_system
+                    log_system("장비재배치", f"{member.name}에게 {best_armor.name} 방어구 장착 완료")
+                else:
+                    from game.error_logger import log_system
+                    log_system("장비재배치", f"{member.name}에게 적합한 방어구 없음")
+                
+                # 액세서리 찾기
+                best_accessory = self._find_best_equipment_for_member(member, "accessory")
+                if best_accessory:
+                    member.equipped_accessory = best_accessory
+                    self.shared_inventory.remove_item(best_accessory)
+                    print(f"   💍 액세서리 장착: {best_accessory.name}")
+                    from game.error_logger import log_system
+                    log_system("장비재배치", f"{member.name}에게 {best_accessory.name} 액세서리 장착 완료")
+                else:
+                    from game.error_logger import log_system
+                    log_system("장비재배치", f"{member.name}에게 적합한 액세서리 없음")
+                
+                # 스탯 재계산
+                member.calculate_total_stats()
+        
+        print(f"\n🎉 파티 장비 재배치 완료!")
+        print(f"📦 공용 인벤토리 남은 아이템: {len(self.shared_inventory.items)}개")
+        
+        return True
+    
+    def _find_best_equipment_for_member(self, member: Character, equipment_type: str):
+        """멤버에게 가장 적합한 장비 찾기"""
+        suitable_items = []
+        
+        # 안전성 검증
+        if not member or not hasattr(member, 'name'):
+            from game.error_logger import log_error
+            log_error("장비재배치", "멤버 객체가 None이거나 name 속성이 없음", {
+                "member": str(member),
+                "equipment_type": equipment_type
+            })
+            return None
+        
+        for item in self.shared_inventory.items:
+            if not item or not hasattr(item, 'item_type'):
+                continue
+                
+            # 장비 타입 매칭
+            if equipment_type == "weapon" and item.item_type == "무기":
+                suitable_items.append(item)
+            elif equipment_type == "armor" and item.item_type == "방어구":
+                suitable_items.append(item)  
+            elif equipment_type == "accessory" and item.item_type == "액세서리":
+                suitable_items.append(item)
+        
+        if not suitable_items:
+            return None
+            
+        # 직업별 우선순위에 따라 최적 장비 선택
+        best_item = None
+        best_score = -1
+        
+        for item in suitable_items:
+            if not item or not hasattr(item, 'name'):
+                continue  # 안전성 검증
+            score = self._calculate_equipment_score(member, item)
+            if score > best_score:
+                best_score = score
+                best_item = item
+        
+        return best_item
+    
+    def _calculate_equipment_score(self, member: Character, item) -> float:
+        """장비의 캐릭터 적합도 점수 계산"""
+        if not hasattr(item, 'stats') or not item.stats:
+            return 0.0
+        
+        score = 0.0
+        job_class = member.character_class
+        
+        # 직업별 스탯 가중치
+        if job_class in ["전사", "기사", "검투사"]:
+            # 물리 공격 중시
+            score += item.stats.get('physical_attack', 0) * 2.0
+            score += item.stats.get('physical_defense', 0) * 1.5
+            score += item.stats.get('hp', 0) * 1.0
+        elif job_class in ["아크메이지", "정령술사", "차원술사"]:
+            # 마법 공격 중시
+            score += item.stats.get('magic_attack', 0) * 2.0
+            score += item.stats.get('mp', 0) * 1.5
+            score += item.stats.get('magic_defense', 0) * 1.0
+        elif job_class in ["신관", "드루이드"]:
+            # 회복/지원 중시
+            score += item.stats.get('mp', 0) * 2.0
+            score += item.stats.get('magic_attack', 0) * 1.5
+            score += item.stats.get('hp', 0) * 1.0
+        elif job_class in ["도적", "암살자", "궁수"]:
+            # 속도/크리티컬 중시
+            score += item.stats.get('speed', 0) * 2.0
+            score += item.stats.get('physical_attack', 0) * 1.5
+            score += item.stats.get('critical_rate', 0) * 1.0
+        else:
+            # 범용적인 점수 계산
+            score += item.stats.get('physical_attack', 0) * 1.0
+            score += item.stats.get('magic_attack', 0) * 1.0
+            score += item.stats.get('physical_defense', 0) * 0.8
+            score += item.stats.get('magic_defense', 0) * 0.8
+            score += item.stats.get('hp', 0) * 0.5
+            score += item.stats.get('mp', 0) * 0.5
+        
+        return score
+    
     # === 플레이어 스킬 시스템 통합 ===
     
     def set_player_skill_system(self, skill_system):
@@ -4858,52 +5143,34 @@ class PartyManager:
     
     def unequip_item(self, slot: str) -> bool:
         """아이템 해제"""
+        unequipped = False
         if slot == "weapon" and self.equipped_weapon:
             item = self.equipped_weapon
             self.equipped_weapon = None
             print(f"{self.name}이(가) {item.name}을(를) 해제했습니다.")
+            unequipped = True
         elif slot == "armor" and self.equipped_armor:
             item = self.equipped_armor
             self.equipped_armor = None
             print(f"{self.name}이(가) {item.name}을(를) 해제했습니다.")
+            unequipped = True
         elif slot == "accessory" and self.equipped_accessory:
             item = self.equipped_accessory
             self.equipped_accessory = None
             print(f"{self.name}이(가) {item.name}을(를) 해제했습니다.")
+            unequipped = True
         else:
             return False
+            
+        # 🔧 장비 효과 재계산 (중요!)
+        if unequipped:
+            self._apply_equipment_effects()
+        
+        return unequipped
         
         # 장비 효과 재계산
         self._apply_equipment_effects()
         return True
-    
-    def _apply_equipment_effects(self):
-        """착용 중인 장비의 효과 적용"""
-        # 장비 보너스 초기화
-        self.equipment_attack_bonus = 0
-        self.equipment_defense_bonus = 0
-        self.equipment_magic_bonus = 0
-        self.equipment_magic_defense_bonus = 0  # 마법방어 보너스 추가
-        self.equipment_speed_bonus = 0
-        self.equipment_hp_bonus = 0
-        self.equipment_mp_bonus = 0
-        
-        # 착용 중인 장비들의 효과 적용
-        equipped_items = [item for item in [self.equipped_weapon, self.equipped_armor, self.equipped_accessory] if item]
-        
-        for item in equipped_items:
-            if hasattr(item, 'stats'):
-                stats = item.stats
-                self.equipment_attack_bonus += stats.get('physical_attack', 0)
-                self.equipment_defense_bonus += stats.get('physical_defense', 0)
-                self.equipment_magic_bonus += stats.get('magic_attack', 0)
-                self.equipment_magic_defense_bonus += stats.get('magic_defense', 0)  # 마법방어 적용
-                self.equipment_speed_bonus += stats.get('speed', 0)
-                self.equipment_hp_bonus += stats.get('max_hp', 0)
-                self.equipment_mp_bonus += stats.get('max_mp', 0)
-        
-        # ATB 속도도 장비 보너스 반영
-        self.atb_speed = self.get_total_speed()
     
     def get_total_attack(self) -> int:
         """장비 보너스가 포함된 총 공격력"""

@@ -6,7 +6,8 @@ Dawn of Stellar의 모든 메뉴에 적용되는 통합 메뉴 시스템
 
 import os
 import sys
-from typing import List, Optional, Callable, Dict, Any
+import time
+from typing import List, Optional, Callable, Any
 from enum import Enum
 class MenuAction(Enum):
     """메뉴 액션 타입"""
@@ -35,7 +36,7 @@ class CursorMenu:
     def __init__(self, title: str = "", options: List[str] = None, descriptions: List[str] = None, 
                  audio_manager=None, keyboard=None, cancellable: bool = True, extra_content: str = "",
                  clear_screen: bool = True,
-                 buffered: bool = False):
+                 buffered: bool = False, multi_select: bool = False, max_selections: int = 4):
         """메뉴 초기화"""
         try:
             if not audio_manager:
@@ -59,6 +60,11 @@ class CursorMenu:
                 self.keyboard = KeyboardInput()
             except:
                 self.keyboard = None
+        except Exception as e:
+            # 예상치 못한 초기화 오류
+            print(f"⚠️ 초기화 중 오류: {e}")
+            self.audio_manager = None
+            self.keyboard = None
 
         # 기본 상태값
         self.selected_index = 0
@@ -73,18 +79,49 @@ class CursorMenu:
         self.clear_screen = clear_screen
         self.buffered = buffered or self.compact_mode
         self._last_render_line_count = 0
-        self._ansi_inplace_supported = self._detect_ansi_support()
+        
+        # 멀티 선택 관련 설정
+        self.multi_select = multi_select
+        self.max_selections = max_selections
+        self.selected_items = set()  # 선택된 아이템 인덱스들
+        # PowerShell/Windows Terminal 환경 감지 및 설정
+        powershell_env = (
+            'PSModulePath' in os.environ or 
+            'WT_SESSION' in os.environ or
+            'TERM_PROGRAM' in os.environ or
+            'powershell' in sys.executable.lower() or
+            'pwsh' in sys.executable.lower()
+        )
+        
+        # 런처에서 PowerShell로 실행되었는지 확인
+        launcher_powershell = os.getenv('LAUNCHER_POWERSHELL') == '1'
+        
+        if powershell_env or launcher_powershell:
+            self._ansi_inplace_supported = True
+            print("[INFO] PowerShell 환경 감지 - 고급 메뉴 시스템 활성화")
+        else:
+            self._ansi_inplace_supported = False
+            print("[INFO] 명령 프롬프트 환경 감지 - 기본 메뉴 시스템 사용")
+            
         self._menu_displayed = False
         
-        # 모바일 환경 감지 (Flutter 클라이언트나 HTTP 모드)
-        self.is_mobile = (os.getenv('MOBILE_MODE') == '1' or 
-                         os.getenv('HTTP_MODE') == '1' or
-                         os.getenv('FLUTTER_MODE') == '1')
+        # 모바일 환경 감지 (Flutter 클라이언트나 HTTP 모드) - 안전한 초기화
+        try:
+            self.is_mobile = (os.getenv('MOBILE_MODE') == '1' or 
+                             os.getenv('HTTP_MODE') == '1' or
+                             os.getenv('FLUTTER_MODE') == '1')
+        except Exception:
+            # 환경변수 접근 실패 시 기본값
+            self.is_mobile = False
         
         # 모바일에서는 인플레이스 업데이트 비활성화 (중복 표시 방지)
         if self.is_mobile:
             self._ansi_inplace_supported = False
             self.compact_mode = True
+        
+        # PowerShell에서 ANSI 지원 강제 활성화
+        if not self.is_mobile and not self.compact_mode:
+            self._ansi_inplace_supported = True
 
         # 옵션 -> MenuItem 자동 생성
         if options:
@@ -95,37 +132,11 @@ class CursorMenu:
             self.set_items(temp_items)
 
     def _println(self, text: str = "", normalize_multi: bool = False):
-        """크로스플랫폼 줄바꿈 출력. Windows에서 CRLF 보장.
-        normalize_multi=True일 때는 문자열 내부의 모든 \n을 CRLF로 변환.
-        """
+        """명령 프롬프트 전용 출력 - 단순하게"""
         try:
-            if os.name == 'nt':
-                t = text or ""
-                if normalize_multi and t:
-                    # 1) 모든 라인 엔딩을 LF로 통일
-                    t = t.replace('\r\n', '\n').replace('\r', '\n')
-                    # 2) 컴팩트 모드에서는 연속 빈 줄을 1줄로 축소
-                    if self.compact_mode:
-                        lines = t.split('\n')
-                        collapsed = []
-                        prev_blank = False
-                        for ln in lines:
-                            blank = (ln.strip() == '')
-                            if blank and prev_blank:
-                                continue
-                            collapsed.append(ln)
-                            prev_blank = blank
-                        t = '\n'.join(collapsed)
-                    # 3) LF를 CRLF로 변환 후 최종 CRLF 추가
-                    t = t.replace('\n', '\r\n')
-                    sys.stdout.write(t + "\r\n")
-                else:
-                    sys.stdout.write(t + "\r\n")
-            else:
-                print(text)
-        except Exception:
-            # 문제가 생기면 일반 print로 폴백
             print(text)
+        except Exception:
+            pass
         
     def set_items(self, items: List[MenuItem]):
         """메뉴 아이템 설정"""
@@ -173,51 +184,81 @@ class CursorMenu:
                 pass  # 사운드 재생 실패해도 계속 진행
     
     def _clear_screen(self):
-        """화면 클리어 - 개선된 버전 + 디바운싱"""
-        import time
+        """환경에 맞는 화면 클리어"""
+        import sys
+        import os
         
-        # 디바운싱: 0.1초 이내 중복 클리어 방지
-        current_time = time.time()
-        if hasattr(self, '_last_clear_time'):
-            if current_time - self._last_clear_time < 0.1:
-                return  # 너무 빈번한 클리어 방지
-        self._last_clear_time = current_time
-        
-        # 버퍼 모드에서는 ANSI 클리어 + 홈 커서 토큰만 보냄
-        if self.buffered:
+        if self._ansi_inplace_supported:
+            # PowerShell/Windows Terminal - ANSI 시퀀스 사용
             try:
-                # ANSI 시퀀스로 화면 완전 클리어
-                print("\x1b[2J\x1b[H", end='', flush=True)
-            except Exception:
+                sys.stdout.write('\033[2J\033[H')  # 화면 클리어 + 커서 홈
+                sys.stdout.flush()
+                return
+            except:
                 pass
-            return
         
-        # 표준 터미널 클리어
+        # 명령 프롬프트 - cls 명령 사용
         try:
-            # Windows에서 더 강력한 클리어
-            if os.name == 'nt':
-                # ANSI 시퀀스 시도 (Windows Terminal, ConEmu 등)
-                if 'WT_SESSION' in os.environ or 'ANSICON' in os.environ:
-                    print("\x1b[2J\x1b[H", end='', flush=True)
-                else:
-                    # CMD 기본 cls
-                    os.system('cls')
-                    print("\x1b[H", end='', flush=True)  # 커서 홈으로
-            else:
-                # Unix/Linux
-                print("\x1b[2J\x1b[H", end='', flush=True)
+            os.system('cls')
         except:
-            # 폴백: 기본 시스템 클리어
-            os.system('cls' if os.name == 'nt' else 'clear')
+            # 최후 수단: 빈 줄로 밀어내기
+            for _ in range(50):
+                print()
+        
+        # 버퍼 플러시
+        try:
+            sys.stdout.flush()
+        except:
+            pass
 
     # ====== 신규: ANSI 지원 감지 & 라인 구성/인플레이스 렌더 ======
     def _detect_ansi_support(self) -> bool:
-        """터미널이 기본 ANSI 시퀀스를 지원하는지 간단 감지"""
+        """터미널이 기본 ANSI 시퀀스를 지원하는지 정확하게 감지"""
+        import os
+        import sys
+        
+        # 모바일/웹 모드는 ANSI 지원 안 함
+        if self.is_mobile or self.compact_mode:
+            return False
+            
+        # stdout이 터미널이 아니면 지원 안 함
+        if not sys.stdout.isatty():
+            return False
+            
         if os.name != 'nt':
+            # Unix/Linux는 대부분 ANSI 지원
             return True
-        # Windows: WT_SESSION(Windows Terminal) 또는 ANSICON / ConEmu 등
-        if 'WT_SESSION' in os.environ or 'ANSICON' in os.environ:
+            
+        # Windows에서 ANSI 지원 체크
+        # 1. Windows Terminal
+        if 'WT_SESSION' in os.environ:
             return True
+            
+        # 2. ConEmu, Cmder 등
+        if 'ANSICON' in os.environ or 'ConEmuANSI' in os.environ:
+            return True
+            
+        # 3. PowerShell 현대 버전
+        if 'PSModulePath' in os.environ:
+            return True
+            
+        # 4. Windows 10 이상의 기본 콘솔 (VT 모드)
+        try:
+            import platform
+            version = platform.version()
+            if version and len(version.split('.')) >= 2:
+                major = int(version.split('.')[0])
+                if major >= 10:  # Windows 10 이상
+                    return True
+        except:
+            pass
+            
+        # 4. VS Code 터미널
+        if 'VSCODE_INJECTION' in os.environ or 'TERM_PROGRAM' in os.environ:
+            return True
+            
+        # 기본값: ANSI 미지원
+        return False
         # colorama 초기화 여부는 여기서 판단 어렵지만 일단 False
         return False
 
@@ -235,7 +276,13 @@ class CursorMenu:
                 lines.append(self.title)
         # 추가 콘텐츠
         if self.extra_content:
-            extra = self.extra_content.replace('\r\n','\n').replace('\r','\n')
+            # extra_content가 리스트인 경우 문자열로 변환
+            if isinstance(self.extra_content, list):
+                extra = '\n'.join(str(item) for item in self.extra_content)
+            else:
+                extra = str(self.extra_content)
+            
+            extra = extra.replace('\r\n','\n').replace('\r','\n')
             extra_lines = extra.split('\n')
             if self.compact_mode:
                 # 연속 공백 줄 축소
@@ -255,13 +302,27 @@ class CursorMenu:
             lines.append("⚠️ 메뉴 아이템이 없습니다!")
         else:
             for i,item in enumerate(self.items):
+                # 체크박스 표시 (멀티 선택 모드일 때)
+                checkbox = ""
+                if self.multi_select:
+                    if i in self.selected_items:
+                        checkbox = "☑️ "
+                    else:
+                        checkbox = "☐ "
+                
                 if not item.enabled:
                     prefix = "   " if i != self.selected_index else "👉 "
-                    line = f"{prefix}🚫 {item.text}"
+                    line = f"{prefix}{checkbox}🚫 {item.text}"
                 elif i == self.selected_index:
-                    line = f"👉 [{i+1}] {item.text} 👈" if self.show_index else f"👉 {item.text} 👈"
+                    if self.show_index:
+                        line = f"👉 {checkbox}[{i+1}] {item.text} 👈"
+                    else:
+                        line = f"👉 {checkbox}{item.text} 👈"
                 else:
-                    line = f"   [{i+1}] {item.text}" if self.show_index else f"   {item.text}"
+                    if self.show_index:
+                        line = f"   {checkbox}[{i+1}] {item.text}"
+                    else:
+                        line = f"   {checkbox}{item.text}"
                 lines.append(line)
         # 설명
         if self.show_description and self.items and self.selected_index < len(self.items):
@@ -277,6 +338,8 @@ class CursorMenu:
         controls=[]
         if len(self.items)>1:
             controls.append("🔼🔽 W/S: 위/아래")
+        if self.multi_select:
+            controls.append("☑️ Space: 체크/해제")
         controls.append("⚡ Enter: 선택")
         if self.cancellable:
             controls.append("❌ Q: 취소")
@@ -301,47 +364,94 @@ class CursorMenu:
         sys.stdout.flush()
 
     def _redraw_in_place(self):
-        """ANSI 커서 이동을 사용한 인플레이스 갱신 (중복 누적 제거)"""
-        if not self._ansi_inplace_supported or not sys.stdout.isatty():
-            # 폴백: 전체 재표시
-            self._update_menu_only()
+        """환경에 맞는 화면 다시 그리기"""
+        if self._ansi_inplace_supported:
+            # PowerShell - 부드러운 인플레이스 업데이트
+            try:
+                import sys
+                sys.stdout.write('\033[2J\033[H')  # 화면 클리어 + 커서 홈
+                sys.stdout.flush()
+                
+                # 새 메뉴 내용 출력
+                lines = self._compose_menu_lines()
+                self._print_lines(lines)
+                self._last_render_line_count = len(lines)
+                return
+            except:
+                pass
+        
+        # 명령 프롬프트 - 전체 화면 클리어 후 다시 그리기
+        self._clear_screen()
+        lines = self._compose_menu_lines()
+        self._print_lines(lines)
+        self._last_render_line_count = len(lines)
+
+    def _minimal_update(self):
+        """ANSI 미지원 환경에서 최소한의 업데이트 (깜빡임 방지)"""
+        # 현재 선택된 항목만 다시 표시 (짧은 업데이트)
+        if not self.items or self.selected_index >= len(self.items):
             return
-        new_lines = self._compose_menu_lines()
-        # 커서를 이전 렌더 줄 수 만큼 위로 이동
-        if self._last_render_line_count > 0:
-            # A: 위로 이동, H: 필요시 홈이지만 여기선 A만
-            sys.stdout.write(f"\x1b[{self._last_render_line_count}F")
-        # 각 줄 지우고 새 내용 출력
-        common = min(self._last_render_line_count, len(new_lines))
-        for i in range(common):
-            sys.stdout.write("\x1b[2K" + new_lines[i] + ("\r\n" if i < len(new_lines)-1 else ""))
-        # 추가 새 줄
-        if len(new_lines) > common:
-            for i in range(common, len(new_lines)):
-                sys.stdout.write("\x1b[2K" + new_lines[i] + ("\r\n" if i < len(new_lines)-1 else ""))
-        # 남은 이전 줄 지우기
-        if self._last_render_line_count > len(new_lines):
-            for _ in range(self._last_render_line_count - len(new_lines)):
-                sys.stdout.write("\x1b[2K\r\n")
-        sys.stdout.flush()
-        self._last_render_line_count = len(new_lines)
+        
+        print("\n" + "─" * 50)
+        current_item = self.items[self.selected_index]
+        print(f"👉 현재 선택: {current_item.text}")
+        if current_item.description:
+            print(f"💡 {current_item.description}")
+        print("─" * 50)
+        
+    def _redraw_in_place_optimized(self):
+        """최적화된 인플레이스 리드로우 (커서 이동만)"""
+        if not self._ansi_inplace_supported or not self._menu_displayed:
+            return False
+            
+        try:
+            # 간단한 ANSI 시퀀스로 메뉴 부분만 업데이트
+            lines = self._compose_menu_lines()
+            
+            # 커서를 메뉴 시작점으로 이동
+            if self._last_render_line_count > 0:
+                sys.stdout.write(f"\x1b[{self._last_render_line_count}A")
+            
+            # 각 줄 업데이트 (지우기 + 새 내용)
+            for i, line in enumerate(lines):
+                sys.stdout.write(f"\x1b[2K{line}")
+                if i < len(lines) - 1:
+                    sys.stdout.write("\r\n")
+            
+            sys.stdout.flush()
+            self._last_render_line_count = len(lines)
+            return True
+            
+        except Exception:
+            return False
 
         
     def display_menu(self):
-        """메뉴 화면 표시"""
-        self._clear_screen()
+        """메뉴 화면 표시 - 명령 프롬프트 최적화"""
+        # 빈 줄로 이전 내용 밀어내기 (확실한 방법)
+        for _ in range(100):
+            print()
+        
+        # cls 시도
+        try:
+            import os
+            os.system('cls')
+        except:
+            pass
+        
+        # 추가로 빈 줄 몇 개 더
+        for _ in range(5):
+            print()
+            
         lines = self._compose_menu_lines()
         self._print_lines(lines)
         self._last_render_line_count = len(lines)
         self._menu_displayed = True
     
     def _update_selection_inline(self):
-        """선택 항목만 인라인으로 표시 (아스키 아트 보존용) - 깜빡임 방지"""
-        # 인플레이스 ANSI 재렌더 (지원시)
-        if self._ansi_inplace_supported:
-            self._redraw_in_place()
-        else:
-            self._update_menu_only()
+        """선택 항목 변경 시 전체 메뉴 다시 그리기"""
+        # 항상 전체 메뉴 다시 그리기
+        self.display_menu()
         
     def _display_menu_footer_inline(self):
         """메뉴 하단 정보를 인라인으로 표시 (화면 스크롤 방지)"""
@@ -515,7 +625,7 @@ class CursorMenu:
             while not key:
                 key = self.keyboard.get_input().lower()
                 if not key:
-                    time.sleep(0.05)  # 50ms 대기
+                    time.sleep(0.02)  # 20ms 대기 (더 빠른 반응)
         else:
             # 폴백: 기존 키보드 입력
             key = self.keyboard.get_key().lower()
@@ -532,19 +642,74 @@ class CursorMenu:
         elif key == 'd':  # 오른쪽 (게임패드 D-패드)
             self.move_cursor(1)
             return MenuAction.RIGHT
-        elif key == '\r' or key == '\n' or key == ' ':  # 엔터 또는 스페이스 (선택)
-            if self.items and self.selected_index < len(self.items):
+        elif key == '\r' or key == '\n':  # 엔터 
+            if self.multi_select:
+                # 멀티 선택 모드: 엔터로 체크/언체크 토글
+                if self.items and self.selected_index < len(self.items):
+                    current_item = self.items[self.selected_index]
+                    if current_item.enabled:
+                        if self.selected_index in self.selected_items:
+                            # 체크 해제
+                            self.selected_items.remove(self.selected_index)
+                            self.play_cancel_sound()
+                        else:
+                            # 체크 추가 (최대 선택 수 확인)
+                            if len(self.selected_items) < self.max_selections:
+                                self.selected_items.add(self.selected_index)
+                                self.play_confirm_sound()
+                                
+                                # 최대 선택 수에 도달하면 자동으로 완료
+                                if len(self.selected_items) >= self.max_selections:
+                                    return MenuAction.SELECT
+                            else:
+                                self.play_error_sound()
+                        return MenuAction.SPECIAL  # 화면 업데이트 필요
+                    else:
+                        self.play_error_sound()
+                        return MenuAction.SPECIAL
+                return MenuAction.SPECIAL
+            else:
+                # 단일 선택 모드: 현재 아이템 선택
+                if self.items and self.selected_index < len(self.items):
+                    current_item = self.items[self.selected_index]
+                    if current_item.enabled:
+                        self.play_confirm_sound()
+                        return MenuAction.SELECT
+                    else:
+                        self.play_error_sound()
+                        return MenuAction.SPECIAL
+                return MenuAction.SELECT
+        elif key == ' ':  # 스페이스바 (체크박스 토글)
+            if self.multi_select and self.items and self.selected_index < len(self.items):
                 current_item = self.items[self.selected_index]
                 if current_item.enabled:
-                    self.play_confirm_sound()
-                    return MenuAction.SELECT
+                    if self.selected_index in self.selected_items:
+                        # 체크 해제
+                        self.selected_items.remove(self.selected_index)
+                        self.play_cancel_sound()
+                    else:
+                        # 체크 추가 (최대 선택 수 확인)
+                        if len(self.selected_items) < self.max_selections:
+                            self.selected_items.add(self.selected_index)
+                            self.play_confirm_sound()
+                        else:
+                            self.play_error_sound()
+                    return MenuAction.SPECIAL  # 화면 업데이트 필요
                 else:
                     self.play_error_sound()
                     return MenuAction.SPECIAL
-            return MenuAction.SELECT
+            return MenuAction.SPECIAL
         elif key == 'q' and self.cancellable:  # 취소 (키보드/게임패드 B버튼)
             self.play_cancel_sound()
             return MenuAction.CANCEL
+        elif key == 'f' or key == '\t':  # F키 또는 Tab키로 확정 (멀티 선택 모드)
+            if self.multi_select and self.selected_items:
+                self.play_confirm_sound()
+                return MenuAction.SELECT
+            elif self.multi_select and not self.selected_items:
+                self.play_error_sound()
+                return MenuAction.SPECIAL
+            return MenuAction.SPECIAL
         elif key == 'i':  # 정보
             return MenuAction.INFO
         elif key.isdigit():  # 숫자 직접 입력
@@ -564,34 +729,67 @@ class CursorMenu:
         
         return MenuAction.SPECIAL  # 기타 키
     
+    def __getattr__(self, name):
+        """누락된 속성에 대한 안전한 기본값 제공"""
+        if name == 'is_mobile':
+            return False
+        elif name == 'compact_mode':
+            return False
+        elif name == '_ansi_inplace_supported':
+            return True
+        elif name == 'buffered':
+            return False
+        elif name == 'clear_screen':
+            return True
+        elif name == '_last_clear_time':
+            return None
+        elif name == '_last_render_line_count':
+            return 0
+        elif name == '_menu_displayed':
+            return False
+        # 기타 누락된 속성들
+        return None
+
     def run(self) -> Optional[int]:
         """메뉴 실행"""
         if not self.items:
             return None
         
-        # 첫 번째 표시
+        # 화면 클리어 후 첫 번째 표시
+        if self.clear_screen:
+            self._clear_screen()
         self.display_menu()
         
         while True:
             action = self.handle_input()
             
             if action in [MenuAction.UP, MenuAction.DOWN]:
-                # 커서 이동 -> 인플레이스 갱신 시도
+                # 커서 이동 -> 간단한 상태 표시만 (메뉴 다시 그리지 않음)
                 self._update_selection_inline()
                 
+            elif action == MenuAction.SPECIAL:
+                # 특별 액션 (체크박스 토글 등) -> 전체 메뉴 다시 그리기
+                self._menu_displayed = False
+                self.display_menu()
+                
             elif action == MenuAction.SELECT:
-                current_item = self.items[self.selected_index]
-                if current_item.enabled:
-                    # 액션이 있으면 실행
-                    if current_item.action:
-                        try:
-                            result = current_item.action()
-                            if result is not None:
-                                return result
-                        except Exception as e:
-                            print(f"⚠️ 액션 실행 오류: {e}")
-                            self.keyboard.get_key() if self.keyboard else None
-                    return self.selected_index
+                if self.multi_select:
+                    # 멀티 선택 모드: 선택된 인덱스들의 리스트 반환
+                    return list(self.selected_items)
+                else:
+                    # 단일 선택 모드: 현재 인덱스 반환
+                    current_item = self.items[self.selected_index]
+                    if current_item.enabled:
+                        # 액션이 있으면 실행
+                        if current_item.action:
+                            try:
+                                result = current_item.action()
+                                if result is not None:
+                                    return result
+                            except Exception as e:
+                                print(f"⚠️ 액션 실행 오류: {e}")
+                                self.keyboard.get_key() if self.keyboard else None
+                        return self.selected_index
                     
             elif action == MenuAction.CANCEL:
                 return None  # Q 키로 취소할 때 None 반환

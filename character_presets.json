@@ -1,0 +1,149 @@
+{
+  "character_presets": {
+    "핀_암살자_1754724856_암살자_핀": {
+      "name": "핀",
+      "character_class": "암살자",
+      "level": 1,
+      "stats": {
+        "physical_attack": 81,
+        "magic_attack": 28,
+        "physical_defense": 34,
+        "magic_defense": 39,
+        "speed": 87,
+        "max_hp": 107,
+        "max_mp": 35
+      },
+      "current_status": {
+        "hp": 107,
+        "mp": 35,
+        "brave_points": 423,
+        "wounds": 0,
+        "experience": 0
+      },
+      "traits": [],
+      "equipment": {},
+      "created_at": "2025-08-09T16:34:16.495186",
+      "description": "핀_암살자_1754724856 파티의 암살자"
+    },
+    "그림니르_전사_1754724879_전사_그림니르": {
+      "name": "그림니르",
+      "character_class": "전사",
+      "level": 1,
+      "stats": {
+        "physical_attack": 75,
+        "magic_attack": 43,
+        "physical_defense": 63,
+        "magic_defense": 48,
+        "speed": 56,
+        "max_hp": 259,
+        "max_mp": 32
+      },
+      "current_status": {
+        "hp": 259,
+        "mp": 32,
+        "brave_points": 531,
+        "wounds": 0,
+        "experience": 0
+      },
+      "traits": [],
+      "equipment": {},
+      "created_at": "2025-08-09T16:34:39.626452",
+      "description": "그림니르_전사_1754724879 파티의 전사"
+    },
+    "오를리_차원술사_1754725028_차원술사_오를리": {
+      "name": "오를리",
+      "character_class": "차원술사",
+      "level": 1,
+      "stats": {
+        "physical_attack": 33,
+        "magic_attack": 88,
+        "physical_defense": 28,
+        "magic_defense": 72,
+        "speed": 47,
+        "max_hp": 63,
+        "max_mp": 91
+      },
+      "current_status": {
+        "hp": 63,
+        "mp": 91,
+        "brave_points": 318,
+        "wounds": 0,
+        "experience": 0
+      },
+      "traits": [],
+      "equipment": {},
+      "created_at": "2025-08-09T16:37:08.211389",
+      "description": "오를리_차원술사_1754725028 파티의 차원술사"
+    },
+    "율리안_신관_1754725075_신관_율리안": {
+      "name": "율리안",
+      "character_class": "신관",
+      "level": 1,
+      "stats": {
+        "physical_attack": 42,
+        "magic_attack": 79,
+        "physical_defense": 57,
+        "magic_defense": 89,
+        "speed": 52,
+        "max_hp": 143,
+        "max_mp": 81
+      },
+      "current_status": {
+        "hp": 143,
+        "mp": 81,
+        "brave_points": 498,
+        "wounds": 0,
+        "experience": 0
+      },
+      "traits": [],
+      "equipment": {},
+      "created_at": "2025-08-09T16:37:55.787282",
+      "description": "율리안_신관_1754725075 파티의 신관"
+    }
+  },
+  "party_presets": {
+    "완벽한_4인_파티": {
+      "characters": [
+        "핀_암살자_1754724856_암살자_핀",
+        "그림니르_전사_1754724879_전사_그림니르",
+        "오를리_차원술사_1754725028_차원술사_오를리",
+        "율리안_신관_1754725075_신관_율리안"
+      ],
+      "party_size": 4,
+      "created_at": "2025-08-10T12:00:00.000000",
+      "description": "핀(암살자) + 그림니르(전사) + 오를리(차원술사) + 율리안(신관) - 완벽한 밸런스 파티"
+    },
+    "핀_암살자_1754724856": {
+      "characters": [
+        "핀_암살자_1754724856_암살자_핀"
+      ],
+      "party_size": 1,
+      "created_at": "2025-08-09T16:34:16.495186",
+      "description": ""
+    },
+    "그림니르_전사_1754724879": {
+      "characters": [
+        "그림니르_전사_1754724879_전사_그림니르"
+      ],
+      "party_size": 1,
+      "created_at": "2025-08-09T16:34:39.626452",
+      "description": ""
+    },
+    "오를리_차원술사_1754725028": {
+      "characters": [
+        "오를리_차원술사_1754725028_차원술사_오를리"
+      ],
+      "party_size": 1,
+      "created_at": "2025-08-09T16:37:08.211389",
+      "description": ""
+    },
+    "율리안_신관_1754725075": {
+      "characters": [
+        "율리안_신관_1754725075_신관_율리안"
+      ],
+      "party_size": 1,
+      "created_at": "2025-08-09T16:37:55.787282",
+      "description": ""
+    }
+  }
+}

@@ -1,4 +1,4 @@
-"""
+﻿"""
 🔥 Brave 시스템이 통합된 전투 시스템 - 특성 효과 및 밸런스 시스템 통합
 """
 
@@ -6,15 +6,20 @@ from typing import List, Optional, Tuple
 import random
 import time
 from .character import Character, StatusEffect
+from .new_skill_system import StatusType
+from .error_logger import log_debug, log_error, log_combat  # 로깅 함수 추가
+
 from .brave_system import BraveManager, BraveAttackType, BattleEffects, BraveSkill
 from .ffvii_sound_system import get_ffvii_sound_system
-from .new_skill_system import StatusType, get_status_icon, skill_system
+from .new_skill_system import get_status_icon, skill_system
 from .ascii_effects import enhanced_battle_effect, combat_animator
 from .input_utils import KeyboardInput, UnifiedInputManager
 from .trait_combat_integration import trait_integrator  # 특성 연동 모듈
 from .optimized_gauge_system import OptimizedGaugeSystem
 from .color_text import Color
 from .ui_animations import get_gauge_animator  # 게이지 애니메이션
+from .aggro_system import get_aggro_system, create_damage_aggro, create_healing_aggro, create_taunt_aggro, create_debuff_aggro, AggroType  # 어그로 시스템
+from .error_logger import log_menu_error, log_effect_error, log_combat_error, log_critical_error  # 오류 로그 시스템
 # from .buffered_display import BufferedDisplay  # 사용 중단 - 직접 출력으로 대체
 
 # 선택적 애니메이션 시스템 import
@@ -73,11 +78,18 @@ time_module = time
 try:
     from .trait_integration_system import get_trait_processor, apply_trait_effects_to_damage, apply_trait_effects_to_defense
     from .relative_balance_system import get_balance_system, calculate_balanced_damage
-    # cursor_menu_system은 필요할 때 동적으로 import
+    from .cursor_menu_system import create_simple_menu  # 커서 메뉴 시스템 전역 import
     from .unified_damage_system import get_damage_system, set_debug_mode
     ENHANCED_SYSTEMS_AVAILABLE = True
+    CURSOR_MENU_AVAILABLE = True
 except ImportError:
     ENHANCED_SYSTEMS_AVAILABLE = False
+    CURSOR_MENU_AVAILABLE = False
+    # 더미 함수 제공
+    def create_simple_menu(*args, **kwargs):
+        class DummyMenu:
+            def run(self): return None
+        return DummyMenu()
 
 # BGM 타입 import 시도
 try:
@@ -108,6 +120,7 @@ class BraveCombatSystem:
     ATB_MAX = 2000  # 100 → 2000 (20배, 오버차지 허용)
     ATB_READY_THRESHOLD = 1000  # 100% → 1000
     ATB_DISPLAY_SCALE = 10  # 표시용 스케일 (1000 → 100으로 변환)
+    BASE_ATB_INCREASE = 15  # 기본 ATB 증가량 (실시간 메뉴용)
     
     def __init__(self, audio_system=None, sound_manager=None):
         self.brave_manager = BraveManager()
@@ -149,6 +162,11 @@ class BraveCombatSystem:
         self.gauge_animator = get_gauge_animator()
         self.gauge_animator.set_combat_mode(True)  # 전투 시작 시 전투 모드 활성화
         
+        # 전투 로그 시스템 초기화
+        self._recent_combat_logs = []
+        self._turn_count = 0
+        self._last_action_completed = False
+        
         # 진동 시스템 초기화
         self.input_manager = UnifiedInputManager()
         self.vibration_enabled = True  # 진동 기본 활성화
@@ -166,45 +184,78 @@ class BraveCombatSystem:
         # AI 게임 모드 플래그 추가
         self.ai_game_mode = False  # AI 게임 모드 여부
         
+        # 플레이어 턴 중 플래그 추가 (ATB 시스템용)
+        self.is_player_turn_active = False  # 플레이어 턴이 진행 중인지
+        self.is_action_executing = False    # 행동(스킬, 공격 등)이 실행 중인지
+        
+        # 🌑 그림자 시스템 초기화 (__init__에서 초기화)
+        if SHADOW_SYSTEM_AVAILABLE:
+            self.shadow_system = get_shadow_system()
+            print("🌑 그림자 시스템 활성화! (암살자 전용)")
+        else:
+            self.shadow_system = None
+            
+        # 🎯 동적 어그로 시스템 초기화
+        self.aggro_system = get_aggro_system()
+        print("🎯 동적 어그로 시스템 활성화! (현실적인 AI 타겟팅)")
+        
+        # 🧠 AI 개성 시스템 초기화
+        self._initialize_ai_personalities()
+            
+        # 취소 스팸 완화: 캐릭터별 취소 카운터/타임스탬프 초기화
+        self._cancel_counters = {}
+        self._cancel_last_time = {}
+        self._cancel_cooldown_until = {}
+        
+        # 디버그 모드 설정 (환경변수나 설정으로 제어 가능)
+        self.debug_mode = False  # 기본값: False (조용한 모드)
+        
+    def _debug_print(self, message: str):
+        """디버그 모드에서만 출력"""
+        if getattr(self, 'debug_mode', False):
+            print(message)
+        
     def is_ai_game_mode_enabled(self) -> bool:
-        """AI 게임모드 활성화 여부 확인 (다중 소스 체크)"""
+        """클래식 게임모드 활성화 여부 확인 (안전한 체크)"""
         try:
-            # 1. 클래스 내부 플래그 확인
-            if hasattr(self, 'ai_game_mode') and self.ai_game_mode:
-                return True
+            # 1. 클래스 내부 플래그 확인 (최우선)
+            if hasattr(self, 'ai_game_mode'):
+                # 명시적으로 False인 경우 확실히 비활성화
+                if self.ai_game_mode is False:
+                    return False
+                return bool(self.ai_game_mode)
             
-            # 2. 메인 모듈 확인
-            import sys
-            main_module = sys.modules.get('__main__')
-            if main_module:
-                ai_enabled = getattr(main_module, 'ai_game_mode_enabled', False)
-                if ai_enabled:
-                    return True
-            
-            # 3. config 모듈 확인
-            try:
-                import config
-                if hasattr(config, 'ai_game_mode_enabled') and config.ai_game_mode_enabled:
-                    return True
-            except ImportError:
-                pass
-                
-            # 4. AI 매니저 존재 여부 확인
+            # 2. AI 매니저 확인 (신뢰할 수 있는 소스) - 제한적으로만 사용
             try:
                 from game.ai_game_mode import ai_game_mode_manager
                 if hasattr(ai_game_mode_manager, 'is_enabled'):
-                    return ai_game_mode_manager.is_enabled()
+                    # AI 매니저가 명시적으로 비활성화된 경우만 체크
+                    if hasattr(ai_game_mode_manager, '_enabled') and ai_game_mode_manager._enabled is False:
+                        return False
             except ImportError:
                 pass
+            
+            # 3. 메인 모듈 확인 비활성화 (false positive 방지)
+            # try:
+            #     import sys
+            #     main_module = sys.modules.get('__main__')
+            #     if main_module and hasattr(main_module, 'ai_game_mode_enabled'):
+            #         return bool(main_module.ai_game_mode_enabled)
+            # except Exception:
+            #     pass
                 
+            # 기본값: AI 모드 비활성화 (보수적 접근)
             return False
         except Exception:
+            # 오류 발생 시 안전하게 수동 모드
             return False
     
     def set_ai_game_mode(self, enabled: bool):
-        """AI 게임모드 활성화/비활성화 설정"""
+        """클래식 게임모드 활성화/비활성화 설정"""
         self.ai_game_mode = enabled
-        print(f"🤖 AI 게임모드: {'활성화' if enabled else '비활성화'}")
+        from .error_logger import get_error_logger
+        logger = get_error_logger()
+        logger.log_debug(f"클래식 게임모드: {'활성화' if enabled else '비활성화'}")
         
         # 🌑 그림자 시스템 초기화
         if SHADOW_SYSTEM_AVAILABLE:
@@ -213,18 +264,18 @@ class BraveCombatSystem:
         else:
             self.shadow_system = None
             
-    # 전투 로그 시스템 초기화
+        # 전투 로그 시스템 초기화
         self._recent_combat_logs = []
         self._max_log_entries = 10  # 최대 로그 저장 개수
         self._turn_count = 0  # 턴 카운터
         self._last_action_completed = False  # 액션 완료 플래그
-    # 취소 스팸 완화: 캐릭터별 취소 카운터/타임스탬프
+        
+        # 취소 스팸 완화: 캐릭터별 취소 카운터/타임스탬프
         self._cancel_counters = {}
         self._cancel_last_time = {}
-    # 취소 후 즉시 재선택을 막는 쿨다운 타이머 (character id -> timestamp)
-        self._cancel_cooldown_until = {}
-
-    # 🎯 적 아이콘 시스템 초기화
+        
+        # 취소 후 즉시 재선택을 막는 쿨다운 타이머 (character id -> timestamp)
+        self._cancel_cooldown_until = {}    # 🎯 적 아이콘 시스템 초기화
         self.enemy_icons = {
             # 동물 몬스터
             "쥐": "🐭", "고양이": "🐱", "개": "🐕", "늑대": "🐺", "곰": "🐻", 
@@ -276,9 +327,13 @@ class BraveCombatSystem:
         """AI 게임 모드 설정"""
         self.ai_game_mode = enabled
         if enabled:
-            print("🤖 AI 게임 모드 활성화 - 자동 진행")
+            from .error_logger import get_error_logger
+            logger = get_error_logger()
+            logger.log_debug("AI 게임 모드 활성화 - 자동 진행")
         else:
-            print("👤 수동 모드 활성화 - 키 입력 필요")
+            from .error_logger import get_error_logger
+            logger = get_error_logger()
+            logger.log_debug("수동 모드 활성화 - 키 입력 필요")
     
     def add_combat_log(self, message: str):
         """전투 로그 추가"""
@@ -665,12 +720,15 @@ class BraveCombatSystem:
         from .character import set_combat_active
         set_combat_active(True)
         
-        # AI 게임모드 상태 확인 및 표시
+        # 클래식 게임모드 상태 확인 및 표시
         ai_mode_enabled = self.is_ai_game_mode_enabled()
+        from .error_logger import get_error_logger
+        logger = get_error_logger()
+        
         if ai_mode_enabled:
-            print(f"🤖 {Color.BRIGHT_CYAN.value}AI 게임모드 활성화{Color.RESET.value} - 일부 파티원이 AI로 제어될 수 있습니다")
+            logger.log_debug("클래식 게임모드 활성화 - 일부 파티원이 클래식 AI로 제어될 수 있습니다")
         else:
-            print(f"🎯 {Color.BRIGHT_GREEN.value}플레이어 제어 모드{Color.RESET.value} - 모든 파티원을 직접 제어합니다")
+            log_debug("AI모드", "플레이어 제어 모드 - 모든 파티원을 직접 제어합니다")
 
         # ✅ 간단 렌더링 모드 감지 (Electron/비 TTY 환경에서 커서 제어 실패 시)
         try:
@@ -722,6 +780,12 @@ class BraveCombatSystem:
         self._turn_count = 0
         self._last_action_completed = False
         self._recent_combat_logs.clear()  # 로그 초기화
+        
+        # 🎯 어그로 시스템 초기화 (모든 적군에 대해)
+        for enemy in enemies:
+            enemy_name = getattr(enemy, 'name', str(enemy))
+            self.aggro_system.initialize_enemy(enemy_name, party)
+            print(f"🎯 {enemy_name}의 어그로 시스템 초기화 완료")
         
         # 입력 버퍼 클리어 (전투 시작 전)
         if hasattr(self, 'keyboard') and self.keyboard:
@@ -789,27 +853,68 @@ class BraveCombatSystem:
         # 모든 참전자의 ATB 게이지 초기화 및 검증
         all_combatants = party + enemies
         valid_combatants = []
-        for combatant in all_combatants:
+        
+        # 완전체 로깅 시스템 사용
+        from .error_logger import get_comprehensive_logger, log_atb_initialization
+        logger = get_comprehensive_logger()
+        
+        logger.log_system_info("ATB", "전투 ATB 시스템 초기화 시작")
+        print("📊 ATB 시스템 초기화 중...")
+        
+        for i, combatant in enumerate(all_combatants):
             # dict 객체인 경우 Character 객체로 변환 필요
             if isinstance(combatant, dict):
                 print(f"⚠️ 경고: {combatant}는 dict 객체입니다. Character 객체가 아닙니다.")
+                logger.log_error("ATB초기화", f"dict 객체 발견: {combatant}")
                 continue
+            
+            # 이전 ATB 상태 로그
+            old_atb = getattr(combatant, 'atb_gauge', 'None')
+            character_speed = getattr(combatant, 'speed', 100)
             
             # ATB 게이지 속성 확인 및 초기화
             if not hasattr(combatant, 'atb_gauge'):
                 combatant.atb_gauge = 0
                 print(f"✨ {combatant.name}에 ATB 게이지를 추가했습니다.")
-            # 기존 ATB 게이지는 유지 (재설정하지 않음)
+                log_atb_initialization(combatant.name, 0, character_speed)
+            else:
+                # 🔄 전투 시작 시 ATB 게이지 적절한 초기화
+                # ATB_READY_THRESHOLD = 1000이므로 0-300 범위로 시작 (0-30%)
+                import random
+                random_start_atb = random.randint(0, 300)  # 0-30% 랜덤 시작
+                combatant.atb_gauge = random_start_atb
+                print(f"🔄 {combatant.name} ATB 초기화: {old_atb} → {random_start_atb} ({random_start_atb*100//self.ATB_READY_THRESHOLD}%)")
+                log_atb_initialization(combatant.name, random_start_atb, character_speed)
             
             # 기본 속도 속성 확인
             if not hasattr(combatant, 'speed'):
                 combatant.speed = 100
                 print(f"✨ {combatant.name}에 기본 속도(100)를 설정했습니다.")
+                logger.log_system_info("ATB", f"{combatant.name} 기본 속도 설정", {"속도": 100})
             
             valid_combatants.append(combatant)
         
         if len(valid_combatants) != len(all_combatants):
             print(f"⚠️ 주의: {len(all_combatants) - len(valid_combatants)}개의 무효한 캐릭터가 감지되었습니다.")
+            logger.log_system_warning("ATB", f"무효한 캐릭터 감지", {
+                "총캐릭터수": len(all_combatants),
+                "유효캐릭터수": len(valid_combatants),
+                "무효캐릭터수": len(all_combatants) - len(valid_combatants)
+            })
+        
+        # ATB 초기화 결과 요약
+        logger.log_system_info("ATB", "ATB 초기화 완료", {"참여자수": len(valid_combatants)})
+        for combatant in valid_combatants:
+            final_atb = combatant.atb_gauge
+            speed = getattr(combatant, 'speed', 100)
+            logger.log_debug("ATB상세", f"최종 상태", {
+                "이름": combatant.name,
+                "ATB": final_atb,
+                "ATB비율": f"{final_atb/20:.1f}%",
+                "속도": speed
+            })
+        
+        print(f"✅ ATB 초기화 완료: {len(valid_combatants)}명의 전투 참여자")
         
         # 참조 저장 (action_order 계산용)
         self._current_party = [c for c in party if c in valid_combatants]
@@ -947,9 +1052,10 @@ class BraveCombatSystem:
                         if warrior_system.analyze_situation_and_adapt(member, other_allies, enemies):
                             print(f"🛡️ {member.name}이(가) 전투 상황에 적응했습니다!")
             except Exception as e:
-                print(f"⚠️ 전사 적응형 시스템 오류: {e}")
+                self._debug_print(f"⚠️ 전사 적응형 시스템 오류: {e}")
             
         # 전투 루프
+        print("🎮 전투 루프 시작!")
         battle_result = self.battle_loop(party, enemies)
         
         # 승리 시에는 BGM이 이미 재생되고 있으므로 바로 복구하지 않음
@@ -961,24 +1067,54 @@ class BraveCombatSystem:
                 if hasattr(self, 'game_instance') and self.game_instance:
                     if hasattr(self.game_instance, 'safe_play_bgm'):
                         self.game_instance.safe_play_bgm("dungeon", loop=True)
-                        print("🎵 던전 BGM으로 복귀! (안전 모드)")
+                        print("🎵 차원 공간 BGM으로 복귀! (안전 모드)")
                     else:
                         # 폴백: 직접 호출
                         if hasattr(self, 'audio_system') and self.audio_system:
                             self.audio_system.play_bgm("dungeon", loop=True)
                         elif hasattr(self, 'sound_manager') and self.sound_manager:
                             self.sound_manager.play_bgm("dungeon")
-                        print("🎵 던전 BGM으로 복귀!")
+                        print("🎵 차원 공간 BGM으로 복귀!")
                 else:
                     # 기존 방식
                     if hasattr(self, 'audio_system') and self.audio_system:
                         self.audio_system.play_bgm("dungeon", loop=True)
-                        print("🎵 던전 BGM으로 복귀!")
+                        print("🎵 차원 공간 BGM으로 복귀!")
                     elif hasattr(self, 'sound_manager') and self.sound_manager:
                         self.sound_manager.play_bgm("dungeon")
-                        print("🎵 던전 BGM으로 복귀!")
+                        print("🎵 차원 공간 BGM으로 복귀!")
             except Exception as e:
-                print(f"⚠️ 던전 BGM 복구 실패: {e}")
+                print(f"⚠️ 차원 공간 BGM 복구 실패: {e}")
+        else:
+            # 🎵 승리 시에도 3초 후 필드 BGM으로 전환
+            import threading
+            def delayed_bgm_restore():
+                import time
+                time.sleep(3.0)  # 승리 팡파레 재생 시간 확보
+                try:
+                    if hasattr(self, 'game_instance') and self.game_instance:
+                        if hasattr(self.game_instance, 'safe_play_bgm'):
+                            self.game_instance.safe_play_bgm("dungeon", loop=True)
+                            print("🎵 승리 후 차원 공간 BGM으로 복귀! (3초 지연)")
+                        else:
+                            if hasattr(self, 'audio_system') and self.audio_system:
+                                self.audio_system.play_bgm("dungeon", loop=True)
+                            elif hasattr(self, 'sound_manager') and self.sound_manager:
+                                self.sound_manager.play_bgm("dungeon")
+                            print("🎵 승리 후 차원 공간 BGM으로 복귀!")
+                    else:
+                        if hasattr(self, 'audio_system') and self.audio_system:
+                            self.audio_system.play_bgm("dungeon", loop=True)
+                            print("🎵 승리 후 차원 공간 BGM으로 복귀!")
+                        elif hasattr(self, 'sound_manager') and self.sound_manager:
+                            self.sound_manager.play_bgm("dungeon")
+                            print("🎵 승리 후 차원 공간 BGM으로 복귀!")
+                except Exception as e:
+                    print(f"⚠️ 승리 후 차원 공간 BGM 복구 실패: {e}")
+            
+            # 백그라운드에서 지연된 BGM 복구 실행
+            bgm_thread = threading.Thread(target=delayed_bgm_restore, daemon=True)
+            bgm_thread.start()
         
         # 전투 종료 후 디스플레이 정리
         try:
@@ -994,6 +1130,12 @@ class BraveCombatSystem:
         """전투 루프 - 개선된 ATB 시스템"""
         turn_count = 0
         
+        print("🔄 전투 루프 시작!")
+        log_debug("전투루프", "전투 루프 시작", {
+            "파티": [f"{p.name}(HP:{getattr(p, 'current_hp', 0)}/{getattr(p, 'max_hp', 0)}, 생존:{getattr(p, 'is_alive', False)})" for p in party],
+            "적": [f"{e.name}(HP:{getattr(e, 'current_hp', 0)}/{getattr(e, 'max_hp', 0)}, 생존:{getattr(e, 'is_alive', False)})" for e in enemies]
+        })
+        
         # 유효한 캐릭터 객체만 필터링
         valid_party = []
         for c in party:
@@ -1001,6 +1143,7 @@ class BraveCombatSystem:
                 valid_party.append(c)
             else:
                 print(f"⚠️ 경고: 파티에 잘못된 객체 감지: {type(c).__name__}")
+                log_debug("전투루프", f"잘못된 파티 객체", {"타입": type(c).__name__})
         
         valid_enemies = []
         for c in enemies:
@@ -1008,127 +1151,151 @@ class BraveCombatSystem:
                 valid_enemies.append(c)
             else:
                 print(f"⚠️ 경고: 적군에 잘못된 객체 감지: {type(c).__name__}")
+                log_debug("전투루프", f"잘못된 적 객체", {"타입": type(c).__name__})
+        
+        print(f"📊 유효한 파티: {len(valid_party)}명, 유효한 적: {len(valid_enemies)}마리")
+        log_debug("전투루프", "유효한 참가자 확인", {
+            "유효파티": len(valid_party),
+            "유효적": len(valid_enemies),
+            "유효파티명": [p.name for p in valid_party],
+            "유효적명": [e.name for e in valid_enemies]
+        })
+        
+        # 🚨 즉시 전투 종료 조건 체크 (시작 직후)
+        if self.check_battle_end(valid_party, valid_enemies):
+            log_debug("전투루프", "전투 시작 직후 종료 조건 만족", {})
+            result = self.determine_winner(valid_party, valid_enemies)
+            return result
         
         # 파티 정보를 클래스 변수로 저장
         self._current_party = valid_party
         self._current_enemies = valid_enemies
         
-        while True:
-            turn_count += 1
-            
-            # ATB 게이지가 100%에 도달할 때까지 점진적 업데이트
-            max_attempts = 200  # 더 많은 시도로 안정성 확보
-            attempts = 0
-            
-            while attempts < max_attempts:
-                # ATB 애니메이션과 함께 업데이트 (첫 번째 시도에서만 애니메이션 표시)
-                show_animation = (attempts == 0)
-                self.update_atb_gauges(valid_party + valid_enemies, show_animation)
+        # 전투 루프 메인 처리
+        try:
+            while True:
+                turn_count += 1
+                print(f"🔄 턴 {turn_count} 시작!")
                 
-                # ATB 업데이트 후 화면 상태 갱신
-                # 첫 번째 업데이트에서만, 그리고 의미있는 변화가 있을 때만 갱신
-                # 첫 루프에서의 잦은 상태 출력은 화면 깜빡임을 유발하므로 제거
+                # ATB 게이지가 100%에 도달할 때까지 점진적 업데이트
+                max_attempts = 10  # 시도 횟수 대폭 줄임 (50 → 10)
+                attempts = 0
                 
-                action_order = self.get_action_order(valid_party + valid_enemies)
-                if action_order:
-                    break
-                attempts += 1
-                time_module.sleep(0.1)  # ATB 업데이트 간 딜레이 (20ms→100ms, 화면 안정성)
-            
-            if not action_order:
-                # ATB 강제 증가로 교착 상태 해결 (조용히 1회 시도)
-                for combatant in valid_party + valid_enemies:
-                    if combatant.is_alive and hasattr(combatant, 'atb_gauge'):
-                        combatant.atb_gauge = min(self.ATB_MAX, max(combatant.atb_gauge, self.ATB_READY_THRESHOLD))
-                action_order = self.get_action_order(valid_party + valid_enemies)
+                while attempts < max_attempts:
+                    try:
+                        # ATB 애니메이션과 함께 업데이트 (첫 번째 시도에서만 애니메이션 표시)
+                        show_animation = (attempts == 0)
+                        self.update_atb_gauges(valid_party + valid_enemies, show_animation)
+                        
+                        action_order = self.get_action_order(valid_party + valid_enemies)
+                        if action_order:
+                            break
+                        attempts += 1
+                        time_module.sleep(0.02)  # 더 빠른 업데이트 (50ms → 20ms)
+                    except Exception as atb_error:
+                        log_error("ATB업데이트", f"ATB 업데이트 중 오류 (시도 {attempts+1})", {"오류": str(atb_error)})
+                        print(f"⚠️ ATB 업데이트 오류: {atb_error}")
+                        break  # ATB 업데이트에 실패하면 루프 종료
+                
                 if not action_order:
-                    # 그래도 실패하면 한 번 더 소폭 증가
+                    # ATB 강제 증가로 교착 상태 해결 (조용히 1회 시도)
                     for combatant in valid_party + valid_enemies:
                         if combatant.is_alive and hasattr(combatant, 'atb_gauge'):
-                            combatant.atb_gauge = min(self.ATB_MAX, combatant.atb_gauge + 500)
+                            combatant.atb_gauge = min(self.ATB_MAX, max(combatant.atb_gauge, self.ATB_READY_THRESHOLD))
                     action_order = self.get_action_order(valid_party + valid_enemies)
                     if not action_order:
-                        return "draw"
-            
-            # 선택된 캐릭터의 턴 처리
-            character = action_order[0]
-            action_taken = False  # 🎯 행동 완료 여부 플래그 초기화
-            
-            if not character.is_alive:
-                continue
+                        # 그래도 실패하면 한 번 더 소폭 증가
+                        for combatant in valid_party + valid_enemies:
+                            if combatant.is_alive and hasattr(combatant, 'atb_gauge'):
+                                combatant.atb_gauge = min(self.ATB_MAX, combatant.atb_gauge + 500)
+                        action_order = self.get_action_order(valid_party + valid_enemies)
+                        if not action_order:
+                            return "draw"
                 
-            # 상태이상 처리
-            if hasattr(character, 'status_manager'):
-                character.status_manager.process_turn_effects(character)
+                # 선택된 캐릭터의 턴 처리
+                character = action_order[0]
+                action_taken = False  # 🎯 행동 완료 여부 플래그 초기화
                 
-            if character in valid_party:
-                print(f"🎮 {character.name}의 턴이 시작됩니다!")
+                # 현재 행동 중인 캐릭터 추적
+                self._current_actor = character
                 
-                # 아군 판별 안정성 강화 - 더 확실한 검증
-                is_ally = False
-                try:
-                    # 1차: 파티 리스트에 직접 포함되는지 확인
-                    is_ally = character in valid_party
+                if not character.is_alive:
+                    continue
                     
-                    # 2차: 원본 파티에도 포함되는지 확인 (백업)
-                    if not is_ally:
-                        is_ally = character in party
+                # 상태이상 처리
+                if hasattr(character, 'status_manager'):
+                    character.status_manager.process_turn_effects(character)
                     
-                    # 3차: 플레이어 캐릭터인지 확인
-                    if not is_ally and hasattr(character, 'is_player_character'):
-                        is_ally = character.is_player_character
+                if character in valid_party:
+                    print(f"🎮 {character.name}의 턴이 시작됩니다!")
                     
-                    # 4차: 적군 속성이 없으면 아군으로 처리
-                    if not is_ally and not hasattr(character, 'is_enemy'):
-                        is_ally = True
-                    
-                    # 5차: 이름 기반 매칭 (최종 백업)
-                    if not is_ally:
-                        party_names = [p.name for p in valid_party]
-                        is_ally = character.name in party_names
+                    # 아군 판별 안정성 강화 - 더 확실한 검증
+                    is_ally = False
+                    try:
+                        # 1차: 파티 리스트에 직접 포함되는지 확인
+                        is_ally = character in valid_party
                         
-                except Exception as e:
-                    print(f"⚠️ 아군 판별 오류: {e}")
-                    is_ally = True  # 안전을 위해 아군으로 처리
+                        # 2차: 원본 파티에도 포함되는지 확인 (백업)
+                        if not is_ally:
+                            is_ally = character in party
+                        
+                        # 3차: 플레이어 캐릭터인지 확인
+                        if not is_ally and hasattr(character, 'is_player_character'):
+                            is_ally = character.is_player_character
+                        
+                        # 4차: 적군 속성이 없으면 아군으로 처리
+                        if not is_ally and not hasattr(character, 'is_enemy'):
+                            is_ally = True
+                        
+                        # 5차: 이름 기반 매칭 (최종 백업)
+                        if not is_ally:
+                            party_names = [p.name for p in valid_party]
+                            is_ally = character.name in party_names
+                            
+                    except Exception as e:
+                        self._debug_print(f"⚠️ 아군 판별 오류: {e}")
+                        is_ally = True  # 안전을 위해 아군으로 처리
                 
                 # 강제 아군 전환 로그 (필요시에만)
                 if not is_ally:
                     print(f"⚠️ {character.name}을 아군으로 강제 변경합니다.")
                     is_ally = True
                 
-                # AI 모드 확인 - 조건부 처리 (안정화된 AI 게임모드 판별)
+                # 클래식 모드 확인 - 조건부 처리 (안정화된 클래식 게임모드 판별)
                 ai_controlled = False
                 
                 try:
                     ai_game_mode_enabled = self.is_ai_game_mode_enabled()
-                    print(f"🔍 AI 게임모드 상태: {ai_game_mode_enabled}")
+                    from .error_logger import get_error_logger
+                    logger = get_error_logger()
+                    logger.log_debug(f"클래식 게임모드 상태: {ai_game_mode_enabled}")
                     
-                    # AI 게임모드가 활성화된 경우에만 AI 제어 체크
+                    # 클래식 게임모드가 활성화된 경우에만 클래식 제어 체크
                     if ai_game_mode_enabled:
                         try:
                             from game.ai_game_mode import ai_game_mode_manager
                             if hasattr(ai_game_mode_manager, 'is_ai_controlled'):
                                 ai_controlled = ai_game_mode_manager.is_ai_controlled(character)
                                 if ai_controlled:
-                                    print(f"🤖 {character.name}은(는) AI가 제어합니다.")
+                                    logger.log_debug(f"{character.name}은(는) AI가 제어합니다.")
                                     result = self.ai_turn(character, valid_party, valid_enemies)
                                 else:
-                                    print(f"🎯 {character.name}은(는) 플레이어가 직접 제어합니다.")
+                                    logger.log_debug(f"{character.name}은(는) 플레이어가 직접 제어합니다.")
                                     result = self.player_turn(character, valid_party, valid_enemies)
                             else:
-                                print(f"🎯 {character.name} 플레이어 턴으로 처리 (AI 매니저 기능 없음)")
+                                logger.log_debug(f"{character.name} 플레이어 턴으로 처리 (AI 매니저 기능 없음)")
                                 result = self.player_turn(character, valid_party, valid_enemies)
                         except ImportError:
-                            print(f"🎯 {character.name} 플레이어 턴으로 처리 (AI 모듈 없음)")
+                            logger.log_debug(f"{character.name} 플레이어 턴으로 처리 (AI 모듈 없음)")
                             result = self.player_turn(character, valid_party, valid_enemies)
                     else:
-                        # AI 게임모드가 비활성화된 경우 모든 파티원을 플레이어가 직접 제어
-                        print(f"🎯 {character.name}은(는) 플레이어가 직접 제어합니다. (AI 모드 OFF)")
+                        # 클래식 게임모드가 비활성화된 경우 모든 파티원을 플레이어가 직접 제어
+                        logger.log_debug(f"{character.name}은(는) 플레이어가 직접 제어합니다. (클래식 모드 OFF)")
                         result = self.player_turn(character, valid_party, valid_enemies)
                         
                 except Exception as e:
                     # 오류 발생 시 안전하게 플레이어 제어로 폴백
-                    print(f"⚠️ AI 모드 판별 오류 ({e}), {character.name} 플레이어 턴으로 처리")
+                    print(f"⚠️ 클래식 모드 판별 오류 ({e}), {character.name} 플레이어 턴으로 처리")
                     result = self.player_turn(character, valid_party, valid_enemies)
                     
                 # 도망 성공 처리
@@ -1185,6 +1352,14 @@ class BraveCombatSystem:
                     self._cancel_cooldown_until[cid] = now + 0.5
                     if hasattr(character, 'atb_gauge') and character.atb_gauge >= getattr(self, 'ATB_READY_THRESHOLD', 1000):
                         character.atb_gauge = getattr(self, 'ATB_READY_THRESHOLD', 1000) - 1
+            
+            # 턴 종료 시 플레이어 턴 플래그 해제
+            if hasattr(self, 'is_player_turn_active'):
+                self.is_player_turn_active = False
+            
+            # 현재 행동자 초기화
+            if hasattr(self, '_current_actor'):
+                self._current_actor = None
                 
             # 상태이상 턴 종료 처리
             if hasattr(character, 'status_manager'):
@@ -1199,11 +1374,27 @@ class BraveCombatSystem:
                 print(f"\n{Color.BRIGHT_CYAN.value}전투가 종료되었습니다!{Color.RESET.value}")
                 self._wait_for_user_input_or_timeout(5.0)
                 return result
-                        
-                        # 1순위: audio_system 사용
             
             # 짧은 대기 후 다음 턴으로 - 더 빠르게
             time_module.sleep(0.03)  # 30ms로 단축 (100ms→30ms)
+        
+        except Exception as battle_error:
+            # 전투 루프에서 치명적 오류 발생
+            log_error("전투루프", f"전투 루프 중 치명적 오류", {"오류": str(battle_error)})
+            print(f"❌ 전투 중 치명적 오류 발생: {battle_error}")
+            print("전투를 안전하게 종료합니다...")
+            import traceback
+            traceback.print_exc()
+            
+            # 안전한 종료 처리
+            try:
+                from .character import set_combat_active
+                set_combat_active(False)
+                if hasattr(self, 'gauge_animator'):
+                    self.gauge_animator.set_combat_mode(False)
+            except:
+                pass
+            return "error"
     
     def ai_turn(self, character: Character, party: List[Character], enemies: List[Character]):
         """AI 턴 처리"""
@@ -1269,7 +1460,9 @@ class BraveCombatSystem:
                 request_type = action_data.get("type")
                 message = ai_companion.make_request_to_player(request_type)
                 print(f"\n💬 {message}")
-                print("   (AI 요청은 전투 후 처리됩니다)")
+                from .error_logger import get_error_logger
+                logger = get_error_logger()
+                logger.log_error("AI_TURN", "(AI 요청은 전투 후 처리됩니다)")
                 # 기본 공격으로 대체
                 alive_enemies = [e for e in enemies if e.is_alive]
                 if alive_enemies:
@@ -1280,28 +1473,44 @@ class BraveCombatSystem:
             return None
             
         except Exception as e:
-            print(f"⚠️ AI 턴 처리 오류: {type(e).__name__}")
+            from .error_logger import get_error_logger
+            logger = get_error_logger()
+            logger.log_ai_mode_error(f"AI 턴 처리 오류: {type(e).__name__}")
             print(f"📋 상세: {str(e)}")
             print("🔄 기본 플레이어 턴으로 전환합니다...")
             # 오류 발생시 기본 플레이어 턴으로 대체
             return self.player_turn(character, party, enemies)
                 
     def player_turn(self, character: Character, party: List[Character], enemies: List[Character]):
-        """플레이어 턴 - AI 게임모드 지원"""        
-        # 전투 종료 체크 - 턴 시작 시 다시 확인
-        if self.check_battle_end(party, enemies):
-            return self.determine_winner(party, enemies)
+        """플레이어 턴 - 클래식 게임모드 지원"""        
+        # 플레이어 턴 시작 플래그 설정
+        self.is_player_turn_active = True
+        
+        # 플레이어 턴 시작 효과음 재생
+        if hasattr(self, 'sound_manager') and self.sound_manager:
+            self.sound_manager.play_sfx("select")  # 선택 효과음으로 턴 알림
+        
+        try:
+            # 전투 종료 체크 - 턴 시작 시 다시 확인
+            if self.check_battle_end(party, enemies):
+                return self.determine_winner(party, enemies)
             
-        # 🛡️ 전사 적응형 시스템 - 턴 시작 시 재평가
-        if WARRIOR_SYSTEM_AVAILABLE and (character.character_class == "전사" or "전사" in character.character_class):
-            try:
-                warrior_system = get_warrior_system()
-                other_allies = [ally for ally in party if ally != character and ally.current_hp > 0]
-                if warrior_system.analyze_situation_and_adapt(character, other_allies, enemies):
-                    pass  # 메시지는 이미 출력됨
-            except Exception as e:
-                print(f"⚠️ 전사 적응형 시스템 오류: {e}")
-            
+            # 🛡️ 전사 적응형 시스템 - 턴 시작 시 재평가
+            if WARRIOR_SYSTEM_AVAILABLE and (character.character_class == "전사" or "전사" in character.character_class):
+                try:
+                    warrior_system = get_warrior_system()
+                    other_allies = [ally for ally in party if ally != character and ally.current_hp > 0]
+                    if warrior_system.analyze_situation_and_adapt(character, other_allies, enemies):
+                        pass  # 메시지는 이미 출력됨
+                except Exception as e:
+                    print(f"⚠️ 전사 적응형 시스템 오류: {e}")
+                
+            # 🎯 캐스팅 완료 체크 - 캐스팅 중인 캐릭터는 자동으로 스킬 실행 (강화된 처리)
+        finally:
+            # 플레이어 턴 종료 시 항상 플래그 해제
+            if hasattr(self, 'is_player_turn_active'):
+                self.is_player_turn_active = False
+                
         # 🎯 캐스팅 완료 체크 - 캐스팅 중인 캐릭터는 자동으로 스킬 실행 (강화된 처리)
         if hasattr(character, 'is_casting') and character.is_casting:
             try:
@@ -1391,25 +1600,54 @@ class BraveCombatSystem:
         if self.auto_battle:
             return self._auto_battle_action(character, party, enemies)
         
-        # AI 게임모드 체크 - 조건부 처리 (안정화된 버전)
+        # 클래식 게임모드 체크 - 조건부 처리 (안정화된 버전)
         try:
             ai_mode_enabled = self.is_ai_game_mode_enabled()
             
             if ai_mode_enabled:
-                print(f"🤖 AI 게임모드 활성화 - {character.name} AI 처리 시도")
+                # AI 모드에서 플레이어가 조작하는 캐릭터인지 확인
                 try:
-                    from .ai_game_mode import process_character_turn
-                    action_type, action_data = process_character_turn(character, party, enemies)
-                    return self._execute_ai_action(character, action_type, action_data, party, enemies)
-                except ImportError:
-                    print(f"⚠️ AI 모듈 로드 실패, {character.name} 플레이어 제어로 전환")
-                except Exception as ai_error:
-                    print(f"⚠️ AI 처리 오류 ({ai_error}), {character.name} 플레이어 제어로 전환")
+                    from .ai_game_mode import ai_game_mode_manager
+                    from .error_logger import get_error_logger
+                    logger = get_error_logger()
+                    
+                    logger.log_debug(f"AI 모드 활성화 - {character.name} 제어 권한 확인 중...")
+                    
+                    if hasattr(ai_game_mode_manager, 'player_controlled_characters'):
+                        player_chars = [char.name for char in ai_game_mode_manager.player_controlled_characters]
+                        logger.log_debug(f"플레이어 조작 캐릭터: {player_chars}")
+                        
+                        if character in ai_game_mode_manager.player_controlled_characters:
+                            logger.log_debug(f"{character.name} - 플레이어 직접 조작 모드")
+                            # 플레이어가 조작하는 캐릭터는 일반 플레이어 턴으로 진행
+                            pass  # 아래의 일반 플레이어 턴 로직 실행
+                        else:
+                            logger.log_debug(f"{character.name} - AI 자동 조작 모드")
+                            try:
+                                from .ai_game_mode import process_character_turn
+                                action_type, action_data = process_character_turn(character, party, enemies)
+                                return self._execute_ai_action(character, action_type, action_data, party, enemies)
+                            except ImportError:
+                                logger.log_error("AI_MODE_ERROR", f"AI 모듈 로드 실패, {character.name} 플레이어 제어로 전환")
+                            except Exception as ai_error:
+                                logger.log_error("AI_MODE_ERROR", f"AI 처리 오류, {character.name} 플레이어 제어로 전환", ai_error)
+                    else:
+                        logger.log_error("AI_MODE_ERROR", f"AI 모드 매니저에 player_controlled_characters 속성이 없음")
+                except Exception as e:
+                    from .error_logger import get_error_logger
+                    logger = get_error_logger()
+                    logger.log_error("AI_MODE_ERROR", f"AI 모드 상태 확인 실패: {e}", e)
+                    logger.log_debug("AI모드", f"{character.name} 플레이어 제어로 폴백")
             else:
-                print(f"🎯 AI 게임모드 비활성화 - {character.name} 플레이어 직접 제어")
+                from .error_logger import get_error_logger
+                logger = get_error_logger()
+                logger.log_debug("AI모드", f"AI 모드 비활성화 - {character.name} 플레이어 제어 모드")
         except Exception as e:
-            # AI 모드 처리 실패시 기본 플레이어 모드로 진행
-            print(f"⚠️ AI 모드 체크 오류 ({e}), {character.name} 플레이어 제어로 진행")
+            from .error_logger import get_error_logger
+            logger = get_error_logger()
+            logger.log_error("AI_MODE_ERROR", f"AI 모드 체크 오류: {e}", e)
+            # 오류 시 플레이어 제어로 폴백
+            logger.log_debug(f"{character.name} 플레이어 제어로 폴백")
         
         while True:
             # 전투 상태 표시
@@ -1514,8 +1752,63 @@ class BraveCombatSystem:
             # choice 변수 초기화
             choice = None
             
-            # 전투 메뉴를 커서 메뉴 시스템으로 교체 (중복 제거)
+            # 🚀 실시간 ATB 전투 메뉴 시스템
             try:
+                # 실시간 메뉴 처리를 위한 논블로킹 메뉴 시스템
+                choice = self._real_time_combat_menu(character, party, enemies, action_options, action_descriptions)
+                
+                if choice is None or choice == -1:  # 취소 또는 ATB 인터럽트
+                    return None
+                    
+            except Exception as realtime_error:
+                print(f"⚠️ 실시간 메뉴 오류: {realtime_error}")
+                print("📝 기본 메뉴 시스템으로 전환합니다...")
+                
+                # 폴백: 기존 메뉴 시스템 사용
+                try:
+                    from .cursor_menu_system import create_simple_menu
+                    
+                    # 간단한 상태 정보 구성
+                    status_lines = []
+                    status_lines.append(f"🛡️ 아군 파티:")
+                    for member in party:
+                        if member.is_alive:
+                            hp_pct = int((member.current_hp / member.max_hp) * 100)
+                            status_lines.append(f"  🔮 {member.name}: HP {hp_pct}%")
+                    
+                    status_lines.append(f"\n⚔️ 적군:")
+                    for enemy in enemies:
+                        if enemy.is_alive:
+                            hp_pct = int((enemy.current_hp / enemy.max_hp) * 100)
+                            status_lines.append(f"  👹 {enemy.name}: HP {hp_pct}%")
+                    
+                    # 기본 메뉴 생성
+                    menu = create_simple_menu(
+                        title="⚔️ 전투 - 행동 선택 (기본 모드)",
+                        options=action_options,
+                        extra_content=status_lines,
+                        clear_screen=False
+                    )
+                    choice = menu.run()
+                    
+                    if choice is None or choice == -1:
+                        return None
+                        
+                except ImportError:
+                    # 최종 폴백: 직접 입력
+                    print("⚔️ 전투 메뉴 (텍스트 모드)")
+                    print("─" * 50)
+                    for i, option in enumerate(action_options):
+                        print(f"[{i+1}] {option}")
+                    print("─" * 50)
+                    
+                    try:
+                        choice_input = input("선택하세요 (1-9): ")
+                        choice = int(choice_input) - 1
+                        if choice < 0 or choice >= len(action_options):
+                            return None
+                    except (ValueError, KeyboardInterrupt):
+                        return None
                 from .cursor_menu_system import create_simple_menu
                 
                 # 전투 상태 정보 구성 (최적화된 이쁜 버전)
@@ -1563,7 +1856,8 @@ class BraveCombatSystem:
                     menu = create_simple_menu(
                         title="⚔️ 전투 - 행동 선택",
                         options=action_options,
-                        extra_content=status_lines
+                        extra_content=status_lines,
+                        clear_screen=False
                     )
                     choice = menu.run()  # 메뉴 실행하여 선택값 받기
                         
@@ -1579,7 +1873,7 @@ class BraveCombatSystem:
                     status_lines.append("─" * 50)
                     
                     for member in alive_party:
-                        status_line = f"🔮 {member.name}({member.character_class}) - HP: {member.hp}/{member.max_hp} MP: {member.mp}/{member.max_mp} BRV: {member.brave_points}"
+                        status_line = f"🔮 {member.name}({member.character_class}) - HP: {member.current_hp}/{member.max_hp} MP: {member.current_mp}/{member.max_mp} BRV: {member.brave_points}"
                         status_lines.append(status_line)
                     
                     # 적 상태 표시 (폴백)
@@ -1595,7 +1889,8 @@ class BraveCombatSystem:
                     menu = create_simple_menu(
                         title="⚔️ 전투 - 행동 선택 (기본 모드)",
                         options=action_options,
-                        extra_content=status_lines
+                        extra_content=status_lines,
+                        clear_screen=False
                     )
                     choice = menu.run()  # 메뉴 실행하여 선택값 받기
                 
@@ -1630,9 +1925,9 @@ class BraveCombatSystem:
                     print("입력 오류. 자동으로 첫 번째 옵션 선택.")
                     choice = 0
             except Exception as e:
-                # 완전한 폴백: 메뉴 시스템 오류 시 자동으로 첫 번째 행동 선택
-                print(f"⚠️ 메뉴 시스템 오류: {e}")
-                print("🔄 자동으로 Brave 공격을 선택합니다.")
+                # 메뉴 시스템 오류를 로그에 기록 (게임 화면에는 표시하지 않음)
+                log_menu_error(f"플레이어 액션 메뉴 선택 중 오류", e)
+                # 조용하게 자동으로 Brave 공격 선택
                 choice = 0
             
             if choice == 0:  # Brave 공격
@@ -1854,7 +2149,9 @@ class BraveCombatSystem:
         """자동 전투 행동 로직"""
         import time
         
-        print(f"\n🤖 {character.name} 자동 행동 중...")
+        from .error_logger import get_error_logger, log_debug
+        logger = get_error_logger()
+        log_debug("자동전투", f"{character.name} 자동 행동 중...")
         time_module.sleep(self.auto_battle_delay)
         
         # 생존한 적들
@@ -2211,7 +2508,9 @@ class BraveCombatSystem:
                 type_str = skill_type.value if hasattr(skill_type, 'value') else str(skill_type)
                 priority = best_skill.get('priority_score', 0)
                 
-                print(f"🎯 AI 전술 (우선순위 {priority}): {best_skill.get('name', '스킬')} ({type_str})")
+                from .error_logger import get_error_logger
+                logger = get_error_logger()
+                logger.log_debug(f"AI 전술 (우선순위 {priority}): {best_skill.get('name', '스킬')} ({type_str})")
                 self._execute_skill_immediately(best_skill, character, targets)
                 return True
         
@@ -2309,6 +2608,20 @@ class BraveCombatSystem:
             best_item = max(heal_items, key=lambda x: x[0].stats.get("healing_power", 0))
             if self.use_item_on_target(character, best_item[0], character):
                 print(f"🧪 자동 회복: {best_item[0].name} 사용")
+                
+                # 🎯 힐링 어그로 이벤트 생성
+                if hasattr(self, 'aggro_system'):
+                    healer_name = getattr(character, 'name', str(character))
+                    heal_amount = best_item[0].stats.get("healing_power", 50)
+                    
+                    # 모든 적에게 힐러의 어그로 추가
+                    if hasattr(self, '_current_enemies'):
+                        for enemy in self._current_enemies:
+                            if getattr(enemy, 'is_alive', True):
+                                enemy_name = getattr(enemy, 'name', str(enemy))
+                                aggro_event = create_healing_aggro(healer_name, heal_amount)
+                                self.aggro_system.add_aggro_event(enemy_name, aggro_event)
+                
                 return True
         return False
     
@@ -2423,47 +2736,34 @@ class BraveCombatSystem:
         # 가장 높은 점수의 적 선택
         return max(target_scores, key=lambda x: x[1])[0]
     
-    def _select_enemy_target(self, party: List[Character]) -> Character:
-        """적 AI의 타겟 선택 (도적 우선 타겟팅)"""
+    def _select_enemy_target(self, party: List[Character], enemy: Character = None) -> Character:
+        """적 AI의 타겟 선택 (동적 어그로 시스템 전용)"""
         if not party:
             return None
         
-        # 타겟 우선순위 점수 계산
-        target_scores = []
-        
-        for member in party:
-            score = 0
-            character_class = getattr(member, 'character_class', '')
-            hp_ratio = member.current_hp / member.max_hp if member.max_hp > 0 else 0
+        # 🎯 어그로 시스템 기반 타겟 선정 우선
+        if enemy and hasattr(self, 'aggro_system'):
+            enemy_name = getattr(enemy, 'name', str(enemy))
             
-            # 기본 점수: 체력이 낮을수록 높은 점수
-            score += (1 - hp_ratio) * 50
+            # 어그로 기반 주요 타겟 선정
+            aggro_target_name = self.aggro_system.get_primary_target(enemy_name, party)
             
-            # 직업별 위험도 평가
-            if character_class == "도적":
-                score += 100  # 도적은 최우선 타겟 (독 확산 위험)
-                print(f"🎯 {member.name}(도적)이 위험 인물로 식별되었습니다!")
-            elif character_class in ["아크메이지", "신관"]:
-                score += 70  # 지원형도 높은 우선순위
-            elif character_class in ["궁수", "암살자"]:
-                score += 60  # 원거리 딜러 우선
-            elif character_class in ["성기사", "전사"]:
-                score += 30  # 탱커는 낮은 우선순위
-            
-            # 상태이상 고려
-            if getattr(member, 'is_casting', False):
-                score += 40  # 캐스팅 중인 대상 우선
-            if hasattr(member, 'is_broken') and member.is_broken:
-                score -= 20  # BREAK 상태는 낮은 우선순위
-                
-            target_scores.append((member, score))
+            if aggro_target_name:
+                # 어그로 타겟 찾기
+                for member in party:
+                    if getattr(member, 'name', '') == aggro_target_name:
+                        # 어그로 분포 표시 (개발 모드에서만)
+                        if self.aggro_system.show_aggro_messages:
+                            aggro_dist = self.aggro_system.get_aggro_distribution(enemy_name)
+                            top_3 = sorted(aggro_dist.items(), key=lambda x: x[1], reverse=True)[:3]
+                            print(f"   📊 현재 어그로 상위 3명: {', '.join([f'{name}({aggro:.0f})' for name, aggro in top_3])}")
+                        
+                        return member
         
-        # 가장 높은 점수의 타겟 선택
-        selected_target = max(target_scores, key=lambda x: x[1])[0]
-        
-        # 도적이 선택되면 추가 메시지
-        if getattr(selected_target, 'character_class', '') == "도적":
-            print(f"⚠️ 적이 독술사 {selected_target.name}을(를) 집중 공격합니다!")
+        # 어그로 시스템 실패 시 첫 번째 아군 선택 (백업)
+        print(f"⚠️ 어그로 시스템 사용 불가, 첫 번째 아군 타겟팅")
+        return party[0]
+        print(f"⚠️ 적이 독술사 {selected_target.name}을(를) 집중 공격합니다!")
         
         return selected_target
                 
@@ -2474,12 +2774,12 @@ class BraveCombatSystem:
             # 🎯 특성 메뉴 중 애니메이션 일시정지
             gauge_animator = get_gauge_animator()
             gauge_animator.pause_animations()
-            if not self.ai_game_mode:  # AI 모드가 아닐 때만 입력 대기
+            if not self.ai_game_mode:  # 클래식 모드가 아닐 때만 입력 대기
                 # 키 버퍼 클리어 후 키 대기
                 self.keyboard.clear_input_buffer()
                 self.keyboard.wait_for_key("아무 키나 눌러 계속...")
             else:
-                time.sleep(0.3)  # AI 모드에서는 짧은 대기
+                time.sleep(0.3)  # 클래식 모드에서는 짧은 대기
             gauge_animator.resume_animations()
             return False
         
@@ -2509,11 +2809,11 @@ class BraveCombatSystem:
             # 🎯 특성 메뉴 중 애니메이션 일시정지
             gauge_animator = get_gauge_animator()
             gauge_animator.pause_animations()
-            if not self.ai_game_mode:  # AI 모드가 아닐 때만 입력 대기
+            if not self.ai_game_mode:  # 클래식 모드가 아닐 때만 입력 대기
                 self.keyboard.clear_input_buffer()  # 키 홀드 방지
                 self.keyboard.wait_for_key("아무 키나 눌러 계속...")
             else:
-                time.sleep(0.3)  # AI 모드에서는 짧은 대기
+                time.sleep(0.3)  # 클래식 모드에서는 짧은 대기
             gauge_animator.resume_animations()
             return False
         
@@ -2724,7 +3024,7 @@ class BraveCombatSystem:
                 f"✨ {character.name}의 스킬 선택", 
                 skill_options, 
                 skill_descriptions, 
-                clear_screen=True
+                clear_screen=False
             )
             choice = menu.run()
             
@@ -2821,6 +3121,9 @@ class BraveCombatSystem:
     
     def _execute_skill_immediately(self, skill, character, targets):
         """스킬 즉시 실행 (캐스트 타임 없는 스킬용)"""
+        # 액션 실행 플래그 설정
+        self.is_action_executing = True
+        
         # MP 소모 애니메이션 적용
         old_mp = character.current_mp
         base_mp_cost = skill.get("mp_cost", 0)
@@ -2916,6 +3219,9 @@ class BraveCombatSystem:
         
         # 스킬 사용 후 딜레이 추가
         self.add_action_pause(f"🎯 스킬 '{skill.get('name', '스킬')}' 효과 적용 완료!")
+        
+        # 액션 실행 완료, 플래그 해제
+        self.is_action_executing = False
     
     def complete_casting(self, character):
         """캐스팅 완료 처리 - 게임 종료 시 예외처리 포함"""
@@ -3049,15 +3355,16 @@ class BraveCombatSystem:
                 return []
             
             try:
-                # 🔄 화면 버퍼링 해결을 위한 강제 새로고침
+                # 🔄 화면 버퍼링 해결을 위한 강제 새로고침 - PowerShell 스택 현상 방지
                 import sys
                 import os
                 if hasattr(sys.stdout, 'flush'):
                     sys.stdout.flush()
-                if os.name == 'nt':  # Windows
-                    os.system('cls')
-                else:
-                    os.system('clear')
+                # PowerShell에서 화면 클리어로 인한 스택 현상 방지
+                # if os.name == 'nt':  # Windows
+                #     os.system('cls')
+                # else:
+                #     os.system('clear')
                 
                 # cursor_menu_system을 여기서 import (오류 발생 가능)
                 cursor_menu_available = False
@@ -3087,10 +3394,10 @@ class BraveCombatSystem:
                         descriptions.append(desc)
                     
                     try:
-                        menu = create_simple_menu("🎯 스킬 대상 선택", options, descriptions, clear_screen=True)
+                        menu = create_simple_menu("🎯 스킬 대상 선택", options, descriptions, clear_screen=False)
                         result = menu.run()
                         
-                        if result == -1:  # 취소
+                        if result is None:  # Q키로 취소
                             return None
                         
                         if 0 <= result < len(alive_allies):
@@ -3177,15 +3484,16 @@ class BraveCombatSystem:
                 return []
             
             try:
-                # 🔄 화면 버퍼링 해결을 위한 강제 새로고침
+                # 🔄 화면 버퍼링 해결을 위한 강제 새로고침 - PowerShell 스택 현상 방지
                 import sys
                 import os
                 if hasattr(sys.stdout, 'flush'):
                     sys.stdout.flush()
-                if os.name == 'nt':  # Windows
-                    os.system('cls')
-                else:
-                    os.system('clear')
+                # PowerShell에서 화면 클리어로 인한 스택 현상 방지
+                # if os.name == 'nt':  # Windows
+                #     os.system('cls')
+                # else:
+                #     os.system('clear')
                 
                 # cursor_menu_system을 여기서 import (오류 발생 가능)
                 cursor_menu_available = False
@@ -3214,10 +3522,10 @@ class BraveCombatSystem:
                         descriptions.append(desc)
                     
                     try:
-                        menu = create_simple_menu("⚔️ 공격 대상 선택", options, descriptions, clear_screen=True)
+                        menu = create_simple_menu("⚔️ 공격 대상 선택", options, descriptions, clear_screen=False)
                         result = menu.run()
                         
-                        if result == -1:  # 취소
+                        if result is None:  # Q키로 취소
                             return None
                         
                         if 0 <= result < len(alive_enemies):
@@ -3349,7 +3657,7 @@ class BraveCombatSystem:
                     options.append(option_text)
                     descriptions.append(desc_text)
                 
-                menu = create_simple_menu("⚔️ 전투 아이템 사용", options, descriptions, clear_screen=True)
+                menu = create_simple_menu("⚔️ 전투 아이템 사용", options, descriptions, clear_screen=False)
                 choice = menu.run()
                 
                 if choice == -1:  # 취소
@@ -3447,10 +3755,10 @@ class BraveCombatSystem:
                 options.append(option_text)
                 descriptions.append(desc)
             
-            menu = create_simple_menu("💀 부활 대상 선택", options, descriptions, clear_screen=True)
+            menu = create_simple_menu("💀 부활 대상 선택", options, descriptions, clear_screen=False)
             result = menu.run()
             
-            if result == -1:  # 취소
+            if result is None:  # Q키로 취소
                 return None
             
             if 0 <= result < len(dead_party):
@@ -3496,10 +3804,10 @@ class BraveCombatSystem:
                 options.append(option_text)
                 descriptions.append(desc)
             
-            menu = create_simple_menu("🎯 치료 대상 선택", options, descriptions, clear_screen=True)
+            menu = create_simple_menu("🎯 치료 대상 선택", options, descriptions, clear_screen=False)
             result = menu.run()
             
-            if result == -1:  # 취소
+            if result is None:  # Q키로 취소
                 return None
             
             if 0 <= result < len(alive_party):
@@ -3527,12 +3835,16 @@ class BraveCombatSystem:
     
     def use_attack_item(self, user: Character, item, party: List[Character], enemies: List[Character]) -> bool:
         """공격 아이템 사용 (폭탄 등)"""
+        # 액션 실행 플래그 설정
+        self.is_action_executing = True
+        
         print(f"\n💥 {user.name}이(가) {item.name}을(를) 사용합니다!")
         
         # 살아있는 적들만 대상으로
         alive_enemies = [e for e in enemies if e.is_alive]
         if not alive_enemies:
             print("❌ 공격할 적이 없습니다!")
+            self.is_action_executing = False
             return False
         
         damage_amount = item.stats.get("damage_amount", 50)
@@ -3561,6 +3873,7 @@ class BraveCombatSystem:
                     target.is_alive = False
                     print(f"💀 {target.name}이(가) 쓰러졌습니다!")
             else:
+                self.is_action_executing = False
                 return False
         
         elif "blind_enemies" in item.effects:
@@ -3574,6 +3887,9 @@ class BraveCombatSystem:
         # 아이템 소모
         user.inventory.remove_item(item.name, 1)
         print(f"✨ {item.name}을(를) 사용했습니다.")
+        
+        # 액션 실행 완료, 플래그 해제
+        self.is_action_executing = False
         return True
     
     def select_enemy_target(self, enemies: List[Character]) -> Character:
@@ -3600,10 +3916,10 @@ class BraveCombatSystem:
                 options.append(option_text)
                 descriptions.append(desc)
             
-            menu = create_simple_menu("🎯 공격 대상 선택", options, descriptions, clear_screen=True)
+            menu = create_simple_menu("🎯 공격 대상 선택", options, descriptions, clear_screen=False)
             result = menu.run()
             
-            if result == -1:  # 취소
+            if result is None:  # Q키로 취소
                 return None
             
             if 0 <= result < len(enemies):
@@ -3627,6 +3943,9 @@ class BraveCombatSystem:
 
     def use_item_on_target(self, user: Character, item, target: Character) -> bool:
         """아이템을 대상에게 사용 - 실제 아이템 효과 시스템 연동"""
+        # 액션 실행 플래그 설정
+        self.is_action_executing = True
+        
         # 아이템 사용 이펙트
         self.visualizer.show_skill_effect(user, f"{item.name} 사용", EffectType.HEAL)
         
@@ -3824,6 +4143,7 @@ class BraveCombatSystem:
                         print(f"💚 {target.name}: {target.current_hp}/{target.max_hp} HP")
                     else:
                         print(f"⚠️ {target.name}은(는) 이미 살아있습니다!")
+                        self.is_action_executing = False
                         return False  # 아이템 소모하지 않음
                 
                 elif effect == "cure":
@@ -3907,6 +4227,8 @@ class BraveCombatSystem:
         else:
             print(f"❌ {item.name}을(를) 사용할 수 없습니다.")
         
+        # 액션 실행 완료, 플래그 해제
+        self.is_action_executing = False
         return success
                 
     def brave_attack_menu(self, attacker: Character, enemies: List[Character]) -> bool:
@@ -3923,9 +4245,7 @@ class BraveCombatSystem:
             return True
             
         # 1차 시도: 커서 메뉴 시스템
-        try:
-            from .cursor_menu_system import create_simple_menu
-            
+        if CURSOR_MENU_AVAILABLE:
             options = []
             descriptions = []
             
@@ -3936,17 +4256,15 @@ class BraveCombatSystem:
                 options.append(option_text)
                 descriptions.append(desc)
             
-            menu = create_simple_menu("⚔️ Brave 공격 대상 선택", options, descriptions, clear_screen=True)
+            menu = create_simple_menu("⚔️ Brave 공격 대상 선택", options, descriptions, clear_screen=False)
             result = menu.run()
             
             if result is not None and 0 <= result < len(alive_enemies):
                 target = alive_enemies[result]
                 self.execute_brave_attack(attacker, target)
                 return True
-            elif result == -1:  # 취소
+            elif result is None:  # Q키로 취소
                 return False
-        except Exception as cursor_error:
-            print(f"⚠️ 커서 메뉴 오류: {cursor_error}")
         
         # 2차 시도: 강화된 번호 입력 시스템
         max_attempts = 3
@@ -4025,9 +4343,7 @@ class BraveCombatSystem:
         if not alive_enemies:
             return False
             
-        try:
-            from .cursor_menu_system import create_simple_menu
-            
+        if CURSOR_MENU_AVAILABLE:
             options = []
             descriptions = []
             
@@ -4042,16 +4358,17 @@ class BraveCombatSystem:
                 options.append(option_text)
                 descriptions.append(desc)
             
-            menu = create_simple_menu("💀 HP 공격 대상 선택", options, descriptions, clear_screen=True)
+            menu = create_simple_menu("💀 HP 공격 대상 선택", options, descriptions, clear_screen=False)
             result = menu.run()
             
             if result is not None and 0 <= result < len(alive_enemies):
                 target = alive_enemies[result]
                 self.execute_hp_attack(attacker, target)
                 return True
+            elif result is None:  # Q키로 취소
+                return False
             return False
-            
-        except ImportError:
+        else:
             # 폴백: 기존 방식
             print("\n대상을 선택하세요:")
             for i, enemy in enumerate(alive_enemies, 1):
@@ -4075,6 +4392,12 @@ class BraveCombatSystem:
         
     def execute_brave_attack(self, attacker: Character, target: Character):
         """Brave 공격 실행 + 그림자 시스템 통합"""
+        from game.error_logger import log_combat
+        log_combat("적행동", f"{attacker.name}이 {target.name}에게 Brave 공격 실행 시작")
+        
+        # 액션 실행 플래그 설정
+        self.is_action_executing = True
+        
         # 🌑 암살자인지 확인
         is_assassin = getattr(attacker, 'character_class', '') == '암살자'
         
@@ -4356,14 +4679,9 @@ class BraveCombatSystem:
         
         # 스킬의 상태효과 적용 (독화살 등)
         if hasattr(skill, 'status_effects') and skill.status_effects:
-            try:
-                from .status_effects import StatusType
-            except ImportError:
-                StatusType = type('StatusType', (), {'POISON': 'poison'})
-                
             for status_effect in skill.status_effects:
                 if hasattr(target, 'status_manager') and target.status_manager:
-                    effect_type = status_effect.get('type', StatusType.POISON)
+                    effect_type = status_effect.get('type', "poison")
                     duration = status_effect.get('duration', 3)
                     intensity = status_effect.get('intensity', 1.0)
                     target.status_manager.add_status(effect_type, duration, intensity)
@@ -4371,11 +4689,6 @@ class BraveCombatSystem:
         
         # 스킬 dict 형태일 때도 처리
         elif hasattr(skill, '__dict__') and skill.__dict__.get('status_effects'):
-            try:
-                from .status_effects import StatusType
-            except ImportError:
-                StatusType = type('StatusType', (), {'POISON': 'poison'})
-                
             for status_effect in skill.__dict__['status_effects']:
                 if hasattr(target, 'status_manager') and target.status_manager:
                     effect_type = status_effect.get('type', 'poison')
@@ -4387,7 +4700,36 @@ class BraveCombatSystem:
         # 🔮🏹 궁수 지원사격 트리거 (아군이 공격을 받을 때)
         self._trigger_support_fire(attacker, target, "ally_attacked")
         
+        # 🎯 어그로 이벤트 생성 (아군이 적을 공격했을 때)
+        if hasattr(self, 'aggro_system') and hasattr(attacker, 'character_class'):
+            # 아군 → 적 공격 시에만 어그로 생성
+            is_attacker_ally = not getattr(attacker, 'is_enemy', False)
+            is_target_enemy = getattr(target, 'is_enemy', False)
+            
+            if is_attacker_ally and is_target_enemy:
+                # 모든 적에게 공격자의 어그로 추가
+                attacker_name = getattr(attacker, 'name', str(attacker))
+                target_name = getattr(target, 'name', str(target))
+                target_max_hp = getattr(target, 'max_hp', 1000)  # 타겟의 최대 HP
+                
+                # 피해량 기반 어그로 생성
+                aggro_event = create_damage_aggro(attacker_name, brave_damage, target_max_hp)
+                
+                # 타겟된 적에게 어그로 추가
+                self.aggro_system.add_aggro_event(target_name, aggro_event)
+                
+                # 다른 적들에게도 절반의 어그로 추가 (관심 끌기)
+                if hasattr(self, '_current_enemies'):
+                    for enemy in self._current_enemies:
+                        enemy_name = getattr(enemy, 'name', str(enemy))
+                        if enemy_name != target_name and getattr(enemy, 'is_alive', True):
+                            indirect_aggro = create_damage_aggro(attacker_name, brave_damage * 0.3)
+                            self.aggro_system.add_aggro_event(enemy_name, indirect_aggro)
+        
         # BRV 공격 결과 확인 - 대기 시간 제거 (어차피 턴 정산에서 대기)
+        
+        # 액션 실행 완료, 플래그 해제
+        self.is_action_executing = False
     
     def _get_class_specific_basic_attack(self, character: Character):
         """직업별 특화된 기본공격 반환 (new_skill_system.py 완전 통합)"""
@@ -5672,6 +6014,12 @@ class BraveCombatSystem:
         
     def execute_hp_attack(self, attacker: Character, target: Character):
         """HP 공격 실행 - Brave 시스템 우선"""
+        from game.error_logger import log_combat
+        log_combat("적행동", f"{attacker.name}이 {target.name}에게 HP 공격 실행 시작")
+        
+        # 액션 실행 플래그 설정
+        self.is_action_executing = True
+        
         # 직업별 기본 Brave HP 공격을 우선 사용
         skill = self._get_class_specific_hp_attack(attacker)
         
@@ -5686,6 +6034,9 @@ class BraveCombatSystem:
         # 🎯 중요: HP 공격 완료 시 행동 완료 플래그 설정
         self._last_action_completed = True
         print(f"✅ {attacker.name}의 HP 공격이 완료되었습니다!")
+        
+        # 액션 실행 완료, 플래그 해제
+        self.is_action_executing = False
         
         return result
             
@@ -5887,6 +6238,7 @@ class BraveCombatSystem:
             
     def enemy_turn(self, enemy: Character, party: List[Character], enemies: List[Character]):
         """적 턴 (AI)"""
+        
         # 전투 종료 체크 - 턴 시작 시 다시 확인
         if self.check_battle_end(party, enemies):
             return self.determine_winner(party, enemies)
@@ -5915,8 +6267,13 @@ class BraveCombatSystem:
             
         print(f"\n{Color.BRIGHT_RED.value}[{enemy.name} 턴]{Color.RESET.value}")
         
-        # 개선된 AI 로직 (도적 우선 타겟팅)
-        target = self._select_enemy_target(alive_party)
+        # 🎯 어그로 기반 타겟 선정 (동적 AI)
+        target = self._select_enemy_target(alive_party, enemy)
+        
+        # 매 턴마다 어그로 자연 감소 적용
+        if hasattr(self, 'aggro_system'):
+            enemy_name = getattr(enemy, 'name', str(enemy))
+            self.aggro_system.decay_aggro(enemy_name)
         
         if enemy.brave_points >= 400 and random.random() < 0.5:  # 1000 → 400, 40% → 50%
             # HP 공격 사용
@@ -5926,7 +6283,7 @@ class BraveCombatSystem:
             # Brave 공격 사용
             print(f"⚔️ {enemy.name}이(가) {target.name}에게 Brave 공격을 시도합니다!")
             self.execute_brave_attack(enemy, target)
-            
+        
         # 턴 종료 후 전투 상태 체크
         if self.check_battle_end(party, enemies):
             return self.determine_winner(party, enemies)
@@ -5940,7 +6297,7 @@ class BraveCombatSystem:
         
         print(f"{character.name}이(가) 방어 태세를 취합니다!")
         # 방어 효과: 다음 받는 데미지 50% 감소
-        defense_effect = StatusEffect(StatusType.BOOST_DEF, 1, 2)
+        defense_effect = StatusEffect("방어_태세", StatusType.BUFF, 1, 2)
         character.status_manager.add_effect(defense_effect)
         
         # Brave 포인트 회복 - INT BRV의 85%
@@ -6368,8 +6725,8 @@ class BraveCombatSystem:
                     special_status += f" {Color.BRIGHT_CYAN.value}🎯 AIM:{member.precision_points}{Color.RESET.value}"
                 elif hasattr(member, 'aim_points') and member.aim_points > 0:
                     special_status += f" {Color.BRIGHT_CYAN.value}🎯 AIM:{member.aim_points}{Color.RESET.value}"
-                
-                # 그림자 스택 (암살자) - 영어 대문자 표시
+
+                # 그림자 스택 (암살자) - 숨김 처리 (사용자 요청)
                 if hasattr(member, 'shadow_count') and member.shadow_count > 0:
                     special_status += f" {Color.BRIGHT_BLUE.value}👤 SHADOW:{member.shadow_count}{Color.RESET.value}"
                 elif hasattr(member, 'shadows') and member.shadows > 0:
@@ -7147,7 +7504,6 @@ class BraveCombatSystem:
                     status_icons += " 💥"
                 if hasattr(member, 'status_effects') and member.status_effects:
                     try:
-                        from .status_effects import StatusType
                         from .new_skill_system import get_status_icon
                         
                         status_types_found = []
@@ -8124,7 +8480,7 @@ class BraveCombatSystem:
                 attacker_options.append("🔙 돌아가기")
                 attacker_descriptions.append("상세 상태 메뉴로 돌아갑니다")
                 
-                attacker_menu = create_simple_menu("🎯 공격자 선택", attacker_options, attacker_descriptions, clear_screen=True)
+                attacker_menu = create_simple_menu("🎯 공격자 선택", attacker_options, attacker_descriptions, clear_screen=False)
                 attacker_choice = attacker_menu.run()
                 
                 if attacker_choice is None or attacker_choice == len(attacker_options) - 1:
@@ -8150,7 +8506,7 @@ class BraveCombatSystem:
                 target_options.append("🔙 돌아가기")
                 target_descriptions.append("공격자 선택으로 돌아갑니다")
                 
-                target_menu = create_simple_menu("🛡️ 대상 선택", target_options, target_descriptions, clear_screen=True)
+                target_menu = create_simple_menu("🛡️ 대상 선택", target_options, target_descriptions, clear_screen=False)
                 target_choice = target_menu.run()
                 
                 if target_choice is None or target_choice == len(target_options) - 1:
@@ -8380,7 +8736,7 @@ class BraveCombatSystem:
                 menu_options.append("🔙 돌아가기")
                 menu_descriptions.append("전투 화면으로 돌아갑니다")
                 
-                menu = create_simple_menu("📊 실시간 상태 조회", menu_options, menu_descriptions, clear_screen=True)
+                menu = create_simple_menu("📊 실시간 상태 조회", menu_options, menu_descriptions, clear_screen=False)
                 choice = menu.run()
                 
                 if choice is None or choice == len(menu_options) - 1:  # 돌아가기
@@ -8739,6 +9095,12 @@ class BraveCombatSystem:
         else:
             print(f"  • ✨ BRV 균등")
         
+        # 어그로 분석 추가
+        if self.aggro_system and self.aggro_system.aggro_table:
+            print(f"\n{Color.BRIGHT_MAGENTA.value}🎯 어그로 분석:{Color.RESET.value}")
+            aggro_status = self.aggro_system.get_all_aggro_status()
+            print(aggro_status)
+        
         input(f"\n{Color.YELLOW.value}계속하려면 Enter를 누르세요...{Color.RESET.value}")
     
     def _show_turn_order_prediction(self, all_combatants: List[Character]):
@@ -8898,18 +9260,18 @@ class BraveCombatSystem:
     
     def _update_atb_instant(self, all_combatants: List[Character], atb_settings: dict):
         """ATB 즉시 업데이트 (애니메이션 없음) - 상대적 속도 기반 동시 업데이트"""
-        speed_multiplier = atb_settings.get("update_speed", 1.0)
         
-        # 상대적 속도 계산을 위한 평균 속도
+        # 유효한 전투 참여자만 필터링
         alive_combatants = [c for c in all_combatants if not isinstance(c, dict) and c.is_alive and hasattr(c, 'atb_gauge')]
         if not alive_combatants:
             return
         
-        total_speed = sum(getattr(c, 'speed', 100) for c in alive_combatants)
+        # 📊 전투 참여자 전체의 평균 속도 계산
+        total_speed = sum(getattr(c, 'speed', 50) for c in alive_combatants)
         avg_speed = total_speed / len(alive_combatants)
         
-        # ATB 게이지 충전 속도 - 속도 기반으로 개별 계산 (부드러운 증가) - 1/5로 느리게 조정
-        base_increase = 50  # 빠른 전투를 유지하되 부드럽게 (250 → 50, 1/5로 감소)
+        # 🏃‍♂️ 상대적 속도 기반 ATB 증가 - 평균 속도 대비 비율로 계산
+        base_atb_increase = 10  # 기본 ATB 증가량 (0.15→10으로 증가하여 적절한 속도)
         
         # 모든 캐릭터의 ATB를 동시에 계산 후 동시에 업데이트
         atb_updates = {}
@@ -8922,39 +9284,50 @@ class BraveCombatSystem:
                 continue
                 
             if combatant.is_alive and hasattr(combatant, 'atb_gauge'):
-                # 개별 속도 기반 ATB 증가 계산
-                speed = getattr(combatant, 'speed', 50)
-                # 속도에 비례한 ATB 증가 (speed 50 = 기본, speed 100 = 2배)
-                speed_multiplier = speed / 50.0
+                # 🎯 개별 캐릭터의 속도와 평균 속도 비교로 상대적 ATB 증가 계산
+                character_speed = getattr(combatant, 'speed', 50)
                 
-                # 캐스팅 중인 경우 ATB 기반 캐스팅 처리
+                # 평균 속도 대비 상대적 비율 계산 (0.5 ~ 2.0 범위로 제한)
+                if avg_speed > 0:
+                    speed_ratio = character_speed / avg_speed
+                    speed_ratio = max(0.5, min(2.0, speed_ratio))  # 너무 극단적이지 않게 제한
+                else:
+                    speed_ratio = 1.0
+                
+                # 상대적 속도 기반 ATB 증가량 계산
+                atb_increase = int(base_atb_increase * speed_ratio)
+                
+                # 난이도 기반 ATB 속도 조절 (적과 아군 모두 공평하게)
+                if hasattr(self, 'is_player_turn_active') and self.is_player_turn_active:
+                    # 플레이어 턴 중에는 난이도 설정에 따른 속도 조절
+                    speed_modifier = self._get_turn_speed_modifier()
+                    atb_increase = int(atb_increase * speed_modifier)
+                    
+                    # 첫 번째 호출 시에만 로깅 (너무 많은 로그 방지)
+                    if not hasattr(self, '_speed_modifier_logged'):
+                        from game.error_logger import log_system
+                        log_system("ATB시스템", f"난이도 기반 ATB 속도 조절 적용", {
+                            "속도배수": speed_modifier,
+                            "기본증가량": base_atb_increase,
+                            "조절후증가량": atb_increase
+                        })
+                        self._speed_modifier_logged = True
+                
+                # 캐스팅 중인 경우 특별 처리
                 if hasattr(combatant, 'is_casting') and combatant.is_casting:
-                    cast_time = getattr(combatant, 'casting_cast_time', 250)  # 기본 25% → 250 ATB units
-                    
-                    # 캐스팅에 필요한 ATB = cast_time (예: 15% 스킬이면 150 ATB)
+                    cast_time = getattr(combatant, 'casting_cast_time', 250)
                     required_atb = cast_time
-                    
-                    # 캐스팅 속도는 일반 ATB와 동일하게 처리
-                    atb_increase = int(base_increase * speed_multiplier)
                     new_atb = combatant.atb_gauge + atb_increase
                     
-                    # ATB 값 범위 보정
-                    new_atb = max(0, min(self.ATB_MAX, int(round(new_atb))))
-                    atb_updates[combatant] = new_atb
-                    
-                    # 캐스팅 완료 체크: required_atb에 도달하면 완료 (100%가 아님)
+                    # 캐스팅 완료 체크
                     if new_atb >= required_atb:
-                        # 캐스팅 완료 예약
                         casting_completions.append(combatant)
-                        # 캐스팅 완료 시 ATB는 required_atb만큼 소모하고 나머지는 유지
-                        atb_updates[combatant] = new_atb - required_atb
-                    continue
+                        new_atb = new_atb - required_atb  # 필요한 ATB만 소모
+                else:
+                    # 일반 ATB 증가
+                    new_atb = combatant.atb_gauge + atb_increase
                 
-                # 일반적인 ATB 게이지 증가 (속도 기반) - 값 안정화
-                atb_increase = int(base_increase * speed_multiplier)
-                new_atb = combatant.atb_gauge + atb_increase
-                
-                # ATB 값 범위 보정 및 반올림으로 안정화
+                # ATB 값 범위 보정
                 new_atb = max(0, min(self.ATB_MAX, int(round(new_atb))))
                 atb_updates[combatant] = new_atb
         
@@ -8991,22 +9364,26 @@ class BraveCombatSystem:
                     break
             
             if significant_changes:
-                # 잠시 대기 후 안정적인 상태에서 화면 갱신 - 즉시 갱신
-                import time
-                time_module.sleep(0.005)  # 5ms 대기로 최대한 빠르게 (50ms→5ms, 거의 즉시 갱신)
-                first_character = next((c for c in self._current_party if c.is_alive), None)
-                if first_character:
-                    self.show_battle_status(first_character, self._current_party, self._current_enemies)
-        
-        # 캐스팅 완료 처리
-        for combatant in casting_completions:
-            display_atb = min(100, int(combatant.atb_gauge / self.ATB_READY_THRESHOLD * 100))
-            cast_time = getattr(combatant, 'casting_cast_time', 250)
-            display_required = min(100, int(cast_time / self.ATB_READY_THRESHOLD * 100))
-            print(f"✨ {combatant.name}의 캐스팅이 완료되었습니다!")
-            self.complete_casting(combatant)
-            # 🎯 캐스팅 소모된 ATB만 차감 (캐스팅 시간만큼만 소모)
-            combatant.atb_gauge = max(0, combatant.atb_gauge - cast_time)
+                # ATB 변화가 있을 때만 필요시 화면 갱신
+                pass  # 빠른 갱신을 위해 화면 갱신은 생략
+    
+    def _get_turn_speed_modifier(self):
+        """난이도 설정에 따른 턴 속도 배수 반환"""
+        try:
+            # config에서 현재 난이도 설정 가져오기
+            import config
+            game_config = config.GameConfig()
+            current_difficulty = getattr(game_config, 'current_difficulty', '보통')
+            difficulty_settings = getattr(game_config, 'DIFFICULTY_SETTINGS', {})
+            
+            if current_difficulty in difficulty_settings:
+                return difficulty_settings[current_difficulty].get('player_turn_speed', 0.2)
+            else:
+                return 0.2  # 기본값 (보통 난이도)
+        except Exception as e:
+            from game.error_logger import log_error
+            log_error("ATB시스템", "난이도 설정 로드 실패", {"오류": str(e)})
+            return 0.2  # 기본값
     
     def _update_atb_with_animation(self, all_combatants: List[Character], atb_settings: dict):
         """ATB 애니메이션과 함께 업데이트 - 240FPS로 매우 부드럽게"""
@@ -9026,7 +9403,7 @@ class BraveCombatSystem:
         avg_speed = total_speed / len(alive_combatants)
         
         # ATB 게이지 충전 속도 - 속도에 완전 정비례 (단순하고 명확하게) - 더욱 부드럽게 조정
-        base_increase = 0.5  # 기본 증가량을 매우 낮게 설정 (1 → 0.5, 더욱 부드러운 애니메이션)
+        base_increase = 0.25  # 기본 증가량을 절반으로 줄임 (0.5 → 0.25)
         
         # 이전 ATB 값들 저장
         previous_atb = {}
@@ -9044,6 +9421,9 @@ class BraveCombatSystem:
                 speed = getattr(combatant, 'speed', 50)
                 # 속도가 50인 캐릭터를 기준으로 완전 정비례 (speed 50 = 1.0배, speed 100 = 2.0배)
                 speed_multiplier = speed / 50.0
+                
+                # 기본 required_atb 값 설정
+                required_atb = self.ATB_MAX  # 기본값: 최대 ATB (캐스팅 아닐 때)
                 
                 # 캐스팅 중인 경우 ATB 기반 캐스팅 처리
                 if hasattr(combatant, 'is_casting') and combatant.is_casting:
@@ -9070,6 +9450,23 @@ class BraveCombatSystem:
                 
                 # 일반적인 ATB 게이지 증가 (속도 기반)
                 atb_increase = int(base_increase * speed_multiplier)
+                
+                # 플레이어 턴 중일 때 ATB 증가 속도 조절
+                if hasattr(self, 'is_action_executing') and self.is_action_executing:
+                    # 행동 실행 중일 때는 ATB 완전 정지
+                    atb_increase = 0
+                elif hasattr(self, 'is_player_turn_active') and self.is_player_turn_active:
+                    # 난이도 설정에서 플레이어 턴 중 속도 배율 가져오기
+                    try:
+                        from ..config import GameConfig
+                        config = GameConfig()
+                        current_difficulty = getattr(config, 'current_difficulty', '보통')
+                        difficulty_settings = config.DIFFICULTY_SETTINGS.get(current_difficulty, {})
+                        player_turn_speed = difficulty_settings.get("player_turn_speed", 0.3)
+                        atb_increase = int(atb_increase * player_turn_speed)
+                    except:
+                        atb_increase = int(atb_increase * 0.3)  # 기본 0.3배 속도
+                
                 new_atb = min(self.ATB_MAX, combatant.atb_gauge + atb_increase)
                 
                 # ATB 값 즉시 업데이트 (애니메이션 제거)
@@ -9237,10 +9634,9 @@ class BraveCombatSystem:
                 
                 # 독 상태 표시 (누적 정보 포함)
                 if hasattr(combatant, 'status_effects') and combatant.status_effects:
-                    from .status_effects import StatusType
                     poison_info = None
                     for effect in combatant.status_effects:
-                        if hasattr(effect, 'type') and effect.type == StatusType.POISON:
+                        if hasattr(effect, 'type') and effect.type == "poison":
                             poison_info = effect
                             break
                     if poison_info:
@@ -9278,10 +9674,9 @@ class BraveCombatSystem:
                 
                 # 독 상태 표시 (누적 정보 포함) - 적군용
                 if hasattr(combatant, 'status_effects') and combatant.status_effects:
-                    from .status_effects import StatusType
                     poison_info = None
                     for effect in combatant.status_effects:
-                        if hasattr(effect, 'type') and effect.type == StatusType.POISON:
+                        if hasattr(effect, 'type') and effect.type == "poison":
                             poison_info = effect
                             break
                     if poison_info:
@@ -9401,7 +9796,9 @@ class BraveCombatSystem:
         now_ts = time_module.time()
         def not_in_cooldown(c):
             cid = id(c)
-            until = self._cancel_cooldown_until.get(cid, 0)
+            # 안전한 속성 접근
+            cancel_cooldown_dict = getattr(self, '_cancel_cooldown_until', {})
+            until = cancel_cooldown_dict.get(cid, 0)
             return now_ts >= until
         ready_combatants = [c for c in valid_combatants if c.is_alive and c.atb_gauge >= self.ATB_READY_THRESHOLD and not_in_cooldown(c)]
         
@@ -9433,8 +9830,20 @@ class BraveCombatSystem:
         
         battle_ended = not party_alive or not enemies_alive
         
+        # 디버깅 로그 추가
+        log_debug("전투종료체크", f"전투 종료 조건 체크", {
+            "파티생존": party_alive,
+            "적생존": enemies_alive,
+            "전투종료": battle_ended,
+            "파티수": len(party),
+            "적수": len(enemies),
+            "파티상태": [f"{p.name}({p.is_alive})" for p in party],
+            "적상태": [f"{e.name}({e.is_alive})" for e in enemies]
+        })
+        
         # 전투가 종료되면 모든 캐릭터의 캐스팅 중단
         if battle_ended:
+            log_debug("전투종료", "전투 종료로 인한 캐스팅 중단", {})
             self._clear_all_casting(party + enemies)
         
         return battle_ended
@@ -9750,8 +10159,9 @@ class BraveCombatSystem:
                     # 폴백: 직접 특수 효과 실행
                     self._execute_special_effects(special_effects, caster, skill, targets)
             except Exception as e:
-                print(f"⚠️ 특수 효과 실행 실패: {e}")
-                # 폴백: 직접 특수 효과 실행
+                # 특수 효과 실행 오류를 로그에 기록
+                log_effect_error("특수효과 실행", f"스킬 '{skill.get('name', 'Unknown')}' 특수효과 실행 중 오류", e)
+                # 조용하게 폴백: 직접 특수 효과 실행
                 self._execute_special_effects(special_effects, caster, skill, targets)
                 
     def _calculate_brv_damage(self, skill, caster, target, brv_power):
@@ -10050,13 +10460,17 @@ class BraveCombatSystem:
                                 # 실패하면 caster만 전달
                                 handler(caster)
                     except Exception as e:
-                        print(f"⚠️ 특수 효과 '{effect_name}' 실행 실패: {e}")
+                        # 특수 효과 실행 오류를 로그에 기록
+                        log_effect_error(effect_name, f"특수 효과 실행 중 오류", e)
                 else:
-                    print(f"⚠️ 알 수 없는 특수 효과: {effect_name}")
-        except ImportError:
-            print(f"⚠️ New Skill System을 불러올 수 없습니다.")
+                    # 알 수 없는 특수 효과를 로그에 기록
+                    log_effect_error(effect_name, "알 수 없는 특수 효과")
+        except ImportError as e:
+            # Import 오류를 로그에 기록
+            log_effect_error("ImportError", "New Skill System을 불러올 수 없음", e)
         except Exception as e:
-            print(f"⚠️ 특수 효과 실행 중 오류: {e}")
+            # 일반 오류를 로그에 기록
+            log_effect_error("General", "특수 효과 실행 중 예상치 못한 오류", e)
     
     def _calculate_heal_amount(self, skill, caster):
         """힐량 계산"""
@@ -10274,9 +10688,72 @@ class BraveCombatSystem:
     
     # ==================== AI 게임모드 지원 메서드들 ====================
     
+    def _initialize_ai_personalities(self):
+        """🧠 AI 개성 시스템 초기화"""
+        # AI 개성별 사고 시간과 정확도 설정
+        self.ai_personalities = {
+            # 전투 직업군 - 빠른 판단
+            '전사': {'thinking_time': (0.3, 0.8), 'accuracy_modifier': 1.1, 'type': '성급함'},
+            '아크메이지': {'thinking_time': (1.5, 3.0), 'accuracy_modifier': 1.2, 'type': '신중함'},
+            '궁수': {'thinking_time': (0.8, 1.5), 'accuracy_modifier': 1.15, 'type': '냉정함'},
+            '도적': {'thinking_time': (0.3, 0.7), 'accuracy_modifier': 1.0, 'type': '성급함'},
+            '성기사': {'thinking_time': (1.0, 2.0), 'accuracy_modifier': 1.1, 'type': '균형'},
+            '암흑기사': {'thinking_time': (0.5, 1.2), 'accuracy_modifier': 1.05, 'type': '균형'},
+            '몽크': {'thinking_time': (0.2, 0.6), 'accuracy_modifier': 0.95, 'type': '성급함'},
+            '바드': {'thinking_time': (1.2, 2.5), 'accuracy_modifier': 1.15, 'type': '신중함'},
+            
+            # 마법 직업군 - 신중한 판단
+            '네크로맨서': {'thinking_time': (2.0, 4.0), 'accuracy_modifier': 1.25, 'type': '신중함'},
+            '용기사': {'thinking_time': (0.8, 1.5), 'accuracy_modifier': 1.1, 'type': '냉정함'},
+            '검성': {'thinking_time': (1.5, 2.5), 'accuracy_modifier': 1.2, 'type': '신중함'},
+            '정령술사': {'thinking_time': (1.8, 3.2), 'accuracy_modifier': 1.3, 'type': '신중함'},
+            '시간술사': {'thinking_time': (2.5, 4.0), 'accuracy_modifier': 1.4, 'type': '신중함'},
+            '연금술사': {'thinking_time': (1.5, 2.8), 'accuracy_modifier': 1.25, 'type': '신중함'},
+            '차원술사': {'thinking_time': (2.0, 3.5), 'accuracy_modifier': 1.35, 'type': '신중함'},
+            '마검사': {'thinking_time': (1.0, 1.8), 'accuracy_modifier': 1.15, 'type': '균형'},
+            '기계공학자': {'thinking_time': (1.2, 2.2), 'accuracy_modifier': 1.2, 'type': '신중함'},
+            '무당': {'thinking_time': (1.8, 3.0), 'accuracy_modifier': 1.25, 'type': '신중함'},
+            
+            # 특수 직업군 - 다양한 성향
+            '암살자': {'thinking_time': (0.1, 0.4), 'accuracy_modifier': 1.3, 'type': '성급함'},
+            '해적': {'thinking_time': (0.4, 0.9), 'accuracy_modifier': 0.9, 'type': '성급함'},
+            '사무라이': {'thinking_time': (1.5, 2.8), 'accuracy_modifier': 1.3, 'type': '신중함'},
+            '드루이드': {'thinking_time': (2.0, 3.5), 'accuracy_modifier': 1.2, 'type': '신중함'},
+            '철학자': {'thinking_time': (3.0, 4.0), 'accuracy_modifier': 1.5, 'type': '신중함'},
+            '검투사': {'thinking_time': (0.3, 0.8), 'accuracy_modifier': 1.0, 'type': '성급함'},
+            '기사': {'thinking_time': (1.0, 2.0), 'accuracy_modifier': 1.15, 'type': '균형'},
+            '신관': {'thinking_time': (1.5, 2.5), 'accuracy_modifier': 1.2, 'type': '신중함'},
+            '광전사': {'thinking_time': (0.1, 0.3), 'accuracy_modifier': 0.8, 'type': '성급함'},
+        }
+        
+        # 자동 배틀 모드용 고정 설정
+        self.auto_battle_thinking_time = (0.5, 1.2)
+        
+        print("🧠 AI 개성 시스템 활성화! (직업별 사고 패턴)")
+    
     def _execute_ai_action(self, character: Character, action_type: str, action_data: dict, party: List[Character], enemies: List[Character]):
-        """AI가 결정한 액션 실행"""
+        """AI가 결정한 액션 실행 (개성별 사고 시간 포함)"""
         try:
+            # 🧠 AI 개성별 사고 시간 적용
+            import random
+            import time
+            
+            character_class = getattr(character, 'character_class', '')
+            personality = self.ai_personalities.get(character_class, {
+                'thinking_time': (0.5, 1.0), 
+                'accuracy_modifier': 1.0, 
+                'type': '균형'
+            })
+            
+            # 자동 배틀 모드가 아닌 경우에만 사고 시간 적용
+            if not getattr(self, 'auto_battle_mode', False):
+                thinking_min, thinking_max = personality['thinking_time']
+                thinking_time = random.uniform(thinking_min, thinking_max)
+                personality_type = personality['type']
+                
+                print(f"🧠 {character.name}({character_class}) {personality_type} 사고 중... ({thinking_time:.1f}초)")
+                time.sleep(thinking_time)
+            
             if action_type == "attack":
                 # 기본 공격
                 target = action_data.get("target")
@@ -10578,9 +11055,9 @@ class BraveCombatSystem:
                 pass  # STANCE 표시 제거
             
             elif character_class == "암살자":
-                # 암살자의 그림자 시스템
-                if hasattr(char, 'shadow_count') and char.shadow_count > 0:
-                    stack_displays.append(f"\033[90m👤 {char.name}: SHADOWS {char.shadow_count}\033[0m")
+                # 암살자의 그림자 시스템 - 숨김 처리 (사용자 요청)
+                # if hasattr(char, 'shadow_count') and char.shadow_count > 0:
+                #     stack_displays.append(f"\033[90m👤 {char.name}: SHADOWS {char.shadow_count}\033[0m")
                 if hasattr(char, 'stealth_turns') and char.stealth_turns > 0:
                     stack_displays.append(f"\033[90m🕶️ {char.name}: STEALTH {char.stealth_turns}T\033[0m")
             
@@ -10900,3 +11377,328 @@ class BraveCombatSystem:
                 if character.support_fire_turns <= 0:
                     character.support_fire_active = False
                     print(f"🔚 {character.name}의 지원사격 모드가 종료되었습니다.")
+
+    def _real_time_combat_menu(self, character, party, enemies, action_options, action_descriptions):
+        """
+        실시간 ATB 시스템이 적용된 전투 메뉴
+        플레이어가 선택하는 동안에도 ATB가 업데이트되며, 적의 ATB가 100%에 도달하면 인터럽트
+        """
+        import time
+        import sys
+        
+        print(f"\n🎮 {character.name}의 턴 - 실시간 ATB 활성")
+        print("="*60)
+        
+        # 현재 선택된 옵션 인덱스
+        selected_index = 0
+        max_index = len(action_options) - 1
+        
+        # ATB 업데이트 타이머 (파워쉘 최적화)
+        last_atb_update = time.time()
+        last_display_update = time.time()
+        atb_update_interval = 0.2  # 200ms마다 ATB 업데이트 (느리게)
+        display_update_interval = 0.5  # 500ms마다 화면 업데이트 (파워쉘 안정화)
+        
+        # 난이도별 불릿 타임 배율 가져오기
+        bullet_time_multiplier = self._get_bullet_time_multiplier()
+        
+        # 초기 화면 표시
+        self._display_realtime_combat_status(character, party, enemies, action_options, selected_index)
+        
+        # 타임아웃 방지 (30초 후 자동으로 첫 번째 옵션 선택)
+        start_time = time.time()
+        timeout = 30.0
+        
+        while True:
+            current_time = time.time()
+            
+            # 타임아웃 체크
+            if current_time - start_time > timeout:
+                print(f"\n⏰ 시간 초과! 자동으로 '{action_options[0]}'을(를) 선택합니다.")
+                return 0
+            
+            # 🔄 실시간 ATB 업데이트 (적절한 주기)
+            if current_time - last_atb_update >= atb_update_interval:
+                enemy_interrupted = False
+                for enemy in enemies:
+                    if enemy.is_alive and hasattr(enemy, 'atb_gauge'):
+                        # ATB가 이미 100%가 아닌 경우에만 증가
+                        if enemy.atb_gauge < self.ATB_READY_THRESHOLD:
+                            # 난이도별 불릿 타임 적용
+                            speed_multiplier = getattr(enemy, 'speed', 50) / 100.0
+                            base_increase = int(self.BASE_ATB_INCREASE * speed_multiplier)
+                            atb_increase = int(base_increase * bullet_time_multiplier * 0.2)  # 적절한 증가량
+                            
+                            old_atb = enemy.atb_gauge
+                            enemy.atb_gauge = min(self.ATB_MAX, enemy.atb_gauge + atb_increase)
+                            
+                            # 적의 ATB가 행동 가능 상태에 도달하면 조용히 인터럽트
+                            if enemy.atb_gauge >= self.ATB_READY_THRESHOLD and old_atb < self.ATB_READY_THRESHOLD:
+                                print(f"\n⚡ {enemy.name}이(가) 행동할 차례입니다!")
+                                time.sleep(1)
+                                return None  # 적 턴으로 전환
+                
+                last_atb_update = current_time
+            
+            # 🖥️ 화면 업데이트 (깜빡임 방지)
+            if current_time - last_display_update >= display_update_interval:
+                self._display_realtime_combat_status(character, party, enemies, action_options, selected_index)
+                last_display_update = current_time
+            
+            # 키 입력 확인 (논블로킹, 강화된 버전)
+            key_pressed = False
+            try:
+                if sys.platform == "win32":
+                    import msvcrt
+                    if msvcrt.kbhit():
+                        key = msvcrt.getch()
+                        key_pressed = True
+                        
+                        if key == b'\r' or key == b'\n':  # Enter
+                            print(f"\n✅ '{action_options[selected_index]}' 선택됨!")
+                            return selected_index
+                        elif key == b'q' or key == b'Q':  # 취소
+                            print(f"\n❌ 취소됨!")
+                            return -1
+                        elif key == b'w' or key == b'W' or key == b'\x00H':  # 위 (W 또는 방향키)
+                            selected_index = max(0, selected_index - 1)
+                            self._display_realtime_combat_status(character, party, enemies, action_options, selected_index)
+                        elif key == b's' or key == b'S' or key == b'\x00P':  # 아래 (S 또는 방향키)
+                            selected_index = min(max_index, selected_index + 1)
+                            self._display_realtime_combat_status(character, party, enemies, action_options, selected_index)
+                        elif key.isdigit():  # 숫자 직접 선택
+                            num = int(key.decode()) - 1
+                            if 0 <= num <= max_index:
+                                print(f"\n✅ '{action_options[num]}' 선택됨!")
+                                return num
+                else:
+                    # Linux/Mac 논블로킹 입력 (개선된 버전)
+                    import select
+                    if select.select([sys.stdin], [], [], 0.01)[0]:
+                        key = sys.stdin.read(1)
+                        key_pressed = True
+                        
+                        if key == '\n':
+                            print(f"\n✅ '{action_options[selected_index]}' 선택됨!")
+                            return selected_index
+                        elif key == 'q' or key == 'Q':
+                            print(f"\n❌ 취소됨!")
+                            return -1
+                        elif key == 'w' or key == 'W':
+                            selected_index = max(0, selected_index - 1)
+                            self._display_realtime_combat_status(character, party, enemies, action_options, selected_index)
+                        elif key == 's' or key == 'S':
+                            selected_index = min(max_index, selected_index + 1)
+                            self._display_realtime_combat_status(character, party, enemies, action_options, selected_index)
+                        elif key.isdigit():
+                            num = int(key) - 1
+                            if 0 <= num <= max_index:
+                                print(f"\n✅ '{action_options[num]}' 선택됨!")
+                                return num
+            except Exception as input_error:
+                # 입력 오류 시 폴백
+                pass
+            
+            # CPU 사용량 절약 (파워쉘 최적화)
+            if not key_pressed:
+                time.sleep(0.05)  # 50ms 대기 (파워쉘에서 안정적)
+    
+    def _display_realtime_menu(self, character, party, enemies, action_options, selected_index):
+        """부드러운 실시간 메뉴 화면 표시 (깜빡임 최소화)"""
+        # ANSI 이스케이프 시퀀스로 부드러운 화면 업데이트
+        import sys
+        import os
+        
+        try:
+            # Windows에서 ANSI 지원 활성화
+            if os.name == 'nt':
+                os.system('color')  # Windows ANSI 활성화
+            
+            # 커서를 맨 위로 이동하고 화면 지우기 (깜빡임 방지)
+            sys.stdout.write('\033[H\033[J')  # 커서 홈 이동 + 화면 클리어
+            sys.stdout.flush()
+        except:
+            # 폴백: 최소한의 화면 클리어
+            print('\n' * 2)
+        
+        print(f"🎮 {character.name}의 턴 - 실시간 ATB 시스템")
+        print("="*70)
+        
+        # 🛡️ 간단한 파티 상태 표시 (ATB_READY_THRESHOLD 기준)
+        print("🛡️ 아군 파티:")
+        for member in party:
+            if member.is_alive:
+                hp_pct = int((member.current_hp / member.max_hp) * 100)
+                
+                # ATB 계산 수정: ATB_READY_THRESHOLD 기준
+                atb_gauge = getattr(member, 'atb_gauge', 0)
+                atb_pct = int((atb_gauge / self.ATB_READY_THRESHOLD) * 100)
+                atb_status = "⚡READY" if atb_pct >= 100 else f"{atb_pct}%"
+                
+                print(f"  🔮 {member.name}: HP {hp_pct}% | ATB {atb_status} [RAW: {atb_gauge}/{self.ATB_READY_THRESHOLD}]")
+        
+        print("\n⚔️ 적군:")
+        for enemy in enemies:
+            if enemy.is_alive:
+                hp_pct = int((enemy.current_hp / enemy.max_hp) * 100)
+                
+                # ATB 계산 수정: ATB_READY_THRESHOLD 기준
+                atb_gauge = getattr(enemy, 'atb_gauge', 0)
+                atb_pct = int((atb_gauge / self.ATB_READY_THRESHOLD) * 100)
+                atb_status = "⚡READY" if atb_pct >= 100 else f"{atb_pct}%"
+                
+                # ATB 위험도에 따른 색상 표시
+                if atb_pct >= 90:
+                    status_color = "🔴⚠️"  # 매우 위험
+                elif atb_pct >= 75:
+                    status_color = "🟠⚡"  # 위험
+                elif atb_pct >= 50:
+                    status_color = "🟡📈"  # 주의
+                else:
+                    status_color = "⚪💤"  # 안전
+                
+                print(f"  {status_color} {enemy.name}: HP {hp_pct}% | ATB {atb_status} [RAW: {atb_gauge}/{self.ATB_READY_THRESHOLD}]")
+        
+        print("\n" + "="*70)
+        print("📝 행동 선택:")
+        
+        # 메뉴 옵션 표시
+        for i, option in enumerate(action_options):
+            if i == selected_index:
+                print(f"👉 [{i+1}] {option} 👈")
+            else:
+                print(f"   [{i+1}] {option}")
+        
+        print("\n" + "="*70)
+        print("🔼🔽 W/S: 위/아래 | ⚡ Enter: 선택 | ❌ Q: 취소 | 🔢 1-9: 직접선택")
+        print("⏰ 실시간 ATB: 적의 ATB가 100%가 되면 자동으로 턴이 넘어갑니다!")
+        print("💡 빨간색 적은 곧 행동합니다! 서둘러 선택하세요!")
+        print("="*70)
+
+    def _get_bullet_time_multiplier(self):
+        """config 파일의 난이도별 불릿 타임 배율 반환"""
+        try:
+            # config 파일에서 난이도와 player_turn_speed 가져오기
+            import config
+            game_config = config.GameConfig()
+            
+            # 현재 난이도 확인 (기본값: "보통")
+            current_difficulty = getattr(self, 'difficulty', '보통')
+            
+            # 설정 파일에서 난이도 정보 가져오기 시도
+            try:
+                settings = game_config.load_settings()
+                if 'difficulty' in settings:
+                    current_difficulty = settings['difficulty']
+            except:
+                pass
+            
+            # config 파일의 DIFFICULTY_SETTINGS에서 player_turn_speed 가져오기
+            difficulty_settings = game_config.DIFFICULTY_SETTINGS
+            if current_difficulty in difficulty_settings:
+                multiplier = difficulty_settings[current_difficulty]['player_turn_speed']
+                return multiplier
+            else:
+                # 기본값: 보통 난이도의 player_turn_speed
+                return difficulty_settings['보통']['player_turn_speed']
+                
+        except Exception as e:
+            # 오류 시 기본값 반환
+            return 0.2  # 보통 난이도 기본값
+
+    def _display_realtime_combat_status(self, character, party, enemies, action_options, selected_index):
+        """파워쉘 최적화된 실시간 전투 상태 표시 (깜빡임 완전 제거)"""
+        import os
+        import sys
+        
+        # 화면 클리어 없이 상태만 업데이트 (깜빡임 방지)
+        # 단순히 새로운 내용을 출력하되 클리어는 하지 않음
+        
+        print(f"\n{'='*70}")
+        print(f"🎮 {character.name}의 턴 - 실시간 ATB 시스템")
+        print("="*70)
+        
+        # 🛡️ 기존 최적화된 게이지 시스템 사용
+        try:
+            from .optimized_gauge_system import OptimizedGaugeSystem
+            gauge_system = OptimizedGaugeSystem()
+            
+            # 기존 최적화된 파티와 적 상태 표시 사용
+            party_display = gauge_system.show_optimized_party_status(party, character)
+            enemy_display = gauge_system.show_optimized_enemy_status(enemies)
+            
+            print(party_display)
+            print(enemy_display)
+            
+        except ImportError:
+            # 폴백: 기존 스타일 간단한 상태 표시 (올바른 ATB 계산)
+            print("🛡️ 아군 파티:")
+            for member in party:
+                if member.is_alive:
+                    hp_pct = int((member.current_hp / member.max_hp) * 100)
+                    
+                    # ATB 계산 (ATB_READY_THRESHOLD = 1000 기준으로 100% 계산)
+                    atb_gauge = getattr(member, 'atb_gauge', 0)
+                    atb_pct = min(100, int((atb_gauge / self.ATB_READY_THRESHOLD) * 100))
+                    atb_status = "⚡READY" if atb_pct >= 100 else f"{atb_pct}%"
+                    
+                    print(f"  🔮 {member.name}: HP {hp_pct}% | ATB {atb_status} (Debug: {atb_gauge}/{self.ATB_READY_THRESHOLD})")
+            
+            print("\n⚔️ 적군:")
+            for enemy in enemies:
+                if enemy.is_alive:
+                    hp_pct = int((enemy.current_hp / enemy.max_hp) * 100)
+                    
+                    # ATB 계산 (ATB_READY_THRESHOLD = 1000 기준으로 100% 계산)
+                    atb_gauge = getattr(enemy, 'atb_gauge', 0)
+                    atb_pct = min(100, int((atb_gauge / self.ATB_READY_THRESHOLD) * 100))
+                    
+                    # ATB 위험도에 따른 색상 표시
+                    if atb_pct >= 90:
+                        status_color = "🔴⚠️"  # 매우 위험
+                    elif atb_pct >= 75:
+                        status_color = "🟠⚡"  # 위험
+                    elif atb_pct >= 50:
+                        status_color = "🟡📈"  # 주의
+                    else:
+                        status_color = "⚪💤"  # 안전
+                        
+                    atb_status = "⚡READY" if atb_pct >= 100 else f"{atb_pct}%"
+                    print(f"  {status_color} {enemy.name}: HP {hp_pct}% | ATB {atb_status} (Debug: {atb_gauge}/{self.ATB_READY_THRESHOLD})")
+        
+        # 실시간 메뉴 표시
+        print("\n" + "="*70)
+        print("📝 행동 선택 (실시간 ATB):")
+        
+        # 메뉴 옵션 표시
+        for i, option in enumerate(action_options):
+            if i == selected_index:
+                print(f"👉 [{i+1}] {option} 👈")
+            else:
+                print(f"   [{i+1}] {option}")
+        
+        # 불릿 타임 정보 표시 (config 기반)
+        bullet_time = self._get_bullet_time_multiplier()
+        bullet_time_pct = int(bullet_time * 100)
+        
+        # 현재 난이도 정보 표시
+        try:
+            import config
+            game_config = config.GameConfig()
+            current_difficulty = getattr(self, 'difficulty', '보통')
+            try:
+                settings = game_config.load_settings()
+                if 'difficulty' in settings:
+                    current_difficulty = settings['difficulty']
+            except:
+                pass
+                
+            difficulty_info = f"난이도: {current_difficulty}"
+        except:
+            difficulty_info = "난이도: 보통"
+        
+        print("\n" + "="*70)
+        print("🔼🔽 W/S: 위/아래 | ⚡ Enter: 선택 | ❌ Q: 취소 | 🔢 1-9: 직접선택")
+        print(f"⏰ 불릿 타임: {bullet_time_pct}% 속도 | {difficulty_info} | 🎯 실시간 ATB")
+        print("💡 적의 ATB가 100%가 되면 자동으로 턴이 넘어갑니다!")
+        print("="*70)

@@ -49,6 +49,17 @@ class GameConfig:
             #"boss": "Dancing Mad"  # 보스 BGM
         }
         
+        # 게임 스토리 설정
+        self.STORY_THEME = {
+            "main_theme": "차원 항해사",  # 주요 테마
+            "setting": "시공간 왜곡과 차원 탐험",  # 배경 설정
+            "terminology": {
+                "location": "차원 공간",  # 던전 대신 사용
+                "boss": "차원 지배자",     # 던전 보스 대신 사용
+                "exploration": "차원 항해"  # 던전 탐험 대신 사용
+            }
+        }
+        
         # 내구도 시스템 설정
         self.DURABILITY_ENABLED = True
         self.DURABILITY_LOSS_RATE_MULTIPLIER = 0.7  # 30% 감소된 내구도 손실률
@@ -76,8 +87,8 @@ class GameConfig:
         # 난이도 설정 (통합된 버전)
         self.DIFFICULTY_SETTINGS = {
             "평온": {
-                "name": "평온한 여행",
-                "description": "편안한 모험을 원하는 초보자를 위한 난이도",
+                "name": "안정된 차원 항해",
+                "description": "차원의 흐름이 안정되어 여유로운 탐험이 가능한 항해 모드",
                 "enemy_hp_multiplier": 0.7,
                 "enemy_damage_multiplier": 0.6,
                 "player_damage_multiplier": 1.3,
@@ -89,11 +100,12 @@ class GameConfig:
                 "wound_accumulation": 0.15,  # 받은 피해의 15%만 상처로
                 "enemy_spawn_rate": 0.8,
                 "boss_hp_multiplier": 0.8,
+                "player_turn_speed": 0.1,  # 플레이어 턴 중 적 ATB 속도 (낮을수록 쉬움)
                 "color": "🔵" 
             },
             "보통": {
-                "name": "균형잡힌 모험",
-                "description": "표준적인 로그라이크 경험을 제공하는 기본 난이도",
+                "name": "표준 차원 항해",
+                "description": "차원 항해사로서 표준적인 시공간 탐험을 경험하는 모드",
                 "enemy_hp_multiplier": 1.0,
                 "enemy_damage_multiplier": 1.0,
                 "player_damage_multiplier": 1.0,
@@ -105,54 +117,58 @@ class GameConfig:
                 "wound_accumulation": 0.25,  # 기본 25%
                 "enemy_spawn_rate": 1.0,
                 "boss_hp_multiplier": 1.0,
+                "player_turn_speed": 0.2,  # 플레이어 턴 중 적 ATB 속도 (표준)
                 "color": "🟢"
             },
             "도전": {
-                "name": "시련의 여정",
-                "description": "숙련된 플레이어를 위한 어려운 난이도",
-                "enemy_hp_multiplier": 1.4,
-                "enemy_damage_multiplier": 1.3,
-                "player_damage_multiplier": 0.8,
-                "exp_multiplier": 1.2,
-                "gold_multiplier": 1.1,
-                "star_fragment_multiplier": 1.3,  # 어려우므로 보상 증가
-                "item_drop_rate": 0.9,
-                "healing_effectiveness": 0.8,
-                "wound_accumulation": 0.35,  # 받은 피해의 35%가 상처로
-                "enemy_spawn_rate": 1.2,
-                "boss_hp_multiplier": 1.5,
+                "name": "불안정한 차원 항해",
+                "description": "차원의 균열이 불안정해져 위험한 시공간 탐험이 시작되는 모드",
+                "enemy_hp_multiplier": 1.2,  # 1.4 → 1.2로 감소
+                "enemy_damage_multiplier": 1.15,  # 1.3 → 1.15로 감소
+                "player_damage_multiplier": 0.9,  # 0.8 → 0.9로 상향
+                "exp_multiplier": 1.15,  # 1.2 → 1.15로 감소
+                "gold_multiplier": 1.05,  # 1.1 → 1.05로 감소
+                "star_fragment_multiplier": 1.2,  # 1.3 → 1.2로 감소
+                "item_drop_rate": 0.95,  # 0.9 → 0.95로 상향
+                "healing_effectiveness": 0.9,  # 0.8 → 0.9로 상향
+                "wound_accumulation": 0.3,  # 0.35 → 0.3으로 감소
+                "enemy_spawn_rate": 1.1,  # 1.2 → 1.1로 감소
+                "boss_hp_multiplier": 1.3,  # 1.5 → 1.3으로 감소
+                "player_turn_speed": 0.3,  # 플레이어 턴 중 적 ATB 속도
                 "color": "🟠"
             },
             "악몽": {
-                "name": "악몽 같은 시련",
-                "description": "극한의 도전을 원하는 마스터를 위한 최고 난이도",
-                "enemy_hp_multiplier": 1.8,
-                "enemy_damage_multiplier": 1.6,
-                "player_damage_multiplier": 0.7,
-                "exp_multiplier": 1.5,
-                "gold_multiplier": 1.2,
-                "star_fragment_multiplier": 1.8,  # 매우 어려우므로 높은 보상
-                "item_drop_rate": 0.8,
-                "healing_effectiveness": 0.6,
-                "wound_accumulation": 0.45,  # 받은 피해의 45%가 상처로
-                "enemy_spawn_rate": 1.4,
-                "boss_hp_multiplier": 2.0,
+                "name": "차원 붕괴 위기",
+                "description": "시공간이 심각하게 교란되어 현실과 악몽이 뒤섞인 위험한 모드",
+                "enemy_hp_multiplier": 1.5,  # 1.8 → 1.5로 감소
+                "enemy_damage_multiplier": 1.3,  # 1.6 → 1.3으로 감소
+                "player_damage_multiplier": 0.8,  # 0.7 → 0.8로 상향
+                "exp_multiplier": 1.3,  # 1.5 → 1.3으로 감소
+                "gold_multiplier": 1.15,  # 1.2 → 1.15로 감소
+                "star_fragment_multiplier": 1.5,  # 1.8 → 1.5로 감소
+                "item_drop_rate": 0.9,  # 0.8 → 0.9로 상향
+                "healing_effectiveness": 0.8,  # 0.6 → 0.8로 상향
+                "wound_accumulation": 0.35,  # 0.45 → 0.35로 감소
+                "enemy_spawn_rate": 1.2,  # 1.4 → 1.2로 감소
+                "boss_hp_multiplier": 1.6,  # 2.0 → 1.6으로 감소
+                "player_turn_speed": 0.4,  # 플레이어 턴 중 적 ATB 속도
                 "color": "❤️"
             },
             "지옥": {
-                "name": "지옥의 심연",
-                "description": "오직 전설의 용사만이 도전할 수 있는 절망적인 난이도",
-                "enemy_hp_multiplier": 2.5,
-                "enemy_damage_multiplier": 2.0,
-                "player_damage_multiplier": 0.6,
-                "exp_multiplier": 2.0,
-                "gold_multiplier": 1.5,
-                "star_fragment_multiplier": 2.5,  # 최고 난이도이므로 최고 보상
-                "item_drop_rate": 0.7,
-                "healing_effectiveness": 0.5,
-                "wound_accumulation": 0.6,  # 받은 피해의 60%가 상처로
-                "enemy_spawn_rate": 1.6,
-                "boss_hp_multiplier": 3.0,
+                "name": "차원 완전 붕괴",
+                "description": "모든 차원이 붕괴하여 혼돈의 공간에서 생존해야 하는 극한 모드",
+                "enemy_hp_multiplier": 1.8,  # 2.5 → 1.8로 감소
+                "enemy_damage_multiplier": 1.5,  # 2.0 → 1.5로 감소
+                "player_damage_multiplier": 0.75,  # 0.6 → 0.75로 상향
+                "exp_multiplier": 1.5,  # 2.0 → 1.5로 감소
+                "gold_multiplier": 1.3,  # 1.5 → 1.3으로 감소
+                "star_fragment_multiplier": 2.0,  # 2.5 → 2.0으로 감소
+                "item_drop_rate": 0.85,  # 0.7 → 0.85로 상향
+                "healing_effectiveness": 0.7,  # 0.5 → 0.7로 상향
+                "wound_accumulation": 0.4,  # 0.6 → 0.4로 감소
+                "enemy_spawn_rate": 1.3,  # 1.6 → 1.3으로 감소
+                "boss_hp_multiplier": 2.0,  # 3.0 → 2.0으로 감소
+                "player_turn_speed": 0.5,  # 플레이어 턴 중 적 ATB 속도
                 "color": "💀"
             }
         }
@@ -160,36 +176,36 @@ class GameConfig:
         # 맵 크기 설정 (정사각형)
         self.MAP_SIZE_SETTINGS = {
             "작은 맵": {
-                "name": "아늑한 던전",
+                "name": "소형 차원 공간",
                 "color": "🟦",
-                "description": "빠른 플레이를 위한 작은 던전",
+                "description": "빠른 탐사를 위한 작은 차원 공간",
                 "width": 25,
                 "height": 25,
                 "room_count": 8,
                 "corridor_complexity": 0.6
             },
             "보통 맵": {
-                "name": "표준 던전",
+                "name": "표준 차원 공간",
                 "color": "🟩",
-                "description": "적당한 크기의 균형잡힌 던전",
+                "description": "적당한 크기의 균형잡힌 차원 공간",
                 "width": 35,
                 "height": 35,
                 "room_count": 12,
                 "corridor_complexity": 0.8
             },
             "큰 맵": {
-                "name": "광활한 던전",
+                "name": "광역 차원 공간",
                 "color": "🟨",
-                "description": "탐험을 좋아하는 플레이어를 위한 큰 던전",
+                "description": "탐험을 좋아하는 항해사를 위한 넓은 차원 공간",
                 "width": 50,
                 "height": 50,
                 "room_count": 18,
                 "corridor_complexity": 1.0
             },
             "거대 맵": {
-                "name": "미궁의 던전",
+                "name": "복합 차원 미궁",
                 "color": "🟪",
-                "description": "장시간 탐험을 위한 거대한 미궁",
+                "description": "장시간 탐사를 위한 복잡한 차원 미궁",
                 "width": 70,
                 "height": 70,
                 "room_count": 25,
@@ -207,7 +223,7 @@ class GameConfig:
                 "차원술사", "광전사"
             ],
             "normal": [
-                "전사", "아크메이지", "궁수", "도적"  # 기본 4개 직업만 해금
+                "전사", "아크메이지", "궁수", "성기사", "암흑기사", "바드", "검성", "검투사"  # 기본 8개 직업
             ]
         }
         
@@ -236,7 +252,7 @@ class GameConfig:
             "group_coordination": 0.6,  # 집단 협력 (0.0-1.0)
             "retreat_threshold": 0.3,  # 후퇴 임계점 (HP 비율)
             "skill_usage_intelligence": 0.8,  # 스킬 사용 지능 (0.0-1.0)
-            "target_prioritization": 0.9,  # 타겟 우선순위 지능 (0.0-1.0)
+            "target_prioritization": 0.6,  # 타겟 우선순위 지능 (0.0-1.0)
             "positioning_awareness": 0.7,  # 위치 인식 능력 (0.0-1.0)
             "reaction_speed": 1.0,  # 반응 속도 배수
             "learning_rate": 0.1 if self.DEVELOPMENT_MODE else 0.05,  # 학습률
@@ -258,22 +274,22 @@ class GameConfig:
                 "reaction_speed_multiplier": 1.0,
             },
             "도전": {
-                "aggression_multiplier": 1.3,
-                "tactical_multiplier": 1.4,
-                "skill_intelligence_multiplier": 1.5,
-                "reaction_speed_multiplier": 1.2,
+                "aggression_multiplier": 1.2,  # 1.3 → 1.2로 감소
+                "tactical_multiplier": 1.2,  # 1.4 → 1.2로 감소
+                "skill_intelligence_multiplier": 1.3,  # 1.5 → 1.3으로 감소
+                "reaction_speed_multiplier": 1.1,  # 1.2 → 1.1로 감소
             },
             "악몽": {
-                "aggression_multiplier": 1.6,
-                "tactical_multiplier": 1.8,
-                "skill_intelligence_multiplier": 2.0,
-                "reaction_speed_multiplier": 1.5,
+                "aggression_multiplier": 1.4,  # 1.6 → 1.4로 감소
+                "tactical_multiplier": 1.5,  # 1.8 → 1.5로 감소
+                "skill_intelligence_multiplier": 1.6,  # 2.0 → 1.6으로 감소
+                "reaction_speed_multiplier": 1.3,  # 1.5 → 1.3으로 감소
             },
             "지옥": {
-                "aggression_multiplier": 2.0,
-                "tactical_multiplier": 2.5,
-                "skill_intelligence_multiplier": 3.0,
-                "reaction_speed_multiplier": 2.0,
+                "aggression_multiplier": 1.6,  # 2.0 → 1.6으로 감소
+                "tactical_multiplier": 1.8,  # 2.5 → 1.8로 감소
+                "skill_intelligence_multiplier": 2.0,  # 3.0 → 2.0으로 감소
+                "reaction_speed_multiplier": 1.5,  # 2.0 → 1.5로 감소
             }
         }
         

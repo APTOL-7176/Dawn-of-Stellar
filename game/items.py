@@ -1854,7 +1854,7 @@ class ItemDatabase:
         items.append(time_crystal)
         
         warp_stone = Item("워프 스톤", ItemType.CONSUMABLE, ItemRarity.RARE,
-                         "즉시 던전에서 탈출한다")
+                         "즉시 차원 공간에서 탈출한다")
         warp_stone.effects = ["emergency_escape"]
         warp_stone.value = 200
         items.append(warp_stone)

@@ -8,17 +8,37 @@ import os
 import sys
 
 
-# Windows에서 ANSI 색상 지원 활성화
+# Windows에서 ANSI 색상 지원 활성화 - PowerShell 호환성 개선
 if os.name == 'nt':
     try:
         import ctypes
+        from ctypes import wintypes
+        
+        # GetStdHandle과 SetConsoleMode 정의
+        STD_OUTPUT_HANDLE = -11
+        ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
+        
         kernel32 = ctypes.windll.kernel32
-        kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
-    except:
+        handle = kernel32.GetStdHandle(STD_OUTPUT_HANDLE)
+        
+        # 현재 콘솔 모드 가져오기
+        mode = wintypes.DWORD()
+        kernel32.GetConsoleMode(handle, ctypes.byref(mode))
+        
+        # Virtual Terminal Processing 활성화
+        new_mode = mode.value | ENABLE_VIRTUAL_TERMINAL_PROCESSING
+        kernel32.SetConsoleMode(handle, new_mode)
+        
+        # PowerShell 환경 감지 및 강제 색상 활성화
+        if 'PSModulePath' in os.environ:
+            os.environ['FORCE_COLOR'] = '1'
+            
+    except Exception as e:
+        # 폴백: 기본 설정 사용
         pass
     
-    # Windows Terminal 및 ConEmu 감지
-    if 'WT_SESSION' in os.environ or 'ConEmuANSI' in os.environ:
+    # Windows Terminal, ConEmu, PowerShell 감지
+    if any(env in os.environ for env in ['WT_SESSION', 'ConEmuANSI', 'PSModulePath']):
         os.environ['FORCE_COLOR'] = '1'
 
 
@@ -65,9 +85,13 @@ class ColorText:
     
     @staticmethod
     def is_color_supported() -> bool:
-        """색상 지원 여부 확인"""
+        """색상 지원 여부 확인 - PowerShell 호환성 개선"""
         # 강제 색상 모드가 설정된 경우
         if os.environ.get('FORCE_COLOR') == '1':
+            return True
+            
+        # PowerShell 환경 감지
+        if 'PSModulePath' in os.environ:
             return True
             
         # Windows Terminal, ConEmu, ANSICON 등
@@ -78,7 +102,7 @@ class ColorText:
         if os.name != 'nt':
             return True
             
-        # 기본적으로 색상 사용
+        # Windows 시스템에서도 기본적으로 색상 지원 시도
         return True
     
     @staticmethod

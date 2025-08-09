@@ -155,7 +155,7 @@ class WarriorAdaptiveSystem:
         }
         stance_effect = StatusEffect(
             name=f"warrior_stance_{stance.name.lower()}",
-            status_type=StatusType.WARRIOR_STANCE,
+            status_type=StatusType.BUFF,
             duration=999,
             effect_value=stance.value
         )

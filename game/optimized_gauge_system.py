@@ -137,9 +137,9 @@ class OptimizedGaugeSystem:
                 brv_current = getattr(character, 'brave', 0)
         speed = getattr(character, 'speed', 50)
         
-        # ATB 게이지 정보
+        # ATB 게이지 정보 - 2025.08.10 수정: ATB_MAX=2000 맞춤
         atb_current = getattr(character, 'atb_gauge', 0)
-        atb_max = getattr(character, 'max_atb_gauge', 10000)
+        atb_max = 2000  # ATB_MAX 상수값 사용 (brave_combat.py와 동일)
         atb_ratio = atb_current / atb_max if atb_max > 0 else 0
         
         # 그림자 정보 (암살자만)
@@ -181,7 +181,7 @@ class OptimizedGaugeSystem:
         elif character_class == "암살자":
             shadow_count = getattr(character, 'shadow_count', 0)
             shadows = getattr(character, 'shadows', 0)
-            mechanics_display += f" 🌚SHADOW: {shadow_count + shadows}"
+            mechanics_display += f" 👤SHADOW: {shadow_count + shadows}"
         
         # 검성 검기 - 항상 표시
         elif character_class == "검성":
@@ -430,14 +430,14 @@ class OptimizedGaugeSystem:
             atb_gauge = OptimizedGaugeSystem.create_visual_gauge(casting_percent, 100, 10)
             atb_status = f"🔮 {casting_percent}%"  # 더 명확하게 표시
         else:
-            # 일반 ATB 게이지
-            atb_gauge = OptimizedGaugeSystem.create_visual_gauge(atb_current, atb_max, 10)
+            # 일반 ATB 게이지 - 2025.08.10 수정: ATB_MAX=2000 기준으로 수정
+            atb_gauge = OptimizedGaugeSystem.create_visual_gauge(atb_current, 2000, 10)
             
-            # ATB 상태 표시
-            if atb_ratio >= 1.0:
+            # ATB 상태 표시 - READY 임계값 1000 사용
+            if atb_current >= 1000:
                 atb_status = "⚡ READY"
             else:
-                atb_percent = int(atb_ratio * 100)
+                atb_percent = int((atb_current / 1000) * 100)  # 1000 기준으로 백분율 계산
                 atb_status = f"⏳ {atb_percent}%"
         
         # 최종 문자열 조합
@@ -706,9 +706,10 @@ class OptimizedGaugeSystem:
         hp_gauge = OptimizedGaugeSystem.create_clean_gauge(hp, max_hp, 10, "hp", hp_ratio, mp_ratio, is_casting, atb_speed_state)
         mp_gauge = OptimizedGaugeSystem.create_clean_gauge(mp, max_mp, 10, "mp", hp_ratio, mp_ratio, is_casting, atb_speed_state)
         
-        # ATB 게이지 처리 - 값 범위 안정화
-        atb_gauge = max(0, min(1000, getattr(character, 'atb_gauge', 0)))  # 0-1000 범위 강제
-        atb_ready_threshold = 1000  # ATB_MAX 1000에 맞춤
+        # ATB 게이지 처리 - 2025.08.10 수정: ATB_MAX=2000, READY=1000 맞춤
+        atb_gauge = max(0, getattr(character, 'atb_gauge', 0))  # 자연스러운 범위 (제한 없음)
+        atb_ready_threshold = 1000  # ATB_READY_THRESHOLD와 동일
+        atb_max_threshold = 2000  # ATB_MAX와 동일
         
         # 상태이상 체크 - 영어 대문자로 표시
         status_effects = []
@@ -781,7 +782,7 @@ class OptimizedGaugeSystem:
         elif character_class == "암살자":
             shadow_count = getattr(character, 'shadow_count', 0)
             shadows = getattr(character, 'shadows', 0)
-            mechanics_display += f" {Color.BRIGHT_BLACK.value}🌚SHADOW: {shadow_count + shadows}{Color.RESET.value}"
+            mechanics_display += f" {Color.BRIGHT_BLACK.value}👤SHADOW: {shadow_count + shadows}{Color.RESET.value}"
         
         # 검성 검기 - 항상 표시
         elif character_class == "검성":
@@ -987,7 +988,7 @@ class OptimizedGaugeSystem:
         
         # 레이아웃 생성
         # ATB 계산 로직 통일 - 완전 안정화된 계산
-        atb_gauge = max(0, min(1000, atb_gauge))  # 0-1000 범위 강제
+        atb_gauge = max(0, atb_gauge)  # 자연스러운 범위 (제한 없음)
         atb_ready_threshold = 1000  # ATB_MAX 1000에 맞춤
         
         # 캐스팅 중일 때는 캐스팅 진행도 표시 - Method 4 적용

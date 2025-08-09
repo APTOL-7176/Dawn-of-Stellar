@@ -24,7 +24,7 @@ class MetaProgression:
             "total_floors_cleared": 0,
             "total_enemies_defeated": 0,
             "total_items_collected": 0,
-            "unlocked_classes": ["전사", "아크메이지", "궁수", "도적", "성기사", "몽크", "바드", "기사", "해적", "광전사"],  # 기본 10개 직업 (스탠다드하고 다루기 쉬운 직업들)
+            "unlocked_classes": ["전사", "아크메이지", "궁수", "성기사", "암흑기사", "바드", "검성", "검투사"],  # 기본 8개 직업 (스탠다드하고 다루기 쉬운 직업들)
             "star_fragments": 0,  # 별조각 (메타 재화)
             "star_fragments_spent": 0,  # 사용한 별조각 추적
             
@@ -322,7 +322,7 @@ class MetaProgression:
         
     def check_class_unlock_condition(self, class_name: str) -> bool:
         """직업 해금 조건 확인 - 별조각 기반"""
-        # 기본 10개 직업은 항상 해금
+        # 기본 8개 직업은 항상 해금
         unlock_cost = self.get_character_unlock_cost(class_name)
         if unlock_cost == 0:
             return True
@@ -336,17 +336,16 @@ class MetaProgression:
     def get_character_unlock_cost(self, class_name: str) -> int:
         """캐릭터 해금 비용 반환"""
         unlock_costs = {
-            # 🆓 기본 10개 직업은 해금 불필요 (비용 0)
-            "전사": 0, "아크메이지": 0, "궁수": 0, "도적": 0, "성기사": 0,
-            "몽크": 0, "바드": 0, "기사": 0, "해적": 0, "광전사": 0,
+            # 🆓 기본 8개 직업은 해금 불필요 (비용 0)
+            "전사": 0, "아크메이지": 0, "궁수": 0, "성기사": 0,
+            "암흑기사": 0, "바드": 0, "검성": 0, "검투사": 0,
             
             # 💰 구매 필요한 직업들
             # 🌟 초급 확장 직업 (25-50 별조각)
-            "검성": 25,      # 검기 시스템
-            "검투사": 30,    # 투기장 시스템  
-            "암흑기사": 35,  # 흡혈 시스템
-            "용기사": 40,    # 용의표식 시스템
-            "네크로맨서": 50, # 언데드 소환
+            "용기사": 25,    # 용의표식 시스템
+            "네크로맨서": 30, # 언데드 소환
+            "도적": 35,      # 독 시스템
+            "몽크": 40,      # 기 콤보 시스템
             
             # ⭐ 중급 직업 (60-120 별조각)
             "정령술사": 60,  # 원소 정령 시스템
@@ -1304,7 +1303,7 @@ class MetaProgression:
                 
                 if not category_options:
                     print(f"\n{bright_red('아직 발견한 아이템이 없습니다!')}")
-                    print(f"{bright_yellow('던전을 탐험하여 새로운 아이템을 발견해보세요.')}")
+                    print(f"{bright_yellow('차원 공간을 탐험하여 새로운 아이템을 발견해보세요.')}")
                     input("아무 키나 눌러 계속...")
                     return
                 
@@ -1338,7 +1337,7 @@ class MetaProgression:
                 
                 if not valid_categories:
                     print(f"\n{bright_red('아직 발견한 아이템이 없습니다!')}")
-                    print(f"{bright_yellow('던전을 탐험하여 새로운 아이템을 발견해보세요.')}")
+                    print(f"{bright_yellow('차원 공간을 탐험하여 새로운 아이템을 발견해보세요.')}")
                     input("아무 키나 눌러 계속...")
                     return
                 

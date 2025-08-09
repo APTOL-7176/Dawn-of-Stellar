@@ -1160,7 +1160,7 @@ class StorySystem:
         intros = {
             1: [
                 StorySegment(f"\n🌟 새로운 모험의 시작", color="yellow", delay=0.08, pause=2.0),
-                StorySegment("\n깊은 지하 던전에서 이상한 빛이 새어나온다...", delay=0.05, pause=2.0),
+                StorySegment("\n깊은 차원 공간에서 이상한 빛이 새어나온다...", delay=0.05, pause=2.0),
                 StorySegment("⚡ 시공간의 첫 번째 균열을 발견했다! ⚡", color="cyan", delay=0.06, pause=2.5)
             ],
             2: [
@@ -2950,10 +2950,10 @@ def show_auto_save_notification():
     story_system.display_story_with_typing_effect(segments)
 
 def show_dungeon_entry_transition(floor_number: int = 1):
-    """던전 진입 전환 스토리 - 던전 입장 시 긴장감 연출"""
+    """차원 공간 진입 전환 스토리 - 차원 공간 입장 시 긴장감 연출"""
     segments = [
         StorySegment(
-            f"\n🏰 던전 {floor_number}층으로 진입합니다...",
+            f"\n� 차원 공간 {floor_number}층으로 진입합니다...",
             delay=0.08,
             pause=1.5,
             color="red"

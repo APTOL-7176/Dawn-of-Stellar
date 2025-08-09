@@ -36,7 +36,8 @@ class ShadowSystem:
         
         added = new_count - current_shadows
         if added > 0:
-            print(f"🌑 {character.name}의 그림자 +{added}개 생성! (현재: {new_count}/{self.max_shadows})")
+            # 더 간결한 그림자 생성 메시지 (기존 전투 출력과 중복 방지)
+            pass  # 메시지 제거 - 전투 시스템에서 통합 표시
         
         return added
     
@@ -64,6 +65,9 @@ class ShadowSystem:
     
     def _set_shadow_count(self, character: Character, count: int):
         """그림자 개수 설정 (내부 메서드)"""
+        from .new_skill_system import StatusType
+        from .status_effects import StatusEffect
+        
         if not hasattr(character, 'status_effects'):
             character.status_effects = []
         
@@ -75,7 +79,6 @@ class ShadowSystem:
         
         # 새 그림자 상태 추가 (0개가 아닐 때만)
         if count > 0:
-            from .new_skill_system import StatusEffect
             shadow_effect = StatusEffect(
                 name=f"shadow_stack_{count}",
                 status_type=StatusType.SHADOW_STACK,

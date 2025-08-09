@@ -663,7 +663,7 @@ class GamepadInput:
         """D-Pad 입력 처리 - 단순한 버튼 매핑"""
         # 십자키를 버튼으로 사용 (이동은 아날로그 스틱으로)
         if hat[1] == 1 and self._check_cooldown('up', current_time):  # 위
-            return 'm'  # AI 모드
+            return 'm'  # 클래식 모드
         elif hat[1] == -1 and self._check_cooldown('down', current_time):  # 아래
             return 'f'  # 필드 (중요한 기능!)
         elif hat[0] == -1 and self._check_cooldown('left', current_time):  # 왼쪽
@@ -694,7 +694,7 @@ class UnifiedInputManager:
         if disable_gamepad or mobile_mode or web_mode or subprocess_mode or terminal_mode:
             self.gamepad = None
             self.gamepad_enabled = False
-            print("🎮 터미널 환경: 게임패드 비활성화됨")
+            # 메시지 출력 완전 제거 (UI 겹침 방지)
         else:
             try:
                 # 콘솔 독점 모드로 게임패드 초기화
@@ -702,9 +702,11 @@ class UnifiedInputManager:
                 self.gamepad = GamepadInput()
                 self.gamepad_enabled = True and enable_gamepad
                 if self.gamepad_enabled and self.gamepad.is_available():
-                    print("🎮 게임패드 연결됨 - 게임 전용 모드")
+                    # 메시지 출력 제거 (UI 겹침 방지)
+                    pass
                 else:
-                    print("🎮 게임패드 없음 - 키보드 모드")
+                    # 메시지 출력 제거 (UI 겹침 방지)
+                    pass
             except Exception as e:
                 self.gamepad = None
                 self.gamepad_enabled = False

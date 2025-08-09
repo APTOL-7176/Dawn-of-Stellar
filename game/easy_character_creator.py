@@ -2,11 +2,133 @@
 개선된 캐릭터 생성 시스템
 """
 
+import os
+import json
+import datetime
 from typing import List, Dict, Optional, Tuple
 import random
 from .character import Character
 from .auto_party_builder import AutoPartyBuilder
 from .input_utils import KeyboardInput
+
+
+class PartyHistoryManager:
+    """파티 히스토리 관리 시스템"""
+    
+    def __init__(self, history_file="party_history.json"):
+        self.history_file = history_file
+        self.max_history = 50  # 최대 50개 파티 보관
+        self.history = self._load_history()
+    
+    def _load_history(self) -> List[Dict]:
+        """히스토리 파일 로드"""
+        try:
+            if os.path.exists(self.history_file):
+                with open(self.history_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+        except Exception as e:
+            print(f"히스토리 로드 실패: {e}")
+        return []
+    
+    def _save_history(self):
+        """히스토리 파일 저장"""
+        try:
+            with open(self.history_file, 'w', encoding='utf-8') as f:
+                json.dump(self.history, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"히스토리 저장 실패: {e}")
+    
+    def add_party(self, party_members: List[Character], exploration_data: Dict = None):
+        """파티를 히스토리에 추가"""
+        try:
+            party_data = {
+                "id": datetime.datetime.now().strftime("%Y%m%d_%H%M%S"),
+                "created_at": datetime.datetime.now().isoformat(),
+                "members": [],
+                "exploration": exploration_data or {},
+                "total_level": 0,
+                "total_power": 0,
+                "composition": ""
+            }
+            
+            # 파티원 정보 저장
+            total_level = 0
+            total_power = 0
+            class_names = []
+            
+            for member in party_members:
+                member_data = {
+                    "name": member.name,
+                    "class": getattr(member, 'character_class', '알 수 없음'),
+                    "level": getattr(member, 'level', 1),
+                    "hp": getattr(member, 'current_hp', 0),
+                    "max_hp": getattr(member, 'max_hp', 0),
+                    "power": self._calculate_member_power(member)
+                }
+                
+                party_data["members"].append(member_data)
+                total_level += member_data["level"]
+                total_power += member_data["power"]
+                class_names.append(member_data["class"])
+            
+            party_data["total_level"] = total_level
+            party_data["total_power"] = total_power
+            party_data["composition"] = " + ".join(class_names)
+            
+            # 히스토리에 추가 (최신이 앞으로)
+            self.history.insert(0, party_data)
+            
+            # 최대 개수 제한
+            if len(self.history) > self.max_history:
+                self.history = self.history[:self.max_history]
+            
+            self._save_history()
+            
+        except Exception as e:
+            print(f"파티 히스토리 추가 실패: {e}")
+    
+    def _calculate_member_power(self, member) -> int:
+        """멤버 전투력 계산"""
+        try:
+            # display.py의 calculate_combat_power 사용
+            from .display import calculate_combat_power
+            return calculate_combat_power(member)
+        except:
+            # 폴백: 간단한 계산
+            return (getattr(member, 'physical_attack', 0) + 
+                   getattr(member, 'magic_attack', 0) + 
+                   getattr(member, 'physical_defense', 0) + 
+                   getattr(member, 'magic_defense', 0))
+    
+    def get_history(self) -> List[Dict]:
+        """전체 히스토리 반환"""
+        return self.history.copy()
+    
+    def delete_party(self, party_id: str) -> bool:
+        """특정 파티 삭제"""
+        try:
+            original_length = len(self.history)
+            self.history = [p for p in self.history if p.get("id") != party_id]
+            
+            if len(self.history) < original_length:
+                self._save_history()
+                return True
+        except Exception as e:
+            print(f"파티 삭제 실패: {e}")
+        
+        return False
+    
+    def clear_history(self):
+        """모든 히스토리 삭제"""
+        self.history.clear()
+        self._save_history()
+    
+    def get_party_by_id(self, party_id: str) -> Optional[Dict]:
+        """ID로 특정 파티 조회"""
+        for party in self.history:
+            if party.get("id") == party_id:
+                return party.copy()
+        return None
 
 try:
     from .passive_selection import get_passive_system
@@ -19,6 +141,12 @@ try:
     CURSOR_MENU_AVAILABLE = True
 except ImportError:
     CURSOR_MENU_AVAILABLE = False
+
+try:
+    from .character_presets import CharacterPresets
+    PRESETS_AVAILABLE = True
+except ImportError:
+    PRESETS_AVAILABLE = False
 
 # 색상 정의
 RESET = '\033[0m'
@@ -45,10 +173,20 @@ class EasyCharacterCreator:
         self.keyboard = KeyboardInput()
         self.auto_builder = AutoPartyBuilder()
         self.last_generated_party = None  # 특성 상세 보기용
+        
+        # 프리셋 매니저 초기화
+        if PRESETS_AVAILABLE:
+            self.preset_manager = CharacterPresets()
+        else:
+            self.preset_manager = None
+        
         if PASSIVE_SYSTEM_AVAILABLE:
             self.passive_manager = get_passive_system()
         else:
             self.passive_manager = None
+        
+        # 파티 히스토리 관리자 초기화
+        self.party_history = PartyHistoryManager()
         
         # 추천 직업 조합 (사용자가 쉽게 선택할 수 있도록)
         self.recommended_combos = {
@@ -113,6 +251,9 @@ class EasyCharacterCreator:
                         "📋 추천 조합 선택",
                         "🛠️ 커스텀 파티 생성",
                         "👤 단일 캐릭터 생성",
+                        "💾 단일 캐릭터만 저장",
+                        "💾 프리셋 관리",
+                        "📚 파티 히스토리 관리",
                         "❓ 도움말",
                         "❌ 나가기"
                     ]
@@ -123,6 +264,9 @@ class EasyCharacterCreator:
                         "미리 준비된 조합 중에서 선택합니다",
                         "직접 캐릭터들을 만들어 파티를 구성합니다",
                         "캐릭터 한 명만 생성합니다",
+                        "단일 캐릭터만 생성하고 저장합니다 (게임 시작 안 함)",
+                        "저장된 캐릭터와 파티를 불러오거나 관리합니다",
+                        "저장된 파티의 역사를 확인하고 관리합니다",
                         "캐릭터 생성에 대한 도움말을 봅니다",
                         "메인 메뉴로 돌아갑니다"
                     ]
@@ -130,7 +274,7 @@ class EasyCharacterCreator:
                     menu = CursorMenu("🎭 캐릭터 생성", options, descriptions, cancellable=True)
                     result = menu.run()
                     
-                    if result is None or result == 6:  # 나가기
+                    if result is None or result == 9:  # 나가기
                         return None
                     elif result == 0:  # 자동 파티 생성
                         party = self._auto_party_creation()
@@ -147,7 +291,19 @@ class EasyCharacterCreator:
                     elif result == 4:  # 단일 캐릭터 생성
                         party = self._single_character_creation()
                         return party
-                    elif result == 5:  # 도움말
+                    elif result == 5:  # 단일 캐릭터만 저장
+                        result = self._single_character_save_only()
+                        if result == "SAVE_ONLY":
+                            continue  # 메뉴로 돌아가기
+                        elif result:
+                            return result
+                    elif result == 6:  # 프리셋 관리
+                        party = self._preset_management()
+                        if party:  # 프리셋에서 파티를 불러온 경우
+                            return party
+                    elif result == 7:  # 파티 히스토리 관리
+                        self._party_history_management()
+                    elif result == 8:  # 도움말
                         self._show_help()
                         
             except Exception:
@@ -381,10 +537,11 @@ class EasyCharacterCreator:
                 return self._recommended_combo_creation_fallback()
             
             # 특성 선택 방식 묻기 (커서 메뉴)
-            trait_options = ["🤖 자동 선택 (빠름)", "✋ 수동 선택 (상세)"]
+            trait_options = ["🤖 자동 선택 (빠름)", "✋ 수동 선택 (상세)", "🔙 뒤로가기"]
             trait_descriptions = [
                 "특성을 자동으로 선택하여 빠르게 게임을 시작합니다",
-                "커서를 사용하여 특성을 직접 선택합니다"
+                "커서를 사용하여 특성을 직접 선택합니다",
+                "이전 메뉴로 돌아갑니다"
             ]
             
             if CURSOR_MENU_AVAILABLE:
@@ -398,7 +555,7 @@ class EasyCharacterCreator:
                         cancellable=True
                     )
                     trait_choice_idx = trait_menu.run()
-                    if trait_choice_idx is None:
+                    if trait_choice_idx is None or trait_choice_idx == 2:  # 취소 또는 뒤로가기
                         return None
                     manual_traits = (trait_choice_idx == 1)  # 0: 자동, 1: 수동
                 except Exception:
@@ -487,24 +644,102 @@ class EasyCharacterCreator:
             print(f"{RED}잘못된 입력입니다. 자동 선택으로 진행합니다.{RESET}")
             return False
     
+    def _ensure_full_party(self, selected_characters: List[Character], source_party: List[Character] = None) -> List[Character]:
+        """4명 파티를 보장하는 헬퍼 함수 - 부족하면 AI가 자동으로 채움"""
+        if len(selected_characters) >= 4:
+            return selected_characters[:4]  # 4명 초과시 앞의 4명만 반환
+        
+        # 4명 미만이면 AI가 나머지를 채움
+        needed_count = 4 - len(selected_characters)
+        
+        if source_party:
+            # 소스 파티에서 선택되지 않은 캐릭터들 중에서 선택
+            remaining_characters = [char for char in source_party if char not in selected_characters]
+            if len(remaining_characters) >= needed_count:
+                auto_selected = remaining_characters[:needed_count]
+                selected_characters.extend(auto_selected)
+                
+                print(f"\n{CYAN}🤖 AI가 나머지 파티원을 자동으로 선택했습니다!{RESET}")
+                print(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                for char in auto_selected:
+                    print(f"👤 {CYAN}AI 선택{RESET}: {char.name} ({char.character_class})")
+                print(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                return selected_characters
+        
+        # 소스 파티가 없거나 부족하면 새로운 캐릭터 자동 생성
+        if hasattr(self, 'auto_builder'):
+            print(f"\n{CYAN}🤖 AI가 나머지 {needed_count}명의 파티원을 자동으로 생성합니다!{RESET}")
+            print(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            
+            # 기존 직업들을 피해서 다양한 직업으로 생성
+            existing_classes = [char.character_class for char in selected_characters]
+            available_classes = [cls for cls in self.auto_builder.ALL_CLASSES if cls not in existing_classes]
+            
+            for i in range(needed_count):
+                if available_classes:
+                    # 사용 가능한 직업 중에서 선택
+                    chosen_class = available_classes.pop(0)
+                else:
+                    # 모든 직업이 사용되었으면 기본 직업들 중에서 선택
+                    chosen_class = ["전사", "아크메이지", "궁수", "성기사"][i % 4]
+                
+                new_character = self.auto_builder._create_character(chosen_class, i)
+                if new_character:
+                    selected_characters.append(new_character)
+                    print(f"👤 {CYAN}AI 생성{RESET}: {new_character.name} ({new_character.character_class})")
+            
+            print(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            print(f"{YELLOW}💡 이제 완전한 4인 파티가 구성되었습니다!{RESET}")
+            input("Enter를 눌러 계속...")
+        
+        return selected_characters
+    
     def _create_party_from_classes(self, selected_combo: List[str], manual_traits: bool) -> List[Character]:
-        """직업 리스트로부터 파티 생성"""
+        """직업 리스트로부터 파티 생성 - 항상 4명 파티 보장"""
         if manual_traits:
             print(f"{GREEN}✅ 수동 특성 선택 모드{RESET}")
         else:
             print(f"{GREEN}✅ 자동 특성 선택 모드{RESET}")
         
+        # 선택된 직업이 4개 미만이면 자동으로 채움
+        if len(selected_combo) < 4:
+            print(f"{YELLOW}🤖 선택된 직업이 {len(selected_combo)}개입니다. AI가 나머지 {4-len(selected_combo)}개 직업을 자동으로 선택합니다...{RESET}")
+            
+            # 기본 균형잡힌 직업들
+            default_classes = ["전사", "아크메이지", "궁수", "성기사", "네크로맨서", "도적", "바드", "몽크"]
+            
+            # 이미 선택된 직업과 중복되지 않는 직업들 찾기
+            available_classes = [cls for cls in default_classes if cls not in selected_combo]
+            
+            # 부족한 만큼 추가
+            needed = 4 - len(selected_combo)
+            additional_classes = available_classes[:needed]
+            
+            # 여전히 부족하다면 모든 직업에서 선택
+            if len(additional_classes) < needed:
+                all_classes = self.auto_builder.ALL_CLASSES if hasattr(self.auto_builder, 'ALL_CLASSES') else default_classes
+                remaining_classes = [cls for cls in all_classes if cls not in selected_combo and cls not in additional_classes]
+                additional_classes.extend(remaining_classes[:needed - len(additional_classes)])
+            
+            selected_combo = selected_combo + additional_classes[:needed]
+            print(f"{CYAN}AI가 추가한 직업: {', '.join(additional_classes[:needed])}{RESET}")
+        
         while True:  # 🔄 재생성 루프
             try:
                 if manual_traits:
                     # 수동 특성 선택을 위해 특성 없이 파티 생성
-                    party = self.auto_builder.create_balanced_party(selected_combo, auto_select_traits=False)
+                    party = self.auto_builder.create_balanced_party(selected_combo[:4], auto_select_traits=False)
                 else:
                     # 자동 특성 선택 포함해서 파티 생성
-                    party = self.auto_builder.create_balanced_party(selected_combo, auto_select_traits=True)
+                    party = self.auto_builder.create_balanced_party(selected_combo[:4], auto_select_traits=True)
             except Exception as e:
                 print(f"{RED}파티 생성 중 오류 발생: {e}{RESET}")
                 return None
+            
+            # 4명 파티 보장
+            if party and len(party) < 4:
+                print(f"{YELLOW}🤖 생성된 파티가 {len(party)}명입니다. AI가 나머지를 자동으로 채웁니다...{RESET}")
+                party = self._ensure_full_party(party, [])
             
             # 수동 특성 선택이면 각 캐릭터마다 특성 선택
             if manual_traits and party:
@@ -520,6 +755,9 @@ class EasyCharacterCreator:
                 confirm_result = self._confirm_party_cursor(party)
                 if confirm_result is True:
                     return party
+                elif confirm_result == "SAVE_ONLY":
+                    # 특별한 "저장만" 신호를 상위로 전달
+                    return "SAVE_ONLY"
                 elif confirm_result is False:
                     # 🔄 재생성: 루프를 계속하여 새 파티 생성
                     print(f"{YELLOW}🔄 같은 설정으로 파티를 다시 생성합니다...{RESET}")
@@ -969,21 +1207,24 @@ class EasyCharacterCreator:
             if i < max_party_size - 1:
                 if CURSOR_MENU_AVAILABLE:
                     try:
-                        continue_options = ["✅ 예, 다음 파티원 추가", "❌ 아니오, 현재 파티로 완료"]
+                        continue_options = ["✅ 예, 다음 파티원 추가", "❌ 아니오, 현재 파티로 완료", "🔙 뒤로가기"]
                         continue_descriptions = [
                             "다음 파티원을 계속 생성합니다",
-                            f"현재 {len(party)}명의 파티로 게임을 시작합니다"
+                            f"현재 {len(party)}명의 파티로 게임을 시작합니다",
+                            "이전 단계로 돌아갑니다"
                         ]
                         
                         continue_menu = CursorMenu(
                             f"🎭 파티 구성 ({len(party)}/{max_party_size})", 
                             continue_options, 
                             continue_descriptions, 
-                            cancellable=False
+                            cancellable=True
                         )
                         continue_result = continue_menu.run()
                         
-                        if continue_result == 1:  # 아니오
+                        if continue_result is None or continue_result == 2:  # 뒤로가기
+                            return None
+                        elif continue_result == 1:  # 아니오
                             break
                     except Exception:
                         # 폴백: 기존 방식
@@ -1016,17 +1257,17 @@ class EasyCharacterCreator:
                     # 역할군별 캐릭터 분류
                     role_categories = {
                         "🛡️ 탱커": {
-                            "classes": ["전사", "성기사", "기사", "암흑기사"],
+                            "classes": ["전사", "성기사", "기사", "암흑기사", "검투사", "광전사", "용기사"],
                             "color": bright_red,
                             "description": "높은 체력과 방어력으로 파티를 보호합니다"
                         },
                         "⚔️ 물리 딜러": {
-                            "classes": ["검성", "사무라이", "암살자", "몽크", "검투사", "광전사", "궁수", "도적", "해적", "기계공학자"],
+                            "classes": ["검성", "사무라이", "암살자", "몽크", "궁수", "도적", "해적"],
                             "color": bright_yellow,
                             "description": "물리 공격으로 적을 제압하는 전투 전문가"
                         },
                         "🔮 마법사": {
-                            "classes": ["아크메이지", "네크로맨서", "정령술사", "시간술사", "연금술사", "차원술사"],
+                            "classes": ["아크메이지", "네크로맨서", "정령술사", "시간술사", "연금술사", "차원술사", "기계공학자"],
                             "color": bright_blue,
                             "description": "강력한 마법으로 적을 소멸시킵니다"
                         },
@@ -1036,7 +1277,7 @@ class EasyCharacterCreator:
                             "description": "파티원을 치유하고 강화하는 지원 역할"
                         },
                         "🎯 특수 클래스": {
-                            "classes": ["용기사", "철학자", "마검사"],
+                            "classes": ["철학자", "마검사"],
                             "color": bright_magenta,
                             "description": "독특한 능력을 가진 특별한 클래스들"
                         }
@@ -1210,19 +1451,22 @@ class EasyCharacterCreator:
             except ValueError:
                 print(f"{RED}❌ 숫자나 'B'를 입력하세요.{RESET}")
     
-    def _should_select_traits(self) -> bool:
-        """특성을 수동으로 선택할지 묻기"""
-        trait_options = ["🤖 자동 선택 - 빠르게 게임 시작 (추천)", "✋ 수동 선택 - 커서로 특성 직접 선택"]
+    def _should_select_traits(self) -> Optional[bool]:
+        """특성을 수동으로 선택할지 묻기 (None: 뒤로가기)"""
+        trait_options = ["🤖 자동 선택 - 빠르게 게임 시작 (추천)", "✋ 수동 선택 - 커서로 특성 직접 선택", "🔙 뒤로가기"]
         trait_descriptions = [
             "특성을 자동으로 선택하여 빠르게 게임을 시작합니다",
-            "커서를 사용하여 특성을 직접 선택합니다. 특성은 게임 중 자동으로 발동되는 패시브 능력입니다"
+            "커서를 사용하여 특성을 직접 선택합니다. 특성은 게임 중 자동으로 발동되는 패시브 능력입니다",
+            "이전 단계로 돌아갑니다"
         ]
         
         if CURSOR_MENU_AVAILABLE:
             try:
-                trait_menu = CursorMenu("🎭 특성 선택 방식을 정하세요", trait_options, trait_descriptions, cancellable=False)
+                trait_menu = CursorMenu("🎭 특성 선택 방식을 정하세요", trait_options, trait_descriptions, cancellable=True)
                 trait_choice = trait_menu.run()
-                if trait_choice == 1:  # 수동 선택
+                if trait_choice is None or trait_choice == 2:  # 뒤로가기
+                    return None
+                elif trait_choice == 1:  # 수동 선택
                     print(f"{CYAN}✅ 수동 선택이 선택되었습니다.{RESET}")
                     return True
                 else:  # 자동 선택
@@ -1546,8 +1790,231 @@ class EasyCharacterCreator:
             character.selected_traits = getattr(character, 'traits', [])
     
     def _create_single_character(self, class_name: str, index: int) -> Character:
-        """단일 캐릭터 생성"""
-        return self.auto_builder._create_character(class_name, index)
+        """단일 캐릭터 생성 (이름 설정 포함)"""
+        # 기본 캐릭터 생성
+        character = self.auto_builder._create_character(class_name, index)
+        
+        # 이름 설정
+        custom_name = self._set_character_name(character, class_name)
+        if custom_name:
+            character.name = custom_name
+            
+        return character
+    
+    def _set_character_name(self, character: Character, class_name: str) -> Optional[str]:
+        """캐릭터 이름 설정"""
+        if not CURSOR_MENU_AVAILABLE:
+            # 폴백: 기본 이름 사용
+            return None
+            
+        try:
+            current_name = getattr(character, 'name', f"{class_name} 전사")
+            
+            options = [
+                f"📝 직접 입력 (현재: {current_name})",
+                "🎲 랜덤 이름 생성",
+                "🇰🇷 한글 이름 선택",
+                f"✅ 기본 이름 사용 ({current_name})"
+            ]
+            
+            descriptions = [
+                "원하는 이름을 직접 입력합니다",
+                "성별과 직업에 맞는 랜덤 이름을 생성합니다",
+                "미리 준비된 한글 이름 중에서 선택합니다", 
+                "자동 생성된 기본 이름을 사용합니다"
+            ]
+            
+            menu = CursorMenu(f"👤 {class_name} 캐릭터 이름 설정", options, descriptions, cancellable=True)
+            result = menu.run()
+            
+            if result is None or result == 3:  # 취소 또는 기본 이름
+                return None
+            elif result == 0:  # 직접 입력
+                return self._input_custom_name(current_name)
+            elif result == 1:  # 랜덤 이름
+                return self._generate_random_name(character, class_name)
+            elif result == 2:  # 한글 이름 선택
+                return self._select_korean_name(class_name)
+                
+        except Exception as e:
+            print(f"{RED}이름 설정 중 오류: {e}{RESET}")
+            return None
+        
+        return None
+    
+    def _select_korean_name(self, class_name: str) -> Optional[str]:
+        """한글 이름 선택"""
+        korean_names = {
+            "남성": ["민준", "서준", "도윤", "예준", "시우", "주원", "하준", "지호", "건우", "우진",
+                   "승현", "준서", "연우", "진우", "현우", "지안", "선우", "서진", "민성", "태현"],
+            "여성": ["서연", "하은", "민서", "지우", "서현", "수빈", "지유", "채원", "지민", "다은",
+                   "예은", "소율", "시은", "수아", "윤서", "채은", "예원", "지아", "하린", "가은"]
+        }
+        
+        # 직업별 특별한 이름들 추가
+        special_names = {
+            "전사": ["강철", "용맹", "철산", "무쇠", "검은별"],
+            "마법사": ["별빛", "달빛", "마나", "현자", "지혜"],
+            "궁수": ["바람", "화살", "독수리", "매의눈", "바람개비"],
+            "도적": ["그림자", "암영", "밤바람", "검은발톱", "달그림자"],
+            "성기사": ["빛나", "성광", "은혜", "축복", "거룩"],
+            "암흑기사": ["어둠", "그림자", "밤", "어스름", "칠흑"],
+            "바드": ["선율", "화음", "노래", "악기", "멜로디"]
+        }
+        
+        # 이름 목록 구성
+        options = []
+        descriptions = []
+        
+        # 일반 남성 이름
+        for name in korean_names["남성"][:10]:
+            options.append(f"👨 {name}")
+            descriptions.append("남성 이름")
+        
+        # 일반 여성 이름  
+        for name in korean_names["여성"][:10]:
+            options.append(f"👩 {name}")
+            descriptions.append("여성 이름")
+        
+        # 직업별 특별 이름
+        if class_name in special_names:
+            for name in special_names[class_name]:
+                options.append(f"⚔️ {name}")
+                descriptions.append(f"{class_name} 특화 이름")
+        
+        options.append("❌ 취소")
+        descriptions.append("이름 선택을 취소합니다")
+        
+        menu = CursorMenu("🇰🇷 한글 이름 선택", options, descriptions, cancellable=True)
+        result = menu.run()
+        
+        if result is None or result == len(options) - 1:  # 취소
+            return None
+        
+        # 선택된 이름에서 이모지 제거
+        selected_name = options[result].split(" ", 1)[1]
+        return selected_name
+    
+    def _input_custom_name(self, current_name: str) -> Optional[str]:
+        """사용자 직접 이름 입력 - 한글 지원 개선"""
+        import sys
+        import os
+        
+        print(f"\n{CYAN}👤 캐릭터 이름 입력{RESET}")
+        print(f"현재 이름: {current_name}")
+        print(f"새 이름을 입력하세요 (Enter: 기본 이름 유지):")
+        
+        try:
+            # Windows 콘솔 인코딩 설정
+            if os.name == 'nt':
+                try:
+                    # UTF-8 코드페이지 설정
+                    import subprocess
+                    subprocess.run(['chcp', '65001'], capture_output=True, shell=True)
+                except:
+                    pass
+            
+            # sys.stdin의 인코딩 확인 및 설정
+            old_encoding = getattr(sys.stdin, 'encoding', 'utf-8')
+            
+            # 안전한 입력 받기
+            print(f"{YELLOW}> {RESET}", end="", flush=True)
+            
+            try:
+                new_name = input().strip()
+            except UnicodeDecodeError:
+                # 인코딩 오류 시 재시도
+                print(f"\n{YELLOW}한글 입력에 문제가 있습니다. 다시 시도해주세요.{RESET}")
+                print(f"{YELLOW}> {RESET}", end="", flush=True)
+                new_name = input().strip()
+            
+            if not new_name:
+                return None  # 기본 이름 유지
+            
+            # 이름 길이 확인 (한글은 2바이트로 계산)
+            name_length = len(new_name.encode('utf-8'))
+            if name_length > 40:  # 한글 기준 약 13자 정도
+                print(f"{RED}❌ 이름이 너무 깁니다 (한글 기준 약 13자 이내){RESET}")
+                input("Enter를 눌러 계속...")
+                return None
+            
+            # 기본적인 유효성 검사만 수행
+            if len(new_name.strip()) == 0:
+                print(f"{RED}❌ 빈 이름은 사용할 수 없습니다{RESET}")
+                input("Enter를 눌러 계속...")
+                return None
+            
+            # 특수문자 제한 (일부만)
+            forbidden_chars = ['<', '>', ':', '"', '|', '?', '*', '\\', '/']
+            if any(char in new_name for char in forbidden_chars):
+                print(f"{RED}❌ 사용할 수 없는 특수문자가 포함되어 있습니다{RESET}")
+                print(f"{YELLOW}💡 파일명에 사용할 수 없는 문자: < > : \" | ? * \\ /{RESET}")
+                input("Enter를 눌러 계속...")
+                return None
+            
+            return new_name
+            
+        except (KeyboardInterrupt, EOFError):
+            return None
+        except Exception as e:
+            print(f"{RED}❌ 이름 입력 중 오류: {e}{RESET}")
+            print(f"{YELLOW}💡 영어 이름을 시도해보세요{RESET}")
+            input("Enter를 눌러 계속...")
+            return None
+    
+    def _is_valid_name_character(self, char: str) -> bool:
+        """이름에 사용 가능한 문자인지 확인"""
+        # 한글 완성형 (가-힣)
+        if '가' <= char <= '힣':
+            return True
+        # 영어 대소문자
+        if 'a' <= char <= 'z' or 'A' <= char <= 'Z':
+            return True
+        # 숫자
+        if '0' <= char <= '9':
+            return True
+        # 공백
+        if char == ' ':
+            return True
+        # 일부 특수문자 허용
+        if char in '-_':
+            return True
+        return False
+        # 숫자
+        if '0' <= char <= '9':
+            return True
+        # 공백
+        if char == ' ':
+            return True
+        return False
+    
+    def _generate_random_name(self, character: Character, class_name: str) -> str:
+        """랜덤 이름 생성"""
+        try:
+            # AI 게임 모드에서 이름 풀 가져오기
+            from .ai_game_mode import CharacterTraits
+            
+            # 성별 결정 (랜덤 또는 기존 캐릭터 성별)
+            import random
+            gender = getattr(character, 'gender', random.choice(['male', 'female']))
+            
+            if gender == 'female':
+                name_pool = CharacterTraits.FEMALE_NAMES
+            else:
+                name_pool = CharacterTraits.MALE_NAMES
+            
+            # 랜덤 이름 선택 (접미사 없이 깔끔하게)
+            base_name = random.choice(name_pool)
+            return base_name
+                
+        except Exception:
+            # 폴백: 간단한 랜덤 이름
+            import random
+            simple_names = [
+                "아리아", "루나", "제이든", "카이", "노바", "제라", "리온", "미라",
+                "오리온", "셀라", "다크스", "루비", "제이크", "에바", "렉스", "티아"
+            ]
+            return random.choice(simple_names)
     
     def _show_available_classes(self, classes: List[str]):
         """사용 가능한 직업 목록 표시"""
@@ -1914,23 +2381,28 @@ class EasyCharacterCreator:
                 while True:
                     # 커서 메뉴 옵션
                     options = [
-                        "✅ 확인하고 시작",
-                        "📋 파티 정보 다시 보기", 
+                        "✅ 확인하고 게임 시작",
+                        "💾 파티만 저장하고 종료",
+                        "✏️ 캐릭터 이름 변경",
+                        "📋 파티 정보 다시 보기",
                         "📝 특성 상세 설명 보기",
                         "🔄 파티 다시 생성",
+                        "🔙 뒤로가기",
                         "❓ 도움말"
                     ]
                     descriptions = [
                         "현재 파티로 게임을 시작합니다",
+                        "파티를 저장하고 메인 메뉴로 돌아갑니다 (게임 시작 안 함)",
+                        "파티원들의 이름을 개별적으로 변경합니다",
                         "선택한 파티의 전체 정보를 다시 확인합니다",
                         "각 캐릭터의 특성에 대한 상세한 설명을 봅니다",
                         "새로운 파티를 다시 생성합니다",
+                        "이전 단계로 돌아갑니다",
                         "파티 생성에 대한 도움말을 봅니다"
                     ]
                     
                     # CursorMenu 생성
-                    import os
-                    os.system('cls' if os.name == 'nt' else 'clear')
+                    self._clear_screen_safely()
                     
                     # 파티 정보 표시
                     self._show_created_party(party)
@@ -1946,22 +2418,26 @@ class EasyCharacterCreator:
                     menu = CursorMenu("🎯 파티 확인", options, descriptions, cancellable=True)
                     choice = menu.run()
                     
-                    if choice is None or choice == -1:  # 취소
+                    if choice is None or choice == 6:  # 취소 또는 뒤로가기
                         return None
-                    elif choice == 0:  # 확인하고 시작
+                    elif choice == 0:  # 확인하고 게임 시작
                         return True
-                    elif choice == 1:  # 파티 정보 다시 보기
-                        os.system('cls' if os.name == 'nt' else 'clear')
+                    elif choice == 1:  # 파티만 저장하고 종료
+                        return self._save_party_only(party)
+                    elif choice == 2:  # 캐릭터 이름 변경
+                        self._change_party_names(party)
+                    elif choice == 3:  # 파티 정보 다시 보기
+                        self._clear_screen_safely()
                         self._show_created_party(party)
                         input(f"\n{YELLOW}계속하려면 Enter를 누르세요...{RESET}")
-                    elif choice == 2:  # 특성 상세 설명 보기
-                        os.system('cls' if os.name == 'nt' else 'clear')
+                    elif choice == 4:  # 특성 상세 설명 보기
+                        self._clear_screen_safely()
                         self._show_trait_details()
                         input(f"\n{YELLOW}계속하려면 Enter를 누르세요...{RESET}")
-                    elif choice == 3:  # 파티 다시 생성
+                    elif choice == 5:  # 파티 다시 생성
                         return False
-                    elif choice == 4:  # 도움말
-                        os.system('cls' if os.name == 'nt' else 'clear')
+                    elif choice == 7:  # 도움말
+                        self._clear_screen_safely()
                         self._show_help()
                         input(f"\n{YELLOW}계속하려면 Enter를 누르세요...{RESET}")
                         
@@ -1971,6 +2447,73 @@ class EasyCharacterCreator:
         else:
             # 폴백: 기존 방식
             return self._confirm_party()
+
+    def _change_party_names(self, party: List[Character]):
+        """파티원들의 이름 변경"""
+        if not CURSOR_MENU_AVAILABLE:
+            print(f"{RED}커서 메뉴 시스템이 필요합니다.{RESET}")
+            return
+        
+        try:
+            while True:
+                # 캐릭터 선택 메뉴
+                options = []
+                descriptions = []
+                
+                for i, character in enumerate(party):
+                    current_name = getattr(character, 'name', f"캐릭터 {i+1}")
+                    char_class = getattr(character, 'character_class', '알 수 없음')
+                    options.append(f"👤 {current_name} ({char_class})")
+                    descriptions.append(f"{char_class} 캐릭터의 이름을 변경합니다")
+                
+                options.extend([
+                    "🎲 모든 캐릭터 랜덤 이름",
+                    "✅ 완료"
+                ])
+                descriptions.extend([
+                    "모든 파티원의 이름을 랜덤으로 변경합니다",
+                    "이름 변경을 완료하고 돌아갑니다"
+                ])
+                
+                import os
+                self._clear_screen_safely()
+                
+                # 현재 파티 이름 표시
+                print(f"\n{CYAN}👤 파티원 이름 변경{RESET}")
+                print(f"{'='*50}")
+                for i, character in enumerate(party, 1):
+                    current_name = getattr(character, 'name', f"캐릭터 {i}")
+                    char_class = getattr(character, 'character_class', '알 수 없음')
+                    print(f"{i}. {YELLOW}{current_name}{RESET} ({char_class})")
+                print(f"{'='*50}\n")
+                
+                menu = CursorMenu("👤 이름을 변경할 캐릭터 선택", options, descriptions, cancellable=True)
+                result = menu.run()
+                
+                if result is None or result == len(party) + 1:  # 취소 또는 완료
+                    break
+                elif result == len(party):  # 모든 캐릭터 랜덤 이름
+                    self._randomize_all_names(party)
+                    print(f"{GREEN}✅ 모든 캐릭터의 이름을 랜덤으로 변경했습니다!{RESET}")
+                    input("Enter를 눌러 계속...")
+                elif 0 <= result < len(party):  # 개별 캐릭터 선택
+                    character = party[result]
+                    char_class = getattr(character, 'character_class', '알 수 없음')
+                    new_name = self._set_character_name(character, char_class)
+                    if new_name:
+                        character.name = new_name
+                        print(f"{GREEN}✅ {char_class} 캐릭터의 이름을 '{new_name}'으로 변경했습니다!{RESET}")
+                        input("Enter를 눌러 계속...")
+                        
+        except Exception as e:
+            print(f"{RED}이름 변경 중 오류: {e}{RESET}")
+            
+    def _randomize_all_names(self, party: List[Character]):
+        """모든 캐릭터의 이름을 랜덤으로 변경"""
+        for character in party:
+            char_class = getattr(character, 'character_class', '알 수 없음')
+            new_name = self._generate_random_name(character, char_class)
+            character.name = new_name
 
     def _confirm_party(self) -> bool:
         """파티 확인 - 특성 설명 메뉴 추가"""
@@ -2472,6 +3015,915 @@ class EasyCharacterCreator:
         
         print(f"\n{CYAN}아무 키나 누르면 돌아갑니다...{RESET}")
         self.keyboard.get_key()
+    
+    def _preset_management(self) -> Optional[List[Character]]:
+        """프리셋 관리 메뉴"""
+        if not PRESETS_AVAILABLE or not self.preset_manager:
+            print(f"{RED}프리셋 시스템을 사용할 수 없습니다.{RESET}")
+            return None
+        
+        if CURSOR_MENU_AVAILABLE:
+            try:
+                while True:
+                    options = [
+                        "📂 저장된 파티 불러오기",
+                        "👤 저장된 파티 불러오기 (개별선택)", 
+                        "💾 현재 파티 저장하기",
+                        "📋 프리셋 목록 보기",
+                        "❌ 돌아가기"
+                    ]
+                    
+                    descriptions = [
+                        "저장된 파티 프리셋을 불러와서 게임을 시작합니다",
+                        "저장된 파티에서 개별 캐릭터를 선택하여 게임을 시작합니다", 
+                        "현재 생성된 파티를 프리셋으로 저장합니다",
+                        "모든 저장된 프리셋을 확인합니다",
+                        "캐릭터 생성 메뉴로 돌아갑니다"
+                    ]
+                    
+                    menu = CursorMenu("💾 프리셋 관리", options, descriptions, cancellable=True)
+                    result = menu.run()
+                    
+                    if result is None or result == 4:  # 돌아가기
+                        return None
+                    elif result == 0:  # 파티 불러오기
+                        party = self._load_party_preset()
+                        if party:
+                            return party
+                    elif result == 1:  # 캐릭터 불러오기  
+                        party = self._load_character_preset()
+                        if party:
+                            return party  # 4명 파티 리스트를 바로 반환
+                    elif result == 2:  # 파티 저장하기
+                        self._save_party_preset()
+                    elif result == 3:  # 프리셋 목록 보기
+                        self._show_preset_list()
+            except Exception:
+                print(f"{RED}프리셋 관리 중 오류가 발생했습니다.{RESET}")
+                return None
+        else:
+            print(f"{RED}커서 메뉴 시스템이 필요합니다.{RESET}")
+            return None
+    
+    def _load_party_preset(self) -> Optional[List[Character]]:
+        """파티 프리셋 불러오기"""
+        party_presets = self.preset_manager.list_party_presets()
+        
+        if not party_presets:
+            print(f"{YELLOW}저장된 파티 프리셋이 없습니다.{RESET}")
+            input("Enter를 눌러 계속...")
+            return None
+        
+        try:
+            options = []
+            descriptions = []
+            
+            for preset in party_presets:
+                options.append(f"🎭 {preset['name']} ({preset['composition']})")
+                desc = f"{preset['description']}"
+                if preset['created_at']:
+                    desc += f" (생성: {preset['created_at'][:10]})"
+                descriptions.append(desc)
+            
+            options.append("❌ 취소")
+            descriptions.append("파티 불러오기를 취소합니다")
+            
+            menu = CursorMenu("📂 저장된 파티 선택", options, descriptions, cancellable=True)
+            result = menu.run()
+            
+            if result is None or result == len(party_presets):  # 취소
+                return None
+            
+            # 선택된 파티 로드
+            selected_preset = party_presets[result]
+            party = self.preset_manager.load_party_preset(selected_preset['name'])
+            
+            if party:
+                print(f"{GREEN}✅ 파티 '{selected_preset['name']}' 불러오기 완료!{RESET}")
+                self._show_created_party(party)
+                
+                # 확인 메뉴
+                confirm_options = ["✅ 이 파티로 시작", "❌ 다른 파티 선택"]
+                confirm_descriptions = ["불러온 파티로 게임을 시작합니다", "다른 파티를 선택합니다"]
+                confirm_menu = CursorMenu("파티 확인", confirm_options, confirm_descriptions)
+                confirm_result = confirm_menu.run()
+                
+                if confirm_result == 0:
+                    return party
+                else:
+                    return self._load_party_preset()  # 다시 선택
+            else:
+                print(f"{RED}❌ 파티 불러오기 실패{RESET}")
+                input("Enter를 눌러 계속...")
+                return None
+                
+        except Exception as e:
+            print(f"{RED}파티 불러오기 중 오류: {e}{RESET}")
+            return None
+    
+    def _load_character_preset(self) -> Optional[List[Character]]:
+        """개별 캐릭터 프리셋 불러오기 - 저장된 게임 파일에서 선택"""
+        try:
+            print(f"\n{CYAN}👤 개별 캐릭터 선택 모드{RESET}")
+            print(f"{YELLOW}저장된 게임 파일에서 캐릭터를 개별 선택합니다...{RESET}")
+            
+            # AutoPartyBuilder의 저장된 캐릭터 선택 기능 사용
+            from .auto_party_builder import get_auto_party_builder
+            auto_builder = get_auto_party_builder()
+            
+            party = auto_builder.build_party_from_saved_characters()
+            
+            if party:
+                print(f"{GREEN}✅ 저장된 캐릭터로 파티 구성 완료!{RESET}")
+                return party
+            else:
+                print(f"\n{YELLOW}저장된 캐릭터 선택이 취소되었거나 실패했습니다.{RESET}")
+                
+                # 대안 제시
+                print(f"{CYAN}💡 대안 옵션:{RESET}")
+                print(f"1. 📂 저장된 파티 프리셋 사용")
+                print(f"2. ❌ 메뉴로 돌아가기")
+                
+                while True:
+                    choice = input(f"{GREEN}선택하세요 (1/2): {RESET}").strip()
+                    if choice == "1":
+                        return self._load_party_preset_fallback()
+                    elif choice == "2":
+                        return None
+                    else:
+                        print(f"{RED}1 또는 2를 입력하세요.{RESET}")
+                
+        except Exception as e:
+            print(f"{RED}저장된 캐릭터 로드 중 오류: {e}{RESET}")
+            print(f"상세 오류: {str(e)}")
+            print(f"{CYAN}💡 대신 파티 프리셋에서 선택해보세요.{RESET}")
+            
+            # 폴백: 기존 파티 프리셋 방식
+            return self._load_party_preset_fallback()
+    
+    def _load_party_preset_fallback(self) -> Optional[List[Character]]:
+        """파티 프리셋에서 불러오기 (폴백)"""
+        party_presets = self.preset_manager.list_party_presets()
+        
+        if not party_presets:
+            print(f"{YELLOW}저장된 파티 프리셋이 없습니다.{RESET}")
+            print(f"{CYAN}💡 팁: 먼저 파티를 생성하고 저장한 후 불러올 수 있습니다.{RESET}")
+            input("Enter를 눌러 계속...")
+            return None
+        
+        # 파티 프리셋 선택 메뉴
+        try:
+            options = []
+            descriptions = []
+            
+            for preset in party_presets:
+                # 파티 이름과 구성 표시
+                party_name = preset.get('name', 'Unknown Party')
+                composition = preset.get('composition', 'Unknown')
+                created_at = preset.get('created_at', '')
+                
+                options.append(f"🎭 {party_name} ({composition})")
+                desc = f"파티 구성: {composition}"
+                if created_at:
+                    desc += f" (생성: {created_at[:10]})"
+                descriptions.append(desc)
+            
+            options.append("❌ 취소")
+            descriptions.append("파티 불러오기를 취소합니다")
+            
+            menu = CursorMenu("📂 저장된 파티 선택", options, descriptions, cancellable=True)
+            result = menu.run()
+            
+            if result is None or result == len(party_presets):  # 취소
+                return None
+            
+            # 선택된 파티 로드
+            selected_preset = party_presets[result]
+            party = self.preset_manager.load_party_preset(selected_preset['name'])
+            
+            if party:
+                print(f"{GREEN}✅ 파티 '{selected_preset['name']}'을(를) 성공적으로 불러왔습니다!{RESET}")
+                return party
+            else:
+                print(f"{RED}❌ 파티를 불러오는 데 실패했습니다.{RESET}")
+                return None
+        except Exception as e:
+            print(f"{RED}파티 프리셋 로드 중 오류: {e}{RESET}")
+            return None
+
+    def _save_party_preset(self):
+        """파티 프리셋 저장"""
+        if not self.last_generated_party:
+            print(f"{YELLOW}저장할 파티가 없습니다. 먼저 파티를 생성해주세요.{RESET}")
+            input("Enter를 눌러 계속...")
+            return
+        
+        try:
+            print(f"\n{CYAN}💾 파티 프리셋 저장{RESET}")
+            print(f"프리셋 이름을 입력하세요:")
+            print(f"{YELLOW}> {RESET}", end="")
+            
+            preset_name = ""
+            while True:
+                key = self.keyboard.get_key()
+                if key == '\r' or key == '\n':  # Enter
+                    if preset_name.strip():
+                        break
+                elif key == '\x08':  # Backspace
+                    if preset_name:
+                        preset_name = preset_name[:-1]
+                        print(f"\r{YELLOW}> {preset_name}{RESET} ", end="")
+                elif len(key) == 1 and key.isprintable():
+                    preset_name += key
+                    print(key, end="", flush=True)
+            
+            print(f"\n설명을 입력하세요 (선택사항):")
+            print(f"{YELLOW}> {RESET}", end="")
+            
+            description = ""
+            while True:
+                key = self.keyboard.get_key()
+                if key == '\r' or key == '\n':  # Enter
+                    break
+                elif key == '\x08':  # Backspace
+                    if description:
+                        description = description[:-1]
+                        print(f"\r{YELLOW}> {description}{RESET} ", end="")
+                elif len(key) == 1 and key.isprintable():
+                    description += key
+                    print(key, end="", flush=True)
+            
+            # 저장 실행
+            if self.preset_manager.save_party_preset(self.last_generated_party, preset_name.strip(), description.strip()):
+                print(f"\n{GREEN}✅ 파티 프리셋 '{preset_name}' 저장 완료!{RESET}")
+            else:
+                print(f"\n{RED}❌ 파티 프리셋 저장 실패{RESET}")
+            
+            input("Enter를 눌러 계속...")
+            
+        except Exception as e:
+            print(f"\n{RED}저장 중 오류: {e}{RESET}")
+            input("Enter를 눌러 계속...")
+    
+    def _show_preset_list(self):
+        """프리셋 목록 보기"""
+        try:
+            print(f"\n{CYAN}{'='*60}{RESET}")
+            print(f"{WHITE}📋 저장된 프리셋 목록{RESET}")
+            print(f"{CYAN}{'='*60}{RESET}")
+            
+            # 파티 프리셋 목록
+            if self.preset_manager:
+                party_presets = self.preset_manager.list_party_presets()
+                print(f"\n{YELLOW}🎭 파티 프리셋 ({len(party_presets)}개):{RESET}")
+                
+                if party_presets:
+                    for i, preset in enumerate(party_presets, 1):
+                        print(f"{WHITE}{i:2d}.{RESET} {preset['name']}")
+                        print(f"     구성: {preset['composition']}")
+                        if preset.get('description'):
+                            print(f"     설명: {preset['description']}")
+                        if preset.get('created_at'):
+                            print(f"     생성일: {preset['created_at'][:10]}")
+                        print()
+                else:
+                    print(f"     {CYAN}저장된 파티 프리셋이 없습니다.{RESET}")
+                    print(f"     {YELLOW}💡 파티를 생성한 후 '현재 파티 저장하기'를 사용해보세요.{RESET}")
+            else:
+                print(f"{RED}프리셋 관리자를 사용할 수 없습니다.{RESET}")
+            
+            # 저장된 게임 파일에서 캐릭터 정보도 표시
+            print(f"\n{YELLOW}💾 저장된 게임 파일 분석:{RESET}")
+            try:
+                import json
+                import os
+                from glob import glob
+                
+                # 저장 파일들 찾기
+                save_files = glob("saves/*.json") + glob("*.json")
+                save_files = [f for f in save_files if f.startswith(("save_", "saves/save_"))]
+                
+                if save_files:
+                    total_characters = 0
+                    for save_file in save_files:
+                        try:
+                            with open(save_file, 'r', encoding='utf-8') as f:
+                                save_data = json.load(f)
+                            
+                            if 'party' in save_data:
+                                char_count = len(save_data['party'])
+                                total_characters += char_count
+                                print(f"     📁 {save_file}: {char_count}명 캐릭터")
+                        except Exception:
+                            continue
+                    
+                    print(f"\n     {GREEN}총 {total_characters}명의 캐릭터를 개별 선택에서 사용 가능{RESET}")
+                else:
+                    print(f"     {CYAN}저장된 게임 파일이 없습니다.{RESET}")
+                    print(f"     {YELLOW}💡 게임을 진행하고 저장한 후 사용할 수 있습니다.{RESET}")
+                    
+            except Exception as e:
+                print(f"     {RED}게임 파일 분석 실패: {e}{RESET}")
+            
+            print(f"\n{CYAN}아무 키나 누르면 돌아갑니다...{RESET}")
+            self.keyboard.get_key()
+            
+        except Exception as e:
+            print(f"{RED}목록 표시 중 오류: {e}{RESET}")
+            print(f"상세 오류: {str(e)}")
+            input("Enter를 눌러 계속...")
+
+    def _save_party_only(self, party: List[Character]) -> Optional[bool]:
+        """파티만 저장하고 게임 시작하지 않기"""
+        try:
+            self._clear_screen_safely()
+            
+            print(f"\n{CYAN}{'='*60}{RESET}")
+            print(f"{CYAN}💾 파티 저장 모드{RESET}")
+            print(f"{CYAN}{'='*60}{RESET}")
+            
+            # 파티 정보 표시
+            self._show_created_party(party)
+            
+            print(f"\n{GREEN}✅ 파티가 성공적으로 저장되었습니다!{RESET}")
+            print(f"{YELLOW}이 파티는 언제든지 '개별 캐릭터 불러오기'에서 사용할 수 있습니다.{RESET}")
+            print(f"\n{CYAN}메인 메뉴로 돌아갑니다...{RESET}")
+            
+            input(f"\n{YELLOW}계속하려면 Enter를 누르세요...{RESET}")
+            
+            # 특별한 반환값으로 "저장만 하고 종료" 신호
+            return "SAVE_ONLY"
+            
+        except Exception as e:
+            print(f"{RED}저장 중 오류 발생: {e}{RESET}")
+            input(f"\n{YELLOW}계속하려면 Enter를 누르세요...{RESET}")
+            return None
+
+    def _clear_screen_safely(self):
+        """안전한 화면 지우기 (화면 겹침 문제 완전 해결)"""
+        try:
+            import os
+            import time
+            import sys
+            
+            # 출력 버퍼 강제 플러시
+            sys.stdout.flush()
+            sys.stderr.flush()
+            
+            # 화면 지우기 전 짧은 대기
+            time.sleep(0.05)
+            
+            # 강력한 화면 지우기
+            if os.name == 'nt':  # Windows
+                try:
+                    # ANSI 시퀀스로 스크롤백까지 클리어
+                    print("\x1b[2J\x1b[3J\x1b[H", end='', flush=True)
+                    time.sleep(0.05)
+                except:
+                    # 폴백: CMD cls
+                    os.system('cls')
+                    time.sleep(0.05)
+            else:  # Unix/Linux/Mac
+                print("\x1b[2J\x1b[3J\x1b[H", end='', flush=True)
+                time.sleep(0.05)
+                
+            # 잔여 메시지 완전 제거를 위한 추가 빈 줄
+            print('\n' * 5, end='', flush=True)
+            print("\x1b[H", end='', flush=True)  # 커서 홈으로
+            
+            # 최종 출력 버퍼 플러시
+            sys.stdout.flush()
+            
+        except Exception:
+            # 화면 지우기 실패 시 대량 빈 줄로 기존 내용 완전 밀어내기
+            try:
+                print('\n' * 150, flush=True)  # 매우 많은 줄로 기존 내용 덮기
+                print("\x1b[H", end='', flush=True)  # 커서 홈으로
+            except:
+                print('\n' * 150)  # 최소한의 폴백
+
+    def _safe_print_after_clear(self, message):
+        """화면 지우기 후 안전한 메시지 출력"""
+        try:
+            import time
+            import sys
+            
+            # 화면 지우기
+            self._clear_screen_safely()
+            
+            # 메시지 출력 전 추가 대기
+            time.sleep(0.05)
+            
+            # 메시지 출력
+            print(message)
+            
+            # 출력 완료 후 버퍼 플러시
+            sys.stdout.flush()
+            
+        except Exception:
+            # 폴백: 단순 출력
+            print(message)
+
+    def _single_character_save_only(self) -> Optional[str]:
+        """단일 캐릭터만 생성해서 저장 (게임 시작 안 함)"""
+        try:
+            import time
+            
+            self._clear_screen_safely()
+            
+            print(f"\n{CYAN}{'='*60}{RESET}")
+            print(f"{CYAN}💾 단일 캐릭터 저장 모드{RESET}")
+            print(f"{CYAN}{'='*60}{RESET}")
+            print(f"{YELLOW}캐릭터 한 명만 생성하고 저장합니다. 게임은 시작하지 않습니다.{RESET}")
+            print()
+            
+            # 직업 선택
+            character_class = self._select_character_class()
+            if not character_class:
+                return None
+            
+            # 캐릭터 생성
+            character = self._create_single_character(character_class, 1)
+            if not character:
+                return None
+            
+            # 특성 선택 방식 묻기
+            trait_options = ["🤖 자동 선택 (빠름)", "✋ 수동 선택 (상세)", "🚫 특성 없이 저장", "🔙 뒤로가기"]
+            trait_descriptions = [
+                "특성을 자동으로 선택합니다",
+                "직접 특성을 선택합니다",
+                "특성 없이 캐릭터만 저장합니다",
+                "이전 메뉴로 돌아갑니다"
+            ]
+            
+            if CURSOR_MENU_AVAILABLE:
+                try:
+                    trait_menu = CursorMenu(
+                        title="🎭 특성 선택 방식", 
+                        options=trait_options, 
+                        descriptions=trait_descriptions, 
+                        cancellable=True
+                    )
+                    trait_choice = trait_menu.run()
+                    if trait_choice is None or trait_choice == 3:  # 취소 또는 뒤로가기
+                        return None
+                    
+                    if trait_choice == 0:  # 자동 선택
+                        self._auto_select_traits(character)
+                        print(f"{GREEN}✅ 특성이 자동으로 선택되었습니다{RESET}")
+                    elif trait_choice == 1:  # 수동 선택
+                        character.select_traits("manual")
+                    elif trait_choice == 2:  # 특성 없이
+                        print(f"{YELLOW}💡 특성 없이 캐릭터를 저장합니다{RESET}")
+                        
+                except Exception:
+                    # 폴백: 자동 특성 선택
+                    self._auto_select_traits(character)
+            else:
+                # 폴백: 자동 특성 선택
+                self._auto_select_traits(character)
+            
+            # 캐릭터 정보 표시
+            self._clear_screen_safely()
+            print(f"\n{GREEN}✅ 캐릭터 생성 완료!{RESET}")
+            self._show_created_party([character])
+            
+            # 저장 확인
+            save_options = ["💾 저장하고 메뉴로", "🔄 다시 생성", "❌ 취소"]
+            save_descriptions = [
+                "이 캐릭터를 저장하고 메인 메뉴로 돌아갑니다",
+                "새로운 캐릭터를 다시 생성합니다",
+                "저장하지 않고 메뉴로 돌아갑니다"
+            ]
+            
+            if CURSOR_MENU_AVAILABLE:
+                try:
+                    save_menu = CursorMenu(
+                        title="💾 캐릭터 저장", 
+                        options=save_options, 
+                        descriptions=save_descriptions, 
+                        cancellable=True
+                    )
+                    save_choice = save_menu.run()
+                    
+                    if save_choice == 0:  # 저장하고 메뉴로
+                        # 프리셋 매니저를 통해 저장 (파티가 아닌 개별 캐릭터로)
+                        if PRESETS_AVAILABLE and self.preset_manager:
+                            try:
+                                # 임시 파티로 만들어서 저장 후 개별 캐릭터로 사용 가능하게
+                                temp_party = [character]
+                                preset_name = f"{character.name}_{character.character_class}_{int(time.time())}"
+                                self.preset_manager.save_party_preset(temp_party, preset_name)
+                                print(f"\n{GREEN}💾 캐릭터가 성공적으로 저장되었습니다!{RESET}")
+                                print(f"{CYAN}저장명: {preset_name}{RESET}")
+                                print(f"{YELLOW}💡 '개별 캐릭터 불러오기'에서 사용할 수 있습니다.{RESET}")
+                            except Exception as e:
+                                print(f"{RED}저장 중 오류 발생: {e}{RESET}")
+                        else:
+                            print(f"{YELLOW}💾 캐릭터 정보가 표시되었습니다 (저장 시스템 없음){RESET}")
+                        
+                        input(f"\n{CYAN}계속하려면 Enter를 누르세요...{RESET}")
+                        return "SAVE_ONLY"
+                        
+                    elif save_choice == 1:  # 다시 생성
+                        return self._single_character_save_only()
+                    else:  # 취소
+                        return None
+                        
+                except Exception:
+                    # 폴백: 자동 저장
+                    print(f"{GREEN}💾 캐릭터가 저장되었습니다{RESET}")
+                    input(f"\n{CYAN}계속하려면 Enter를 누르세요...{RESET}")
+                    return "SAVE_ONLY"
+            else:
+                # 폴백: 자동 저장
+                print(f"{GREEN}💾 캐릭터가 저장되었습니다{RESET}")
+                input(f"\n{CYAN}계속하려면 Enter를 누르세요...{RESET}")
+                return "SAVE_ONLY"
+                
+        except Exception as e:
+            print(f"{RED}단일 캐릭터 저장 중 오류 발생: {e}{RESET}")
+            input(f"\n{CYAN}계속하려면 Enter를 누르세요...{RESET}")
+            return None
+
+    def _party_history_management(self):
+        """파티 히스토리 관리 메뉴"""
+        if not CURSOR_MENU_AVAILABLE:
+            print(f"{RED}커서 메뉴 시스템이 필요합니다.{RESET}")
+            input("Enter를 눌러 계속...")
+            return
+        
+        try:
+            while True:
+                self._clear_screen_safely()
+                
+                # 히스토리 통계 표시
+                history = self.party_history.get_history()
+                total_parties = len(history)
+                
+                print(f"\n{CYAN}📚 파티 히스토리 관리{RESET}")
+                print(f"{'='*50}")
+                print(f"💾 총 저장된 파티: {YELLOW}{total_parties}개{RESET}")
+                
+                if total_parties > 0:
+                    # 최근 파티 정보
+                    latest_party = max(history.values(), key=lambda x: x['created_at'])
+                    latest_date = latest_party['created_at']
+                    print(f"📅 최근 저장: {YELLOW}{latest_date}{RESET}")
+                    
+                    # 가장 강한 파티 찾기
+                    strongest_party = max(history.values(), key=lambda x: x.get('total_power', 0))
+                    strongest_power = strongest_party.get('total_power', 0)
+                    strongest_name = strongest_party.get('party_name', '이름 없음')
+                    print(f"💪 최강 파티: {YELLOW}{strongest_name}{RESET} (전투력: {strongest_power:,})")
+                    
+                print(f"{'='*50}\n")
+                
+                options = [
+                    "📋 파티 히스토리 보기",
+                    "🔍 파티 상세 분석",
+                    "📊 파티 비교 분석", 
+                    "🗑️ 파티 삭제",
+                    "🧹 전체 히스토리 삭제",
+                    "💾 현재 파티 추가 (테스트)",
+                    "❌ 돌아가기"
+                ]
+                
+                descriptions = [
+                    "저장된 모든 파티의 목록을 확인합니다",
+                    "특정 파티의 상세한 분석을 봅니다",
+                    "여러 파티를 비교 분석합니다",
+                    "선택한 파티를 삭제합니다",
+                    "모든 파티 히스토리를 삭제합니다",
+                    "테스트용으로 현재 파티를 히스토리에 추가합니다",
+                    "캐릭터 생성 메뉴로 돌아갑니다"
+                ]
+                
+                menu = CursorMenu("📚 파티 히스토리 관리", options, descriptions, cancellable=True)
+                choice = menu.run()
+                
+                if choice is None or choice == 6:  # 취소 또는 돌아가기
+                    break
+                elif choice == 0:  # 파티 히스토리 보기
+                    self._show_party_history()
+                elif choice == 1:  # 파티 상세 분석
+                    self._analyze_party_from_history()
+                elif choice == 2:  # 파티 비교 분석
+                    self._compare_parties_from_history()
+                elif choice == 3:  # 파티 삭제
+                    self._delete_party_from_history()
+                elif choice == 4:  # 전체 히스토리 삭제
+                    self._clear_all_history()
+                elif choice == 5:  # 현재 파티 추가 (테스트)
+                    self._add_test_party_to_history()
+                    
+        except Exception as e:
+            print(f"{RED}파티 히스토리 관리 중 오류 발생: {e}{RESET}")
+            input("Enter를 눌러 계속...")
+
+    def _show_party_history(self):
+        """파티 히스토리 목록 표시"""
+        history = self.party_history.get_history()
+        
+        if not history:
+            print(f"\n{YELLOW}📭 저장된 파티 히스토리가 없습니다.{RESET}")
+            input("Enter를 눌러 계속...")
+            return
+        
+        self._clear_screen_safely()
+        print(f"\n{CYAN}📋 파티 히스토리 목록{RESET}")
+        print(f"{'='*70}")
+        
+        # 날짜순으로 정렬
+        sorted_parties = sorted(history.items(), key=lambda x: x[1]['created_at'], reverse=True)
+        
+        for i, (party_id, party_data) in enumerate(sorted_parties, 1):
+            party_name = party_data.get('party_name', '이름 없음')
+            created_at = party_data.get('created_at', '날짜 불명')
+            total_power = party_data.get('total_power', 0)
+            exploration_data = party_data.get('exploration_data', {})
+            floor_reached = exploration_data.get('max_floor', 0)
+            
+            print(f"{i:2d}. {YELLOW}{party_name}{RESET}")
+            print(f"    📅 생성일: {created_at}")
+            print(f"    💪 전투력: {total_power:,}")
+            print(f"    🏰 최고층: {floor_reached}층")
+            
+            # 파티 구성 간단 표시
+            members = party_data.get('members', [])
+            if members:
+                member_classes = [m.get('character_class', '알 수 없음') for m in members]
+                print(f"    👥 구성: {', '.join(member_classes)}")
+            print()
+        
+        print(f"{'='*70}")
+        input(f"\n{CYAN}계속하려면 Enter를 누르세요...{RESET}")
+
+    def _analyze_party_from_history(self):
+        """히스토리에서 파티 선택하여 상세 분석"""
+        history = self.party_history.get_history()
+        
+        if not history:
+            print(f"\n{YELLOW}📭 분석할 파티 히스토리가 없습니다.{RESET}")
+            input("Enter를 눌러 계속...")
+            return
+        
+        # 파티 선택 메뉴
+        options = []
+        descriptions = []
+        party_list = []
+        
+        sorted_parties = sorted(history.items(), key=lambda x: x[1]['created_at'], reverse=True)
+        
+        for party_id, party_data in sorted_parties:
+            party_name = party_data.get('party_name', '이름 없음')
+            total_power = party_data.get('total_power', 0)
+            created_at = party_data.get('created_at', '날짜 불명')
+            
+            options.append(f"📊 {party_name} (전투력: {total_power:,})")
+            descriptions.append(f"생성일: {created_at}")
+            party_list.append((party_id, party_data))
+        
+        self._clear_screen_safely()
+        menu = CursorMenu("🔍 분석할 파티 선택", options, descriptions, cancellable=True)
+        choice = menu.run()
+        
+        if choice is None or choice >= len(party_list):
+            return
+        
+        party_id, party_data = party_list[choice]
+        
+        # display.py의 로바트 분석 시스템 사용
+        try:
+            from game.display import get_display
+            display = get_display()
+            
+            # 파티 데이터를 Character 객체로 복원
+            characters = []
+            for member_data in party_data.get('members', []):
+                # 간단한 Character 객체 생성 (분석용)
+                char = type('Character', (), {})()
+                for key, value in member_data.items():
+                    setattr(char, key, value)
+                characters.append(char)
+            
+            if characters:
+                self._clear_screen_safely()
+                print(f"\n{CYAN}🤖 로바트의 파티 분석 시스템{RESET}")
+                print(f"📊 분석 대상: {YELLOW}{party_data.get('party_name', '이름 없음')}{RESET}")
+                print(f"{'='*60}")
+                
+                # 로바트의 완전체 분석 실행
+                display.show_detailed_party_analysis(characters)
+                
+                print(f"\n{CYAN}📈 히스토리 추가 정보{RESET}")
+                print(f"{'='*40}")
+                exploration_data = party_data.get('exploration_data', {})
+                print(f"📅 생성일: {party_data.get('created_at', '날짜 불명')}")
+                print(f"🏰 최고 도달층: {exploration_data.get('max_floor', 0)}층")
+                print(f"⚔️ 총 전투 수: {exploration_data.get('total_battles', 0)}회")
+                print(f"🏆 승리 수: {exploration_data.get('victories', 0)}회")
+                
+                if exploration_data.get('total_battles', 0) > 0:
+                    win_rate = (exploration_data.get('victories', 0) / exploration_data.get('total_battles', 1)) * 100
+                    print(f"📊 승률: {win_rate:.1f}%")
+                
+            else:
+                print(f"{RED}❌ 파티 데이터를 불러올 수 없습니다.{RESET}")
+                
+        except Exception as e:
+            print(f"{RED}❌ 분석 중 오류 발생: {e}{RESET}")
+        
+        input(f"\n{CYAN}계속하려면 Enter를 누르세요...{RESET}")
+
+    def _compare_parties_from_history(self):
+        """여러 파티 비교 분석"""
+        history = self.party_history.get_history()
+        
+        if len(history) < 2:
+            print(f"\n{YELLOW}📭 비교할 파티가 부족합니다. (최소 2개 필요){RESET}")
+            input("Enter를 눌러 계속...")
+            return
+        
+        print(f"\n{CYAN}📊 파티 비교 분석 시스템{RESET}")
+        print(f"{'='*50}")
+        
+        # 전투력 랭킹
+        sorted_by_power = sorted(history.items(), key=lambda x: x[1].get('total_power', 0), reverse=True)
+        print(f"\n💪 {YELLOW}전투력 랭킹{RESET}")
+        for i, (party_id, party_data) in enumerate(sorted_by_power[:5], 1):
+            party_name = party_data.get('party_name', '이름 없음')
+            total_power = party_data.get('total_power', 0)
+            print(f"{i}. {party_name}: {total_power:,}")
+        
+        # 탐험 성과 랭킹
+        sorted_by_floor = sorted(history.items(), 
+                                key=lambda x: x[1].get('exploration_data', {}).get('max_floor', 0), 
+                                reverse=True)
+        print(f"\n🏰 {YELLOW}탐험 성과 랭킹{RESET}")
+        for i, (party_id, party_data) in enumerate(sorted_by_floor[:5], 1):
+            party_name = party_data.get('party_name', '이름 없음')
+            max_floor = party_data.get('exploration_data', {}).get('max_floor', 0)
+            print(f"{i}. {party_name}: {max_floor}층")
+        
+        # 승률 랭킹
+        parties_with_battles = [(pid, pdata) for pid, pdata in history.items() 
+                               if pdata.get('exploration_data', {}).get('total_battles', 0) > 0]
+        
+        if parties_with_battles:
+            sorted_by_winrate = sorted(parties_with_battles, 
+                                      key=lambda x: x[1].get('exploration_data', {}).get('victories', 0) / 
+                                                   max(x[1].get('exploration_data', {}).get('total_battles', 1), 1), 
+                                      reverse=True)
+            print(f"\n🏆 {YELLOW}승률 랭킹{RESET}")
+            for i, (party_id, party_data) in enumerate(sorted_by_winrate[:5], 1):
+                party_name = party_data.get('party_name', '이름 없음')
+                exploration_data = party_data.get('exploration_data', {})
+                victories = exploration_data.get('victories', 0)
+                total_battles = exploration_data.get('total_battles', 1)
+                win_rate = (victories / total_battles) * 100 if total_battles > 0 else 0
+                print(f"{i}. {party_name}: {win_rate:.1f}% ({victories}/{total_battles})")
+        
+        # 직업 조합 분석
+        print(f"\n👥 {YELLOW}인기 직업 조합 TOP 3{RESET}")
+        class_combinations = {}
+        for party_data in history.values():
+            members = party_data.get('members', [])
+            if len(members) >= 4:
+                classes = sorted([m.get('character_class', '알 수 없음') for m in members])
+                combo_key = ', '.join(classes)
+                class_combinations[combo_key] = class_combinations.get(combo_key, 0) + 1
+        
+        if class_combinations:
+            sorted_combos = sorted(class_combinations.items(), key=lambda x: x[1], reverse=True)
+            for i, (combo, count) in enumerate(sorted_combos[:3], 1):
+                print(f"{i}. {combo} ({count}회 사용)")
+        
+        input(f"\n{CYAN}계속하려면 Enter를 누르세요...{RESET}")
+
+    def _delete_party_from_history(self):
+        """히스토리에서 파티 삭제"""
+        history = self.party_history.get_history()
+        
+        if not history:
+            print(f"\n{YELLOW}📭 삭제할 파티 히스토리가 없습니다.{RESET}")
+            input("Enter를 눌러 계속...")
+            return
+        
+        # 파티 선택 메뉴
+        options = []
+        descriptions = []
+        party_list = []
+        
+        sorted_parties = sorted(history.items(), key=lambda x: x[1]['created_at'], reverse=True)
+        
+        for party_id, party_data in sorted_parties:
+            party_name = party_data.get('party_name', '이름 없음')
+            total_power = party_data.get('total_power', 0)
+            created_at = party_data.get('created_at', '날짜 불명')
+            
+            options.append(f"🗑️ {party_name}")
+            descriptions.append(f"전투력: {total_power:,}, 생성일: {created_at}")
+            party_list.append((party_id, party_data))
+        
+        self._clear_screen_safely()
+        menu = CursorMenu("🗑️ 삭제할 파티 선택", options, descriptions, cancellable=True)
+        choice = menu.run()
+        
+        if choice is None or choice >= len(party_list):
+            return
+        
+        party_id, party_data = party_list[choice]
+        party_name = party_data.get('party_name', '이름 없음')
+        
+        # 삭제 확인
+        if CURSOR_MENU_AVAILABLE:
+            confirm_options = ["❌ 예, 삭제합니다", "✅ 아니오, 취소"]
+            confirm_descriptions = [f"'{party_name}' 파티를 영구 삭제합니다", "삭제를 취소하고 돌아갑니다"]
+            
+            confirm_menu = CursorMenu(f"⚠️ '{party_name}' 파티를 정말 삭제하시겠습니까?", 
+                                    confirm_options, confirm_descriptions, cancellable=True)
+            confirm_choice = confirm_menu.run()
+            
+            if confirm_choice == 0:  # 삭제 확인
+                self.party_history.delete_party(party_id)
+                print(f"\n{GREEN}✅ '{party_name}' 파티가 삭제되었습니다.{RESET}")
+            else:
+                print(f"\n{YELLOW}❌ 삭제가 취소되었습니다.{RESET}")
+        else:
+            print(f"\n{YELLOW}❌ 커서 메뉴가 필요합니다.{RESET}")
+        
+        input("Enter를 눌러 계속...")
+
+    def _clear_all_history(self):
+        """전체 히스토리 삭제"""
+        history = self.party_history.get_history()
+        
+        if not history:
+            print(f"\n{YELLOW}📭 삭제할 히스토리가 없습니다.{RESET}")
+            input("Enter를 눌러 계속...")
+            return
+        
+        total_count = len(history)
+        
+        # 삭제 확인
+        if CURSOR_MENU_AVAILABLE:
+            confirm_options = ["❌ 예, 모두 삭제", "✅ 아니오, 취소"]
+            confirm_descriptions = [
+                f"모든 파티 히스토리 ({total_count}개)를 영구 삭제합니다", 
+                "삭제를 취소하고 돌아갑니다"
+            ]
+            
+            self._clear_screen_safely()
+            print(f"\n{RED}⚠️ 경고: 전체 히스토리 삭제{RESET}")
+            print(f"📊 총 {total_count}개의 파티 히스토리가 영구 삭제됩니다.")
+            print(f"{RED}이 작업은 되돌릴 수 없습니다!{RESET}\n")
+            
+            confirm_menu = CursorMenu(f"⚠️ 정말로 모든 파티 히스토리를 삭제하시겠습니까?", 
+                                    confirm_options, confirm_descriptions, cancellable=True)
+            confirm_choice = confirm_menu.run()
+            
+            if confirm_choice == 0:  # 삭제 확인
+                self.party_history.clear_history()
+                print(f"\n{GREEN}✅ 모든 파티 히스토리가 삭제되었습니다.{RESET}")
+            else:
+                print(f"\n{YELLOW}❌ 삭제가 취소되었습니다.{RESET}")
+        else:
+            print(f"\n{YELLOW}❌ 커서 메뉴가 필요합니다.{RESET}")
+        
+        input("Enter를 눌러 계속...")
+
+    def _add_test_party_to_history(self):
+        """테스트용 파티를 히스토리에 추가"""
+        try:
+            # 샘플 파티 생성
+            test_party = self._auto_party_creation()
+            
+            if test_party and len(test_party) >= 4:
+                # 파티 이름 입력
+                party_name = input(f"\n{CYAN}파티 이름을 입력하세요 (기본: 테스트 파티): {RESET}").strip()
+                if not party_name:
+                    party_name = f"테스트 파티 #{len(self.party_history.get_history()) + 1}"
+                
+                # 히스토리에 추가
+                self.party_history.add_party(test_party, party_name)
+                
+                print(f"\n{GREEN}✅ '{party_name}' 파티가 히스토리에 추가되었습니다!{RESET}")
+                
+                # 파티 정보 간단 표시
+                print(f"\n{CYAN}추가된 파티 정보:{RESET}")
+                for i, character in enumerate(test_party, 1):
+                    char_name = getattr(character, 'name', f'캐릭터{i}')
+                    char_class = getattr(character, 'character_class', '알 수 없음')
+                    print(f"{i}. {char_name} ({char_class})")
+                
+            else:
+                print(f"\n{RED}❌ 테스트 파티 생성에 실패했습니다.{RESET}")
+                
+        except Exception as e:
+            print(f"\n{RED}❌ 테스트 파티 추가 중 오류: {e}{RESET}")
+        
+        input("Enter를 눌러 계속...")
 
 
 # 전역 인스턴스

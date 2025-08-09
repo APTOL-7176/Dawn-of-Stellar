@@ -1,5 +1,5 @@
 """
-게임 월드 및 던전 시스템
+게임 월드 및 차원 공간 시스템
 """
 
 import random
@@ -41,7 +41,7 @@ class TileType(Enum):
 
 
 class Tile:
-    """던전 타일 클래스"""
+    """차원 공간 타일 클래스"""
     
     def __init__(self, tile_type: TileType, x: int, y: int):
         self.type = tile_type
@@ -133,7 +133,7 @@ class Tile:
 
 
 class Room:
-    """던전 방 클래스"""
+    """차원 공간 방 클래스"""
     
     def __init__(self, x: int, y: int, width: int, height: int):
         self.x = x
@@ -232,14 +232,26 @@ class GameWorld:
             self.tiles.append(row)
             
     def generate_level(self, saved_seed=None):
-        """레벨 생성 (던전 생성) - 고정 씨드 사용"""
+        """레벨 생성 (차원 공간 생성) - 고정 씨드 사용"""
         # 층수 기반 고정 씨드 설정 (같은 층은 항상 같은 결과)
         if saved_seed is not None:
             level_seed = saved_seed
-            print(f"레벨 {self.current_level} 던전 복원 (저장된 씨드: {level_seed})")
+            print(f"레벨 {self.current_level} 차원 공간 복원 (저장된 씨드: {level_seed})")
         else:
-            level_seed = hash(f"level_{self.current_level}") % (2**32)
-            print(f"레벨 {self.current_level} 던전 생성 (새 씨드: {level_seed})")
+            # 더 다양한 시드 생성 (시간 기반 + 파티 기반)
+            import time
+            import hashlib
+            
+            # 파티 구성을 시드에 반영
+            party_hash = ""
+            if hasattr(self, 'party_manager') and self.party_manager and self.party_manager.members:
+                party_names = [member.name for member in self.party_manager.members]
+                party_hash = "".join(party_names)
+            
+            # 시간 + 층수 + 파티 구성 조합으로 시드 생성
+            seed_string = f"{time.time()}_{self.current_level}_{party_hash}_{random.randint(1, 10000)}"
+            level_seed = int(hashlib.md5(seed_string.encode()).hexdigest()[:8], 16)
+            print(f"레벨 {self.current_level} 차원 공간 생성 (동적 씨드: {level_seed})")
         
         # 현재 층의 씨드 저장
         self.current_level_seed = level_seed
@@ -259,7 +271,7 @@ class GameWorld:
         self.treasure_chests = []
         self.interactive_objects = []
         
-        print(f"레벨 {self.current_level} 던전을 생성 중...")
+        print(f"레벨 {self.current_level} 차원 공간을 생성 중...")
         
         # 방 생성 시도
         max_rooms = random.randint(6, 12)  # 방 개수 증가
@@ -290,7 +302,7 @@ class GameWorld:
         # 시야 업데이트
         self.update_visibility()
         
-        print("던전 생성 완료!")
+        print("차원 공간 생성 완료!")
         
     def try_place_room(self):
         """방 배치 시도"""
@@ -391,6 +403,16 @@ class GameWorld:
                         'type': random.choice(['고블린', '오크', '스켈레톤', '다크엘프', '트롤'])
                     }
                     self.tiles[y][x].has_enemy = True
+                    
+                    # 적 생성 로깅
+                    from .error_logger import log_enemy
+                    enemy_type = self.floor_enemies[(x, y)]['type']
+                    # 적 생성 로그 기록
+                    log_enemy("적생성", f"적 생성: {enemy_type} Lv.{enemy_level} @ ({x}, {y})", {
+                        "위치": (x, y),
+                        "타입": enemy_type,
+                        "레벨": enemy_level
+                    })
                     break
                     
                 attempts += 1
@@ -398,20 +420,40 @@ class GameWorld:
             # 안전 반지름 때문에 적을 배치하지 못한 경우 알림
             if attempts >= 50:
                 print(f"⚠️ 적 배치 실패: 플레이어 안전 반지름({safe_radius}블록) 제약으로 인해 적절한 위치를 찾지 못했습니다.")
+        
+        # 적 배치 완료 후 총계 로깅 (완전체 시스템)
+        final_enemy_count = len(self.enemies_positions)
+        from .error_logger import get_comprehensive_logger, log_world_generation
+        logger = get_comprehensive_logger()
+        
+        # 월드 생성 정보 로그
+        log_world_generation(self.current_level, (self.width, self.height), len(self.rooms), final_enemy_count)
+        
+        # 적 배치 상세 정보
+        logger.log_world_event("적배치완료", f"목표: {num_enemies}마리, 실제: {final_enemy_count}마리", 
+                              {"목표적수": num_enemies, "실제적수": final_enemy_count, "적위치목록": self.enemies_positions})
+        
+        print(f"✅ 적 배치 완료: {final_enemy_count}/{num_enemies}마리")
+        
+        # 적이 배치되지 않은 경우 경고
+        if final_enemy_count == 0:
+            print("⚠️ 경고: 적이 하나도 배치되지 않았습니다!")
+            logger.log_warning("적배치", "적이 하나도 배치되지 않음", 
+                              {"이유": "플레이어 안전 반지름이 너무 클 수 있음", "안전반지름": safe_radius})
                 
     def place_items(self):
         """아이템 배치 (개선된 시스템) - 위치별 고정 시드"""
         # 방 당 1-3개의 아이템 배치
         for room_idx, room in enumerate(self.rooms):
-            # 방별 고정 시드 설정
-            room_seed = hash(f"room_items_{self.current_level}_{room_idx}_{room.x}_{room.y}") % (2**32)
+            # 방별 고정 시드 설정 (hash 대신 안정적인 계산)
+            room_seed = (self.current_level_seed + room_idx * 100 + room.x + room.y) % (2**32)
             random.seed(room_seed)
             
             num_items = random.randint(1, 3)
             
             for item_idx in range(num_items):
                 # 아이템별 고정 시드 설정
-                item_seed = hash(f"item_{self.current_level}_{room_idx}_{item_idx}") % (2**32)
+                item_seed = (room_seed + item_idx * 10) % (2**32)
                 random.seed(item_seed)
                 
                 attempts = 0
@@ -438,12 +480,12 @@ class GameWorld:
         
         # 복도에 보너스 아이템 배치 (낮은 확률)
         safe_radius = 7  # 플레이어 스폰 지점 반지름 7블록 내 아이템 생성 금지
-        bonus_seed = hash(f"bonus_items_{self.current_level}") % (2**32)
+        bonus_seed = (self.current_level_seed + 5000) % (2**32)
         random.seed(bonus_seed)
         
         bonus_items = random.randint(1, 3)
         for bonus_idx in range(bonus_items):
-            bonus_item_seed = hash(f"bonus_{self.current_level}_{bonus_idx}") % (2**32)
+            bonus_item_seed = (bonus_seed + bonus_idx * 50) % (2**32)
             random.seed(bonus_item_seed)
             
             if random.random() < 0.3:  # 30% 확률
@@ -500,7 +542,7 @@ class GameWorld:
         
         # 각 방에 특수 요소 배치 확률 (더 많이)
         for room_idx, room in enumerate(self.rooms[1:], 1):  # 첫 번째 방은 시작점이므로 제외
-            feature_seed = hash(f"features_{self.current_level}_{room_idx}") % (2**32)
+            feature_seed = (self.current_level_seed + 6000 + room_idx * 200) % (2**32)
             random.seed(feature_seed)
             
             # 70% 확률로 특수 요소 배치 (기존 30%에서 증가)
@@ -731,46 +773,130 @@ class GameWorld:
     def can_move(self, dx: int, dy: int) -> bool:
         """이동 가능한지 확인 - 개선된 오류 처리"""
         try:
+            from .error_logger import log_player
+            
             new_x = self.player_pos[0] + dx
             new_y = self.player_pos[1] + dy
             
             # 경계 확인
             if not self.is_valid_pos(new_x, new_y):
+                log_player("이동판정", f"경계 벗어남: ({new_x}, {new_y})", {
+                    "현재위치": self.player_pos,
+                    "목표위치": (new_x, new_y),
+                    "이동가능": False,
+                    "실패원인": "경계초과"
+                })
                 return False
                 
             # 타일 확인
             if new_y >= len(self.tiles) or new_x >= len(self.tiles[new_y]):
+                log_player("이동판정", f"타일 배열 범위 초과: ({new_x}, {new_y})", {
+                    "현재위치": self.player_pos,
+                    "목표위치": (new_x, new_y),
+                    "이동가능": False,
+                    "실패원인": "배열범위초과",
+                    "tiles_height": len(self.tiles),
+                    "tiles_width": len(self.tiles[new_y]) if new_y < len(self.tiles) else 0
+                })
                 return False
                 
             tile = self.tiles[new_y][new_x]
-            return tile.is_walkable()
+            is_walkable = tile.is_walkable()
+            
+            # 🔥 중요: 적이 있는 위치도 이동 시도 가능하도록 허용 (전투를 위해)
+            if (new_x, new_y) in self.enemies_positions:
+                is_walkable = True  # 적이 있는 위치는 전투를 위해 이동 허용
+            
+            log_player("이동판정", f"타일 검사 완료: {tile.type.name}", {
+                "현재위치": self.player_pos,
+                "목표위치": (new_x, new_y),
+                "타일타입": tile.type.name,
+                "이동가능": is_walkable,
+                "적존재": (new_x, new_y) in self.enemies_positions,
+                "타일정보": {
+                    "is_locked": getattr(tile, 'is_locked', None),
+                    "secret_revealed": getattr(tile, 'secret_revealed', None),
+                    "is_trapped": getattr(tile, 'is_trapped', None)
+                }
+            })
+            
+            return is_walkable
             
         except Exception as e:
+            from .error_logger import log_error
+            log_error("이동판정", f"can_move 오류: {e}", {
+                "현재위치": self.player_pos,
+                "이동량": (dx, dy),
+                "예외": str(e)
+            })
             print(f"can_move 오류: {e}")
             return False
         
     def move_player(self, dx: int, dy: int):
         """플레이어 이동 - 개선된 아이템 처리"""
         try:
+            from .error_logger import log_player
+            
             new_x = self.player_pos[0] + dx
             new_y = self.player_pos[1] + dy
             
             # 이동 가능한지 확인
             if not self.can_move(dx, dy):
+                log_player("이동실패", f"이동 불가능: ({self.player_pos[0]}, {self.player_pos[1]}) → ({new_x}, {new_y})", {
+                    "현재위치": self.player_pos,
+                    "목표위치": (new_x, new_y),
+                    "이동량": (dx, dy),
+                    "실패원인": "can_move() 체크 실패"
+                })
                 return None  # 이동 불가
             
             # 이동하려는 위치에 적이 있는지 먼저 확인
             if (new_x, new_y) in self.enemies_positions:
                 print(f"⚔️ 적과 충돌! 위치: ({new_x}, {new_y})")
+                log_player("전투감지", f"적과 충돌 감지: ({new_x}, {new_y})", {
+                    "플레이어위치": self.player_pos,
+                    "충돌위치": (new_x, new_y),
+                    "적개수": len(self.enemies_positions)
+                })
                 # 적과 충돌 - 주변 적들도 함께 전투에 참여
                 nearby_enemies = self.get_nearby_enemies_for_combat(new_x, new_y)
                 print(f"🎯 전투 대상: {len(nearby_enemies)}개 위치의 적들")
                 return {"type": "combat", "enemies": nearby_enemies, "trigger_pos": (new_x, new_y)}
             
+            # 주변에 적이 있는지도 확인 (인접 타일)
+            adjacent_enemies = []
+            for dx_check in [-1, 0, 1]:
+                for dy_check in [-1, 0, 1]:
+                    if dx_check == 0 and dy_check == 0:
+                        continue  # 자기 위치는 제외
+                    check_x = new_x + dx_check
+                    check_y = new_y + dy_check
+                    if (check_x, check_y) in self.enemies_positions:
+                        adjacent_enemies.append((check_x, check_y))
+            
+            # 인접한 적이 있으면 50% 확률로 전투 발생
+            if adjacent_enemies and random.random() < 0.5:
+                print(f"⚔️ 인접한 적이 공격! 위치: {adjacent_enemies[0]}")
+                log_player("전투감지", f"인접 적 공격: {adjacent_enemies[0]}", {
+                    "플레이어위치": self.player_pos,
+                    "공격위치": adjacent_enemies[0],
+                    "인접적수": len(adjacent_enemies)
+                })
+                nearby_enemies = self.get_nearby_enemies_for_combat(adjacent_enemies[0][0], adjacent_enemies[0][1])
+                return {"type": "combat", "enemies": nearby_enemies, "trigger_pos": adjacent_enemies[0]}
+            
             # 플레이어 위치 업데이트 및 이동거리 추적
             old_pos = self.player_pos
             self.player_pos = (new_x, new_y)
-            print(f"🚶 플레이어 이동: {old_pos} → {self.player_pos}")
+            
+            # 🔥 플레이어 이동 로깅 추가!
+            log_player("플레이어이동", f"위치 변경: {old_pos} → {self.player_pos}", {
+                "이전위치": old_pos,
+                "새위치": self.player_pos,
+                "이동량": (dx, dy),
+                "이동성공": True,
+                "총이동거리": self.total_movement_distance + abs(dx) + abs(dy)
+            })
             
             # 이동거리 추가 (맨하탄 거리)
             movement_distance = abs(dx) + abs(dy)
@@ -1032,6 +1158,13 @@ class GameWorld:
                     if x == player_x and y == player_y:
                         char = bright_yellow("@", True)  # 플레이어 (밝은 노랑)
                     elif (x, y) in self.enemies_positions:
+                        # 적 표시 디버깅
+                        from .error_logger import log_enemy
+                        log_enemy("적표시", f"적 위치에 E 표시", {
+                            "적위치": (x, y),
+                            "플레이어위치": (player_x, player_y),
+                            "총적개수": len(self.enemies_positions)
+                        })
                         # 적 - 빨간색으로 통일
                         char = bright_red("E", True)  # 적 (밝은 빨간색)
                     elif (x, y) in self.items_positions:
@@ -1182,11 +1315,25 @@ class GameWorld:
         
     def move_enemies(self):
         """적들의 AI 이동 처리"""
+        # 로깅 시스템 사용
+        from .error_logger import log_enemy
+        
         if not self.enemies_positions:
-            return
+            log_enemy("적이동", "적이 없어서 이동 처리하지 않음", {
+                "적개수": 0,
+                "플레이어위치": self.player_pos
+            })
+            return False  # 이동 없음을 반환
             
         player_x, player_y = self.player_pos
         new_positions = []
+        moved_count = 0
+        
+        log_enemy("적이동", f"적 이동 처리 시작", {
+            "총적수": len(self.enemies_positions),
+            "플레이어위치": (player_x, player_y),
+            "적위치목록": list(self.enemies_positions)
+        })
         
         for enemy_pos in self.enemies_positions:
             enemy_x, enemy_y = enemy_pos
@@ -1194,47 +1341,110 @@ class GameWorld:
             # 플레이어와의 거리 계산
             distance = abs(enemy_x - player_x) + abs(enemy_y - player_y)
             
+            # 적 타입 정보 가져오기
+            enemy_data = self.floor_enemies.get((enemy_x, enemy_y), {})
+            enemy_type = enemy_data.get('type', '알수없음')
+            
+            log_enemy("적이동상세", f"적 거리 체크", {
+                "적위치": (enemy_x, enemy_y),
+                "적타입": enemy_type,
+                "플레이어거리": distance
+            })
+            
+            # 적이 있는 타일 정보 확인
+            if self.is_valid_pos(enemy_x, enemy_y):
+                tile = self.tiles[enemy_y][enemy_x]
+                log_enemy("적이동상세", f"적 타일 정보", {
+                    "타일타입": str(tile.type),
+                    "이동가능": tile.is_walkable(),
+                    "적있음": getattr(tile, 'has_enemy', False)
+                })
+            
             # 시야 범위 안에 있는 적만 이동 (5 타일 이내)
-            if distance <= 5 and self.tiles[enemy_y][enemy_x].visible:
+            if distance <= 5:  # 추적 범위를 5칸으로 설정
+                log_enemy("적이동", f"적 추적 범위 내", {
+                    "거리": distance, 
+                    "적타입": enemy_type,
+                    "적위치": (enemy_x, enemy_y),
+                    "플레이어위치": (player_x, player_y)
+                })
                 # 플레이어를 향해 이동
                 new_x, new_y = enemy_x, enemy_y
+                original_pos = (enemy_x, enemy_y)
                 
+                # 이동 방향 결정 로직
+                move_reason = ""
                 if enemy_x < player_x and self._can_move_to(enemy_x + 1, enemy_y):
                     new_x = enemy_x + 1
+                    move_reason = "동쪽으로 추적"
                 elif enemy_x > player_x and self._can_move_to(enemy_x - 1, enemy_y):
                     new_x = enemy_x - 1
+                    move_reason = "서쪽으로 추적"
                 elif enemy_y < player_y and self._can_move_to(enemy_x, enemy_y + 1):
                     new_y = enemy_y + 1
+                    move_reason = "남쪽으로 추적"
                 elif enemy_y > player_y and self._can_move_to(enemy_x, enemy_y - 1):
                     new_y = enemy_y - 1
+                    move_reason = "북쪽으로 추적"
+                else:
+                    move_reason = "이동불가-막힘"
                 
                 # 적 정보 업데이트
                 if (new_x, new_y) != (enemy_x, enemy_y):
+                    moved_count += 1
+                    
+                    # 적 이동 로깅 (임시 제거 - 함수 없음)
+                    # log_enemy_movement((enemy_x, enemy_y), (new_x, new_y), enemy_type, move_reason)
+                    
                     # 이전 위치 정리
                     if self.is_valid_pos(enemy_x, enemy_y):
                         self.tiles[enemy_y][enemy_x].has_enemy = False
+                        log_enemy("적이동", f"이전 위치 정리", {"위치": (enemy_x, enemy_y)})
                     
                     # 새 위치 설정
                     if self.is_valid_pos(new_x, new_y):
                         self.tiles[new_y][new_x].has_enemy = True
+                        log_enemy("적이동", f"새 위치 설정", {"위치": (new_x, new_y)})
                     
                     # 적 데이터 이동
-                    if (enemy_x, enemy_y) in self.floor_enemies:
+                    if hasattr(self, 'floor_enemies') and (enemy_x, enemy_y) in self.floor_enemies:
                         enemy_data = self.floor_enemies.pop((enemy_x, enemy_y))
                         self.floor_enemies[(new_x, new_y)] = enemy_data
+                        log_enemy("적이동", f"적 데이터 이동", {"적정보": enemy_data})
                     
                     new_positions.append((new_x, new_y))
                 else:
+                    log_enemy("적이동", f"적 이동 실패", {"이유": move_reason, "적타입": enemy_type})
                     new_positions.append((enemy_x, enemy_y))
             else:
-                # 시야 밖의 적은 랜덤 이동 (25% 확률)
-                if random.random() < 0.25:
+                # 시야 밖의 적은 랜덤 이동 (95% 확률)
+                log_enemy("적이동", f"적이 추적 범위 밖", {"거리": distance, "적타입": enemy_type})
+                random_chance = random.random()
+                
+                if random_chance < 0.95:  # 95% 확률
+                    log_enemy("적이동", f"랜덤 이동 시도", {"적위치": (enemy_x, enemy_y), "확률": random_chance})
                     directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
                     random.shuffle(directions)
+                    moved_this_turn = False
                     
                     for dx, dy in directions:
                         new_x, new_y = enemy_x + dx, enemy_y + dy
+                        log_enemy("적이동상세", f"방향 시도", {
+                            "방향": (dx, dy),
+                            "시작": (enemy_x, enemy_y),
+                            "목표": (new_x, new_y)
+                        })
                         if self._can_move_to(new_x, new_y):
+                            moved_count += 1
+                            moved_this_turn = True
+                            log_enemy("적이동", f"랜덤 이동 성공", {
+                                "이전위치": (enemy_x, enemy_y),
+                                "새위치": (new_x, new_y)
+                            })
+                            
+                            # 적 이동 로깅 (임시 제거 - 함수 없음)
+                            # log_enemy_movement((enemy_x, enemy_y), (new_x, new_y), enemy_type, "랜덤이동")
+                            
                             # 이전 위치 정리
                             if self.is_valid_pos(enemy_x, enemy_y):
                                 self.tiles[enemy_y][enemy_x].has_enemy = False
@@ -1244,29 +1454,52 @@ class GameWorld:
                                 self.tiles[new_y][new_x].has_enemy = True
                             
                             # 적 데이터 이동
-                            if (enemy_x, enemy_y) in self.floor_enemies:
+                            if hasattr(self, 'floor_enemies') and (enemy_x, enemy_y) in self.floor_enemies:
                                 enemy_data = self.floor_enemies.pop((enemy_x, enemy_y))
                                 self.floor_enemies[(new_x, new_y)] = enemy_data
                             
                             new_positions.append((new_x, new_y))
                             break
-                    else:
+                    
+                    if not moved_this_turn:
+                        log_enemy("적이동", f"모든 방향 이동 불가", {"적위치": (enemy_x, enemy_y)})
                         new_positions.append((enemy_x, enemy_y))
                 else:
+                    log_enemy("적이동", f"랜덤 이동 확률 실패", {"확률": f"{random_chance:.3f}"})
                     new_positions.append((enemy_x, enemy_y))
         
+        log_enemy("적이동완료", f"이동 완료", {
+            "총적수": len(new_positions),
+            "이동한적수": moved_count,
+            "이동비율": f"{moved_count}/{len(new_positions)}"
+        })
         self.enemies_positions = new_positions
+        
+        # 적이 이동했으면 화면 갱신 필요함을 반환
+        enemies_moved = moved_count > 0
+        
+        return enemies_moved  # 적이 이동했으면 True, 안했으면 False
     
     def _can_move_to(self, x: int, y: int) -> bool:
-        """해당 위치로 이동 가능한지 확인"""
+        """해당 위치로 이동 가능한지 확인 - 간소화"""
+        from .error_logger import log_enemy
+        
+        # 경계 체크
         if not self.is_valid_pos(x, y):
             return False
+            
+        # 벽 체크
         if not self.tiles[y][x].is_walkable():
             return False
+            
+        # 플레이어 위치 체크
         if (x, y) == self.player_pos:
             return False
+            
+        # 다른 적 위치 체크 (이 부분을 좀 더 관대하게)
         if (x, y) in self.enemies_positions:
             return False
+        
         return True
         
     def track_enemy_defeat(self, enemy_pos: Tuple[int, int]):

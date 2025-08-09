@@ -452,6 +452,7 @@ def run_game_in_new_process(mode, dev_mode=False, mobile_mode=False):
     env['TERMINAL_MODE'] = '1'
     env['SDL_GAMECONTROLLER_IGNORE_DEVICES'] = '1'
     env['SDL_JOYSTICK_DEVICE'] = ''
+    env['LAUNCHER_POWERSHELL'] = '1'  # PowerShell 환경임을 알림
     
     if dev_mode:
         env['DEV_MODE'] = '1'
@@ -466,20 +467,24 @@ def run_game_in_new_process(mode, dev_mode=False, mobile_mode=False):
     
     try:
         if os.name == 'nt':
-            # Windows에서 새 콘솔 창에서 실행 - 간단한 배치파일 방식
+            # Windows에서 배치파일로 실행 (한글 경로 안전)
             batch_file = "temp_game_launcher.bat"
-            batch_content = f"""@echo off
+            batch_content = f'''@echo off
 chcp 65001 >nul 2>&1
 cd /d "{os.getcwd()}"
+echo 🎮 Dawn of Stellar 게임을 시작합니다...
 "{python_exe}" main.py
+echo 게임이 종료되었습니다.
 pause
 del "%~f0"
-"""
+'''
             with open(batch_file, 'w', encoding='utf-8') as f:
                 f.write(batch_content)
             
-            # 배치파일을 새 창에서 실행
-            subprocess.Popen(['cmd', '/c', 'start', batch_file], env=env)
+            # 배치파일을 PowerShell에서 실행
+            subprocess.Popen([
+                'powershell', '-Command', f'Start-Process "{batch_file}" -Wait'
+            ], env=env)
         else:
             # Linux/Mac에서 새 터미널에서 실행
             subprocess.run([

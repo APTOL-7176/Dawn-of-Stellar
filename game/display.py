@@ -781,7 +781,7 @@ class RobotAIMaster:
             }
     
     def _ultimate_dungeon_strategy(self, members, world, threat_analysis, power_analysis, inventory_analysis):
-        """궁극의 던전 전략 - 층수별 맞춤 전략"""
+        """궁극의 차원 공간 전략 - 층수별 맞춤 전략"""
         try:
             current_level = getattr(world, 'current_level', 1)
             power_ratio = power_analysis["power_ratio"]
@@ -871,7 +871,7 @@ class RobotAIMaster:
         except Exception as e:
             return {
                 "status": "ERROR",
-                "message": f"던전 전략 오류: {e}",
+                "message": f"차원 공간 전략 오류: {e}",
                 "strategies": ["🗺️ 기본 탐험 모드"]
             }
     
@@ -1013,48 +1013,401 @@ class RobotAIMaster:
         except:
             return "🤖 로-바트: 신중한 탐험이 답이야~ 내 말 믿고!"
 
+    def analyze_cooking_materials_enhanced(self, party_manager, world):
+        """🤖 로-바트의 완전체 요리 재료 분석 시스템!"""
+        try:
+            # 두 곳 모두 인벤토리 체크 (파티 인벤토리 + 요리 시스템 인벤토리)
+            inventory = getattr(party_manager, 'inventory', {}).copy()
+            
+            # 요리 시스템 인벤토리도 추가로 확인
+            if hasattr(party_manager, 'cooking_system') and party_manager.cooking_system:
+                cooking_inventory = getattr(party_manager.cooking_system, 'inventory', {})
+                for item, count in cooking_inventory.items():
+                    inventory[item] = inventory.get(item, 0) + count
+            
+            if not inventory:
+                return "🤖 로-바트: 요리할 재료가 하나도 없잖아! 재료부터 모아!"
+            
+            # 재료 타입별 분류 (로-바트 특허 분류법!)
+            ingredient_types = {
+                '고기류': 0, '채소류': 0, '향신료': 0, 
+                '액체류': 0, '과일류': 0, '곡물류': 0
+            }
+            
+            for ingredient_name, count in inventory.items():
+                # 재료 타입 추정 (로-바트 AI 판정)
+                if any(keyword in ingredient_name for keyword in ['고기', '생선', '육류', '닭', '돼지', '소']):
+                    ingredient_types['고기류'] += count
+                elif any(keyword in ingredient_name for keyword in ['채소', '버섯', '양파', '당근', '양배추']):
+                    ingredient_types['채소류'] += count
+                elif any(keyword in ingredient_name for keyword in ['향신료', '소금', '후추', '마늘', '생강']):
+                    ingredient_types['향신료'] += count
+                elif any(keyword in ingredient_name for keyword in ['물', '우유', '와인', '육수', '국물']):
+                    ingredient_types['액체류'] += count
+                elif any(keyword in ingredient_name for keyword in ['과일', '딸기', '사과', '배', '포도']):
+                    ingredient_types['과일류'] += count
+                elif any(keyword in ingredient_name for keyword in ['쌀', '밀', '보리', '빵', '면']):
+                    ingredient_types['곡물류'] += count
+            
+            # 로-바트의 완벽한 균형 체크!
+            insufficient_types = [type_name for type_name, count in ingredient_types.items() if count < 2]
+            
+            if insufficient_types:
+                return f"🤖 로-바트 분석: 재료 균형 엉망! {', '.join(insufficient_types)} 더 가져와!"
+            
+            # 풍족함 레벨 체크
+            total_ingredients = sum(ingredient_types.values())
+            if total_ingredients >= 30:
+                return "🤖 로-바트 감탄: 재료 엄청 많네! 요리 파티 열자!"
+            elif total_ingredients >= 15:
+                return "🤖 로-바트 만족: 적당한 재료량! 맛있는 요리 가능!"
+            else:
+                return "🤖 로-바트 아쉬움: 재료 좀 더 모으자~ 부족해!"
+                
+        except Exception as e:
+            return f"🤖 로-바트 당황: 재료 분석 실패... 뭔가 이상해! ({e})"
+
+    def analyze_skill_usage_enhanced(self, members):
+        """🤖 로-바트의 스킬 사용 패턴 완전 분석!"""
+        try:
+            if not members:
+                return "🤖 로-바트: 파티원이 없는데 뭘 분석해?!"
+            
+            skill_problems = []
+            mp_wasters = []
+            skill_hoarders = []
+            
+            for member in members:
+                name = getattr(member, 'name', '이름없음')
+                current_mp = getattr(member, 'current_mp', getattr(member, 'mp', 0))
+                max_mp = getattr(member, 'max_mp', 1)
+                
+                # MP 효율성 체크
+                mp_ratio = current_mp / max_mp if max_mp > 0 else 0
+                
+                # 만땅(100%)인 경우는 제외, 80-99%만 아끼는 사람으로 분류
+                if 0.8 <= mp_ratio < 1.0:
+                    skill_hoarders.append(name)
+                elif mp_ratio < 0.2:
+                    mp_wasters.append(name)
+                
+                # 스킬 사용 가능 여부 체크
+                from game.error_logger import log_debug
+                log_debug("로바트분석", f"{name} MP 상태 체크", {
+                    "current_mp": current_mp,
+                    "max_mp": max_mp, 
+                    "mp_ratio": f"{mp_ratio:.2f}"
+                })
+                
+                if current_mp < 10:  # 기본 스킬도 못 쓸 정도
+                    skill_problems.append(f"{name} (MP 고갈)")
+                    log_debug("로바트분석", f"{name} MP 고갈 판정", {
+                        "current_mp": current_mp,
+                        "판정기준": "10 미만"
+                    })
+            
+            # 로-바트의 신랄한 평가
+            comments = []
+            if skill_hoarders:
+                comments.append(f"🤖 로-바트 지적: {', '.join(skill_hoarders)}! MP 아껴서 뭐해? 써!")
+            if mp_wasters:
+                comments.append(f"🤖 로-바트 핀잔: {', '.join(mp_wasters)}! MP 관리 좀 해!")
+            if skill_problems:
+                comments.append(f"🤖 로-바트 경고: {', '.join(skill_problems)} - 회복 필요!")
+            
+            if not comments:
+                return "🤖 로-바트 인정: 스킬 사용 패턴 완벽! 내가 잘 가르쳤지?"
+            
+            return " ".join(comments)
+            
+        except Exception as e:
+            return f"🤖 로-바트 오류: 스킬 분석 실패... ({e})"
+
+    def analyze_progression_readiness_enhanced(self, members, world):
+        """🤖 로-바트의 파티 진행 준비도 완전 체크!"""
+        try:
+            current_floor = getattr(world, 'current_level', 1)
+            
+            # 전투력 평가
+            combat_powers = [calculate_combat_power(char) for char in members]
+            avg_power = sum(combat_powers) // len(combat_powers) if combat_powers else 0
+            expected_power = self.get_recommended_power(current_floor)
+            
+            power_ratio = avg_power / expected_power if expected_power > 0 else 0
+            
+            # 체력/MP 상태 체크
+            health_ratios = []
+            mp_ratios = []
+            
+            for member in members:
+                hp_ratio = getattr(member, 'hp', 0) / getattr(member, 'max_hp', 1)
+                mp_ratio = getattr(member, 'mp', 0) / getattr(member, 'max_mp', 1)
+                health_ratios.append(hp_ratio)
+                mp_ratios.append(mp_ratio)
+            
+            avg_hp = sum(health_ratios) / len(health_ratios) if health_ratios else 0
+            avg_mp = sum(mp_ratios) / len(mp_ratios) if mp_ratios else 0
+            
+            # 로-바트의 종합 평가
+            if power_ratio >= 1.2 and avg_hp >= 0.8 and avg_mp >= 0.6:
+                return f"🤖 로-바트 자신감: {current_floor + 1}층 진격! 내 교육의 성과다!"
+            elif power_ratio >= 1.0 and avg_hp >= 0.7 and avg_mp >= 0.5:
+                return f"🤖 로-바트 허가: {current_floor + 1}층 도전 가능! 조심해서 가!"
+            elif power_ratio >= 0.8:
+                return f"🤖 로-바트 고민: 전투력은 괜찮은데... 체력/MP 좀 더 채우자"
+            else:
+                return f"🤖 로-바트 금지: {current_floor}층에서 더 키워! 무리하면 죽어!"
+                
+        except Exception as e:
+            return f"🤖 로-바트 혼란: 진행 분석 오류... ({e})"
+
+    def get_battle_commander_analysis(self, party_members, enemies, battle_state="START"):
+        """🤖 로-바트의 전투 지휘관 모드! (완전체 전술 분석)"""
+        try:
+            # 파티 전투 상태 분석
+            party_analysis = self._analyze_party_combat_state_enhanced(party_members)
+            enemy_analysis = self._analyze_enemy_threat_enhanced(enemies) if enemies else {}
+            
+            # 전투 전술 수립
+            strategy = self._formulate_battle_strategy_enhanced(party_analysis, enemy_analysis, battle_state)
+            
+            # 로-바트의 전투 지시
+            battle_commands = []
+            battle_commands.append(f"🤖 로-바트 지휘: {strategy['main_strategy']}")
+            
+            if strategy.get('priority_actions'):
+                battle_commands.append(f"🎯 우선 행동: {', '.join(strategy['priority_actions'])}")
+            
+            if strategy.get('warnings'):
+                battle_commands.append(f"⚠️ 주의사항: {', '.join(strategy['warnings'])}")
+            
+            return "\n".join(battle_commands)
+            
+        except Exception as e:
+            return f"🤖 로-바트 패닉: 전투 분석 실패! 각자 알아서 해! ({e})"
+
+    def _analyze_party_combat_state_enhanced(self, members):
+        """향상된 파티 전투 상태 분석"""
+        if not members:
+            return {"status": "NO_PARTY", "power": 0}
+        
+        total_hp_ratio = 0
+        total_mp_ratio = 0
+        total_power = 0
+        critical_members = []
+        
+        for member in members:
+            hp_ratio = getattr(member, 'hp', 0) / getattr(member, 'max_hp', 1)
+            mp_ratio = getattr(member, 'mp', 0) / getattr(member, 'max_mp', 1)
+            power = calculate_combat_power(member)
+            
+            total_hp_ratio += hp_ratio
+            total_mp_ratio += mp_ratio
+            total_power += power
+            
+            if hp_ratio < 0.3:
+                critical_members.append(getattr(member, 'name', '알 수 없음'))
+        
+        return {
+            "avg_hp_ratio": total_hp_ratio / len(members),
+            "avg_mp_ratio": total_mp_ratio / len(members),
+            "total_power": total_power,
+            "critical_members": critical_members,
+            "party_size": len(members)
+        }
+
+    def _analyze_enemy_threat_enhanced(self, enemies):
+        """향상된 적 위협도 분석"""
+        if not enemies:
+            return {"threat_level": "NONE"}
+        
+        total_enemy_power = 0
+        boss_count = 0
+        special_abilities = []
+        
+        for enemy in enemies:
+            enemy_power = getattr(enemy, 'combat_power', 0)
+            total_enemy_power += enemy_power
+            
+            if 'boss' in str(getattr(enemy, 'type', '')).lower():
+                boss_count += 1
+            
+            # 특수 능력 체크 (예시)
+            if hasattr(enemy, 'special_abilities'):
+                special_abilities.extend(enemy.special_abilities)
+        
+        threat_level = "LOW"
+        if boss_count > 0:
+            threat_level = "BOSS"
+        elif total_enemy_power > 1000:
+            threat_level = "HIGH"
+        elif total_enemy_power > 500:
+            threat_level = "MEDIUM"
+        
+        return {
+            "threat_level": threat_level,
+            "total_power": total_enemy_power,
+            "enemy_count": len(enemies),
+            "boss_count": boss_count,
+            "special_abilities": special_abilities
+        }
+
+    def _formulate_battle_strategy_enhanced(self, party_analysis, enemy_analysis, battle_state):
+        """향상된 전투 전략 수립"""
+        strategy = {
+            "main_strategy": "",
+            "priority_actions": [],
+            "warnings": []
+        }
+        
+        # 파티 상태 기반 전략
+        if party_analysis.get("avg_hp_ratio", 0) < 0.5:
+            strategy["main_strategy"] = "회복 우선! 체력부터 채워!"
+            strategy["priority_actions"].append("힐러 즉시 회복")
+            strategy["warnings"].append("위험 상태 - 신중하게!")
+        
+        # 적 위협도 기반 전략
+        threat_level = enemy_analysis.get("threat_level", "LOW")
+        if threat_level == "BOSS":
+            strategy["main_strategy"] = "보스전! 모든 스킬 총동원!"
+            strategy["priority_actions"].append("버프 스킬 먼저")
+            strategy["priority_actions"].append("딜러 집중 공격")
+        elif threat_level == "HIGH":
+            strategy["main_strategy"] = "강력한 적! 전술적 접근!"
+            strategy["priority_actions"].append("탱커 방어 집중")
+        else:
+            strategy["main_strategy"] = "일반 전투! 효율적으로 처리!"
+        
+        # 전투 단계별 조정
+        if battle_state == "CRITICAL":
+            strategy["warnings"].append("위기 상황 - 즉시 대응 필요!")
+        
+        return strategy
+
+    def get_ultimate_analysis_suite(self, party_manager, world, situation="COMPREHENSIVE"):
+        """🤖 로-바트의 궁극 분석 스위트! (모든 분석 총동원)"""
+        try:
+            analysis_results = []
+            
+            # 기본 상황 분석
+            basic_analysis = self.analyze_everything(party_manager, world, situation)
+            analysis_results.append("=== 🤖 로-바트 기본 분석 ===")
+            
+            # message가 없거나 비어있을 경우 기본 메시지 제공
+            message = basic_analysis.get("message", "")
+            if not message or message == "분석 오류":
+                # 기본 분석 메시지 생성
+                alive_count = len(party_manager.get_alive_members())
+                if alive_count > 0:
+                    message = f"🤖 로-바트: 파티 {alive_count}명 모두 건재! 내 분석 덕분이지!"
+                else:
+                    message = "🤖 로-바트: 어? 파티가 위험해!"
+            
+            analysis_results.append(message)
+            
+            # 요리 재료 분석
+            cooking_analysis = self.analyze_cooking_materials_enhanced(party_manager, world)
+            analysis_results.append("\n=== 🍳 요리 재료 분석 ===")
+            analysis_results.append(cooking_analysis)
+            
+            # 스킬 사용 분석
+            if hasattr(party_manager, 'members'):
+                skill_analysis = self.analyze_skill_usage_enhanced(party_manager.members)
+                analysis_results.append("\n=== ✨ 스킬 사용 분석 ===")
+                analysis_results.append(skill_analysis)
+                
+                # 진행 준비도 분석
+                progression_analysis = self.analyze_progression_readiness_enhanced(party_manager.members, world)
+                analysis_results.append("\n=== 🚀 진행 준비도 분석 ===")
+                analysis_results.append(progression_analysis)
+            
+            # 로-바트의 최종 종합 평가
+            analysis_results.append("\n=== 🎯 로-바트 최종 평가 ===")
+            analysis_results.append("🤖 내 분석은 항상 완벽하지! 내 조언 잘 따라해!")
+            
+            return "\n".join(analysis_results)
+            
+        except Exception as e:
+            return f"🤖 로-바트 대혼란: 궁극 분석 시스템 오류! 이럴 리가... ({e})"
+
 
 # 전역 로-바트 인스턴스 (게임의 자랑스러운 마스코트!)
 robart = RobotAIMaster()
 
 
 def calculate_combat_power(character):
-    """캐릭터의 정교한 전투력 계산 - 모든 시스템 반영"""
+    """캐릭터의 정교한 전투력 계산 - 로바트 권장 수치에 맞춤 조정"""
     try:
-        if not character.is_alive():
+        if not hasattr(character, 'is_alive') or not character.is_alive:
             return 0
             
-        # === 기본 스탯 점수 ===
-        base_power = character.level * 12  # 기본 배율 향상
+        # === 기본 스탯 기반 전투력 계산 (대폭 축소) ===
+        # 실제 스탯을 반영한 기본 전투력 (스케일 축소: /10)
+        attack_power = (getattr(character, 'attack', 0) + getattr(character, 'physical_attack', 0)) * 0.1
+        magic_power = getattr(character, 'magic_attack', 0) * 0.1
+        defense_power = (getattr(character, 'defense', 0) + getattr(character, 'physical_defense', 0)) * 0.08
+        magic_def_power = getattr(character, 'magic_defense', 0) * 0.08
+        speed_power = getattr(character, 'speed', 0) * 0.06
         
-        # === HP/MP/BRV 상태 보너스 ===
-        hp_ratio = character.current_hp / character.max_hp if character.max_hp > 0 else 0
-        mp_ratio = character.current_mp / character.max_mp if character.max_mp > 0 else 0
-        brv_points = getattr(character, 'brv_points', 0)
+        # === HP/MP 최댓값 기반 생존력 반영 ===
+        max_hp = getattr(character, 'max_hp', 100)
+        max_mp = getattr(character, 'max_mp', 50)
         
-        # HP 상태에 따른 보정
+        # HP는 탱킹 능력에 직결되므로 적당한 비중으로 반영 (축소)
+        hp_power = max_hp * 0.03  # HP 100당 3점
+        # MP는 마법 지속력에 영향 (축소)
+        mp_power = max_mp * 0.02  # MP 50당 1점
+        
+        # 기본 전투력 = 공격력 + 마공 + 방어력 + 속도 + HP 생존력 + MP 지속력
+        base_power = attack_power + magic_power + defense_power + magic_def_power + speed_power + hp_power + mp_power
+        
+        # 레벨 보정 (매우 작게 조정)
+        level_bonus = getattr(character, 'level', 1) * 5  # 레벨당 5점만
+        
+        base_power += level_bonus
+        
+        # === HP/MP/BRV 상태 보너스 (축소) ===
+        # safe 속성 접근
+        current_hp = getattr(character, 'hp', getattr(character, 'current_hp', getattr(character, 'max_hp', 100)))
+        max_hp = getattr(character, 'max_hp', 100)
+        current_mp = getattr(character, 'mp', getattr(character, 'current_mp', getattr(character, 'max_mp', 50)))
+        max_mp = getattr(character, 'max_mp', 50)
+        
+        hp_ratio = current_hp / max_hp if max_hp > 0 else 1
+        mp_ratio = current_mp / max_mp if max_mp > 0 else 1
+        brv_points = getattr(character, 'brave_points', getattr(character, 'brv_points', 0))
+        
+        # HP 상태에 따른 보정 (축소)
         if hp_ratio >= 0.8:
-            hp_bonus = 25
-        elif hp_ratio >= 0.6:
-            hp_bonus = 15
-        elif hp_ratio >= 0.4:
             hp_bonus = 5
+        elif hp_ratio >= 0.6:
+            hp_bonus = 3
+        elif hp_ratio >= 0.4:
+            hp_bonus = 1
         elif hp_ratio >= 0.2:
-            hp_bonus = -10
+            hp_bonus = -2
         else:
-            hp_bonus = -25
+            hp_bonus = -5
         
-        # MP 상태 보정
-        mp_bonus = mp_ratio * 15
+        # MP 상태 보정 (축소)
+        mp_bonus = mp_ratio * 3
         
-        # BRV 포인트 보정
-        brv_bonus = min(brv_points * 0.05, 30)  # 최대 30점
+        # BRV 포인트 보정 (축소)
+        brv_bonus = min(brv_points * 0.001, 5)  # 최대 5점으로 대폭 축소
         
-        # === 핵심 스탯 보너스 ===
-        stat_bonus = (character.attack + character.defense + character.magic_attack + 
-                     character.magic_defense + character.speed) * 1.2
+        # === 핵심 스탯 보너스 (대폭 축소) ===
+        # safe 속성 접근으로 수정
+        attack_total = getattr(character, 'attack', 0) + getattr(character, 'physical_attack', 0)
+        defense_total = getattr(character, 'defense', 0) + getattr(character, 'physical_defense', 0)
+        magic_attack_total = getattr(character, 'magic_attack', 0)
+        magic_defense_total = getattr(character, 'magic_defense', 0)
+        speed_total = getattr(character, 'speed', 0)
         
-        # === 장비 시스템 완전 분석 ===
+        # 스탯 보너스를 1.2에서 0.03으로 대폭 축소 (40배 감소)
+        stat_bonus = (attack_total + defense_total + magic_attack_total + 
+                     magic_defense_total + speed_total) * 0.03
+        
+        # === 장비 시스템 완전 분석 (축소) ===
         equipment_bonus = 0
         equipment_durability_penalty = 0
         set_bonus = 0
@@ -1064,81 +1417,83 @@ def calculate_combat_power(character):
             for slot, item in character.equipment.items():
                 if item:
                     equipped_items.append(item)
-                    # 기본 스탯 보너스
-                    equipment_bonus += getattr(item, 'attack', 0) * 1.5
-                    equipment_bonus += getattr(item, 'defense', 0) * 1.5
-                    equipment_bonus += getattr(item, 'magic_attack', 0) * 1.5
-                    equipment_bonus += getattr(item, 'magic_defense', 0) * 1.5
-                    equipment_bonus += getattr(item, 'speed', 0) * 1.5
+                    # 기본 스탯 보너스 (대폭 축소)
+                    equipment_bonus += getattr(item, 'attack', 0) * 0.03
+                    equipment_bonus += getattr(item, 'defense', 0) * 0.03
+                    equipment_bonus += getattr(item, 'magic_attack', 0) * 0.03
+                    equipment_bonus += getattr(item, 'magic_defense', 0) * 0.03
+                    equipment_bonus += getattr(item, 'speed', 0) * 0.03
                     
-                    # 내구도 시스템 반영
+                    # 내구도 시스템 반영 (축소)
                     if hasattr(item, 'durability') and hasattr(item, 'max_durability'):
                         durability_ratio = item.durability / item.max_durability if item.max_durability > 0 else 1
                         if durability_ratio < 0.3:
-                            equipment_durability_penalty += 15  # 내구도 낮음
+                            equipment_durability_penalty += 3  # 내구도 낮음
                         elif durability_ratio < 0.6:
-                            equipment_durability_penalty += 8
+                            equipment_durability_penalty += 2
                         elif durability_ratio < 0.8:
-                            equipment_durability_penalty += 3
+                            equipment_durability_penalty += 1
                     
-                    # 특수 장비 효과
+                    # 특수 장비 효과 (축소)
                     if hasattr(item, 'special_effects'):
                         for effect in item.special_effects:
                             if 'damage' in effect.lower() or 'attack' in effect.lower():
-                                equipment_bonus += 10
+                                equipment_bonus += 2
                             elif 'defense' in effect.lower() or 'protection' in effect.lower():
-                                equipment_bonus += 8
+                                equipment_bonus += 2
             
-            # 세트 장비 보너스 체크
+            # 세트 장비 보너스 체크 (축소)
             if len(equipped_items) >= 3:
-                set_bonus = 20  # 세트 보너스
+                set_bonus = 4  # 세트 보너스
         
-        # === 상처 시스템 정밀 분석 ===
+        # === 상처 시스템 정밀 분석 (축소) ===
         wound_penalty = 0
         if hasattr(character, 'wounds') and character.wounds > 0:
             wound_ratio = character.wounds / character.max_hp if character.max_hp > 0 else 0
             if wound_ratio >= 0.6:
-                wound_penalty = character.wounds * 0.8  # 심각한 상처
+                wound_penalty = character.wounds * 0.02  # 심각한 상처
             elif wound_ratio >= 0.4:
-                wound_penalty = character.wounds * 0.6
+                wound_penalty = character.wounds * 0.015
             elif wound_ratio >= 0.2:
-                wound_penalty = character.wounds * 0.4
+                wound_penalty = character.wounds * 0.01
             else:
-                wound_penalty = character.wounds * 0.2
+                wound_penalty = character.wounds * 0.005
         
-        # === 버프/디버프 시스템 ===
+        # === 버프/디버프 시스템 (축소) ===
         buff_bonus = 0
         debuff_penalty = 0
         
-        # 요리 버프
+        # 요리 버프 (축소)
         if hasattr(character, 'food_buffs') and character.food_buffs:
             for buff in character.food_buffs:
-                buff_bonus += 15  # 요리 버프당 15점
+                buff_bonus += 3  # 요리 버프당 3점
         
-        # 상태이상 확인
+        # 상태이상 확인 (축소)
         if hasattr(character, 'status_effects'):
             for effect in character.status_effects:
                 if effect in ['독', 'poison', '화상', 'burn']:
-                    debuff_penalty += 10
+                    debuff_penalty += 2
                 elif effect in ['축복', 'bless', '강화', 'enhance']:
-                    buff_bonus += 20
+                    buff_bonus += 4
         
-        # === 직업별 특수 보정 ===
+        # === 직업별 특수 보정 (대폭 축소) ===
         class_bonus = 0
         job_class = getattr(character, 'character_class', '')
         
         # 전투 특화 직업
         if job_class in ['전사', '성기사', '암흑기사', '검성', '검투사']:
-            class_bonus = character.level * 2
+            class_bonus = getattr(character, 'level', 1) * 0.5
         # 마법 특화 직업
         elif job_class in ['아크메이지', '정령술사', '시간술사', '차원술사']:
-            class_bonus = (character.magic_attack + character.magic_defense) * 0.3
+            magic_att = getattr(character, 'magic_attack', 0)
+            magic_def = getattr(character, 'magic_defense', 0)
+            class_bonus = (magic_att + magic_def) * 0.01
         # 균형 직업
         elif job_class in ['궁수', '도적', '바드', '드루이드']:
-            class_bonus = character.level * 1.5
+            class_bonus = getattr(character, 'level', 1) * 0.3
         # 지원 직업
         elif job_class in ['성직자', '연금술사', '기계공학자']:
-            class_bonus = mp_ratio * 25  # MP 의존도 높음
+            class_bonus = mp_ratio * 5  # MP 의존도 높음
         
         # === 최종 전투력 계산 ===
         total_power = (base_power + hp_bonus + mp_bonus + brv_bonus + 
@@ -1148,12 +1503,13 @@ def calculate_combat_power(character):
         
         return max(0, int(total_power))
         
-    except Exception:
-        return character.level * 12  # 기본값
+    except Exception as e:
+        print(f"⚠️ 전투력 계산 오류 ({character.name}): {e}")
+        return getattr(character, 'level', 1) * 12  # 기본값
 
 
 def get_ai_recommendation(party_manager, world):
-    """� 로-바트의 천재적 추천 시스템! (100% 신뢰 가능!)"""
+    """🤖 로-바트의 천재적 추천 시스템! (100% 신뢰 가능!)"""
     try:
         # 로-바트에게 모든 분석 위임 (당연히 최고지!)
         analysis = robart.analyze_everything(party_manager, world, "FIELD")
@@ -1166,15 +1522,43 @@ def get_ai_recommendation(party_manager, world):
             return analysis["message"]
         elif analysis["status"] in ["FIELD_ANALYSIS", "BOSS_PREP", "SPECIAL_FLOOR", "NORMAL_EXPLORATION", "FIELD_OPTIMIZED"]:
             if "actions" in analysis and analysis["actions"]:
-                return f" 로-바트: {analysis['actions'][0]} (내 말을 믿어!)"
+                return f"🤖 {analysis['actions'][0]} (내 말을 믿어!)"
             elif "checklist" in analysis:
-                return f" 로-바트: {analysis['checklist'][0]} (역시 내가 최고야!)"
+                return f"🤖 {analysis['checklist'][0]} (역시 내가 최고야!)"
             else:
-                return f" 로-바트: {analysis.get('message', '신중한 탐험 권장')} (흠... 당연한 얘기지?)"
+                return f"🤖 {analysis.get('message', '신중한 탐험 권장')} (흠... 당연한 얘기지?)"
         
         return "🤖 로-바트: 잠깐... 계산 중... (천재도 시간이 필요해!)"
     except Exception as e:
         return f"🤖 로-바트: 어? 뭔가 이상한데? 오류: {e}"
+
+
+def get_robart_ultimate_analysis(party_manager, world, situation="COMPREHENSIVE"):
+    """🤖 로-바트의 궁극 완전체 분석 시스템! (모든 분석 기능 총동원)"""
+    return robart.get_ultimate_analysis_suite(party_manager, world, situation)
+
+
+def get_detailed_ai_analysis(party_manager, world, situation="FIELD"):
+    """🤖 로-바트의 상세한 분석 (당연히 완벽함!)"""
+    try:
+        analysis = robart.analyze_everything(party_manager, world, situation)
+        return analysis
+    except Exception as e:
+        return {"status": "ERROR", "message": f"🤖 로-바트: 분석 실패... 어라? {e}"}
+
+
+def get_combat_ai_strategy(party_manager, world, enemies=None):
+    """🤖 로-바트의 전투 전용 전략 (승리 보장!)"""
+    try:
+        # 적 정보 추가 분석 (로-바트의 전문 분야!)
+        if enemies:
+            enemy_threat = sum(getattr(enemy, 'level', 1) for enemy in enemies) * 5
+            world.enemy_threat_level = enemy_threat
+        
+        analysis = robart.analyze_everything(party_manager, world, "COMBAT")
+        return analysis
+    except Exception as e:
+        return {"status": "ERROR", "message": f"🤖 로-바트: 전투 전략 오류! {e}"}
 
 
 def get_detailed_ai_analysis(party_manager, world, situation="FIELD"):
@@ -1237,9 +1621,9 @@ def get_ultimate_life_coach_advice(party_manager, world):
                     advice_list.append(f"🩸 로-바트 주의: {member.name} 심각한 상처! 과다치유가 답이야!")
         
         # 3. 장비 최적화 (Equipment Optimization)
-        equipment_issues = analyze_equipment_deficiencies(alive_members)
-        if equipment_issues:
-            advice_list.append(f"🤖 로-바트 장비 진단: {equipment_issues} (내가 다 봤어!)")
+        equipment_analysis = robart._analyze_equipment_needs(alive_members)
+        if equipment_analysis:
+            advice_list.append(f"🤖 로-바트 장비 진단: {equipment_analysis} (내가 다 봤어!)")
         
         # 4. 요리 및 영양 관리 (Nutrition Management)
         cooking_issues = analyze_cooking_materials(party_manager, world)
@@ -1280,32 +1664,8 @@ def get_ultimate_life_coach_advice(party_manager, world):
 
 
 def get_battle_ai_commander(party_members, enemies, battle_state="START"):
-    """⚔️ 전투 AI 사령관 - 전투 상황 최적 전략 수립"""
-    try:
-        current_difficulty = getattr(party_members[0], 'world_difficulty', '쉬움') if party_members else '쉬움'
-        if current_difficulty in ['어려움', '지옥', 'HARD', 'NIGHTMARE', 'INSANE']:
-            return {"status": "BLOCKED", "message": "🚫 로-바트 전투사령관: 고난이도에서는 내 지휘 봉인... (미안!)"}
-        
-        if not party_members:
-            return {"status": "CRITICAL", "message": "🤖 로-바트: 파티 전멸... 이럴 줄 알았어! 게임 오버야!"}
-        
-        # 전투 상황 종합 분석
-        party_analysis = _analyze_party_combat_state(party_members)
-        enemy_analysis = _analyze_enemy_threat(enemies) if enemies else {"threat": 0}
-        
-        # 전투 전략 수립
-        strategy = _formulate_battle_strategy(party_analysis, enemy_analysis, battle_state)
-        
-        return {
-            "status": "ACTIVE",
-            "party_state": party_analysis,
-            "enemy_threat": enemy_analysis,
-            "strategy": strategy,
-            "priority_actions": _get_priority_battle_actions(party_analysis, enemy_analysis)
-        }
-        
-    except Exception as e:
-        return {"status": "ERROR", "message": f"전투 AI 오류: {e}"}
+    """🤖 로-바트의 전투 지휘관 (통합 완전체 버전)"""
+    return robart.get_battle_commander_analysis(party_members, enemies, battle_state)
 
 
 def _analyze_party_combat_state(members):
@@ -1416,144 +1776,19 @@ def _get_priority_battle_actions(party_analysis, enemy_analysis):
         return ["🤖 로-바트: 에러 났지만 내가 있으니 안전한 행동으로 갈게~"]
 
 
-def analyze_equipment_deficiencies(members):
-    """장비 부족 분석 (파격적 AI 기능)"""
-    try:
-        issues = []
-        for member in members:
-            if not hasattr(member, 'equipment'):
-                continue
-                
-            empty_slots = []
-            weak_equipment = []
-            
-            # 장비 슬롯 확인
-            expected_slots = ['weapon', 'armor', 'accessory']
-            for slot in expected_slots:
-                if slot not in member.equipment or not member.equipment[slot]:
-                    empty_slots.append(slot)
-                else:
-                    item = member.equipment[slot]
-                    # 레벨 대비 장비 품질 확인
-                    item_power = getattr(item, 'attack', 0) + getattr(item, 'defense', 0)
-                    expected_power = member.level * 5
-                    if item_power < expected_power * 0.6:
-                        weak_equipment.append(slot)
-            
-            if empty_slots:
-                return f"🤖 로-바트 지적: {member.name}! 장비도 안 챙기고 뭐하는 거야? 미착용: {', '.join(empty_slots)}"
-            elif weak_equipment:
-                return f"🤖 로-바트 충고: {member.name}의 장비가 후져! 업그레이드 필요: {', '.join(weak_equipment)}"
-        
-        return None
-    except:
-        return "🤖 로-바트: 장비 체크 중 오류! 하지만 내가 있으니 걱정 마!"
-
-
 def analyze_cooking_materials(party_manager, world):
-    """요리 재료 및 버프 분석 (실제 요리 시스템 연동)"""
-    try:
-        # 요리 시스템 확인
-        if not hasattr(party_manager, 'cooking_system'):
-            return "요리 시스템 미활성화"
-        
-        cooking_system = party_manager.cooking_system
-        
-        # 현재 보유 재료 확인
-        if not hasattr(cooking_system, 'inventory') or not cooking_system.inventory:
-            return "🤖 로-바트 한탄: 요리 재료가 하나도 없네? 채집이나 하러 가!"
-        
-        inventory = cooking_system.inventory
-        total_ingredients = sum(inventory.values())
-        
-        if total_ingredients < 5:
-            return f"🤖 로-바트 지적: 재료 겨우 {total_ingredients}개? 이런 걸로 어떻게 요리해? 채집 좀 해!"
-        
-        # 재료 균형 확인
-        ingredient_types = {
-            '고기류': 0, '채소류': 0, '향신료': 0, '액체류': 0, '과일류': 0
-        }
-        
-        for ingredient_name, count in inventory.items():
-            # 재료 타입 추정 (실제 시스템에 맞게 조정 필요)
-            if '고기' in ingredient_name or '생선' in ingredient_name:
-                ingredient_types['고기류'] += count
-            elif '채소' in ingredient_name or '버섯' in ingredient_name:
-                ingredient_types['채소류'] += count
-            elif '향신료' in ingredient_name or '소금' in ingredient_name:
-                ingredient_types['향신료'] += count
-            elif '물' in ingredient_name or '우유' in ingredient_name:
-                ingredient_types['액체류'] += count
-            elif '과일' in ingredient_name or '딸기' in ingredient_name:
-                ingredient_types['과일류'] += count
-        
-        # 부족한 재료 타입 찾기
-        insufficient_types = [type_name for type_name, count in ingredient_types.items() if count < 2]
-        
-        if insufficient_types:
-            return f"🤖 로-바트 분석: 재료 균형 엉망! {', '.join(insufficient_types)} 더 가져와!"
-        
-        # 버프 상태 확인
-        unbuffed_members = []
-        for member in party_manager.get_alive_members():
-            if hasattr(member, 'food_buffs') and member.food_buffs:
-                continue  # 버프 있음
-            elif hasattr(cooking_system, 'active_food_effect') and cooking_system.active_food_effect:
-                continue  # 전체 버프 있음
-            else:
-                unbuffed_members.append(member.name)
-        
-        if unbuffed_members and total_ingredients >= 10:
-            return f"🤖 로-바트 추천: 재료 충분하니까 {unbuffed_members[0]}한테 버프나 줘! 내가 시켜야 하나?"
-        
-        # 고급 재료 확인
-        rare_ingredients = [name for name, count in inventory.items() if '고급' in name or '특수' in name]
-        if rare_ingredients:
-            return f"🤖 로-바트 발견: 고급 재료 {rare_ingredients[0]} 있네? 특수 요리나 해봐!"
-        
-        return None
-    except Exception as e:
-        # 에러 디버깅을 위해 상세 정보 표시
-        return f"🤖 로-바트: 요리 분석 중 오류! {str(e)[:30]}... 하지만 걱정 마!"
+    """🤖 로-바트의 요리 재료 분석 (통합 완전체 버전)"""
+    return robart.analyze_cooking_materials_enhanced(party_manager, world)
 
 
 def analyze_skill_usage(members):
-    """로-바트의 스킬 사용 최적화 분석"""
-    try:
-        for member in members:
-            mp_ratio = member.current_mp / member.max_mp if member.max_mp > 0 else 0
-            
-            # MP가 가득 찬 캐릭터 확인
-            if mp_ratio >= 0.9:
-                return f"🤖 로-바트 지시: {member.name} MP 가득참! 스킬 써제껴! 아끼면 바보야!"
-            
-            # MP가 너무 낮은 캐릭터 확인
-            elif mp_ratio < 0.3:
-                return f"🤖 로-바트 경고: {member.name} MP 바닥! 마력 수정이나 찾아와!"
-        
-        return None
-    except:
-        return "🤖 로-바트: 스킬 분석 중 오류! 하지만 내가 있으니 괜찮아!"
+    """🤖 로-바트의 스킬 사용 분석 (통합 완전체 버전)"""
+    return robart.analyze_skill_usage_enhanced(members)
 
 
 def analyze_progression_readiness(members, world):
-    """로-바트의 진행 준비도 분석"""
-    try:
-        combat_powers = [calculate_combat_power(char) for char in members]
-        avg_power = sum(combat_powers) // len(combat_powers) if combat_powers else 0
-        
-        current_level = getattr(world, 'current_level', 1)
-        expected_power = current_level * 15
-        
-        if avg_power < expected_power * 0.7:
-            weakest_member = min(members, key=lambda x: calculate_combat_power(x))
-            return f"🤖 로-바트 진단: 전투력 부족! {weakest_member.name} 강화부터 해! 내 말 안 들으면 죽어!"
-        elif avg_power >= expected_power * 1.3:
-            return "🤖 로-바트 인정: 강력한 파티네! 내가 잘 키웠어~ 보너스 층도 도전해봐!"
-        
-        return None
-    except:
-        return "🤖 로-바트: 진행 준비도 분석 중 오류! 하지만 내가 판단하기로는... 괜찮을걸?"
+    """🤖 로-바트의 진행 준비도 분석 (통합 완전체 버전)"""
+    return robart.analyze_progression_readiness_enhanced(members, world)
 
 
 class GameDisplay:
@@ -1647,14 +1882,14 @@ class GameDisplay:
         os.system('cls' if os.name == 'nt' else 'clear')
         
         # 상단 정보 표시
-        title = f"던전 {world.current_level}층 - Dawn Of Stellar"
+        title = f"차원 공간 {world.current_level}층 - Dawn Of Stellar"
         title_padding = max(0, (safe_width - len(title)) // 2)
         print(f"{' ' * title_padding}{bright_cyan(title)}")
         print()
         print()
         print()
         
-        # 던전 맵 표시 (개선된 크기)
+        # 차원 공간 맵 표시 (개선된 크기)
         try:
             if hasattr(world, 'get_colored_map_display'):
                 # 맵 크기를 더 넓게 설정
@@ -1698,7 +1933,22 @@ class GameDisplay:
             if cooking_system:
                 total_weight = cooking_system.get_total_inventory_weight()
                 max_weight = cooking_system.get_max_inventory_weight()
-                weight_info = f" | 가방: {total_weight:.1f}/{max_weight:.1f}kg"
+                
+                # 무게 비율에 따른 색상 적용 (현재 무게에만)
+                weight_ratio = total_weight / max_weight if max_weight > 0 else 0
+                if weight_ratio < 0.5:  # 50% 미만: 밝은 청록색 (매우 여유)
+                    weight_color = "\033[96m"  # 밝은 청록색
+                elif weight_ratio < 0.7:  # 70% 미만: 초록색 (여유)
+                    weight_color = "\033[92m"  # 밝은 초록
+                elif weight_ratio < 0.85:  # 85% 미만: 노란색 (주의)
+                    weight_color = "\033[93m"  # 노란색
+                elif weight_ratio < 0.95:  # 95% 미만: 주황색 (경고)
+                    weight_color = "\033[38;5;208m"  # 주황색 (256색)
+                else:  # 95% 이상: 빨간색 (위험)
+                    weight_color = "\033[91m"  # 빨간색
+                
+                reset_color = "\033[0m"
+                weight_info = f" | 가방: {weight_color}{total_weight:.1f}{reset_color}/{max_weight:.1f}kg"
             else:
                 weight_info = ""
         except Exception:
@@ -1779,7 +2029,7 @@ class GameDisplay:
                 power_status = red("파티 전멸")
             
             total_gold = sum(getattr(char, 'gold', 0) for char in party_manager.members)
-            print(f"│ 파티: {alive_count}/{len(party_manager.members)}명 생존 | 전투력: {avg_combat_power} ({power_status}) | 골드: {total_gold}")
+            print(f"│ 파티: {alive_count}/{len(party_manager.members)}명 생존 | 전투력: {avg_combat_power} ({power_status})")
             
             # AI 추천 행동 (로-바트)
             ai_recommendation = get_ai_recommendation(party_manager, world)
@@ -1834,7 +2084,7 @@ class GameDisplay:
                 
                 reset_color = "\033[0m"
                 percentage = int(weight_ratio * 100)
-                weight_info = f" | 가방: {weight_color}{total_weight:.1f}/{max_weight:.1f}kg ({percentage}%){reset_color}"
+                weight_info = f" | 가방: {weight_color}{total_weight:.1f}{reset_color}/{max_weight:.1f}kg ({percentage}%)"
             except Exception as e:
                 # 오류 시 기본 표시
                 weight_info = " | 가방: ?/?kg"
@@ -1940,13 +2190,13 @@ class GameDisplay:
                 alive_count = len(alive_members)
                 total_gold = sum(char.gold for char in party_manager.members)
                 
-                print(f"│ 파티: {alive_count}/{len(party_manager.members)}명 생존 | 전투력: {avg_combat_power} ({power_status}) | 골드: {total_gold:,}")
+                print(f"│ 파티: {alive_count}/{len(party_manager.members)}명 생존 | 전투력: {avg_combat_power} ({power_status})")
                 
                 # AI 추천 행동
                 ai_recommendation = get_ai_recommendation(party_manager, world)
                 print(f"│ {ai_recommendation}")
                 
-                # 던전 통계
+                # 차원 공간 통계
                 if hasattr(world, 'enemies_defeated'):
                     print(f"│ 처치한 적: {world.enemies_defeated}체 | 발견한 보물: {getattr(world, 'treasures_found', 0)}개")
                 
@@ -2027,12 +2277,12 @@ class GameDisplay:
             os.system('cls' if os.name == 'nt' else 'clear')
             
             # 상단 정보 표시
-            title = f"던전 {world.current_level}층 - Dawn Of Stellar"
+            title = f"차원 공간 {world.current_level}층 - Dawn Of Stellar"
             title_padding = max(0, (safe_width - len(title)) // 2)
             print(f"{' ' * title_padding}{bright_cyan(title)}")
             print()
             
-            # 던전 맵 표시 (개선된 크기)
+            # 차원 공간 맵 표시 (개선된 크기)
             if hasattr(world, 'get_colored_map_display'):
                 # 맵 크기를 적절하게 설정
                 map_width = min(40, safe_width - 10)  # 맵 너비 축소 (50 -> 30)
@@ -2046,9 +2296,9 @@ class GameDisplay:
                             print(line)
                 else:
                     # 백업 맵 표시
-                    print("🗺️  던전 지도를 불러올 수 없습니다")
+                    print("🗺️  차원 공간 지도를 불러올 수 없습니다")
             else:
-                print("🗺️  던전 탐험 중...")
+                print("🗺️  차원 공간 탐험 중...")
             
             print()  # 맵과 파티 상태 사이 여백
             
@@ -2068,15 +2318,41 @@ class GameDisplay:
                     except Exception:
                         gold_info = " | 골드: 0G"
                     
-                    # 가방 정보 안전하게 표시
+                    # 가방 정보 안전하게 표시 (파티원 인벤토리 + 요리 재료)
                     try:
+                        total_weight = 0.0
+                        max_weight = 0.0
+                        
+                        # 파티원들의 인벤토리 무게 계산
+                        for member in party_manager.members:
+                            if hasattr(member, 'inventory'):
+                                total_weight += member.inventory.get_total_weight()
+                                max_weight += member.inventory.max_weight
+                        
+                        # 요리 시스템 무게 추가
                         if cooking_system:
-                            total_weight = cooking_system.get_total_inventory_weight()
-                            max_weight = cooking_system.get_max_inventory_weight()
-                            weight_info = f" | 가방: {total_weight:.1f}/{max_weight:.1f}kg"
+                            cooking_weight = cooking_system.get_total_inventory_weight()
+                            total_weight += cooking_weight
+                        
+                        if max_weight > 0:
+                            # 무게 비율에 따른 색상 적용 (현재 무게에만)
+                            weight_ratio = total_weight / max_weight
+                            if weight_ratio < 0.5:  # 50% 미만: 밝은 청록색 (매우 여유)
+                                weight_color = "\033[96m"  # 밝은 청록색
+                            elif weight_ratio < 0.7:  # 70% 미만: 초록색 (여유)
+                                weight_color = "\033[92m"  # 밝은 초록
+                            elif weight_ratio < 0.85:  # 85% 미만: 노란색 (주의)
+                                weight_color = "\033[93m"  # 노란색
+                            elif weight_ratio < 0.95:  # 95% 미만: 주황색 (경고)
+                                weight_color = "\033[38;5;208m"  # 주황색 (256색)
+                            else:  # 95% 이상: 빨간색 (위험)
+                                weight_color = "\033[91m"  # 빨간색
+                            
+                            reset_color = "\033[0m"
+                            weight_info = f" | 가방: {weight_color}{total_weight:.1f}{reset_color}/{max_weight:.1f}kg"
                         else:
                             weight_info = ""
-                    except Exception:
+                    except Exception as e:
                         weight_info = ""
                     
                     print(f"  {party_info}{gold_info}{weight_info}")
@@ -2154,7 +2430,7 @@ class GameDisplay:
                             power_status = red("파티 전멸")
                         
                         total_gold = sum(getattr(char, 'gold', 0) for char in party_manager.members)
-                        print(f"│ 파티: {alive_count}/{len(party_manager.members)}명 생존 | 전투력: {avg_combat_power} ({power_status}) | 골드: {total_gold}")
+                        print(f"│ 파티: {alive_count}/{len(party_manager.members)}명 생존 | 전투력: {avg_combat_power} ({power_status})")
                         
                         # AI 추천 행동 (로-바트)
                         ai_recommendation = get_ai_recommendation(party_manager, world)
@@ -2192,7 +2468,7 @@ class GameDisplay:
             
         except Exception as e:
             # 최종 폴백: 최소한의 정보
-            print(f"🎮 Dawn of Stellar - 던전 {getattr(world, 'current_level', 1)}층")
+            print(f"🎮 Dawn of Stellar - 차원 공간 {getattr(world, 'current_level', 1)}층")
             print(f"📍 위치: {getattr(world, 'player_pos', '?')}")
             print(f"⚠️ 화면 표시 오류: {e}")
             print("게임은 계속 진행됩니다.")
@@ -2380,8 +2656,476 @@ class GameDisplay:
         print("        ⭐ D A W N   O F   S T E L L A R ⭐")
         print("                  별빛의 여명")
         print("="*50)
-        print(bright_cyan("게임 로그라이크 던전 탐험 게임", True))
+        print(bright_cyan("게임 로그라이크 차원 항해 게임", True))
         print(f"   전술적 ATB 전투 시스템")
         print(f"   4인 파티 관리")
-        print(f"   무한 던전 탐험")
+        print(f"   무한 차원 공간 탐험")
         print(bright_white("게임이 곧 시작됩니다...", True))
+
+
+def show_detailed_party_analysis(party_manager, world=None):
+    """🤖 로바트의 완전체 파티 분석 - 말도 안되게 상세함! (모든 로바트 기능 총동원)"""
+    try:
+        alive_members = party_manager.get_alive_members()
+        if not alive_members:
+            print("🤖 로-바트: 어? 살아있는 파티원이 없네? 이상한데?")
+            return
+        
+        # 화면 클리어
+        import os
+        if os.name == 'nt':  # Windows
+            os.system('cls')
+        else:  # Linux/Mac
+            os.system('clear')
+        
+        print("=" * 100)
+        print("🤖 로-바트의 완전체 파티 분석 보고서 (모든 기능 총동원!)")
+        print("=" * 100)
+        
+        # === 🚀 로바트 궁극 분석 스위트 실행! ===
+        if world:
+            print("\n🔥 로-바트 궁극 분석 시스템 가동! 🔥")
+            print("=" * 60)
+            ultimate_analysis = get_robart_ultimate_analysis(party_manager, world, "COMPREHENSIVE")
+            print(ultimate_analysis)
+            print("=" * 60)
+        
+        # === 1. 전투력 완전 분석 ===
+        print(f"\n📊 전투력 완전 분석 (꼴찌까지 다 찾아줌!)")
+        print("-" * 80)
+        
+        combat_powers = []
+        detailed_stats = []
+        
+        for char in alive_members:
+            power = calculate_combat_power(char)
+            
+            # 상세 스탯 분석
+            hp_ratio = char.current_hp / char.max_hp if char.max_hp > 0 else 0
+            mp_ratio = char.current_mp / char.max_mp if char.max_mp > 0 else 0
+            
+            # 개별 능력치들
+            phys_attack = getattr(char, 'physical_attack', 0)
+            phys_defense = getattr(char, 'physical_defense', 0)
+            magic_attack = getattr(char, 'magic_attack', 0) or getattr(char, 'magical_attack', 0)
+            magic_defense = getattr(char, 'magic_defense', 0) or getattr(char, 'magical_defense', 0)
+            speed = getattr(char, 'speed', 0)
+            accuracy = getattr(char, 'accuracy', 0)
+            evasion = getattr(char, 'evasion', 0)
+            
+            # 특수 상태
+            wounds = getattr(char, 'wounds', 0)
+            atb_gauge = getattr(char, 'atb_gauge', 0)
+            brave_points = getattr(char, 'brave_points', 0)
+            
+            combat_powers.append((char, power))
+            detailed_stats.append({
+                'char': char,
+                'power': power,
+                'hp_ratio': hp_ratio,
+                'mp_ratio': mp_ratio,
+                'phys_attack': phys_attack,
+                'phys_defense': phys_defense,
+                'magic_attack': magic_attack,
+                'magic_defense': magic_defense,
+                'speed': speed,
+                'accuracy': accuracy,
+                'evasion': evasion,
+                'wounds': wounds,
+                'atb_gauge': atb_gauge,
+                'brave_points': brave_points
+            })
+        
+        # 전투력 순으로 정렬 (내림차순)
+        combat_powers.sort(key=lambda x: x[1], reverse=True)
+        detailed_stats.sort(key=lambda x: x['power'], reverse=True)
+        
+        total_power = sum(power for _, power in combat_powers)
+        avg_power = total_power // len(combat_powers) if combat_powers else 0
+        
+        print(f"🎯 파티 총 전투력: {total_power:,} | 평균: {avg_power:,}")
+        print()
+        
+        for i, stats in enumerate(detailed_stats):
+            char = stats['char']
+            power = stats['power']
+            rank = i + 1
+            percentage = (power / total_power * 100) if total_power > 0 else 0
+            
+            # 랭킹 아이콘과 평가
+            if rank == 1:
+                rank_icon = "🥇"
+                rank_text = "최강의 에이스!"
+            elif rank == 2:
+                rank_icon = "🥈"
+                rank_text = "든든한 2인자"
+            elif rank == 3:
+                rank_icon = "🥉"
+                rank_text = "준수한 3인자"
+            elif rank == len(detailed_stats):
+                rank_icon = "💩"
+                rank_text = "꼴찌... 키워야 함"
+            else:
+                rank_icon = f"#{rank}"
+                rank_text = "평범함"
+            
+            # 상태 분석
+            health_status = "💚완벽" if stats['hp_ratio'] > 0.9 else "💛양호" if stats['hp_ratio'] > 0.7 else "🧡주의" if stats['hp_ratio'] > 0.5 else "❤️위험" if stats['hp_ratio'] > 0.2 else "💀빈사"
+            mana_status = "충만" if stats['mp_ratio'] > 0.8 else "보통" if stats['mp_ratio'] > 0.5 else "부족"
+            
+            print(f"{rank_icon} {rank}위: {char.name} ({char.character_class}) - {rank_text}")
+            print(f"   ⚔️ 전투력: {power:,} ({percentage:.1f}%) | {health_status} | {mana_status}")
+            print(f"   📊 물공{stats['phys_attack']:,} 물방{stats['phys_defense']:,} 마공{stats['magic_attack']:,} 마방{stats['magic_defense']:,}")
+            print(f"   ⚡ 속도{stats['speed']:,} 명중{stats['accuracy']:,} 회피{stats['evasion']:,} BRV{stats['brave_points']:,}")
+            
+            if stats['wounds'] > 0:
+                print(f"   🩸 상처: {stats['wounds']:,} (치료 필요!)")
+            
+            # 특수 평가
+            if stats['phys_attack'] > stats['magic_attack'] * 2:
+                print(f"   💪 물리 특화형 캐릭터")
+            elif stats['magic_attack'] > stats['phys_attack'] * 2:
+                print(f"   🔮 마법 특화형 캐릭터")
+            else:
+                print(f"   ⚖️ 균형형 캐릭터")
+            
+            if stats['speed'] > avg_power * 0.3:
+                print(f"   🏃 스피드형 (빠름)")
+            elif stats['phys_defense'] + stats['magic_defense'] > avg_power * 0.5:
+                print(f"   🛡️ 탱커형 (방어 특화)")
+            
+            print()
+        
+        # 전투력 격차 분석
+        if len(combat_powers) >= 2:
+            strongest = combat_powers[0][1]
+            weakest = combat_powers[-1][1]
+            gap = strongest - weakest
+            gap_ratio = (gap / strongest * 100) if strongest > 0 else 0
+            
+            print(f"🔍 전투력 격차 분석:")
+            print(f"   최강자 vs 꼴찌: {gap:,} 차이 ({gap_ratio:.1f}%)")
+            
+            if gap_ratio > 70:
+                print(f"   🤖 로-바트: 격차 심각! {combat_powers[-1][0].name} 집중 육성 필요!")
+            elif gap_ratio > 50:
+                print(f"   🤖 로-바트: 격차가 크네. 밸런스 맞춰야겠어!")
+            elif gap_ratio > 30:
+                print(f"   🤖 로-바트: 적당한 격차. 나쁘지 않아.")
+            else:
+                print(f"   🤖 로-바트: 완벽한 밸런스! 역시 내 조언 덕분이지?")
+        
+        # === 2. 장비 완전 분석 ===
+        print(f"\n🛡️ 장비 상태 완전 분석 (내구도부터 효과까지 다 체크)")
+        print("-" * 80)
+        
+        total_equipment_score = 0
+        equipment_rankings = []
+        
+        for char in alive_members:
+            char_equipment_score = 0
+            char_equipment_details = {
+                'char': char,
+                'equipped_count': 0,
+                'total_durability': 0,
+                'durability_count': 0,
+                'issues': [],
+                'bonuses': [],
+                'total_bonus_value': 0
+            }
+            
+            # 장착된 장비 분석
+            if hasattr(char, 'equipped_items') and char.equipped_items:
+                for slot, item in char.equipped_items.items():
+                    if item:
+                        char_equipment_details['equipped_count'] += 1
+                        
+                        # 장비 점수 계산 (레벨, 품질 등 고려)
+                        item_score = getattr(item, 'level', 1) * 10
+                        char_equipment_score += item_score
+                        
+                        # 내구도 체크
+                        if hasattr(item, 'get_durability_percentage'):
+                            durability = item.get_durability_percentage()
+                            char_equipment_details['total_durability'] += durability
+                            char_equipment_details['durability_count'] += 1
+                            
+                            if durability < 10:
+                                char_equipment_details['issues'].append(f"{slot} 거의 파괴됨!")
+                            elif durability < 30:
+                                char_equipment_details['issues'].append(f"{slot} 위험상태")
+                            elif durability < 60:
+                                char_equipment_details['issues'].append(f"{slot} 수리필요")
+                        
+                        # 스탯 보너스 분석
+                        if hasattr(item, 'get_effective_stats'):
+                            effective_stats = item.get_effective_stats()
+                            for stat, value in effective_stats.items():
+                                if isinstance(value, (int, float)) and value > 0:
+                                    char_equipment_details['total_bonus_value'] += value
+                                    if value >= 50:
+                                        char_equipment_details['bonuses'].append(f"{stat}+{value}")
+            
+            char_equipment_details['score'] = char_equipment_score
+            equipment_rankings.append(char_equipment_details)
+            total_equipment_score += char_equipment_score
+        
+        # 장비 랭킹 정렬
+        equipment_rankings.sort(key=lambda x: x['score'], reverse=True)
+        
+        print(f"🎯 파티 총 장비 점수: {total_equipment_score:,}")
+        print()
+        
+        for i, eq_data in enumerate(equipment_rankings):
+            char = eq_data['char']
+            rank = i + 1
+            
+            avg_durability = (eq_data['total_durability'] / eq_data['durability_count']) if eq_data['durability_count'] > 0 else 100
+            max_slots = 6  # 추정
+            equipment_ratio = (eq_data['equipped_count'] / max_slots * 100) if max_slots > 0 else 0
+            
+            # 장비 상태 평가
+            if equipment_ratio >= 90 and avg_durability >= 80:
+                eq_status = "🟢완벽장비"
+            elif equipment_ratio >= 70 and avg_durability >= 60:
+                eq_status = "🟡양호장비"
+            elif equipment_ratio >= 50:
+                eq_status = "🟠부족장비"
+            else:
+                eq_status = "🔴빈약장비"
+            
+            print(f"#{rank} {char.name}: {eq_status}")
+            print(f"   📦 장착률: {equipment_ratio:.0f}% ({eq_data['equipped_count']}/{max_slots})")
+            print(f"   🔧 평균 내구도: {avg_durability:.0f}%")
+            print(f"   💎 장비 점수: {eq_data['score']:,}")
+            print(f"   📈 총 보너스: {eq_data['total_bonus_value']:,}")
+            
+            if eq_data['issues']:
+                print(f"   ⚠️ 문제: {', '.join(eq_data['issues'])}")
+            
+            if eq_data['bonuses']:
+                print(f"   ✨ 주요보너스: {', '.join(eq_data['bonuses'])}")
+            
+            print()
+        
+        # === 3. 역할 및 시너지 분석 ===
+        print(f"\n🎯 역할 분석 & 파티 시너지")
+        print("-" * 80)
+        
+        role_analysis = {}
+        for char in alive_members:
+            char_class = getattr(char, 'character_class', '알 수 없음')
+            
+            # 상세 역할 분류
+            if char_class in ["전사", "성기사", "기사", "광전사"]:
+                role = "🛡️ 탱커"
+            elif char_class in ["궁수", "도적", "암살자", "사무라이", "검투사"]:
+                role = "⚔️ 물리딜러"
+            elif char_class in ["아크메이지", "네크로맨서", "정령술사", "시간술사", "연금술사", "차원술사"]:
+                role = "🔮 마법딜러"
+            elif char_class in ["신관", "드루이드"]:
+                role = "💚 힐러"
+            elif char_class in ["바드", "철학자"]:
+                role = "🎵 서포터"
+            else:
+                role = "❓ 만능형"
+            
+            if role not in role_analysis:
+                role_analysis[role] = []
+            role_analysis[role].append(char)
+        
+        # 역할별 분석
+        for role, chars in role_analysis.items():
+            print(f"{role}: {len(chars)}명")
+            for char in chars:
+                power = calculate_combat_power(char)
+                print(f"   • {char.name} (전투력: {power:,})")
+        
+        # 파티 밸런스 평가
+        print(f"\n🎯 파티 밸런스 평가:")
+        tank_count = len(role_analysis.get("🛡️ 탱커", []))
+        healer_count = len(role_analysis.get("💚 힐러", []))
+        dps_count = len(role_analysis.get("⚔️ 물리딜러", [])) + len(role_analysis.get("🔮 마법딜러", []))
+        support_count = len(role_analysis.get("🎵 서포터", []))
+        
+        if tank_count >= 1 and healer_count >= 1 and dps_count >= 2:
+            balance_score = "✅ 완벽한 밸런스!"
+        elif tank_count >= 1 and dps_count >= 2:
+            balance_score = "🟡 준수한 구성"
+        elif dps_count >= 3:
+            balance_score = "🔴 공격 편중 (위험함)"
+        else:
+            balance_score = "❌ 불안정한 구성"
+        
+        print(f"   {balance_score}")
+        print(f"   탱커 {tank_count}명, 힐러 {healer_count}명, 딜러 {dps_count}명, 서포터 {support_count}명")
+        
+        # === 4. 로바트의 완전체 종합 평가 ===
+        print(f"\n🤖 로-바트의 완전체 종합 평가 (99.999% 정확함!)")
+        print("-" * 80)
+        
+        # 현재 층수 기반 평가
+        current_level = getattr(world, 'current_level', 1) if world else 1
+        recommended_power = robart.get_recommended_power(current_level)
+        
+        power_ratio = avg_power / recommended_power if recommended_power > 0 else 0
+        
+        if power_ratio >= 1.5:
+            power_evaluation = "💪 압도적 전투력! 지루할 정도로 강해!"
+        elif power_ratio >= 1.2:
+            power_evaluation = "✅ 충분한 전투력! 역시 내 조언 덕분이지?"
+        elif power_ratio >= 1.0:
+            power_evaluation = "🟡 적당한 전투력. 방심하지 마!"
+        elif power_ratio >= 0.8:
+            power_evaluation = "🟠 약간 부족함. 조금만 더 키워!"
+        elif power_ratio >= 0.6:
+            power_evaluation = "🔴 많이 부족함. 집중 육성 필요!"
+        else:
+            power_evaluation = "💀 심각하게 약함! 당장 강화해!"
+        
+        print(f"📊 전투력 평가: {power_evaluation}")
+        print(f"   현재 평균: {avg_power:,} / 권장: {recommended_power:,} ({power_ratio:.1%})")
+        
+        # 종합 점수 계산
+        total_score = (power_ratio * 40) + (equipment_ratio * 30) + (avg_durability * 0.2) + (len(alive_members) * 5)
+        
+        if total_score >= 80:
+            overall_grade = "S급 완벽 파티!"
+        elif total_score >= 70:
+            overall_grade = "A급 우수 파티"
+        elif total_score >= 60:
+            overall_grade = "B급 양호 파티"
+        elif total_score >= 50:
+            overall_grade = "C급 보통 파티"
+        else:
+            overall_grade = "D급 개선 필요"
+        
+        print(f"🏆 종합 등급: {overall_grade} (점수: {total_score:.1f}/100)")
+        
+        # 로바트의 조언들
+        bragging_comment = robart.get_bragging_comment()
+        print(f"\n🤖 로-바트의 조언:")
+        print(f"   {bragging_comment}")
+        
+        strongest_char = combat_powers[0][0].name if combat_powers else "???"
+        weakest_char = combat_powers[-1][0].name if len(combat_powers) > 1 else "???"
+        print(f"   • {strongest_char}이(가) 최강! {weakest_char}이(가) 꼴찌!")
+        
+        if equipment_rankings:
+            best_eq = equipment_rankings[0]['char'].name
+            worst_eq = equipment_rankings[-1]['char'].name
+            print(f"   • 장비왕: {best_eq}, 장비꼴찌: {worst_eq}")
+        
+        # 구체적 개선 제안
+        print(f"\n💡 구체적 개선 제안:")
+        
+        if power_ratio < 1.0:
+            print(f"   • 전투력 부족! {current_level}층에서 레벨업 추천")
+        
+        for eq_data in equipment_rankings:
+            if eq_data['total_durability'] / max(eq_data['durability_count'], 1) < 50:
+                print(f"   • {eq_data['char'].name} 장비 수리 시급!")
+        
+        if tank_count == 0:
+            print(f"   • 탱커 없음! 전사/성기사 추가 권장")
+        if healer_count == 0:
+            print(f"   • 힐러 없음! 신관/드루이드 추가 권장")
+        
+        print("=" * 100)
+        print("🤖 로-바트: 이 정도면 완벽한 분석이지? 역시 나야! (자화자찬)")
+        print("=" * 100)
+        
+    except Exception as e:
+        print(f"🤖 로-바트: 어? 뭔가 이상한데? 분석 중 오류: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+# ===== 🤖 로-바트 편의 함수들 (모든 기능 쉽게 사용!) =====
+
+def get_robart_cooking_analysis(party_manager, world):
+    """🍳 로-바트의 요리 재료 분석"""
+    return robart.analyze_cooking_materials_enhanced(party_manager, world)
+
+def get_robart_skill_analysis(members):
+    """✨ 로-바트의 스킬 사용 분석"""
+    return robart.analyze_skill_usage_enhanced(members)
+
+def get_robart_progression_analysis(members, world):
+    """🚀 로-바트의 진행 준비도 분석"""
+    return robart.analyze_progression_readiness_enhanced(members, world)
+
+def get_robart_battle_commander(party_members, enemies, battle_state="START"):
+    """⚔️ 로-바트의 전투 지휘관"""
+    return robart.get_battle_commander_analysis(party_members, enemies, battle_state)
+
+def get_robart_full_analysis(party_manager, world, situation="COMPREHENSIVE"):
+    """🔥 로-바트의 모든 분석 기능 한 번에!"""
+    return robart.get_ultimate_analysis_suite(party_manager, world, situation)
+
+def get_robart_basic_recommendation(party_manager, world):
+    """💡 로-바트의 기본 추천 (간단 버전)"""
+    try:
+        analysis = robart.analyze_everything(party_manager, world, "FIELD")
+        return analysis.get("message", "🤖 로-바트: 뭔가 이상한데? 신중하게 가!")
+    except Exception as e:
+        return f"🤖 로-바트: 분석 실패! 각자 알아서 해! ({e})"
+
+def robart_says(message_type="random"):
+    """🤖 로-바트의 랜덤 멘트"""
+    import random
+    
+    if message_type == "confidence":
+        messages = [
+            "🤖 로-바트: 내가 있으니까 걱정 마! 천재잖아!",
+            "🤖 로-바트: 당연히 내 분석이 맞지~ 의심하지 마!",
+            "🤖 로-바트: 이 정도는 식은 죽 먹기야! 내가 누군데!",
+            "🤖 로-바트: 역시 나는 천재야! 칭찬해줘!"
+        ]
+    elif message_type == "warning":
+        messages = [
+            "🤖 로-바트: 어? 뭔가 이상한데? 조심해!",
+            "🤖 로-바트: 위험해! 내 말 들어!",
+            "🤖 로-바트: 이건 좀 위험한데... 신중하게!",
+            "🤖 로-바트: 경고! 무리하면 안 돼!"
+        ]
+    elif message_type == "error":
+        messages = [
+            "🤖 로-바트: 어라? 뭔가 꼬였네? 이상한데?",
+            "🤖 로-바트: 오류 발생! 이런 일이 있을 리가...",
+            "🤖 로-바트: 어? 계산이 안 맞네? 버그야?",
+            "🤖 로-바트: 이런... 예상 못한 상황이야!"
+        ]
+    else:  # random
+        messages = [
+            "🤖 로-바트: 오늘도 내가 최고지!",
+            "🤖 로-바트: 내 분석을 믿어! 틀릴 리 없어!",
+            "🤖 로-바트: 천재의 조언을 들어!",
+            "🤖 로-바트: 역시 나야~ 완벽해!",
+            "🤖 로-바트: 내가 도와줄게! 고마워해!",
+            "🤖 로-바트: 이것도 모르면서... 내가 알려줄게!"
+        ]
+    
+    return random.choice(messages)
+
+# ===== 전역 로-바트 인스턴스와 접근자 =====
+
+def get_robart():
+    """🤖 로-바트 인스턴스 반환"""
+    return robart
+
+def robart_analyze_all(party_manager, world, show_details=True):
+    """🔥 로-바트의 완전체 분석 (상세 표시 옵션)"""
+    if show_details:
+        # 상세 분석 + 화면 출력
+        show_detailed_party_analysis(party_manager, world)
+    else:
+        # 간단 분석만 반환
+        return get_robart_full_analysis(party_manager, world)
+
+# 별칭 함수들 (사용 편의성)
+robart_cooking = get_robart_cooking_analysis
+robart_skills = get_robart_skill_analysis  
+robart_progression = get_robart_progression_analysis
+robart_battle = get_robart_battle_commander
+robart_ultimate = get_robart_full_analysis

@@ -1,12 +1,26 @@
 @echo off
-:: Dawn of Stellar - Python Launcher Batch File
+:: Dawn of Stellar - PowerShell 강제 실행 런처
 :: UTF-8 encoding for Korean support
 chcp 65001 > nul
 
-title Dawn of Stellar - Python Launcher
+title Dawn of Stellar - PowerShell Launcher
 
-:: Color settings
-color 0B
+:: 현재 실행 환경 확인
+echo [INFO] Checking execution environment...
+
+:: PowerShell에서 실행 중인지 확인
+if "%PSModulePath%"=="" (
+    echo [DETECT] Running in Command Prompt - Switching to PowerShell...
+    echo [SWITCH] Launching game in PowerShell for better compatibility...
+    
+    :: PowerShell에서 런처 재실행
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "& { cd '%~dp0'; .\파이썬런처실행.bat /powershell }"
+    exit /b 0
+)
+
+:: PowerShell 환경 표시
+echo [SUCCESS] Running in PowerShell environment!
+echo [INFO] ANSI colors and advanced features enabled.
 
 echo.
 echo ================================================================

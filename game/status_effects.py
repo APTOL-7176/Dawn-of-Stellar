@@ -8,6 +8,16 @@ from typing import Dict, List, Any, Optional
 from enum import Enum
 import random
 
+# StatusType을 new_skill_system에서 import
+try:
+    from .new_skill_system import StatusType
+except ImportError:
+    # fallback: 기본 StatusType 정의
+    class StatusType(Enum):
+        BUFF = "buff"
+        DEBUFF = "debuff"
+        POISON = "poison"
+
 # 간단한 Color 클래스 정의
 class Color:
     GREEN = '\033[92m'
@@ -15,31 +25,6 @@ class Color:
     YELLOW = '\033[93m'
     BRIGHT_GREEN = '\033[92m'
     RESET = '\033[0m'
-
-class StatusType(Enum):
-    """상태 이상 타입"""
-    BUFF = "buff"
-    DEBUFF = "debuff"
-    DOT = "dot"  # Damage over Time
-    HOT = "hot"  # Heal over Time
-    STUN = "stun"
-    SILENCE = "silence"
-    POISON = "poison"
-    BURN = "burn"
-    FREEZE = "freeze"
-    PARALYZE = "paralyze"
-    SLEEP = "sleep"
-    CHARM = "charm"
-    FEAR = "fear"
-    BLIND = "blind"
-    WEAKEN = "weaken"
-    STRENGTHEN = "strengthen"
-    HASTE = "haste"
-    SLOW = "slow"
-    SHIELD = "shield"
-    REGENERATION = "regeneration"
-    CURSE = "curse"
-    BLESSING = "blessing"
 
 class StatusEffect:
     """상태 이상 효과 클래스"""

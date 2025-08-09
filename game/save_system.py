@@ -1103,33 +1103,6 @@ class GameStateSerializer:
             character.equipped_armor = deserialize_equipment(equipment_data.get('equipped_armor'))
             character.equipped_accessory = deserialize_equipment(equipment_data.get('equipped_accessory'))
             
-            # 🎯 장비 복원 후 인벤토리에 장비 아이템 자동 추가 (중요!)
-            equipped_items = []
-            if character.equipped_weapon:
-                equipped_items.append(character.equipped_weapon)
-                # Inventory.add_item은 Item 객체를 기대하므로 객체 자체를 추가
-                try:
-                    character.inventory.add_item(character.equipped_weapon, 1)
-                except Exception as _e:
-                    print(f"⚠️ 무기 인벤토리 추가 실패: {getattr(character.equipped_weapon, 'name', 'unknown')} - {_e}")
-                print(f"🔧 {character.equipped_weapon.name} 인벤토리에 자동 추가 (장착됨)")
-            
-            if character.equipped_armor:
-                equipped_items.append(character.equipped_armor)
-                try:
-                    character.inventory.add_item(character.equipped_armor, 1)
-                except Exception as _e:
-                    print(f"⚠️ 방어구 인벤토리 추가 실패: {getattr(character.equipped_armor, 'name', 'unknown')} - {_e}")
-                print(f"🔧 {character.equipped_armor.name} 인벤토리에 자동 추가 (장착됨)")
-            
-            if character.equipped_accessory:
-                equipped_items.append(character.equipped_accessory)
-                try:
-                    character.inventory.add_item(character.equipped_accessory, 1)
-                except Exception as _e:
-                    print(f"⚠️ 액세서리 인벤토리 추가 실패: {getattr(character.equipped_accessory, 'name', 'unknown')} - {_e}")
-                print(f"🔧 {character.equipped_accessory.name} 인벤토리에 자동 추가 (장착됨)")
-            
             # 장비 복원 로그
             print(f"🎒 [LOAD LOG] {character.name} 장비 복원:")
             print(f"🎒 [LOAD LOG] - Weapon: {character.equipped_weapon}")
@@ -1137,7 +1110,7 @@ class GameStateSerializer:
             print(f"🎒 [LOAD LOG] - Accessory: {character.equipped_accessory}")
             
             equipped_count = sum(1 for eq in [character.equipped_weapon, character.equipped_armor, character.equipped_accessory] if eq is not None)
-            print(f"✅ {character.name} 장비 복원 완료: {equipped_count}개 장비 + 인벤토리 동기화")
+            print(f"✅ {character.name} 장비 복원 완료: {equipped_count}개 장비")
         
         # 🎯 장비 복원 후 ATB 속도 재계산 (장비 보너스 포함)
         try:

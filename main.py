@@ -3,6 +3,7 @@
 Dawn Of Stellar - 메인 파일  
 별빛의 여명 - 28명의 개성있는 캐릭터와 ATB 전투 시스템을 가진 전술 RPG
 🎮 완전 통합 시스템 버전 - 165+ 상태효과, 100+ 적, FFVII BGM/SFX, 튜토리얼 🎮
+🔥 핫 리로드 지원: 게임 실행 중 파일 업데이트 자동 반영 🔥
 """
 
 import sys
@@ -14,6 +15,18 @@ from enum import Enum
 from typing import List, Tuple
 import time
 import random
+
+# 핫 리로드 매니저 import
+try:
+    from state_preserving_hot_reload import handle_state_preserving_hot_reload
+    HOT_RELOAD_AVAILABLE = True
+    print("🔥 상태 보존 핫 리로드 v2.0 활성화됨! 게임 상태를 유지하며 모듈을 업데이트합니다.")
+    print("💡 게임 중 'r' 키를 눌러 상태 보존 리로드 메뉴를 사용하세요.")
+except ImportError as e:
+    print(f"⚠️ 상태 보존 핫 리로드 기능을 불러올 수 없습니다: {e}")
+    HOT_RELOAD_AVAILABLE = False
+    def handle_state_preserving_hot_reload(key, game=None): return False
+
 # 스토리 시스템 import
 try:
     from story_system import show_opening_story, show_chapter_intro, show_character_intro
@@ -78,6 +91,7 @@ try:
     from game.random_encounters import (RandomEncounterManager, FieldSkillManager, 
                                         get_encounter_manager, get_field_skill_manager)
     from game.tutorial import show_help
+    from game.error_logger import get_comprehensive_logger, log_error, log_debug, log_player_action, log_player_movement  # 완전체 로그 시스템
     from config import game_config
 except ImportError as e:
     print(f"핵심 모듈 임포트 오류: {e}")
@@ -570,7 +584,7 @@ class DawnOfStellarGame:
         self.running = True
         self.character_db = CharacterDatabase()
         
-        # AI 게임모드 기본값 설정 (기본적으로 비활성화)
+        # 클래식 게임모드 기본값 설정 (기본적으로 비활성화)
         self.ai_game_mode_enabled = False
         
         # 키보드 입력 초기화 (게임패드 지원)
@@ -612,6 +626,245 @@ class DawnOfStellarGame:
             pass
         except:
             pass
+    
+    def _show_party_combat_analysis(self):
+        """파티 전투력 상세 분석 - 로바트 포함"""
+        if not hasattr(self, 'party_manager') or not self.party_manager.members:
+            print("파티 정보가 없습니다.")
+            return
+        
+        try:
+            from game.display import calculate_combat_power, get_detailed_ai_analysis
+            
+            print(f"\n{'='*70}")
+            print(f"{bright_cyan('📊 파티 전투력 상세 분석')}")
+            print(f"{'='*70}")
+            
+            # 각 파티원의 전투력 계산
+            combat_data = []
+            for member in self.party_manager.members:
+                if member.is_alive:
+                    power = calculate_combat_power(member)
+                    combat_data.append({
+                        'name': member.name,
+                        'class': member.character_class,
+                        'level': member.level,
+                        'power': power,
+                        'hp_ratio': member.current_hp / member.max_hp if member.max_hp > 0 else 0,
+                        'mp_ratio': member.current_mp / member.max_mp if member.max_mp > 0 else 0,
+                        'character': member
+                    })
+            
+            # 전투력 순으로 정렬
+            combat_data.sort(key=lambda x: x['power'], reverse=True)
+            
+            print(f"{bright_yellow('🏆 전투력 순위')}")
+            print("-" * 70)
+            
+            for i, data in enumerate(combat_data, 1):
+                rank_emoji = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}위"
+                
+                # 전투력에 따른 색상
+                if data['power'] >= 800:
+                    power_color = bright_red  # 최강
+                elif data['power'] >= 600:
+                    power_color = bright_magenta  # 강함
+                elif data['power'] >= 400:
+                    power_color = bright_yellow  # 보통
+                elif data['power'] >= 200:
+                    power_color = bright_cyan  # 약함
+                else:
+                    power_color = bright_white  # 매우 약함
+                
+                # 상태 표시
+                hp_status = "🟢" if data['hp_ratio'] > 0.8 else "🟡" if data['hp_ratio'] > 0.5 else "🔴"
+                mp_status = "🔵" if data['mp_ratio'] > 0.8 else "🟡" if data['mp_ratio'] > 0.5 else "🔴"
+                
+                print(f"{rank_emoji} {bright_white(data['name'])} ({data['class']}) Lv.{data['level']}")
+                print(f"    전투력: {power_color(str(data['power']))} | HP: {hp_status} {data['hp_ratio']*100:.0f}% | MP: {mp_status} {data['mp_ratio']*100:.0f}%")
+                print()
+            
+            # 꼴찌 분석
+            if len(combat_data) > 1:
+                weakest = combat_data[-1]
+                strongest = combat_data[0]
+                gap = strongest['power'] - weakest['power']
+                
+                print(f"{bright_red('⚠️ 전투력 격차 분석')}")
+                print("-" * 70)
+                print(f"최강자: {bright_green(strongest['name'])} (전투력 {strongest['power']})")
+                print(f"최약자: {bright_red(weakest['name'])} (전투력 {weakest['power']})")
+                print(f"격차: {bright_yellow(str(gap))} ({gap/strongest['power']*100:.1f}% 차이)")
+                
+                if gap > 300:
+                    print(f"{bright_red('📢 경고: 파티원 간 전투력 격차가 매우 큽니다!')}")
+                elif gap > 150:
+                    print(f"{bright_yellow('💡 주의: 파티원 간 전투력 격차가 있습니다.')}")
+                else:
+                    print(f"{bright_green('✅ 양호: 파티원 간 전투력이 균형적입니다.')}")
+                print()
+            
+            # 로바트 종합 분석
+            try:
+                analysis = get_detailed_ai_analysis(self.party_manager, self.world, "FIELD")
+                if analysis and analysis.get("status") != "ERROR":
+                    print(f"{bright_cyan('🤖 로-바트의 종합 분석')}")
+                    print("-" * 70)
+                    
+                    if "robart_comment" in analysis:
+                        print(f"{analysis['robart_comment']}")
+                    
+                    if "power_assessment" in analysis:
+                        print(f"전투력 평가: {analysis['power_assessment']}")
+                    
+                    if "recommended_action" in analysis:
+                        print(f"💡 추천사항: {bright_cyan(analysis['recommended_action'])}")
+                    
+                    if "special_advice" in analysis:
+                        print(f"🎯 특별조언: {analysis['special_advice']}")
+                else:
+                    print(f"🤖 로-바트: 지금은 분석이 어려워... (시스템 점검 중)")
+            except Exception as e:
+                print(f"🤖 로-바트: 어? 뭔가 이상한데? ({e})")
+            
+            print(f"{'='*70}")
+            
+        except ImportError as e:
+            print(f"분석 시스템을 로드할 수 없습니다: {e}")
+        except Exception as e:
+            print(f"전투력 분석 중 오류: {e}")
+        
+        self.keyboard.wait_for_key("아무 키나 눌러 계속...")
+    
+    def _show_party_equipment_analysis(self):
+        """파티 장비 상태 분석"""
+        if not hasattr(self, 'party_manager') or not self.party_manager.members:
+            print("파티 정보가 없습니다.")
+            return
+        
+        print(f"\n{'='*70}")
+        print(f"{bright_cyan('🛡️ 파티 장비 상태 분석')}")
+        print(f"{'='*70}")
+        
+        total_equipment_value = 0
+        equipment_warnings = []
+        
+        for member in self.party_manager.members:
+            if not member.is_alive:
+                continue
+                
+            print(f"\n{bright_yellow(f'👤 {member.name} ({member.character_class})')}")
+            print("-" * 50)
+            
+            equipment_found = False
+            member_value = 0
+            
+            if hasattr(member, 'equipped_items') and member.equipped_items:
+                for slot, item in member.equipped_items.items():
+                    if item is not None:
+                        equipment_found = True
+                        
+                        # 아이템 표시 이름 (내구도 포함)
+                        if hasattr(item, 'get_display_name'):
+                            display_name = item.get_display_name()
+                        else:
+                            display_name = item.name
+                        
+                        # 내구도 분석
+                        durability_status = "🟢"
+                        durability_warning = ""
+                        
+                        if hasattr(item, 'get_durability_percentage'):
+                            durability_pct = item.get_durability_percentage()
+                            if durability_pct < 20:
+                                durability_status = "🔴"
+                                durability_warning = " (수리 필요!)"
+                                equipment_warnings.append(f"{member.name}의 {display_name} 내구도 위험")
+                            elif durability_pct < 50:
+                                durability_status = "🟠"
+                                durability_warning = " (수리 권장)"
+                            elif durability_pct < 80:
+                                durability_status = "🟡"
+                            
+                            print(f"   {slot}: {display_name} {durability_status}{durability_pct:.0f}%{durability_warning}")
+                        elif hasattr(item, 'current_durability') and hasattr(item, 'max_durability'):
+                            durability_pct = (item.current_durability / item.max_durability * 100) if item.max_durability > 0 else 0
+                            if durability_pct < 20:
+                                durability_status = "🔴"
+                                durability_warning = " (수리 필요!)"
+                                equipment_warnings.append(f"{member.name}의 {display_name} 내구도 위험")
+                            elif durability_pct < 50:
+                                durability_status = "🟠"
+                            elif durability_pct < 80:
+                                durability_status = "🟡"
+                            
+                            print(f"   {slot}: {display_name} {durability_status}{durability_pct:.0f}%{durability_warning}")
+                        else:
+                            print(f"   {slot}: {display_name}")
+                        
+                        # 장비 가치 추정 (간단한 계산)
+                        item_value = getattr(item, 'value', 0) or getattr(item, 'price', 0) or (member.level * 10)
+                        member_value += item_value
+                        
+                        # 주요 능력치 보너스 표시
+                        if hasattr(item, 'get_effective_stats'):
+                            effective_stats = item.get_effective_stats()
+                            stat_bonuses = []
+                            for stat, value in effective_stats.items():
+                                if isinstance(value, (int, float)) and value > 0:
+                                    if stat == "physical_attack":
+                                        stat_bonuses.append(f"공격+{value}")
+                                    elif stat == "physical_defense":
+                                        stat_bonuses.append(f"방어+{value}")
+                                    elif stat == "magic_attack":
+                                        stat_bonuses.append(f"마공+{value}")
+                                    elif stat == "magic_defense":
+                                        stat_bonuses.append(f"마방+{value}")
+                                    elif stat == "speed":
+                                        stat_bonuses.append(f"속도+{value}")
+                            
+                            if stat_bonuses:
+                                print(f"      ({', '.join(stat_bonuses)})")
+            
+            if not equipment_found:
+                print("   (장착된 장비 없음)")
+                equipment_warnings.append(f"{member.name}이(가) 장비를 착용하지 않음")
+            else:
+                print(f"   💰 예상 장비 가치: {member_value:,} 골드")
+            
+            total_equipment_value += member_value
+        
+        # 종합 분석
+        print(f"\n{bright_cyan('📋 종합 분석')}")
+        print("-" * 70)
+        print(f"💰 파티 총 장비 가치: {bright_yellow(f'{total_equipment_value:,} 골드')}")
+        
+        if equipment_warnings:
+            print(f"\n{bright_red('⚠️ 장비 경고사항:')}")
+            for warning in equipment_warnings:
+                print(f"  • {warning}")
+        else:
+            print(f"\n{bright_green('✅ 모든 장비 상태 양호!')}")
+        
+        print(f"\n💡 {bright_cyan('장비 개선 제안:')}")
+        
+        # 장비 개선 제안 로직
+        unequipped_members = [m for m in self.party_manager.members if m.is_alive and (not hasattr(m, 'equipped_items') or not m.equipped_items)]
+        if unequipped_members:
+            print(f"  • {len(unequipped_members)}명의 파티원이 장비를 착용하지 않았습니다")
+            print("  • 상점에서 기본 장비를 구매하는 것을 권장합니다")
+        
+        low_durability_count = len([w for w in equipment_warnings if "내구도" in w])
+        if low_durability_count > 0:
+            print(f"  • {low_durability_count}개의 장비가 수리가 필요합니다")
+            print("  • 대장간에서 수리하거나 새 장비로 교체하세요")
+        
+        if not equipment_warnings:
+            print("  • 현재 장비 상태가 우수합니다!")
+            print("  • 더 높은 등급의 장비를 찾아 업그레이드를 고려해보세요")
+        
+        print(f"{'='*70}")
+        self.keyboard.wait_for_key("아무 키나 눌러 계속...")
     
     @staticmethod
     def restore_explored_tiles(world, tiles_data):
@@ -801,16 +1054,35 @@ class DawnOfStellarGame:
         print("✅ [AUDIO RESTORED] 정상 오디오 모드가 복원되었습니다")
     
     def safe_clear_screen(self):
-        """안전한 화면 클리어 - 디바운싱 적용"""
+        """안전한 화면 클리어 - PowerShell 스택 현상 방지"""
         import time
+        import os
+        import sys
         
         current_time = time.time()
-        # 0.1초 이내 중복 클리어 방지
-        if current_time - self._last_clear_time < 0.1:
+        # 0.5초 이내 중복 클리어 방지 (스택 현상 방지를 위해 증가)
+        if current_time - self._last_clear_time < 0.5:
             return
         
         self._last_clear_time = current_time
-        print("\033[2J\033[H", end='', flush=True)
+        
+        try:
+            # PowerShell 스택 현상 방지를 위해 화면 클리어 비활성화
+            # 대신 버퍼 플러시만 사용
+            sys.stdout.flush()
+            if hasattr(sys.stderr, 'flush'):
+                sys.stderr.flush()
+            
+            # PowerShell 환경 감지 (스택 현상 방지를 위해 주석 처리)
+            # if os.name == 'nt' and 'powershell' in os.environ.get('PSModulePath', '').lower():
+            #     # PowerShell에서는 cls 명령 사용
+            #     os.system('cls')
+            # else:
+            #     # 다른 터미널에서는 ANSI 이스케이프 시퀀스 사용
+            #     print("\033[2J\033[H", end='', flush=True)
+        except Exception:
+            # 폴백: 버퍼 플러시만 (스택 현상 방지)
+            pass
     
     def is_key_debounced(self, key: str) -> bool:
         """강화된 키 디바운싱 체크 - 키 홀드 및 빠른 반복 방지 + 실시간 홀드 감지"""
@@ -1031,6 +1303,42 @@ class DawnOfStellarGame:
             print(f"🎁 모험가의 준비로 파티가 {items_given}개의 아이템을 받았습니다!")
         else:
             print("⚠️ 시작 아이템을 지급할 수 없었습니다. (인벤토리 부족)")
+    
+    def _give_basic_starting_items(self):
+        """새 게임 시작 시 기본 아이템 제공 (영구 성장 시스템과 별도)"""
+        db = ItemDatabase()
+        
+        # 기본 시작 아이템 (새 게임 시작 시 항상 제공)
+        basic_starting_items = [
+            "체력 포션", "체력 포션", "마나 포션", 
+            "화염병", "해독제", "빵",
+            "강철 검", "가죽 갑옷", "힘의 반지"
+        ]
+        
+        # 파티 전체에게 아이템 분배
+        items_given = 0
+        for member in self.party_manager.members:
+            if not basic_starting_items:
+                break
+                
+            # 각 파티원에게 3개씩 아이템 지급
+            items_for_member = min(3, len(basic_starting_items))
+            for _ in range(items_for_member):
+                if basic_starting_items:
+                    item_name = basic_starting_items.pop(0)
+                    item = db.get_item(item_name)
+                    if item:
+                        success = member.inventory.add_item(item)
+                        if success:
+                            items_given += 1
+                        else:
+                            # 인벤토리가 가득 차면 다음 파티원에게
+                            break
+        
+        if items_given > 0:
+            print(f"🎒 새로운 모험가들이 {items_given}개의 기본 아이템을 받았습니다!")
+        else:
+            print("⚠️ 기본 아이템을 지급할 수 없었습니다. (인벤토리 부족)")
         
     def show_character_selection(self):
         """🎭 캐릭터 생성 시스템 - Easy Character Creator (기본)"""
@@ -1061,6 +1369,9 @@ class DawnOfStellarGame:
                 # party_manager에도 파티 설정 (중요!)
                 if hasattr(self, 'party_manager') and self.party_manager:
                     self.party_manager.members = party
+                
+                # 🎁 새 게임 시작 시 기본 아이템 제공
+                self._give_basic_starting_items()
                 
                 # print(f"\n{bright_green('✅ 파티가 성공적으로 준비되었습니다!')}")  # 메시지 제거
                 # print(f"{bright_cyan('🛡️ 파티원:')} {', '.join([c.name for c in party])}")  # 메시지 제거
@@ -1200,7 +1511,7 @@ class DawnOfStellarGame:
         pass
     
     def select_ai_game_mode(self):
-        """AI 게임모드 선택 - 커서 메뉴 방식"""
+        """클래식 게임모드 선택 - 커서 메뉴 방식"""
         try:
             from game.cursor_menu_system import CursorMenu
             
@@ -1221,13 +1532,13 @@ class DawnOfStellarGame:
             ]
             
             # 추가 정보 텍스트
-            extra_content = f"""{bright_cyan('💡 AI 모드의 장점:')}
+            extra_content = f"""{bright_cyan('💡 클래식 모드의 장점:')}
    ⚡ 전투 속도 향상 - 턴이 빨라집니다
-   🧠 스마트한 AI 동료 지원 - 직업별 최적화
-   🎯 전략적 협동 공격 - AI와 연계 가능
+   🧠 스마트한 클래식 동료 지원 - 직업별 최적화
+   🎯 전략적 협동 공격 - 클래식 AI와 연계 가능
    📦 아이템 자동 관리 - 최적 장비 추천
    💬 개성있는 대화 - 9가지 성격 시스템
-   🤝 상황별 제안 - AI가 전략 조언 제공
+   🤝 상황별 제안 - 클래식 AI가 전략 조언 제공
 
 {bright_yellow('🎯 처음이시라면 "AI 파트너 모드"를 추천합니다!')}"""
             
@@ -1254,7 +1565,7 @@ class DawnOfStellarGame:
                 print(f"\n✅ {bright_green('전체 수동 조작 모드')}가 선택되었습니다.")
                 print("🎮 모든 캐릭터를 직접 조작합니다.")
                 
-            elif choice in [1, 2, 3]:  # AI 모드들
+            elif choice in [1, 2, 3]:  # 클래식 모드들
                 self.ai_game_mode_enabled = True
                 
                 # 조작할 캐릭터 수 결정
@@ -1264,7 +1575,7 @@ class DawnOfStellarGame:
                     from game.ai_game_mode import initialize_ai_game_mode
                     initialize_ai_game_mode(self.party_manager.members, controlled_count)
                 except Exception as ai_error:
-                    print(f"⚠️ AI 모드 초기화 오류: {ai_error}")
+                    print(f"⚠️ 클래식 모드 초기화 오류: {ai_error}")
                     print("기본 모드로 계속 진행합니다.")
                     self.ai_game_mode_enabled = False
                 
@@ -1277,7 +1588,7 @@ class DawnOfStellarGame:
                 
                 print(f"\n✅ {bright_green(mode_names[choice])}가 선택되었습니다!")
                 
-                # AI 모드별 추가 안내
+                # 클래식 모드별 추가 안내
                 if choice == 1:  # AI 파트너 모드
                     print("🎯 1명만 조작하고 나머지 3명은 AI가 자동으로 처리합니다.")
                     print("💡 전투에서 '💬 AI 요청 확인'으로 AI의 제안을 들어보세요!")
@@ -1286,7 +1597,7 @@ class DawnOfStellarGame:
                     print("💡 적절한 밸런스로 전투의 재미와 효율을 모두 챙길 수 있습니다!")
                 elif choice == 3:  # 혼합 모드
                     print("🎯 상황에 따라 조작 방식을 자유롭게 변경할 수 있습니다.")
-                    print("💡 전투 중에도 AI 모드를 켜고 끌 수 있습니다!")
+                    print("💡 전투 중에도 클래식 모드를 켜고 끌 수 있습니다!")
                 
                 # 아이템 공유 권한 설정
                 try:
@@ -1313,13 +1624,13 @@ class DawnOfStellarGame:
             self._select_ai_game_mode_fallback()
             
         except Exception as e:
-            print(f"❌ AI 모드 선택 오류: {e}")
+            print(f"❌ 클래식 모드 선택 오류: {e}")
             print("기본 모드(전체 수동 조작)로 진행합니다.")
             self.ai_game_mode_enabled = False
     
     
     def _select_ai_game_mode_fallback(self):
-        """AI 게임모드 선택 - 기본 메뉴 (폴백)"""
+        """클래식 게임모드 선택 - 기본 메뉴 (폴백)"""
         print(f"\n{'='*50}")
         print(f"{bright_white('        🤖 게임 조작 모드 선택 🤖')}")
         print(f"{'='*50}")
@@ -1330,7 +1641,7 @@ class DawnOfStellarGame:
         print("3. 🎯 듀얼 컨트롤 (2명 조작, 나머지는 AI)")
         print("4. 🔄 혼합 모드 (상황에 따라 변경)")
         
-        print(f"\n{bright_cyan('💡 AI 모드의 장점:')}")
+        print(f"\n{bright_cyan('💡 클래식 모드의 장점:')}")
         print("   ⚡ 전투 속도 향상")
         print("   🧠 스마트한 AI 동료 지원")
         print("   🎯 전략적 협동 공격")
@@ -1348,7 +1659,7 @@ class DawnOfStellarGame:
                     break
                 
                 elif choice in ['2', '3', '4']:
-                    # AI 게임모드 활성화
+                    # 클래식 게임모드 활성화
                     self.ai_game_mode_enabled = True
                     
                     # 조작할 캐릭터 수 결정
@@ -1381,7 +1692,7 @@ class DawnOfStellarGame:
             self.keyboard.wait_for_key("아무 키나 눌러 계속...")
     
     def _setup_item_sharing_for_ai_mode(self):
-        """AI 모드용 아이템 공유 설정"""
+        """클래식 모드용 아이템 공유 설정"""
         try:
             from game.party_item_sharing import party_item_sharing, ItemSharingPermission
             from game.cursor_menu_system import CursorMenu
@@ -2286,7 +2597,7 @@ class DawnOfStellarGame:
             # 확인창 추가 - 패시브 효과 적용 후 잠시 멈춤
             if len(selected_passives) > 0:
                 print(f"\n{bright_white('💡 선택하신 패시브 효과들이 이번 게임에서 활성화됩니다!')}")
-                print(f"{bright_cyan('이 효과들은 던전 탐험 중 자동으로 적용됩니다.')}")
+                print(f"{bright_cyan('이 효과들은 차원 공간 탐험 중 자동으로 적용됩니다.')}")
                 self.keyboard.wait_for_key(f"\n{bright_green('✅ 아무 키나 눌러 모험을 계속하세요...')}")
             else:
                 self.keyboard.wait_for_key(f"\n{bright_white('🔑 아무 키나 눌러 계속...')}")
@@ -2608,7 +2919,7 @@ class DawnOfStellarGame:
                 
                 if self.passive_states[effect_type]["uses_this_floor"] < uses_per_floor:
                     for member in self.party_manager.members:
-                        if member.is_alive and member.hp <= (member.max_hp * hp_threshold):
+                        if member.is_alive and member.current_hp <= (member.max_hp * hp_threshold):
                             heal_amount = int(member.max_hp * hp_regen)
                             if heal_amount > 0:
                                 member.heal(heal_amount)
@@ -2651,15 +2962,15 @@ class DawnOfStellarGame:
                 for member in self.party_manager.members:
                     if member.is_alive:
                         # HP 체크 및 회복
-                        if member.hp < (member.max_hp * threshold):
+                        if member.current_hp < (member.max_hp * threshold):
                             new_hp = int(member.max_hp * restore_to)
-                            member.hp = new_hp
+                            member.current_hp = new_hp
                             self.add_game_message(f"💚 {member.name}의 불멸의 재생력으로 HP가 {int(restore_to*100)}%로 회복되었습니다!")
                         
                         # MP 체크 및 회복
-                        if member.mp < (member.max_mp * threshold):
+                        if member.current_mp < (member.max_mp * threshold):
                             new_mp = int(member.max_mp * restore_to)
-                            member.mp = new_mp
+                            member.current_mp = new_mp
                             self.add_game_message(f"💙 {member.name}의 불멸의 재생력으로 MP가 {int(restore_to*100)}%로 회복되었습니다!")
             
             # 혈액 재생: 적 처치 시 HP 6% 회복, 상처 3% 치료
@@ -3628,6 +3939,11 @@ class DawnOfStellarGame:
                 print("⚠️ 바닥 아이템 복원을 위한 조건이 충족되지 않았습니다.")
                 return
             
+            # 기존 바닥 아이템 클리어 (무한 파밍 방지)
+            if hasattr(self.world, 'items_on_ground'):
+                self.world.items_on_ground.clear()
+                print("🧹 기존 바닥 아이템 클리어 완료")
+            
             restored_items = []
             item_count = 0
             
@@ -3724,14 +4040,35 @@ class DawnOfStellarGame:
                     print(f"⚠️ 적 복원 중 오류: {enemy_error}")
                     continue
             
-            # 월드에 적 목록 설정
+            # 월드에 적 목록 설정 (기존 적들 클리어 후 복원)
             if hasattr(self.world, 'enemies'):
+                self.world.enemies.clear()  # 기존 적들 클리어
                 self.world.enemies = restored_enemies
-                print(f"✅ 적 위치 {enemy_count}개 복원 완료")
+                print(f"✅ 적 위치 {enemy_count}개 복원 완료 (기존 적 클리어됨)")
             else:
                 # enemies 속성이 없으면 생성
                 self.world.enemies = restored_enemies
                 print(f"✅ 적 속성 생성 및 {enemy_count}개 위치 복원 완료")
+            
+            # enemies_positions 리스트 업데이트 (충돌 검사용)
+            if hasattr(self.world, 'enemies_positions'):
+                self.world.enemies_positions.clear()  # 기존 위치 클리어
+                for enemy in restored_enemies:
+                    enemy_pos = (enemy['x'], enemy['y'])
+                    self.world.enemies_positions.append(enemy_pos)
+                    # 타일에도 적 정보 설정
+                    if hasattr(self.world, 'tiles') and self.world.tiles:
+                        x, y = enemy_pos
+                        if 0 <= y < len(self.world.tiles) and 0 <= x < len(self.world.tiles[y]):
+                            self.world.tiles[y][x].has_enemy = True
+                print(f"✅ 적 충돌 검사용 위치 목록 {len(self.world.enemies_positions)}개 업데이트 완료")
+            else:
+                # enemies_positions 속성이 없으면 생성
+                self.world.enemies_positions = []
+                for enemy in restored_enemies:
+                    enemy_pos = (enemy['x'], enemy['y'])
+                    self.world.enemies_positions.append(enemy_pos)
+                print(f"✅ 적 위치 목록 생성 및 {len(self.world.enemies_positions)}개 업데이트 완료")
                 
         except Exception as e:
             print(f"⚠️ 적 위치 복원 중 오류: {e}")
@@ -3952,6 +4289,8 @@ class DawnOfStellarGame:
             else:
                 from game.brave_combat import BraveCombatSystem
                 combat_system = BraveCombatSystem(self.audio_system, self.audio_system)
+                # AI 모드 명시적 비활성화 (일반 게임모드)
+                combat_system.set_ai_game_mode(False)
                 self.brave_combat_system = combat_system
                 print(f"{bright_yellow('💡 전투 시스템을 새로 초기화했습니다.')}")
             
@@ -3991,14 +4330,14 @@ class DawnOfStellarGame:
             self.keyboard.wait_for_key("아무 키나 눌러 계속...")
     
     def show_ai_mode_settings(self):
-        """AI 모드 설정 화면"""
+        """클래식 모드 설정 화면"""
         try:
             from game.ai_game_mode import ai_game_mode_manager
             from game.party_item_sharing import party_item_sharing, ItemSharingPermission
             from game.cursor_menu_system import CursorMenu
             
             print(f"\n{bright_cyan('═══════════════════════════════════')}")
-            print(f"{bright_white('        🤖 AI 게임모드 설정 🤖')}")
+            print(f"{bright_white('        🎮 클래식 게임모드 설정 🎮')}")
             print(f"{bright_cyan('═══════════════════════════════════')}")
             
             # 현재 상태 표시
@@ -4009,7 +4348,7 @@ class DawnOfStellarGame:
             # 커서 메뉴 시스템 사용
             try:
                 menu = CursorMenu(
-                    title="🤖 AI 게임모드 설정",
+                    title="🎮 클래식 게임모드 설정",
                     options=[
                         "🔧 아이템 공유 권한 변경",
                         "📊 AI 상태 확인",
@@ -4624,15 +4963,42 @@ class DawnOfStellarGame:
             else:
                 print("⚠️ 저장된 월드 상태가 없습니다. 새 맵이 생성됩니다.")
             
-            # 현재 위치 복원
+            # 플레이어 위치 복원 (중요!)
+            if 'player_position' in game_state and game_state['player_position']:
+                player_pos = game_state['player_position']
+                if hasattr(self, 'world') and self.world and isinstance(player_pos, (list, tuple)) and len(player_pos) >= 2:
+                    self.world.player_pos = (int(player_pos[0]), int(player_pos[1]))
+                    print(f"📍 플레이어 위치 복원: {self.world.player_pos}")
+                else:
+                    print(f"⚠️ 플레이어 위치 복원 실패: world={hasattr(self, 'world')}, pos={player_pos}")
+            else:
+                print("⚠️ 저장된 플레이어 위치가 없습니다.")
+            
+            # 현재 위치 복원 및 파티 매니저와 동기화
             current_position = game_state.get('current_position', {})
             if current_position:
                 x = current_position.get('x', 0)
                 y = current_position.get('y', 0)
+                
+                # 파티 매니저 위치 설정
                 if hasattr(self.party_manager, 'x'):
                     self.party_manager.x = x
                     self.party_manager.y = y
-                    print(f"📍 파티 위치 복원: ({x}, {y})")
+                
+                # 월드 플레이어 위치와 동기화
+                if hasattr(self, 'world') and self.world:
+                    self.world.player_pos = (x, y)
+                    print(f"📍 통합 위치 복원: ({x}, {y})")
+                    
+                    # 시야 업데이트
+                    try:
+                        if hasattr(self.world, 'update_visibility'):
+                            self.world.update_visibility()
+                            print("👁️ 위치 복원 후 시야 업데이트 완료")
+                    except Exception as vis_error:
+                        print(f"⚠️ 시야 업데이트 실패: {vis_error}")
+            else:
+                print("⚠️ 저장된 현재 위치가 없습니다.")
             
             # 현재 층수 복원
             if 'current_floor' in game_state:
@@ -5061,8 +5427,8 @@ class DawnOfStellarGame:
         # 영구 성장 보너스 적용
         self.apply_permanent_bonuses()
         
-        # 🎵 메인 메뉴 BGM 정지 후 던전 테마 BGM 시작
-        # print("🎵 던전 BGM을 시작합니다...")  # 메시지 제거
+        # 🎵 메인 메뉴 BGM 정지 후 차원 공간 테마 BGM 시작
+        # print("🎵 차원 공간 BGM을 시작합니다...")  # 메시지 제거
         try:
             # 먼저 현재 BGM 완전 정지
             if hasattr(self, 'audio_system') and self.audio_system:
@@ -5070,13 +5436,13 @@ class DawnOfStellarGame:
                 pygame.mixer.music.stop()
                 pygame.mixer.music.unload()  # 메모리에서 완전 해제
             
-            # 잠시 대기 후 던전 BGM 시작
+            # 잠시 대기 후 차원 공간 BGM 시작
             import time
             time.sleep(0.1)  # 100ms 대기
             
-            # 초기 던전 BGM 설정
+            # 초기 차원 공간 BGM 설정
             self.safe_play_bgm("dungeon", loop=True)
-            # print(f"✅ BGM 재생 중: dungeon (1층 던전)")  # 메시지 제거
+            # print(f"✅ BGM 재생 중: dungeon (1층 차원 공간)")  # 메시지 제거
         except Exception as e:
             # print(f"⚠️ BGM 재생 실패: {e}")  # 메시지 제거
             pass
@@ -5128,17 +5494,17 @@ class DawnOfStellarGame:
             return bright_red(f"{current_hp}/{max_hp}")
         
     def start_adventure(self, skip_passive_selection=False, skip_ai_mode_selection=False):
-        """모험 시작 - AI 게임모드 선택 포함"""
+        """모험 시작 - 클래식 게임모드 선택 포함"""
         # print(f"\n{bright_cyan('🌟 모험을 시작합니다!', True)}")  # 메시지 제거
         
-        # 게임 로드 시에는 AI 모드 선택 건너뛰기 (저장된 설정 사용)
+        # 게임 로드 시에는 클래식 모드 선택 건너뛰기 (저장된 설정 사용)
         if not skip_ai_mode_selection:
-            # AI 게임모드 선택
+            # 클래식 게임모드 선택
             self.select_ai_game_mode()
         else:
             print(f"\n{bright_cyan('🤖 저장된 AI 설정을 사용합니다.')}")
             ai_status = "활성화" if getattr(self, 'ai_game_mode_enabled', False) else "비활성화"
-            print(f"   AI 게임모드: {ai_status}")
+            print(f"   클래식 게임모드: {ai_status}")
         
         # 불러오기가 아닌 경우에만 파티 전체 패시브 효과 선택
         if not skip_passive_selection:
@@ -5205,7 +5571,7 @@ class DawnOfStellarGame:
                 
             print(f"  {bright_cyan(str(i))}. {emoji} {character_display} - HP: {hp_display}")
         
-        print(f"\n{bright_yellow(f'🏢 현재 위치: 던전 {self.world.current_level}층')}")
+        print(f"\n{bright_yellow(f'� 현재 위치: 차원 공간 {self.world.current_level}층')}")
         # print(f"{bright_green('🚀 모험이 시작되었습니다!')}")  # 메시지 제거
         print()
         print(f"{bright_cyan('═══ 🎮 게임 조작법 ═══')}")
@@ -5213,11 +5579,11 @@ class DawnOfStellarGame:
         print(f"  {cyan('📋 메뉴:')} {bright_white('I')}(인벤토리) {bright_white('P')}(파티상태) {bright_white('F')}(필드활동)")  
         print(f"  {magenta('⚙️  기타:')} {bright_white('H')}(도움말) {bright_white('Q')}(종료) {bright_white('B')}(저장)")
         
-        # AI 게임모드 조작법 항상 표시
+        # 클래식 게임모드 조작법 항상 표시
         if hasattr(self, 'ai_game_mode_enabled') and self.ai_game_mode_enabled:
-            print(f"  {bright_magenta('🤖 AI모드:')} {bright_white('M')}(AI설정) {bright_white('R')}(AI요청) {bright_white('Y')}(AI상태)")
+            print(f"  {bright_magenta('🎮 클래식모드:')} {bright_white('M')}(클래식설정) {bright_white('R')}(클래식요청) {bright_white('Y')}(클래식상태)")
         else:
-            print(f"  {bright_magenta('🤖 AI모드:')} {bright_white('M')}(AI설정) - AI 게임모드 미활성화")
+            print(f"  {bright_magenta('🎮 클래식모드:')} {bright_white('M')}(클래식설정) - 클래식 게임모드 미활성화")
         print(f"{bright_cyan('═══════════════════')}")
         print()
         
@@ -5225,18 +5591,30 @@ class DawnOfStellarGame:
         # print(f"{bright_cyan('🎮 게임이 시작됩니다!')}")  # 메시지 제거
         self.keyboard.wait_for_key("🔑 아무 키나 눌러 게임 시작...")
         
-        # 🎵 메인 메뉴/캐릭터 생성 BGM에서 던전 BGM으로 전환
+        # 게임 시작 직후 적 초기 이동 (한 번만)
+        try:
+            if hasattr(self.world, 'move_enemies') and hasattr(self.world, 'enemies_positions'):
+                enemy_count = len(self.world.enemies_positions)
+                if enemy_count > 0:
+                    print(f"👹 {enemy_count}마리의 적이 움직이기 시작합니다...")
+                    self.world.move_enemies()
+                    log_debug("게임시작", f"초기 적 이동 완료", {"적수": enemy_count})
+        except Exception as e:
+            print(f"⚠️ 초기 적 이동 중 오류: {e}")
+            log_error("게임시작", f"초기 적 이동 오류", e)
+        
+        # 🎵 메인 메뉴/캐릭터 생성 BGM에서 차원 공간 BGM으로 전환
         try:
             if hasattr(self, 'audio_system') and self.audio_system:
                 import pygame
-                # 현재 BGM이 던전 BGM이 아닌 경우에만 전환
+                # 현재 BGM이 차원 공간 BGM이 아닌 경우에만 전환
                 from game.audio_system import BGMType
                 if not hasattr(self.audio_system, 'current_bgm_type') or self.audio_system.current_bgm_type != BGMType.FLOOR_1_3:
                     pygame.mixer.music.stop()
                     pygame.mixer.music.unload()
                     import time
                     time.sleep(0.1)  # 잠시 대기
-                    # 던전 BGM 시작
+                    # 차원 공간 BGM 시작
                     self.update_floor_bgm()  # 현재 층에 맞는 BGM 재생
         except Exception:
             pass
@@ -5420,7 +5798,7 @@ class DawnOfStellarGame:
             print(f"⚠️ BGM 업데이트 실패: {e}")
 
     def main_game_loop(self):
-        """실제 게임 플레이 루프 - AI 게임모드 통합"""
+        """실제 게임 플레이 루프 - 클래식 게임모드 통합"""
         import time  # time 모듈 import 추가
         floors_cleared = 0
         enemies_defeated = 0
@@ -5445,7 +5823,7 @@ class DawnOfStellarGame:
         # 게임 시작 화면 클리어 (한 번만)
         self.safe_clear_screen()
         
-        # AI 게임모드 초기화 확인
+        # 클래식 게임모드 초기화 확인
         if hasattr(self, 'ai_game_mode_enabled') and self.ai_game_mode_enabled:
             from game.ai_game_mode import ai_game_mode_manager
             from game.party_item_sharing import party_item_sharing
@@ -5495,8 +5873,8 @@ class DawnOfStellarGame:
                 
                 # 화면 갱신이 필요한 경우에만 표시
                 if need_screen_refresh:
-                    # 강제 화면 클리어 (UI 겹침/복사 방지)
-                    self.safe_clear_screen()
+                    # 화면 클리어 제거 - 깜빡임 방지
+                    # self.safe_clear_screen()  # 주석 처리
                     
                     try:
                         display_success = False
@@ -5535,7 +5913,7 @@ class DawnOfStellarGame:
                             # 화면 클리어 (폴백용) - 디바운싱 적용
                             self.safe_clear_screen()
                                 
-                            print(f"\n🎮 Dawn of Stellar - 던전 {getattr(self.world, 'current_level', 1)}층")
+                            print(f"\n🎮 Dawn of Stellar - 차원 공간 {getattr(self.world, 'current_level', 1)}층")
                             print(f"📍 플레이어 위치: {getattr(self.world, 'player_pos', '알 수 없음')}")
                             print("❌ 화면 표시 시스템에 문제가 있습니다. 게임은 계속 진행됩니다.")
                             print(f"⚙️ 화면 표시 문제가 있습니다. Enter를 눌러 다시 시도하세요.")
@@ -5543,13 +5921,13 @@ class DawnOfStellarGame:
                     except Exception as display_error:
                         # 최종 fallback: 기본 텍스트만 표시
                         print(f"🔧 Display 오류: {display_error}")
-                        print(f"🎮 Dawn of Stellar - 던전 {getattr(self.world, 'current_level', 1)}층")
+                        print(f"🎮 Dawn of Stellar - 차원 공간 {getattr(self.world, 'current_level', 1)}층")
                         print(f"📍 위치: {getattr(self.world, 'player_pos', '?')}")
                         print("화면 표시에 문제가 있습니다. 게임은 계속 진행됩니다.")
                     
                     need_screen_refresh = False  # 화면 갱신 완료
                 
-                # AI 요청 확인 (AI 게임모드인 경우)
+                # 클래식 요청 확인 (클래식 게임모드인 경우)
                 if hasattr(self, 'ai_game_mode_enabled') and self.ai_game_mode_enabled:
                     from game.party_item_sharing import party_item_sharing
                     if party_item_sharing.pending_requests:
@@ -5579,13 +5957,16 @@ class DawnOfStellarGame:
                 # 액션 처리
                 action_result = self.process_action(action)
                 
+                # 🔥 중요: process_action에서 적 이동이나 전투가 있었으면 화면 갱신
+                if action_result is True:
+                    need_screen_refresh = True
+                
                 # 액션 처리 후 화면 갱신이 필요한 경우에만 설정
                 # 이동, 상호작용은 화면 갱신 필요 / 정보성 명령은 불필요
                 if action in ['w', 'a', 's', 'd']:  # 이동
                     need_screen_refresh = True
                     # 이동 후 화면 갱신 플래그만 설정 (중복 렌더링 방지)
                     need_screen_refresh = True
-                    print(f"✅ 이동 완료 - 화면 갱신 예약")
                 elif action in ['i', 'm', 'c', 'p', 'x', 'z', 'f']:  # 메뉴/상호작용
                     need_screen_refresh = True
                 elif action in ['h', '?', 'esc']:  # 정보성/도움말
@@ -5872,7 +6253,7 @@ class DawnOfStellarGame:
                 ]
                 
                 descriptions = [
-                    "던전 맵의 크기를 조정합니다 (25x25 ~ 70x70)",
+                    "차원 공간 맵의 크기를 조정합니다 (25x25 ~ 70x70)",
                     "화면 크기, 전체화면, 색상 등 디스플레이 관련 설정",
                     "BGM, 효과음, 볼륨 등 오디오 관련 설정",
                     "자동 저장, 애니메이션, 전투 속도 등 게임플레이 설정",
@@ -6854,11 +7235,11 @@ class DawnOfStellarGame:
             # 조작법은 게임 시작 시에만 한 번 표시
             if not hasattr(self, '_controls_shown'):
                 
-                # AI 게임모드 조작법
+                # 클래식 게임모드 조작법
                 if hasattr(self, 'ai_game_mode_enabled') and self.ai_game_mode_enabled:
-                    print(f"  {bright_magenta('🤖 AI모드:')} M(AI설정), R(AI요청), Y(AI상태)")
+                    print(f"  {bright_magenta('🎮 클래식모드:')} M(클래식설정), R(클래식요청), Y(클래식상태)")
                 else:
-                    print(f"  {bright_magenta('🤖 AI모드:')} M(AI설정) - 미활성화")
+                    print(f"  {bright_magenta('🎮 클래식모드:')} M(클래식설정) - 미활성화")
                 
                 # 자동전투 상태 표시
                 auto_battle_status = self.get_auto_battle_status()
@@ -6883,12 +7264,15 @@ class DawnOfStellarGame:
                 if not key:
                     print(f"\n⚠️ 입력이 없습니다. 다시 시도합니다... ({attempt}/{max_attempts})")
                     continue  # 다시 시도
-                # 빈 문자열이나 공백만 있는 경우 처리
-                key = key.strip()
-                if not key:
-                    print(f"\n⚠️ 유효하지 않은 입력입니다. 다시 시도합니다... ({attempt}/{max_attempts})")
-                    continue  # 다시 시도
-                return key
+                # Enter키는 strip하지 않고 그대로 반환
+                if key in ['\r', '\n']:
+                    return key
+                    
+                # 빈 문자열이나 공백만 있는 경우 처리 (Enter키 제외)
+                key_stripped = key.strip()
+                if not key_stripped:
+                    continue  # 다시 시도 (메시지 없이)
+                return key_stripped
             
             # 최대 시도 횟수 초과
             print(f"\n⚠️ 최대 입력 시도 횟수({max_attempts})를 초과했습니다. 위로 이동합니다.")
@@ -6899,7 +7283,7 @@ class DawnOfStellarGame:
             return 'q'  # 오류 시 종료
     
     def process_action(self, action):
-        """액션 처리 - AI 게임모드 및 이동/층 전환 지원"""
+        """액션 처리 - 클래식 게임모드 및 이동/층 전환 지원"""
         if action.lower() == 'q':
             # 게임 종료 확인창
             if self.confirm_quit():
@@ -6921,21 +7305,22 @@ class DawnOfStellarGame:
             print()
             print(f"{magenta('⚙️  시스템 조작:')}")
             print(f"   {bright_white('H')} - ❓ 도움말 (이 화면)")
+            print(f"   {bright_white('L')} - 📋 오류 로그 확인")
             print(f"   {bright_white('Q')} - 🚪 게임 종료")
             print(f"   {bright_white('B')} - 💾 게임 저장")
             print(f"   {bright_white('T')} - ⚔️ 자동전투 토글")
             print(f"   {bright_white('Z')} - 🌀 긴급 텔레포트 (갇혔을 때 사용)")
             
-            # AI 게임모드인 경우 추가 조작법
+            # 클래식 게임모드인 경우 추가 조작법
             if hasattr(self, 'ai_game_mode_enabled') and self.ai_game_mode_enabled:
                 print()
-                print(f"{bright_magenta('🤖 AI 게임모드:')}")
-                print(f"   {bright_white('M')} - 🎛️ AI 모드 설정")
+                print(f"{bright_magenta('🎮 클래식 게임모드:')}")
+                print(f"   {bright_white('M')} - 🎛️ 클래식 모드 설정")
                 print(f"   {bright_white('R')} - 💬 AI 요청 처리")
                 print(f"   {bright_white('Y')} - 📊 AI 상태 확인")
             
             print(f"{bright_cyan('═══════════════════════════════════════')}")
-            print(f"{bright_green('💡 팁: 던전을 탐험하며 몬스터와 전투하고 보물을 찾아보세요!')}")
+            print(f"{bright_green('💡 팁: 차원 공간을 탐험하며 차원 생명체와 전투하고 보물을 찾아보세요!')}")
             print(f"{bright_cyan('═══════════════════════════════════════')}")
             
             # 조작법을 다시 표시하도록 플래그 리셋
@@ -6945,25 +7330,40 @@ class DawnOfStellarGame:
         elif action.lower() == 't':  # T키로 자동전투 토글
             self.toggle_auto_battle()
             
-        elif action.lower() == 'm':  # M키로 AI 모드 설정
+        elif action.lower() == 'l':  # L키로 오류 로그 확인
+            self.show_error_logs()
+            
+        elif action.lower() == 'm':  # M키로 클래식 모드 설정
             if hasattr(self, 'ai_game_mode_enabled') and self.ai_game_mode_enabled:
                 self.show_ai_mode_settings()
             else:
-                print("❌ AI 게임모드가 활성화되지 않았습니다.")
+                print("❌ 클래식 게임모드가 활성화되지 않았습니다.")
                 self.keyboard.wait_for_key("아무 키나 눌러 계속...")
         
-        elif action.lower() == 'r':  # R키로 AI 요청 처리
+        elif action.lower() == 'r':  # R키로 클래식 요청 처리 또는 상태 보존 핫 리로드
             if hasattr(self, 'ai_game_mode_enabled') and self.ai_game_mode_enabled:
                 self.handle_ai_requests()
             else:
-                print("❌ AI 게임모드가 활성화되지 않았습니다.")
-                self.keyboard.wait_for_key("아무 키나 눌러 계속...")
+                # 상태 보존 핫 리로드 기능 시도
+                if HOT_RELOAD_AVAILABLE:
+                    try:
+                        if handle_state_preserving_hot_reload('r', self):
+                            print("🔥 상태 보존 핫 리로드가 완료되었습니다!")
+                        else:
+                            print("❌ 핫 리로드가 취소되었습니다.")
+                    except Exception as e:
+                        print(f"❌ 상태 보존 핫 리로드 실행 중 오류: {e}")
+                        import traceback
+                        print(f"상세 오류: {traceback.format_exc()}")
+                else:
+                    print("❌ 상태 보존 핫 리로드 기능이 비활성화되어 있습니다.")
+                # 대기 없이 바로 계속 (핫 리로드에서 이미 대기함)
         
-        elif action.lower() == 'y':  # Y키로 AI 상태 확인
+        elif action.lower() == 'y':  # Y키로 클래식 상태 확인
             if hasattr(self, 'ai_game_mode_enabled') and self.ai_game_mode_enabled:
                 self.show_ai_status()
             else:
-                print("❌ AI 게임모드가 활성화되지 않았습니다.")
+                print("❌ 클래식 게임모드가 활성화되지 않았습니다.")
                 self.keyboard.wait_for_key("아무 키나 눌러 계속...")
         
         elif action == '\r' or action == '\n':  # Enter 키 - 상호작용
@@ -7041,7 +7441,7 @@ class DawnOfStellarGame:
             self.keyboard.wait_for_key("아무 키나 눌러 계속...")
                 
         elif action.lower() == 'i':
-            # 인벤토리 메뉴 - AI 게임모드에서는 아이템 공유 상태도 표시
+            # 인벤토리 메뉴 - 클래식 게임모드에서는 아이템 공유 상태도 표시
             if hasattr(self, 'ai_game_mode_enabled') and self.ai_game_mode_enabled:
                 from game.party_item_sharing import party_item_sharing
                 party_item_sharing.handle_pending_requests()  # 대기 중인 요청 먼저 처리
@@ -7050,16 +7450,16 @@ class DawnOfStellarGame:
                 try:
                     from game.cursor_menu_system import create_simple_menu
                     
-                    # 메뉴 옵션 - AI 게임모드가 아닐 때만 아이템 전송 추가
-                    inventory_options = ["🧪 소모품", "⚔️ 장비", "🤔 장비 해제", "⚡ 최적화 재장착"]
+                    # 메뉴 옵션 - 클래식 게임모드가 아닐 때만 아이템 전송 추가
+                    inventory_options = ["🧪 소모품", "⚔️ 장비", "🤔 장비 해제", "🔄 장비 재배치"]
                     inventory_descriptions = [
                         "치유 물약, 버프 아이템 등을 사용합니다",
                         "무기, 방어구, 장신구를 장착합니다",
                         "현재 장착된 장비를 해제합니다",
-                        "모든 파티원의 장비를 최적화하여 재장착합니다"
+                        "모든 파티원의 장비를 해제 후 직업별 중요도에 따라 재배치합니다"
                     ]
                     
-                    # AI 게임모드가 아닌 경우에만 아이템 전송 옵션 추가
+                    # 클래식 게임모드가 아닌 경우에만 아이템 전송 옵션 추가
                     if not (hasattr(self, 'ai_game_mode_enabled') and self.ai_game_mode_enabled):
                         inventory_options.insert(-1, "📦 아이템 전송")
                         inventory_descriptions.insert(-1, "파티원 간 아이템을 주고받습니다")
@@ -7204,17 +7604,17 @@ class DawnOfStellarGame:
                     elif inventory_choice == 2:  # 장비 해제
                         self._handle_equipment_unequip()
                     
-                    elif inventory_choice == 3:  # 📦 아이템 전송 (AI모드가 아닐 때만) 또는 ⚡ 최적화 재장착 (AI모드일 때)
+                    elif inventory_choice == 3:  # 📦 아이템 전송 (클래식모드가 아닐 때만) 또는 🔄 장비 재배치 (클래식모드일 때)
                         if not (hasattr(self, 'ai_game_mode_enabled') and self.ai_game_mode_enabled):
-                            # AI 모드가 아닐 때: 아이템 전송
+                            # 클래식 모드가 아닐 때: 아이템 전송
                             self._handle_item_transfer()
                         else:
-                            # AI 모드일 때: 최적화 재장착
-                            self._handle_equipment_optimize()
+                            # 클래식 모드일 때: 장비 재배치
+                            self._handle_equipment_redistribute()
                         
-                    elif inventory_choice == 4:  # ⚡ 최적화 재장착 (AI모드가 아닐 때만 - 아이템 전송이 추가되어 밀림)
+                    elif inventory_choice == 4:  # 🔄 장비 재배치 (클래식모드가 아닐 때만 - 아이템 전송이 추가되어 밀림)
                         if not (hasattr(self, 'ai_game_mode_enabled') and self.ai_game_mode_enabled):
-                            self._handle_equipment_optimize()
+                            self._handle_equipment_redistribute()
                     
                     # choice == 마지막 (취소)는 자동으로 처리
                         
@@ -7303,77 +7703,91 @@ class DawnOfStellarGame:
                         else:
                             member_descriptions.append("현재 주변에 적이 없습니다")
                     
+                    # 파티 메뉴 옵션에 추가 분석 메뉴 추가
+                    member_names.append("📊 로바트의 완전체 파티 분석")
+                    member_descriptions.append("🤖 로바트가 파티 전투력, 장비, 랭킹을 완전 분석합니다!")
+                    
                     menu = create_simple_menu("👥 파티 상태", member_names, member_descriptions)
                     result = menu.run()
                     
-                    # 캐릭터 선택 시 상세 정보 표시 또는 추가 액션 가능
-                    if result is not None and result >= 0:
-                        selected_member = self.party_manager.members[result]
-                        print(f"\n{'='*50}")
-                        print(f"✨ {bright_cyan(selected_member.name)} 상세 정보 ✨")
-                        print(f"{'='*50}")
-                        print(f"🎭 직업: {bright_yellow(selected_member.character_class)}")
-                        print(f"⭐ 레벨: {bright_green(selected_member.level)} (경험치: {blue(f'{selected_member.experience:,}')})")
-                        
-                        # HP 상태 (색상 구분)
-                        hp_ratio = selected_member.current_hp / selected_member.max_hp
-                        if hp_ratio >= 0.8:
-                            hp_color = bright_green
-                        elif hp_ratio >= 0.5:
-                            hp_color = bright_yellow
-                        else:
-                            hp_color = bright_red
-                        print(f"❤️ HP:         {hp_color(f'{selected_member.current_hp:,}')} / {bright_green(f'{selected_member.max_hp:,}')}")
-                        
-                        # MP 상태 (색상 구분)
-                        mp_ratio = selected_member.current_mp / selected_member.max_mp if selected_member.max_mp > 0 else 1
-                        if mp_ratio >= 0.8:
-                            mp_color = cyan
-                        elif mp_ratio >= 0.5:
-                            mp_color = bright_cyan
-                        else:
-                            mp_color = bright_magenta
-                        print(f"💙 MP:         {mp_color(f'{selected_member.current_mp:,}')} / {cyan(f'{selected_member.max_mp:,}')}")
-                        
-                        print(f"⚔️ 물리공격력:  {bright_red(f'{selected_member.physical_attack:,}')}")
-                        print(f"🛡️ 물리방어력:  {bright_cyan(f'{selected_member.physical_defense:,}')}")
-                        
-                        # 마법공격력과 마법방어력 추가
-                        if hasattr(selected_member, 'magic_attack'):
-                            print(f"🔮 마법공격력:  {bright_magenta(f'{selected_member.magic_attack:,}')}")
-                        elif hasattr(selected_member, 'magical_attack'):
-                            print(f"🔮 마법공격력:  {bright_magenta(f'{selected_member.magical_attack:,}')}")
-                        else:
-                            print(f"🔮 마법공격력:  {bright_magenta('0')}")
-                        
-                        if hasattr(selected_member, 'magic_defense'):
-                            print(f"🌟 마법방어력:  {bright_yellow(f'{selected_member.magic_defense:,}')}")
-                        elif hasattr(selected_member, 'magical_defense'):
-                            print(f"🌟 마법방어력:  {bright_yellow(f'{selected_member.magical_defense:,}')}")
-                        else:
-                            print(f"🌟 마법방어력:  {bright_yellow('0')}")
+                    # 메뉴 결과 처리
+                    if result is not None:
+                        if result == len(self.party_manager.members):  # 로바트 완전체 분석
+                            try:
+                                from game.display import show_detailed_party_analysis
+                                show_detailed_party_analysis(self.party_manager, self.world)
+                                self.keyboard.wait_for_key("아무 키나 눌러 계속...")
+                            except Exception as e:
+                                print(f"🤖 로-바트: 어? 분석 중 오류가... {e}")
+                                self.keyboard.wait_for_key("아무 키나 눌러 계속...")
+                        elif result >= 0 and result < len(self.party_manager.members):  # 개별 캐릭터
+                            selected_member = self.party_manager.members[result]
+                            print(f"\n{'='*50}")
+                            print(f"✨ {bright_cyan(selected_member.name)} 상세 정보 ✨")
+                            print(f"{'='*50}")
+                            print(f"🎭 직업: {bright_yellow(selected_member.character_class)}")
+                            print(f"⭐ 레벨: {bright_green(selected_member.level)} (경험치: {blue(f'{selected_member.experience:,}')})")
                             
-                        print(f"🏃 속도:        {bright_green(f'{selected_member.speed:,}')}")
-                        print(f"🎯 명중률:      {cyan(f'{selected_member.accuracy:,}')}")
-                        print(f"💨 회피력:      {bright_cyan(f'{selected_member.evasion:,}')}")
-                        
-                        if hasattr(selected_member, 'wounds') and selected_member.wounds > 0:
-                            print(f"🩸 상처: {bright_red(f'{selected_member.wounds:,}')} (제한된 최대 HP: {bright_yellow(f'{selected_member.limited_max_hp:,}')})")
-                        
-                        # ATB 게이지
-                        atb_percentage = int(selected_member.atb_gauge)
-                        atb_bar = "█" * (atb_percentage // 10) + "░" * (10 - atb_percentage // 10)
-                        print(f"⚡ ATB: {bright_cyan(atb_bar)} {atb_percentage}%")
-                        
-                        # 속성 정보 표시
-                        print(f"\n{bright_cyan('🔮 속성 정보:')}")
-                        if hasattr(selected_member, 'get_element_display_info'):
-                            element_info = selected_member.get_element_display_info()
-                            print(f"   {element_info['display_text']}")
-                        elif hasattr(selected_member, 'element_affinity'):
-                            print(f"   🔮 기본 속성: {selected_member.element_affinity}")
-                            if hasattr(selected_member, 'element_weaknesses') and selected_member.element_weaknesses:
-                                weakness_str = ", ".join(selected_member.element_weaknesses)
+                            # HP 상태 (색상 구분)
+                            hp_ratio = selected_member.current_hp / selected_member.max_hp
+                            if hp_ratio >= 0.8:
+                                hp_color = bright_green
+                            elif hp_ratio >= 0.5:
+                                hp_color = bright_yellow
+                            else:
+                                hp_color = bright_red
+                            print(f"❤️ HP:         {hp_color(f'{selected_member.current_hp:,}')} / {bright_green(f'{selected_member.max_hp:,}')}")
+                            
+                            # MP 상태 (색상 구분)
+                            mp_ratio = selected_member.current_mp / selected_member.max_mp if selected_member.max_mp > 0 else 1
+                            if mp_ratio >= 0.8:
+                                mp_color = cyan
+                            elif mp_ratio >= 0.5:
+                                mp_color = bright_cyan
+                            else:
+                                mp_color = bright_magenta
+                            print(f"💙 MP:         {mp_color(f'{selected_member.current_mp:,}')} / {cyan(f'{selected_member.max_mp:,}')}")
+                            
+                            print(f"⚔️ 물리공격력:  {bright_red(f'{selected_member.physical_attack:,}')}")
+                            print(f"🛡️ 물리방어력:  {bright_cyan(f'{selected_member.physical_defense:,}')}")
+                            
+                            # 마법공격력과 마법방어력 추가
+                            if hasattr(selected_member, 'magic_attack'):
+                                print(f"🔮 마법공격력:  {bright_magenta(f'{selected_member.magic_attack:,}')}")
+                            elif hasattr(selected_member, 'magical_attack'):
+                                print(f"🔮 마법공격력:  {bright_magenta(f'{selected_member.magical_attack:,}')}")
+                            else:
+                                print(f"🔮 마법공격력:  {bright_magenta('0')}")
+                            
+                            if hasattr(selected_member, 'magic_defense'):
+                                print(f"🌟 마법방어력:  {bright_yellow(f'{selected_member.magic_defense:,}')}")
+                            elif hasattr(selected_member, 'magical_defense'):
+                                print(f"🌟 마법방어력:  {bright_yellow(f'{selected_member.magical_defense:,}')}")
+                            else:
+                                print(f"🌟 마법방어력:  {bright_yellow('0')}")
+                                
+                            print(f"🏃 속도:        {bright_green(f'{selected_member.speed:,}')}")
+                            print(f"🎯 명중률:      {cyan(f'{selected_member.accuracy:,}')}")
+                            print(f"💨 회피력:      {bright_cyan(f'{selected_member.evasion:,}')}")
+                            
+                            if hasattr(selected_member, 'wounds') and selected_member.wounds > 0:
+                                print(f"🩸 상처: {bright_red(f'{selected_member.wounds:,}')} (제한된 최대 HP: {bright_yellow(f'{selected_member.limited_max_hp:,}')})")
+                            
+                            # ATB 게이지 (0-2000 범위를 0-100%로 변환)
+                            atb_percentage = int((selected_member.atb_gauge / 2000) * 100)  # 올바른 백분율 계산
+                            atb_percentage = max(0, min(100, atb_percentage))  # 0-100% 범위로 제한
+                            atb_bar = "█" * (atb_percentage // 10) + "░" * (10 - atb_percentage // 10)
+                            print(f"⚡ ATB: {bright_cyan(atb_bar)} {atb_percentage}%")
+                            
+                            # 속성 정보 표시
+                            print(f"\n{bright_cyan('🔮 속성 정보:')}")
+                            if hasattr(selected_member, 'get_element_display_info'):
+                                element_info = selected_member.get_element_display_info()
+                                print(f"   {element_info['display_text']}")
+                            elif hasattr(selected_member, 'element_affinity'):
+                                print(f"   🔮 기본 속성: {selected_member.element_affinity}")
+                                if hasattr(selected_member, 'element_weaknesses') and selected_member.element_weaknesses:
+                                    weakness_str = ", ".join(selected_member.element_weaknesses)
                                 print(f"   💔 약점: {weakness_str}")
                             else:
                                 print(f"   💔 약점: 없음")
@@ -7389,59 +7803,65 @@ class DawnOfStellarGame:
                         
                         # 장착된 장비 정보
                         print(f"\n{bright_cyan('🎒 장착된 장비:')}")
-                        equipped_items = selected_member.get_equipped_items()
-                        equipment_found = False
-                        
-                        for slot, item in equipped_items.items():
-                            if item:
-                                equipment_found = True
-                                # 아이템 표시 이름 (내구도 포함)
-                                if hasattr(item, 'get_display_name'):
-                                    display_name = item.get_display_name()
-                                else:
-                                    display_name = item.name
+                        try:
+                            if selected_member:  # locals() 체크 제거
+                                equipped_items = selected_member.get_equipped_items()
+                                equipment_found = False
                                 
-                                # 내구도 정보
-                                durability_info = ""
-                                if hasattr(item, 'get_durability_percentage'):
-                                    durability_pct = item.get_durability_percentage()
-                                    if durability_pct < 100:
-                                        durability_color = "🟢" if durability_pct > 80 else "🟡" if durability_pct > 50 else "🟠" if durability_pct > 20 else "🔴"
-                                        durability_info = f" {durability_color}{durability_pct:.0f}%"
-                                elif hasattr(item, 'current_durability') and hasattr(item, 'max_durability'):
-                                    durability_pct = (item.current_durability / item.max_durability * 100) if item.max_durability > 0 else 0
-                                    durability_color = "🟢" if durability_pct > 80 else "🟡" if durability_pct > 50 else "🟠" if durability_pct > 20 else "🔴"
-                                    durability_info = f" {durability_color}{durability_pct:.0f}%"
+                                for slot, item in equipped_items.items():
+                                    if item:
+                                        equipment_found = True
+                                        # 아이템 표시 이름 (내구도 포함)
+                                        if hasattr(item, 'get_display_name'):
+                                            display_name = item.get_display_name()
+                                        else:
+                                            display_name = item.name
+                                        
+                                        # 내구도 정보
+                                        durability_info = ""
+                                        if hasattr(item, 'get_durability_percentage'):
+                                            durability_pct = item.get_durability_percentage()
+                                            if durability_pct < 100:
+                                                durability_color = "🟢" if durability_pct > 80 else "🟡" if durability_pct > 50 else "🟠" if durability_pct > 20 else "🔴"
+                                                durability_info = f" {durability_color}{durability_pct:.0f}%"
+                                        elif hasattr(item, 'current_durability') and hasattr(item, 'max_durability'):
+                                            durability_pct = (item.current_durability / item.max_durability * 100) if item.max_durability > 0 else 0
+                                            durability_color = "🟢" if durability_pct > 80 else "🟡" if durability_pct > 50 else "🟠" if durability_pct > 20 else "🔴"
+                                            durability_info = f" {durability_color}{durability_pct:.0f}%"
+                                        
+                                        print(f"   {slot}: {display_name}{durability_info}")
+                                        
+                                        # 주요 능력치 보너스 표시
+                                        if hasattr(item, 'get_effective_stats'):
+                                            effective_stats = item.get_effective_stats()
+                                            stat_bonuses = []
+                                            for stat, value in effective_stats.items():
+                                                if isinstance(value, (int, float)) and value > 0:
+                                                    if stat == "physical_attack":
+                                                        stat_bonuses.append(f"공격+{value}")
+                                                    elif stat == "physical_defense":
+                                                        stat_bonuses.append(f"방어+{value}")
+                                                    elif stat == "magic_attack":
+                                                        stat_bonuses.append(f"마공+{value}")
+                                                    elif stat == "magic_defense":
+                                                        stat_bonuses.append(f"마방+{value}")
+                                                    elif stat == "speed":
+                                                        stat_bonuses.append(f"속도+{value}")
+                                                    elif stat == "vision_range":
+                                                        stat_bonuses.append(f"시야+{value}")
+                                            
+                                            if stat_bonuses:
+                                                print(f"      ({', '.join(stat_bonuses)})")
                                 
-                                print(f"   {slot}: {display_name}{durability_info}")
-                                
-                                # 주요 능력치 보너스 표시
-                                if hasattr(item, 'get_effective_stats'):
-                                    effective_stats = item.get_effective_stats()
-                                    stat_bonuses = []
-                                    for stat, value in effective_stats.items():
-                                        if isinstance(value, (int, float)) and value > 0:
-                                            if stat == "physical_attack":
-                                                stat_bonuses.append(f"공격+{value}")
-                                            elif stat == "physical_defense":
-                                                stat_bonuses.append(f"방어+{value}")
-                                            elif stat == "magic_attack":
-                                                stat_bonuses.append(f"마공+{value}")
-                                            elif stat == "magic_defense":
-                                                stat_bonuses.append(f"마방+{value}")
-                                            elif stat == "speed":
-                                                stat_bonuses.append(f"속도+{value}")
-                                            elif stat == "vision_range":
-                                                stat_bonuses.append(f"시야+{value}")
+                                if not equipment_found:
+                                    print("   (장착된 장비 없음)")
+                            else:
+                                print("   ❌ 캐릭터 정보를 찾을 수 없음")
                                     
-                                    if stat_bonuses:
-                                        print(f"      ({', '.join(stat_bonuses)})")
-                        
-                        if not equipment_found:
-                            print("   (장착된 장비 없음)")
-                        
+                        except Exception as e:
+                            print(f"   ❌ 장비 정보 로딩 실패: {e}")
+                            
                         print(f"{'='*50}")
-                        # TODO: 스킬, 특성 등 추가 정보 표시 가능
                         self.keyboard.wait_for_key("아무 키나 눌러 계속...")
                         
                 except ImportError:
@@ -7624,7 +8044,9 @@ class DawnOfStellarGame:
             
         # 이동 처리
         elif action.lower() in ['w', 'a', 's', 'd']:
-            self.handle_player_movement(action.lower())
+            result = self.handle_player_movement(action.lower())
+            if result is True:
+                return True  # 화면 갱신 필요 신호
             
         # 방향키 처리 (특수 키코드)
         elif action in ['\x1b[A', '\x1b[B', '\x1b[C', '\x1b[D']:  # 방향키
@@ -7635,17 +8057,133 @@ class DawnOfStellarGame:
                 '\x1b[D': 'a'   # 왼쪽
             }
             if action in direction_map:
-                self.handle_player_movement(direction_map[action])
-        # 빈 문자열이나 엔터키 처리
-        elif action.strip() == '' or action == '\n':
-            # 빈 입력은 무시하고 다시 입력 받음
-            return
+                result = self.handle_player_movement(direction_map[action])
+                if result is True:
+                    return True  # 화면 갱신 필요 신호
+        # 빈 문자열이나 엔터키 처리 (상호작용 시스템)
+        elif action.strip() == '' or action == '\n' or action == '\r':
+            # Enter 키: 주변 구조물과 상호작용
+            result = self.handle_tile_interaction()
+            if result:
+                return True  # 화면 갱신 필요
         else:
             print(f"⚠️ 알 수 없는 명령: '{action}' (도움말: H)")
             self.keyboard.wait_for_key("아무 키나 눌러 계속...")
+        
+        # 🔥 중요: 플레이어 행동 후 적들 이동 처리
+        # 이동 액션(w,a,s,d)이나 상호작용 후에만 적 이동
+        if action.lower() in ['w', 'a', 's', 'd', '\r', '\n'] or action in ['\x1b[A', '\x1b[B', '\x1b[C', '\x1b[D']:
+            try:
+                if hasattr(self.world, 'move_enemies') and hasattr(self.world, 'enemies_positions'):
+                    enemy_count = len(self.world.enemies_positions)
+                    if enemy_count > 0:
+                        enemies_moved = self.world.move_enemies()
+                        if enemies_moved:
+                            # 메인 루프에서 need_screen_refresh 플래그를 설정하도록 신호
+                            return True  # 화면 갱신 필요 신호
+            except Exception as e:
+                print(f"⚠️ 적 이동 처리 중 오류: {e}")
+    
+    def handle_tile_interaction(self):
+        """플레이어 주변 타일과의 상호작용 처리"""
+        player_x, player_y = self.world.player_pos
+        
+        # 플레이어 현재 위치의 타일 먼저 확인
+        current_tile_result = self.world.interact_with_tile((player_x, player_y))
+        if current_tile_result.get('success'):
+            print(f"\n✨ {current_tile_result['message']}")
+            if current_tile_result.get('pause'):
+                self.keyboard.wait_for_key("아무 키나 눌러 계속...")
+            return True
+        
+        # 주변 8방향 타일 확인
+        directions = [
+            (-1, -1), (0, -1), (1, -1),  # 위쪽 3개
+            (-1,  0),          (1,  0),  # 좌우
+            (-1,  1), (0,  1), (1,  1)   # 아래쪽 3개
+        ]
+        
+        interactable_tiles = []
+        
+        for dx, dy in directions:
+            check_x, check_y = player_x + dx, player_y + dy
+            
+            # 범위 체크
+            if not self.world.is_valid_pos(check_x, check_y):
+                continue
+                
+            tile = self.world.tiles[check_y][check_x]
+            
+            # 상호작용 가능한 타일 타입들
+            interactable_types = [
+                'LOCKED_DOOR', 'SECRET_DOOR', 'TRAP', 'CHEST', 
+                'FOUNTAIN', 'LEVER', 'ALTAR', 'BOOKSHELF', 
+                'FORGE', 'GARDEN', 'CRYSTAL', 'CURSED_ALTAR',
+                'POISON_CLOUD', 'DARK_PORTAL', 'CURSED_CHEST', 
+                'UNSTABLE_FLOOR'
+            ]
+            
+            if tile.type.name in interactable_types:
+                interactable_tiles.append((check_x, check_y, tile))
+        
+        if not interactable_tiles:
+            print("\n💭 상호작용할 수 있는 구조물이 주변에 없습니다.")
+            self.keyboard.wait_for_key("아무 키나 눌러 계속...")
+            return False
+        
+        # 상호작용 가능한 타일이 하나인 경우 바로 실행
+        if len(interactable_tiles) == 1:
+            tile_x, tile_y, tile = interactable_tiles[0]
+            result = self.world.interact_with_tile((tile_x, tile_y))
+            print(f"\n✨ {result['message']}")
+            if result.get('pause'):
+                self.keyboard.wait_for_key("아무 키나 눌러 계속...")
+            return True
+        
+        # 여러 개인 경우 선택 메뉴 표시
+        print("\n🔍 상호작용할 구조물을 선택하세요:")
+        for i, (tile_x, tile_y, tile) in enumerate(interactable_tiles):
+            direction = ""
+            dx, dy = tile_x - player_x, tile_y - player_y
+            if dx == -1 and dy == -1: direction = "↖️ 왼쪽 위"
+            elif dx == 0 and dy == -1: direction = "⬆️ 위"
+            elif dx == 1 and dy == -1: direction = "↗️ 오른쪽 위"
+            elif dx == -1 and dy == 0: direction = "⬅️ 왼쪽"
+            elif dx == 1 and dy == 0: direction = "➡️ 오른쪽"
+            elif dx == -1 and dy == 1: direction = "↙️ 왼쪽 아래"
+            elif dx == 0 and dy == 1: direction = "⬇️ 아래"
+            elif dx == 1 and dy == 1: direction = "↘️ 오른쪽 아래"
+            
+            tile_name = tile.type.name.replace('_', ' ')
+            print(f"  [{i+1}] {direction} {tile_name}")
+        
+        print("  [0] 취소")
+        
+        try:
+            choice = input("\n선택 (숫자): ").strip()
+            if choice == "0" or choice == "":
+                return False
+            
+            choice_idx = int(choice) - 1
+            if 0 <= choice_idx < len(interactable_tiles):
+                tile_x, tile_y, tile = interactable_tiles[choice_idx]
+                result = self.world.interact_with_tile((tile_x, tile_y))
+                print(f"\n✨ {result['message']}")
+                if result.get('pause'):
+                    self.keyboard.wait_for_key("아무 키나 눌러 계속...")
+                return True
+            else:
+                print("잘못된 선택입니다.")
+                return False
+        except ValueError:
+            print("잘못된 입력입니다.")
+            return False
     
     def handle_player_movement(self, direction):
         """플레이어 이동 처리 - 개선된 오류 처리와 아이템 획득 + 20걸음 턴 시스템 + 키 홀드 방지"""
+        # moved 변수 초기화
+        moved = False
+        
         # 키 홀드 방지: 이동 명령 간 최소 딜레이
         import time
         if not hasattr(self, '_last_movement_time'):
@@ -7675,6 +8213,9 @@ class DawnOfStellarGame:
             if self.world.can_move(dx, dy):
                 # 플레이어 이동 실행
                 result = self.world.move_player(dx, dy)
+                
+                # 이동 성공 시 moved = True 설정
+                moved = True
                 
                 # 걸음 카운터 증가 (20걸음 = 1턴)
                 if not hasattr(self, 'step_counter'):
@@ -7706,11 +8247,9 @@ class DawnOfStellarGame:
                         
                         print(f"\n⚔️ {bright_red(f'{len(enemy_positions)}개 위치의 적들과 교전 시작!')}")
                         print(f"🎯 충돌 위치: {trigger_pos}")
-                        try:
-                            self.keyboard.wait_for_key("아무 키나 눌러 전투 시작...")
-                        except Exception as e:
-                            print(f"⚠️ 키 입력 오류: {e}")
-                            input("아무 키나 눌러 전투 시작...")  # 폴백
+                        
+                        # 바로 전투 시작 (키 입력 대기 제거)
+                        print("⚔️ 전투 시작!")
                         
                         try:
                             # 다중 적 전투 실행
@@ -7722,6 +8261,8 @@ class DawnOfStellarGame:
                                 self.add_game_message(f"🎉 승리! 모든 적이 소멸되었습니다!")
                         except Exception as e:
                             print(f"⚠️ 전투 중 오류가 발생했습니다: {e}")
+                            import traceback
+                            traceback.print_exc()
                         
                         return  # handle_player_movement 종료하여 main_game_loop로 돌아감
                     
@@ -7801,16 +8342,60 @@ class DawnOfStellarGame:
                 # 필드 자동 회복 처리
                 self._process_field_regeneration()
                     
+                # 현재 위치 상호작용 체크 (적, 아이템, 오브젝트)
+                self.check_position_interactions()
+                
                 self.check_random_encounter()
                 
-                # 적들 이동 처리 (플레이어 이동 후)
-                if hasattr(self.world, 'move_enemies') and self.world.enemies_positions:
+                # 적들 이동 처리 (플레이어 이동 후) - 상세 디버깅 추가
+                import logging
+                
+                # 적 이동 디버깅 로거 설정
+                move_debug_logger = logging.getLogger('enemy_move_debug')
+                if not move_debug_logger.handlers:
+                    handler = logging.FileHandler('enemy_move_debug.log', encoding='utf-8')
+                    formatter = logging.Formatter('%(asctime)s - %(message)s')
+                    handler.setFormatter(formatter)
+                    move_debug_logger.addHandler(handler)
+                    move_debug_logger.setLevel(logging.INFO)
+                
+                # 상세한 조건 체크
+                has_move_enemies = hasattr(self.world, 'move_enemies')
+                has_enemies = bool(getattr(self.world, 'enemies_positions', []))
+                enemy_count = len(getattr(self.world, 'enemies_positions', []))
+                
+                move_debug_logger.info(f"=== 플레이어 이동 후 적 이동 체크 ===")
+                move_debug_logger.info(f"world 객체 존재: {self.world is not None}")
+                move_debug_logger.info(f"move_enemies 메서드 존재: {has_move_enemies}")
+                move_debug_logger.info(f"enemies_positions 존재: {hasattr(self.world, 'enemies_positions')}")
+                move_debug_logger.info(f"적 수: {enemy_count}")
+                move_debug_logger.info(f"적 위치 목록: {getattr(self.world, 'enemies_positions', '없음')}")
+                
+                print(f"🔍 적 이동 체크: 메서드={has_move_enemies}, 적수={enemy_count}")
+                
+                if has_move_enemies and has_enemies:
                     enemy_count_before = len(self.world.enemies_positions)
-                    self.world.move_enemies()
-                    # 적이 실제로 많고 가끔씩만 메시지 표시 (2% 확률로 드물게)
-                    if enemy_count_before >= 3 and random.random() < 0.02:
-                        # 메시지 버퍼에 추가 (맵 아래쪽에 표시됨)
-                        self.add_game_message("👹 멀리서 적들의 움직임이 감지됩니다...")
+                    move_debug_logger.info(f"✅ 적 이동 함수 호출 - 적 수: {enemy_count_before}")
+                    
+                    # 🔥 중요: move_enemies() 반환값으로 화면 갱신 필요 여부 확인
+                    enemies_moved = self.world.move_enemies()
+                    
+                    # 이동 후 적 위치 출력
+                    after_positions = list(self.world.enemies_positions)
+                    enemy_count_after = len(self.world.enemies_positions)
+                    move_debug_logger.info(f"✅ 적 이동 완료 - 적 수: {enemy_count_after}")
+                    
+                    # 🔥 적이 움직였으면 화면 갱신 필요 신호를 메인 루프에 전달
+                    if enemies_moved:
+                        # 메인 루프에 화면 갱신 신호 전달
+                        moved = True  # 플레이어가 이동했고 적도 움직였으므로 화면 갱신 필요
+                        
+                elif has_move_enemies and not has_enemies:
+                    move_debug_logger.info("❌ 적이 없어서 이동 처리 안함")
+                elif not has_move_enemies:
+                    move_debug_logger.info("❌ move_enemies 메서드가 없음")
+                else:
+                    move_debug_logger.info("❌ 알 수 없는 이유로 적 이동 처리 안함")
                 
             else:
                 # 이동 실패 원인 파악
@@ -7846,7 +8431,172 @@ class DawnOfStellarGame:
                     tile = self.world.tiles[new_y][new_x]
                     print(f"  - 목표 타일: {tile.type.name} (walkable: {tile.is_walkable()})")
             self.keyboard.wait_for_key("아무 키나 눌러 계속...")
+        
+        # 화면 갱신 필요성 반환 (이동 성공 여부)
+        return moved
     
+    def _get_item_pickup_priority_member(self, item):
+        """아이템 획득 우선순위 멤버 선택"""
+        try:
+            party_members = self.party_manager.get_active_party()
+            if not party_members:
+                return None
+            
+            from game.error_logger import log_system
+            
+            # 아이템 타입별 우선순위 결정
+            item_type = getattr(item, 'item_type', getattr(item, 'type', '기타'))
+            
+            priorities = []
+            for member in party_members:
+                if not member.is_alive:
+                    continue
+                    
+                score = 0
+                job_class = getattr(member, 'character_class', '일반')
+                
+                # 무기 아이템 우선순위 (장비 스탯 기반)
+                if item_type == "무기":
+                    # 장비의 실제 스탯 확인
+                    item_stats = self._get_item_effective_stats(item)
+                    
+                    physical_attack = item_stats.get('physical_attack', 0)
+                    magic_attack = item_stats.get('magic_attack', 0) + item_stats.get('magical_attack', 0)
+                    
+                    # 직업별 능력치 선호도에 따른 점수 계산
+                    if job_class in ["아크메이지", "정령술사", "마검사", "네크로맨서", "시간술사", "연금술사", "차원술사", "무당"]:
+                        # 마법 직업: 마법공격력 우선, 물리공격력은 보조
+                        score += magic_attack * 2 + physical_attack * 0.5
+                    elif job_class in ["전사", "검성", "기사", "검투사", "사무라이", "암흑기사", "광전사"]:
+                        # 물리 근접 직업: 물리공격력 우선
+                        score += physical_attack * 2 + magic_attack * 0.3
+                    elif job_class in ["궁수", "암살자", "해적", "도적"]:
+                        # 물리 원거리/특수 직업: 물리공격력 우선, 약간의 마법공격력도 고려
+                        score += physical_attack * 1.8 + magic_attack * 0.5
+                    elif job_class in ["성기사", "신관"]:
+                        # 하이브리드 직업: 균형있게 고려
+                        score += (physical_attack + magic_attack) * 1.2
+                    else:
+                        # 기타 직업: 더 높은 스탯을 선호
+                        score += max(physical_attack, magic_attack) * 1.5
+                        
+                    # 추가 옵션들도 고려
+                    score += item_stats.get('speed', 0) * 0.5  # 속도 보너스
+                    score += item_stats.get('accuracy', 0) * 0.3  # 명중률 보너스
+                    score += item_stats.get('crit_chance', 0) * 1.0  # 크리티컬 확률
+                        
+                # 방어구 우선순위 (장비 스탯 기반)
+                elif item_type == "방어구":
+                    item_stats = self._get_item_effective_stats(item)
+                    
+                    physical_defense = item_stats.get('physical_defense', 0)
+                    magic_defense = item_stats.get('magic_defense', 0) + item_stats.get('magical_defense', 0)
+                    hp_bonus = item_stats.get('hp', 0) + item_stats.get('max_hp', 0)
+                    
+                    # 직업별 방어 선호도
+                    if job_class in ["전사", "성기사", "기사", "검투사"]:
+                        # 탱커: 모든 방어력과 HP 중시
+                        score += (physical_defense + magic_defense) * 1.5 + hp_bonus * 0.8
+                    elif job_class in ["광전사", "암흑기사", "사무라이"]:
+                        # 근접 딜러: 물리방어 우선, HP 보너스
+                        score += physical_defense * 1.8 + magic_defense * 1.0 + hp_bonus * 0.6
+                    elif job_class in ["아크메이지", "정령술사", "네크로맨서", "시간술사", "연금술사"]:
+                        # 마법사: 마법방어와 MP 우선
+                        score += magic_defense * 1.8 + physical_defense * 1.0 + item_stats.get('mp', 0) * 0.7
+                    elif job_class in ["궁수", "암살자", "도적"]:
+                        # 민첩 직업: 균형잡힌 방어력, 속도 보너스 중시
+                        score += (physical_defense + magic_defense) * 1.2 + item_stats.get('speed', 0) * 1.0
+                    else:
+                        # 기타: 균형있게
+                        score += (physical_defense + magic_defense) * 1.3 + hp_bonus * 0.5
+                        
+                # 소모품 우선순위 (인벤토리 여유공간 기준)
+                elif item_type in ["소모품", "음식"]:
+                    inventory_space = self._get_member_inventory_space(member)
+                    score += inventory_space * 10  # 여유공간 많을수록 우선
+                    
+                    # 요리사/연금술사 우선
+                    if job_class in ["연금술사", "드루이드"]:
+                        score += 50
+                        
+                # 액세서리는 모든 직업이 동등
+                elif item_type == "액세서리":
+                    score += 50
+                    
+                # 귀중품은 파티 리더 우선 (첫 번째 멤버)
+                elif item_type == "귀중품":
+                    if member == party_members[0]:
+                        score += 100
+                        
+                priorities.append((member, score))
+            
+            # 점수가 가장 높은 멤버 선택
+            if priorities:
+                best_member = max(priorities, key=lambda x: x[1])[0]
+                log_system("아이템획득", f"{best_member.name}이 {item.name} 획득 우선권", {
+                    "아이템타입": item_type,
+                    "직업": best_member.character_class
+                })
+                return best_member
+                
+            return party_members[0]  # 기본값
+            
+        except Exception as e:
+            from game.error_logger import log_error
+            log_error("아이템획득", "우선순위 선택 중 오류", {"오류": str(e)})
+            return party_members[0] if party_members else None
+    
+    def _get_member_inventory_space(self, member):
+        """멤버의 인벤토리 여유공간 계산"""
+        try:
+            if hasattr(member, 'inventory') and hasattr(member.inventory, 'items'):
+                max_items = getattr(member.inventory, 'max_items', 50)
+                current_items = len(member.inventory.items)
+                return max_items - current_items
+            return 50  # 기본값
+        except:
+            return 50
+
+    def _get_item_effective_stats(self, item):
+        """아이템의 효과적인 스탯을 가져오기 (추가 옵션 포함)"""
+        try:
+            stats = {}
+            
+            # 기본 스탯들
+            if hasattr(item, 'get_effective_stats'):
+                stats = item.get_effective_stats().copy()
+            elif hasattr(item, 'stats'):
+                stats = item.stats.copy() if item.stats else {}
+            
+            # 개별 속성들도 확인
+            stat_names = [
+                'physical_attack', 'magic_attack', 'magical_attack',
+                'physical_defense', 'magic_defense', 'magical_defense',
+                'hp', 'max_hp', 'mp', 'max_mp', 'speed', 'accuracy', 
+                'evasion', 'crit_chance', 'crit_damage'
+            ]
+            
+            for stat_name in stat_names:
+                if hasattr(item, stat_name):
+                    value = getattr(item, stat_name, 0)
+                    if isinstance(value, (int, float)) and value > 0:
+                        stats[stat_name] = max(stats.get(stat_name, 0), value)
+            
+            # 추가 옵션들 확인 (equipment effects 등)
+            if hasattr(item, 'effects') and item.effects:
+                for effect in item.effects:
+                    if hasattr(effect, 'stat_bonuses') and effect.stat_bonuses:
+                        for stat, bonus in effect.stat_bonuses.items():
+                            if isinstance(bonus, (int, float)) and bonus > 0:
+                                stats[stat] = stats.get(stat, 0) + bonus
+            
+            return stats
+            
+        except Exception as e:
+            from game.error_logger import log_error
+            log_error("장비분석", "아이템 스탯 분석 실패", {"아이템": getattr(item, 'name', '알 수 없음'), "오류": str(e)})
+            return {}
+
     def _handle_item_acquisition(self, item):
         """아이템 획득 처리 (통합 메서드)"""
         try:
@@ -7874,19 +8624,67 @@ class DawnOfStellarGame:
                 except Exception as e:
                     pass  # 메타 진행 기록 실패해도 게임은 계속
             
-            # 첫 번째 파티원에게 아이템 추가
+            # 파티원들에게 순서대로 아이템 추가 시도
             if self.party_manager.members:
-                first_member = self.party_manager.members[0]
-                if hasattr(first_member, 'inventory'):
-                    success = first_member.inventory.add_item(item)
-                    if success:
-                        print(f"✅ {bright_green(item.name)}을(를) 획득했습니다!")
-                        if hasattr(item, 'description'):
-                            print(f"   {item.description}")
-                    else:
-                        print(f"❌ 인벤토리가 가득 차서 {item.name}을(를) 버렸습니다.")
+                item_added = False
+                failed_members = []
+                
+                print(f"\n🎒 파티 인벤토리 상태:")
+                for i, member in enumerate(self.party_manager.members):
+                    if hasattr(member, 'inventory'):
+                        current_weight = member.inventory.get_total_weight()
+                        max_weight = member.inventory.max_weight
+                        weight_ratio = (current_weight / max_weight) * 100 if max_weight > 0 else 0
+                        print(f"   {i+1}. {member.name}: {current_weight:.1f}/{max_weight:.1f}kg ({weight_ratio:.1f}%)")
+                
+                # 우선순위 기반 아이템 획득 시스템
+                priority_member = self._get_item_pickup_priority_member(item)
+                acquisition_order = []
+                
+                if priority_member:
+                    # 우선순위 멤버를 첫 번째로
+                    acquisition_order.append(priority_member)
+                    # 나머지 멤버들 추가 (우선순위 멤버 제외)
+                    for member in self.party_manager.members:
+                        if member != priority_member:
+                            acquisition_order.append(member)
                 else:
-                    print(f"✅ {bright_green(item.name)}을(를) 발견했습니다! (인벤토리 시스템 미구현)")
+                    # 우선순위 시스템 실패 시 기본 순서
+                    acquisition_order = self.party_manager.members
+                
+                # 우선순위 순서대로 아이템 추가 시도
+                for i, member in enumerate(acquisition_order):
+                    if hasattr(member, 'inventory'):
+                        can_add, reason = member.inventory.can_add_item(item)
+                        if can_add:
+                            success = member.inventory.add_item(item)
+                            if success:
+                                priority_msg = " (우선순위)" if member == priority_member else ""
+                                print(f"\n✅ {bright_green(item.name)}을(를) {bright_cyan(member.name)}이(가) 획득했습니다!{priority_msg}")
+                                if hasattr(item, 'description'):
+                                    print(f"   📝 {item.description}")
+                                
+                                # 획득 후 인벤토리 상태 업데이트
+                                new_weight = member.inventory.get_total_weight()
+                                max_weight = member.inventory.max_weight
+                                weight_ratio = (new_weight / max_weight) * 100 if max_weight > 0 else 0
+                                print(f"   📦 {member.name}의 인벤토리: {new_weight:.1f}/{max_weight:.1f}kg ({weight_ratio:.1f}%)")
+                                
+                                item_added = True
+                                break
+                        else:
+                            failed_members.append(f"{member.name}: {reason}")
+                            if i == 0:  # 우선순위 멤버가 실패했을 때만 출력
+                                print(f"   ❌ {member.name}: {reason}")
+                
+                # 모든 파티원이 받지 못한 경우
+                if not item_added:
+                    print(f"\n❌ 파티 전체 인벤토리가 가득 차서 {bright_red(item.name)}을(를) 버렸습니다.")
+                    print("📋 전체 실패 이유:")
+                    for failed_info in failed_members:
+                        print(f"   • {failed_info}")
+            else:
+                print(f"✅ {bright_green(item.name)}을(를) 발견했습니다! (파티원 없음)")
             
             self.keyboard.wait_for_key("아무 키나 눌러 계속...")
             
@@ -8159,6 +8957,9 @@ class DawnOfStellarGame:
     def check_random_encounter(self):
         """🔥 강화된 랜덤 인카운터 체크"""
         try:
+            # 디버깅용 로깅 추가
+            from game.error_logger import log_debug
+            
             # 강화된 조우 시스템 우선 사용
             if hasattr(self, 'enhanced_encounter_manager') and self.enhanced_encounter_manager:
                 party = []
@@ -8166,20 +8967,34 @@ class DawnOfStellarGame:
                     party = self.party_manager.members
                 
                 if not party:
+                    log_debug("인카운터", "파티가 없어서 인카운터 발생 안함", {})
                     return  # 파티가 없으면 인카운터 발생 안함
                 
                 current_floor = getattr(self.world, 'current_floor', 1) if hasattr(self, 'world') else 1
                 
-                # 강화된 조우 확률 계산 (기존보다 낮은 확률)
+                # 강화된 조우 확률 계산 (확률 대폭 증가)
                 import random
-                base_chance = 0.003  # 0.3% 기본 확률
-                floor_bonus = current_floor * 0.0005  # 층당 0.05% 증가
-                steps_bonus = getattr(self, 'steps_since_last_encounter', 0) * 0.001  # 걸음당 0.1% 증가
+                base_chance = 0.01  # 1% 기본 확률 (0.3% → 1%)
+                floor_bonus = current_floor * 0.0005  # 층당 0.05% 증가 (0.05% → 0.05%)
+                steps_bonus = getattr(self, 'steps_since_last_encounter', 0) * 0.0008  # 걸음당 0.08% 증가 (0.1% → 0.08%)
+
+                total_chance = min(base_chance + floor_bonus + steps_bonus, 0.25)  # 최대 25% (1.5% → 25%)
                 
-                total_chance = min(base_chance + floor_bonus + steps_bonus, 0.015)  # 최대 1.5%
+                roll = random.random()
+                log_debug("인카운터체크", f"인카운터 확률 체크", {
+                    "기본확률": base_chance,
+                    "층보너스": floor_bonus,
+                    "걸음보너스": steps_bonus,
+                    "총확률": total_chance,
+                    "주사위": roll,
+                    "성공여부": roll < total_chance,
+                    "현재층": current_floor,
+                    "걸음수": getattr(self, 'steps_since_last_encounter', 0)
+                })
                 
-                if random.random() < total_chance:
+                if roll < total_chance:
                     # 강화된 조우 시스템 실행
+                    log_debug("인카운터발생", "강화된 인카운터 시스템 발동", {"확률": total_chance})
                     encounter_result = self.enhanced_encounter_manager.trigger_enhanced_encounter(party, current_floor)
                     if encounter_result:
                         self.handle_enhanced_encounter(encounter_result)
@@ -8200,12 +9015,22 @@ class DawnOfStellarGame:
                 
                 encounter = self.encounter_manager.check_encounter(party, current_floor, steps_taken)
                 if encounter:
+                    log_debug("인카운터발생", "기존 인카운터 매니저 발동", {"encounter": str(encounter)})
                     self.handle_encounter(encounter)
                     self.steps_since_last_encounter = 0
             else:
-                # 간단한 랜덤 인카운터 (최종 폴백)
+                # 간단한 랜덤 인카운터 (최종 폴백) - 확률 증가
                 import random
-                if random.random() < 0.03:  # 3% 확률
+                roll = random.random()
+                chance = 0.15  # 15% 확률 (3% → 15%)
+                log_debug("인카운터체크", f"폴백 인카운터 체크", {
+                    "확률": chance,
+                    "주사위": roll,
+                    "성공여부": roll < chance
+                })
+                
+                if roll < chance:  
+                    log_debug("인카운터발생", "폴백 인카운터 발동", {"확률": chance})
                     print(f"\n⚔️ {bright_red('적과 마주쳤습니다!')}")
                     try:
                         self.keyboard.wait_for_key("아무 키나 눌러 전투 시작...")
@@ -8598,7 +9423,7 @@ class DawnOfStellarGame:
                             ["60% 확률로 보상을 받을 수 있습니다", "안전하게 지나갑니다"],
                             audio_manager=getattr(self, 'audio_manager', None),
                             keyboard=self.keyboard,
-                            clear_screen=True
+                            clear_screen=False  # 스택 현상 방지
                         )
                         
                         choice = wish_menu.run()
@@ -9403,7 +10228,7 @@ class DawnOfStellarGame:
             print(f"⚠️ 보스 생성 오류: {e}")
             # 기본 보스로 대체
             from game.character import Character
-            basic_boss = Character("던전 보스", "보스")
+            basic_boss = Character("차원 지배자", "보스")
             basic_boss.max_hp = 2000
             basic_boss.current_hp = 2000
             basic_boss.physical_attack = 150
@@ -9457,6 +10282,8 @@ class DawnOfStellarGame:
                 audio_system=getattr(self, 'audio_system', None),
                 sound_manager=getattr(self, 'sound_manager', None)
             )
+            # AI 모드 명시적 비활성화 (일반 게임모드)
+            combat_system.set_ai_game_mode(False)
             
             # 보스전 시작
             print("\n💀 최종 보스 세피로스와의 전투!")
@@ -9654,6 +10481,19 @@ class DawnOfStellarGame:
         
         # 새 층 생성
         self.world.generate_level()
+        
+        # 🗺️ 탐험 상태 초기화 (새 층이므로 이전 층의 탐험 정보를 제거)
+        if hasattr(self.world, 'explored'):
+            self.world.explored.clear()
+            print("🗺️ 탐험 상태 초기화 완료")
+        
+        # 타일별 탐험 상태도 초기화
+        if hasattr(self.world, 'tiles') and self.world.tiles:
+            for row in self.world.tiles:
+                for tile in row:
+                    if hasattr(tile, 'explored'):
+                        tile.explored = False
+            print("🗺️ 모든 타일의 탐험 상태 초기화 완료")
         
         # 3층마다 보스 체크 및 생성
         self._check_and_spawn_floor_boss()
@@ -10258,7 +11098,7 @@ class DawnOfStellarGame:
             lines.append("")
             
             # 특징 소개
-            lines.append(f"{'⚔️  28개 고유 직업  ⭐  Brave 전투시스템  🏰  무한 던전':^20}")
+            lines.append(f"{'⚔️  28개 고유 직업  ⭐  Brave 전투시스템  �  차원 공간':^20}")
             lines.append(f"{'🧬  Organic 특성  👥  4인 파티 시스템  🎲  절차적 생성':^20}")
             lines.append(f"{'🎵  동적 BGM  💎  메타 진행  📚  240개+ 레시피':^20}")
             lines.append(f"{yellow('──────   🎯 GAME FEATURES   ──────────────────────'):^20}")
@@ -10332,7 +11172,7 @@ class DawnOfStellarGame:
             print()
             
             # 특징 소개
-            print(f"{'⚔️  28개 고유 직업  ⭐  Brave 전투시스템  🏰  무한 던전':^20}")
+            print(f"{'⚔️  28개 고유 직업  ⭐  Brave 전투시스템  �  차원 공간':^20}")
             print(f"{'🧬  Organic 특성  👥  4인 파티 시스템  🎲  절차적 생성':^20}")
             print(f"{'🎵  동적 BGM  💎  메타 진행  📚  240개+ 레시피':^20}")
             print(f"{yellow('──────   🎯 GAME FEATURES   ──────────────────────'):^20}")
@@ -10865,7 +11705,7 @@ class DawnOfStellarGame:
                     if party_count > 0:  # 파티가 제대로 복원되었는지 확인
                         # print(f"✅ 파티 복원 확인 완료. 게임 시작 중...")  # 숨김
                         input("게임을 시작하려면 Enter를 누르세요...")
-                        load_game.start_adventure(skip_passive_selection=True, skip_ai_mode_selection=True)  # 불러오기 시 패시브 선택과 AI 모드 선택 건너뛰기
+                        load_game.start_adventure(skip_passive_selection=True, skip_ai_mode_selection=True)  # 불러오기 시 패시브 선택과 클래식 모드 선택 건너뛰기
                     else:
                         print("❌ 파티 정보가 복원되지 않았습니다.")
                         print("💡 가능한 원인:")
@@ -12679,6 +13519,9 @@ class DawnOfStellarGame:
         """전투 시작 - Brave Combat System 사용"""
         try:
             from game.brave_combat import BraveCombatSystem
+            from game.error_logger import log_debug
+            
+            log_debug("전투시작", "start_battle 함수 호출됨", {})
             
             # 현재 위치의 적 확인 (world.player_pos 사용)
             if hasattr(self.world, 'player_pos'):
@@ -12690,16 +13533,22 @@ class DawnOfStellarGame:
             
             # 주변 적들 찾기 (world.enemies_positions 사용)
             if hasattr(self.world, 'enemies_positions'):
+                log_debug("전투시작", f"적 위치 확인", {
+                    "플레이어위치": (player_x, player_y),
+                    "전체적위치": list(self.world.enemies_positions) if self.world.enemies_positions else []
+                })
+                
                 for enemy_pos in self.world.enemies_positions:
                     enemy_x, enemy_y = enemy_pos
                     if abs(enemy_x - player_x) <= 1 and abs(enemy_y - player_y) <= 1:
+                        log_debug("전투시작", f"주변 적 발견", {"적위치": enemy_pos})
+                        
                         # 적 데이터 찾기
                         if hasattr(self.world, 'floor_enemies') and enemy_pos in self.world.floor_enemies:
                             enemy_data = self.world.floor_enemies[enemy_pos]
                             
                             # dict 객체인 경우 Character 객체로 변환
                             if isinstance(enemy_data, dict):
-                                # 조용히 변환 (경고 메시지 제거)
                                 try:
                                     from game.enemy_system import EnemyManager
                                     enemy_manager = EnemyManager()
@@ -12708,6 +13557,7 @@ class DawnOfStellarGame:
                                     enemy_character = enemy_manager.spawn_enemy(enemy_level)
                                     if hasattr(enemy_character, 'name'):
                                         enemies_at_position.append(enemy_character)
+                                        log_debug("전투시작", f"적 변환 성공", {"적이름": enemy_character.name})
                                     else:
                                         # 폴백: 기본 Character 생성
                                         from game.character import Character
@@ -12716,9 +13566,12 @@ class DawnOfStellarGame:
                                         fallback_enemy.current_hp = fallback_enemy.max_hp
                                         fallback_enemy.physical_attack = 15 + (enemy_level * 5)
                                         fallback_enemy.physical_defense = 10 + (enemy_level * 3)
+                                        fallback_enemy.is_alive = True  # 중요: is_alive 속성 설정
+                                        fallback_enemy.is_enemy = True  # 적 마크
                                         enemies_at_position.append(fallback_enemy)
+                                        log_debug("전투시작", f"폴백 적 생성", {"적이름": fallback_enemy.name})
                                 except Exception as e:
-                                    print(f"❌ dict 객체 변환 중 오류: {e}")
+                                    log_debug("전투시작", f"dict 객체 변환 중 오류: {e}", {})
                                     # 마지막 폴백
                                     from game.character import Character
                                     fallback_enemy = Character("적", "적")
@@ -12726,10 +13579,78 @@ class DawnOfStellarGame:
                                     fallback_enemy.current_hp = 50
                                     fallback_enemy.physical_attack = 15
                                     fallback_enemy.physical_defense = 10
+                                    fallback_enemy.is_alive = True  # 중요: is_alive 속성 설정
+                                    fallback_enemy.is_enemy = True  # 적 마크
                                     enemies_at_position.append(fallback_enemy)
                             else:
                                 # 이미 Character 객체인 경우
+                                if not hasattr(enemy_data, 'is_alive'):
+                                    enemy_data.is_alive = True  # 안전성 보장
+                                if not hasattr(enemy_data, 'is_enemy'):
+                                    enemy_data.is_enemy = True  # 적 마크
                                 enemies_at_position.append(enemy_data)
+                                log_debug("전투시작", f"기존 Character 객체 사용", {"적이름": getattr(enemy_data, 'name', '이름없음')})
+            
+            if not enemies_at_position:
+                log_debug("전투시작", "주변에 적이 없어서 랜덤 적 생성", {})
+                # 랜덤 적 생성
+                try:
+                    from game.enemy_system import EnemyManager
+                    enemy_manager = EnemyManager()
+                    enemy = enemy_manager.spawn_enemy(self.world.current_level)
+                    # 안전성 보장
+                    if not hasattr(enemy, 'is_alive'):
+                        enemy.is_alive = True
+                    if not hasattr(enemy, 'is_enemy'):
+                        enemy.is_enemy = True
+                    enemies_at_position = [enemy]
+                    print(f"🦹 {enemy.name}이(가) 나타났습니다!")
+                    log_debug("전투시작", f"랜덤 적 생성 성공", {"적이름": enemy.name})
+                except Exception as e:
+                    log_debug("전투시작", f"적 생성 중 오류: {e}", {})
+                    # 기본 적 생성 (폴백)
+                    from game.character import Character
+                    basic_enemy = Character("고블린", "적")
+                    basic_enemy.max_hp = 100
+                    basic_enemy.current_hp = 100
+                    basic_enemy.physical_attack = 25
+                    basic_enemy.physical_defense = 20
+                    basic_enemy.is_alive = True  # 중요: is_alive 속성 설정
+                    basic_enemy.is_enemy = True  # 적 마크
+                    enemies_at_position = [basic_enemy]
+                    print(f"⚠️ 기본 적 생성: {basic_enemy.name}")
+            
+            log_debug("전투시작", f"전투 대상 준비 완료", {
+                "적수": len(enemies_at_position),
+                "적이름들": [getattr(e, 'name', '이름없음') for e in enemies_at_position]
+            })
+            
+            # Brave 전투 시스템 초기화 및 실행
+            brave_combat = BraveCombatSystem(self.audio_system, self.audio_system)
+            
+            log_debug("전투시작", "BraveCombatSystem 전투 시작", {})
+            combat_result = brave_combat.start_battle(self.party_manager.members, enemies_at_position)
+            
+            # 전투 결과 처리
+            if combat_result:
+                print(f"\n🎉 {bright_green('승리했습니다!')}")
+                log_debug("전투종료", "전투 승리", {})
+                # 전투 승리 후 처리는 기존 코드 유지
+            else:
+                log_debug("전투종료", "전투 결과가 False", {})
+                
+        except Exception as e:
+            from game.error_logger import log_error
+            log_error("전투시스템", f"start_battle 중 오류 발생: {e}", {
+                "오류타입": type(e).__name__,
+                "오류메시지": str(e)
+            })
+            print(f"⚠️ 전투 중 오류 발생: {e}")
+            print("전투를 건너뜁니다.")
+            try:
+                self.keyboard.wait_for_key("아무 키나 눌러 계속...")
+            except:
+                input("아무 키나 눌러 계속...")  # 폴백
             
             if not enemies_at_position:
                 # 랜덤 적 생성
@@ -12771,6 +13692,9 @@ class DawnOfStellarGame:
         try:
             from game.brave_combat import BraveCombatSystem
             
+            print(f"⚔️ 전투 시작 함수 호출됨!")
+            print(f"📍 적 위치들: {enemy_positions}")
+            
             if not enemy_positions:
                 print("❌ 전투할 적이 없습니다.")
                 return "no_enemies"
@@ -12783,43 +13707,73 @@ class DawnOfStellarGame:
             print(f"🔍 적 위치 확인: {enemy_positions}")
             
             # 각 위치의 적들을 전투용 캐릭터로 변환
-            for enemy_pos in enemy_positions:
+            for i, enemy_pos in enumerate(enemy_positions):
+                print(f"🔍 적 위치 확인 [{i+1}/{len(enemy_positions)}]: {enemy_pos}")
+                
+                # 1. world.floor_enemies에서 확인
+                enemy_data = None
                 if hasattr(self.world, 'floor_enemies') and enemy_pos in self.world.floor_enemies:
                     enemy_data = self.world.floor_enemies[enemy_pos]
-                    print(f"📊 적 데이터 발견: {enemy_pos} -> {type(enemy_data)}")
-                    
-                    # dict 객체인 경우 Character 객체로 변환
+                    print(f"📊 floor_enemies에서 적 발견: {type(enemy_data)}")
+                else:
+                    print(f"❌ floor_enemies에서 적을 찾을 수 없음: {enemy_pos}")
+                    if hasattr(self.world, 'floor_enemies'):
+                        print(f"📋 현재 floor_enemies 키들: {list(self.world.floor_enemies.keys())}")
+                
+                # 2. enemies_positions 기반으로 기본 적 생성
+                if not enemy_data and hasattr(self.world, 'enemies_positions') and enemy_pos in self.world.enemies_positions:
+                    print(f"📍 enemies_positions에서 위치 확인됨, 기본 적 생성")
+                    try:
+                        from game.enemy_system import EnemyManager
+                        enemy_manager = EnemyManager()
+                        enemy_data = enemy_manager.spawn_enemy(self.world.current_level)
+                        print(f"✨ 기본 적 생성됨: {type(enemy_data)}")
+                    except Exception as e:
+                        print(f"❌ 기본 적 생성 실패: {e}")
+                        continue
+                
+                if not enemy_data:
+                    print(f"❌ 위치 {enemy_pos}에 적 데이터 없음")
+                    continue
+                
+                # 적 Character 객체로 변환/처리
+                try:
                     if isinstance(enemy_data, dict):
-                        try:
-                            from game.enemy_system import EnemyManager
-                            enemy_manager = EnemyManager()
-                            enemy_level = enemy_data.get('level', 1)
-                            enemy_type = enemy_data.get('type', '고블린')
-                            
-                            print(f"🎯 적 생성: {enemy_type} (레벨 {enemy_level})")
-                            
-                            # spawn_enemy는 floor 인자를 받음
-                            enemy_character = enemy_manager.spawn_enemy(self.world.current_level)
-                            
-                            # 생성된 적의 레벨을 저장된 레벨로 조정
-                            if hasattr(enemy_character, 'level'):
-                                enemy_character.level = enemy_level
-                                # 레벨에 맞춰 스탯도 재조정
-                                if hasattr(enemy_character, '_set_enemy_stats'):
-                                    enemy_character._set_enemy_stats()
-                            
-                            if hasattr(enemy_character, 'name'):
-                                enemies_for_combat.append(enemy_character)
-                                print(f"✅ 적 추가됨: {enemy_character.name}")
-                        except Exception as e:
-                            print(f"❌ 적 생성 오류: {e}")
-                            continue
+                        # dict 데이터를 Character 객체로 변환
+                        from game.enemy_system import EnemyManager
+                        enemy_manager = EnemyManager()
+                        enemy_level = enemy_data.get('level', self.world.current_level)
+                        enemy_type = enemy_data.get('type', '고블린')
+                        
+                        print(f"🎯 dict 적 변환: {enemy_type} (레벨 {enemy_level})")
+                        enemy_character = enemy_manager.spawn_enemy(self.world.current_level)
+                        
+                        if hasattr(enemy_character, 'level'):
+                            enemy_character.level = enemy_level
+                        
+                        enemies_for_combat.append(enemy_character)
+                        print(f"✅ dict 적 추가: {enemy_character.name}")
+                        
                     elif hasattr(enemy_data, 'name'):
                         # 이미 Character 객체인 경우
                         enemies_for_combat.append(enemy_data)
-                        print(f"✅ 기존 적 추가됨: {enemy_data.name}")
-                else:
-                    print(f"❌ 위치에 적이 없음: {enemy_pos}")
+                        print(f"✅ 기존 Character 적 추가: {enemy_data.name}")
+                        
+                    else:
+                        print(f"❓ 알 수 없는 적 데이터 형식: {type(enemy_data)}")
+                        # 폴백: 기본 적 생성
+                        try:
+                            from game.enemy_system import EnemyManager
+                            enemy_manager = EnemyManager()
+                            enemy_character = enemy_manager.spawn_enemy(self.world.current_level)
+                            enemies_for_combat.append(enemy_character)
+                            print(f"🔄 폴백 적 생성: {enemy_character.name}")
+                        except Exception as e:
+                            print(f"❌ 폴백 적 생성 실패: {e}")
+                            
+                except Exception as e:
+                    print(f"❌ 적 처리 중 오류: {e}")
+                    continue
             
             if not enemies_for_combat:
                 print("❌ 전투 가능한 적이 없습니다.")
@@ -12953,16 +13907,16 @@ class DawnOfStellarGame:
                 print("아무 키나 눌러 계속...")
                 self.keyboard.wait_for_key()
                 
-                # 🎵 승리 후 사용자가 키를 눌렀을 때 던전 BGM으로 복귀
+                # 🎵 승리 후 사용자가 키를 눌렀을 때 차원 공간 BGM으로 복귀
                 try:
                     if hasattr(self, 'audio_system') and self.audio_system:
                         self.audio_system.play_bgm("dungeon", loop=True)
-                        print("🎵 던전 BGM으로 복귀!")
+                        print("🎵 차원 공간 BGM으로 복귀!")
                     elif hasattr(self, 'sound_manager') and self.sound_manager:
                         self.sound_manager.play_bgm("dungeon")
-                        print("🎵 던전 BGM으로 복귀!")
+                        print("🎵 차원 공간 BGM으로 복귀!")
                 except Exception as e:
-                    print(f"⚠️ 던전 BGM 복구 실패: {e}")
+                    print(f"⚠️ 차원 공간 BGM 복구 실패: {e}")
                 
                 # 적 제거
                     
@@ -13263,14 +14217,38 @@ class DawnOfStellarGame:
                 current_item = getattr(target_member, f"equipped_{slot_name}", None)
                 
                 if current_item:
-                    print(f"⚠️ {target_member.name}이(가) 이미 {current_item.name}을(를) 장착하고 있습니다.")
-                    print("교체하시겠습니까? (Y/N)")
-                    
-                    choice = input().strip().upper()
-                    if choice != 'Y':
-                        print("장착을 취소했습니다.")
-                        self.keyboard.wait_for_key("아무 키나 눌러 계속...")
-                        return
+                    try:
+                        from game.cursor_menu_system import create_simple_menu
+                        
+                        options = [
+                            f"✅ 교체하기 ({current_item.name} → {item.name})",
+                            "❌ 취소하기"
+                        ]
+                        descriptions = [
+                            f"현재 장착된 {current_item.name}을(를) 해제하고 {item.name}을(를) 장착합니다.",
+                            "장착을 취소하고 이전 메뉴로 돌아갑니다."
+                        ]
+                        
+                        menu = create_simple_menu(
+                            f"⚠️ {target_member.name} 장비 교체 확인",
+                            options,
+                            descriptions
+                        )
+                        choice = menu.run()
+                        
+                        if choice != 0:  # 교체하기가 아님
+                            return
+                            
+                    except ImportError:
+                        # 폴백: 기존 Y/N 방식
+                        print(f"⚠️ {target_member.name}이(가) 이미 {current_item.name}을(를) 장착하고 있습니다.")
+                        print("교체하시겠습니까? (Y/N)")
+                        
+                        choice = input().strip().upper()
+                        if choice != 'Y':
+                            print("장착을 취소했습니다.")
+                            self.keyboard.wait_for_key("아무 키나 눌러 계속...")
+                            return
                     
                     # 기존 아이템 해제하고 인벤토리에 추가
                     unequipped = target_member.unequip_item(slot_name)
@@ -14722,16 +15700,16 @@ class DawnOfStellarGame:
             
             print(f"✅ {unequipped_count}개 장비 해제 완료!")
             
-            # 2단계: AI 게임모드의 장비 최적화 시스템 사용
+            # 2단계: 클래식 게임모드의 장비 최적화 시스템 사용
             print(f"{bright_cyan('2️⃣ AI 시스템으로 최적화 중...')}")
             
             try:
-                # AI 게임모드 사용 여부 확인
+                # 클래식 게임모드 사용 여부 확인
                 is_ai_mode = hasattr(self, 'ai_mode_active') and getattr(self, 'ai_mode_active', False)
                 
                 if is_ai_mode:
-                    # AI 게임모드: 개별 캐릭터만 최적화 (전체 분배 방지)
-                    print(f"   🤖 AI 게임모드: 개별 캐릭터 최적화 방식 사용")
+                    # 클래식 게임모드: 개별 캐릭터만 최적화 (전체 분배 방지)
+                    print(f"   🎮 클래식 게임모드: 개별 캐릭터 최적화 방식 사용")
                     from game.ai_game_mode import BasicEquipmentManager
                     basic_manager = BasicEquipmentManager()
                     
@@ -14883,7 +15861,7 @@ class DawnOfStellarGame:
                 else:
                     print("   장비 없음")
             
-            print(f"\n{bright_yellow('💡 팁: 던전에서 새로운 장비를 얻으면 언제든 다시 최적화할 수 있습니다!')}")
+            print(f"\n{bright_yellow('💡 팁: 차원 공간에서 새로운 장비를 얻으면 언제든 다시 최적화할 수 있습니다!')}")
             
         except Exception as e:
             print(f"❌ 장비 최적화 시스템 오류: {type(e).__name__}")
@@ -15109,6 +16087,57 @@ class DawnOfStellarGame:
         
         return score
     
+    def _handle_equipment_redistribute(self):
+        """파티 장비 재배치 핸들러"""
+        from game.error_logger import log_system
+        log_system("장비재배치", "_handle_equipment_redistribute 함수 호출됨")
+        
+        try:
+            from game.cursor_menu_system import create_simple_menu
+            
+            print(f"\n{bright_cyan('=== 🔄 장비 재배치 시스템 ===')}")
+            print("모든 파티원의 장비를 해제한 후, 직업별 중요도에 따라 재배치합니다.")
+            print("⚠️ 기존 장착된 모든 장비가 공용 인벤토리로 이동됩니다.")
+            
+            # 확인 메뉴
+            confirm_menu = create_simple_menu(
+                "장비 재배치 확인", 
+                ["🚀 재배치 실행", "❌ 취소"],
+                [
+                    "모든 파티원의 장비를 해제하고 직업별 중요도에 따라 재배치합니다",
+                    "장비 재배치를 취소하고 이전 메뉴로 돌아갑니다"
+                ]
+            )
+            
+            choice = confirm_menu.run()
+            if choice != 0:  # 취소
+                log_system("장비재배치", "사용자가 장비 재배치 취소")
+                return
+            
+            print(f"\n{bright_yellow('🔄 장비 재배치를 시작합니다...')}")
+            log_system("장비재배치", "party_manager.redistribute_equipment() 호출 시작")
+            
+            # PartyManager의 redistribute_equipment 메서드 호출
+            success = self.party_manager.redistribute_equipment()
+            
+            log_system("장비재배치", f"redistribute_equipment 실행 결과: {success}")
+            
+            if success:
+                print(f"\n{bright_green('✅ 장비 재배치가 성공적으로 완료되었습니다!')}")
+            else:
+                print(f"\n{bright_red('❌ 장비 재배치 중 오류가 발생했습니다.')}")
+            
+        except Exception as e:
+            from game.error_logger import log_error
+            log_error("장비재배치", "장비 재배치 실행 중 오류 발생", {
+                "오류내용": str(e),
+                "오류타입": type(e).__name__
+            })
+            print(f"\n{bright_red('❌ 장비 재배치 실행 중 오류 발생:')}")
+            print(f"   {str(e)}")
+        
+        self.keyboard.wait_for_key("아무 키나 눌러 계속...")
+    
     def _update_enemy_difficulty(self):
         """파티 변경 시 적 난이도 업데이트"""
         try:
@@ -15324,24 +16353,207 @@ def increment_steps(game_data):
 def handle_interaction(game):
     """플레이어 주변 상호작용 처리 (커서 메뉴 사용)"""
     try:
+        print("🔍 Enter키 상호작용 시작!")
+        log_debug("상호작용", f"상호작용 시도", {"플레이어위치": game.world.player_pos})
+        
         if not hasattr(game, 'world') or not game.world:
             print("❌ 월드 정보가 없습니다.")
+            log_error("상호작용", f"월드 정보 없음", data={"게임객체": hasattr(game, 'world')})
+            return
+        
+        # 먼저 현재 위치에서 밟아서 상호작용하는 것들 확인
+        px, py = game.world.player_pos
+        current_tile = game.world.tiles[py][px]
+        
+        log_debug("상호작용", f"현재 타일 확인", {
+            "위치": (px, py),
+            "타일타입": current_tile.type.name,
+            "타일기호": current_tile.symbol
+        })
+        
+        # 현재 위치에서 상호작용 가능한 것들 (밟아서 작동)
+        if current_tile.type in [game.world.TileType.FOUNTAIN, game.world.TileType.ALTAR, 
+                                game.world.TileType.CRYSTAL, game.world.TileType.GARDEN,
+                                game.world.TileType.CURSED_ALTAR, game.world.TileType.POISON_CLOUD,
+                                game.world.TileType.DARK_PORTAL, game.world.TileType.UNSTABLE_FLOOR]:
+            print(f"🦶 {current_tile.type.name}을(를) 밟았습니다!")
+            log_debug("상호작용", f"밟아서 상호작용", {"타일타입": current_tile.type.name})
+            result = game.world.interact_with_tile((px, py))
+            
+            if result.get('success'):
+                print(f"✅ {result.get('message', '상호작용 성공!')}")
+                log_player_action(f"밟기 상호작용 성공: {current_tile.type.name}", {"결과": result})
+                if result.get('pause', False):
+                    game.keyboard.wait_for_key("계속하려면 아무 키나 누르세요...")
+            else:
+                print(f"❌ {result.get('message', '상호작용 실패!')}")
+                log_error("상호작용", f"밟기 상호작용 실패", data={"결과": result})
+            game.keyboard.wait_for_key("계속하려면 아무 키나 누르세요...")
             return
         
         # 플레이어 주변의 상호작용 가능한 객체들 확인
         interactables = game.world.get_interactable_nearby(game.world.player_pos)
         
-        if not interactables:
-            # SFX 재생
-            try:
-                from game.audio_system import SFXType
-                if hasattr(game, 'audio_system') and game.audio_system:
-                    game.audio_system.play_sfx(SFXType.INTERACT_FAIL)
-            except:
-                pass
+        # 스킬이 없어도 모든 특수 타일들을 상호작용 목록에 포함
+        nearby_special_tiles = []
+        for dx in range(-1, 2):
+            for dy in range(-1, 2):
+                if dx == 0 and dy == 0:
+                    continue  # 현재 위치는 이미 체크했음
+                x, y = px + dx, py + dy
+                if not game.world.is_valid_pos(x, y):
+                    continue
+                
+                tile = game.world.tiles[y][x]
+                if not tile.visible and not tile.explored:
+                    continue
+                
+                # 모든 특수 타일 타입에 대해 상호작용 정보 생성
+                if tile.type in [game.world.TileType.ALTAR, game.world.TileType.LEVER, 
+                               game.world.TileType.BOOKSHELF, game.world.TileType.FORGE, 
+                               game.world.TileType.GARDEN, game.world.TileType.CRYSTAL,
+                               game.world.TileType.CURSED_ALTAR, game.world.TileType.POISON_CLOUD, 
+                               game.world.TileType.DARK_PORTAL, game.world.TileType.CURSED_CHEST, 
+                               game.world.TileType.UNSTABLE_FLOOR, game.world.TileType.CHEST,
+                               game.world.TileType.LOCKED_DOOR, game.world.TileType.SECRET_DOOR,
+                               game.world.TileType.TRAP]:
+                    
+                    skill_map = {
+                        game.world.TileType.ALTAR: ('신성마법', ['성기사', '신관']),
+                        game.world.TileType.LEVER: ('기계조작', ['기계공학자', '도적']),
+                        game.world.TileType.BOOKSHELF: ('지식탐구', ['철학자', '아크메이지']),
+                        game.world.TileType.FORGE: ('기계공학', ['기계공학자']),
+                        game.world.TileType.GARDEN: ('자연친화', ['드루이드']),
+                        game.world.TileType.CRYSTAL: ('정령술', ['정령술사', '아크메이지']),
+                        game.world.TileType.CURSED_ALTAR: ('신성마법', ['성기사', '신관']),
+                        game.world.TileType.POISON_CLOUD: ('자연친화', ['드루이드']),
+                        game.world.TileType.DARK_PORTAL: ('정령술', ['정령술사', '아크메이지']),
+                        game.world.TileType.CURSED_CHEST: ('자물쇠해제', ['도적', '궁수']),
+                        game.world.TileType.UNSTABLE_FLOOR: ('기계조작', ['기계공학자', '도적']),
+                        game.world.TileType.CHEST: ('자물쇠해제' if getattr(tile, 'is_locked', False) else None, ['도적', '궁수'] if getattr(tile, 'is_locked', False) else []),
+                        game.world.TileType.LOCKED_DOOR: ('자물쇠해제', ['도적', '궁수']),
+                        game.world.TileType.SECRET_DOOR: ('비밀탐지', ['도적', '궁수', '철학자']),
+                        game.world.TileType.TRAP: ('함정해제', ['도적', '궁수'])
+                    }
+                    
+                    tile_names = {
+                        game.world.TileType.ALTAR: '신성한 제단',
+                        game.world.TileType.LEVER: '고대 레버',
+                        game.world.TileType.BOOKSHELF: '고대 서적',
+                        game.world.TileType.FORGE: '마법 대장간',
+                        game.world.TileType.GARDEN: '신비한 정원',
+                        game.world.TileType.CRYSTAL: '마법 수정',
+                        game.world.TileType.CURSED_ALTAR: '저주받은 제단 ⚠️',
+                        game.world.TileType.POISON_CLOUD: '독성 구름 ⚠️',
+                        game.world.TileType.DARK_PORTAL: '어둠의 포털 ⚠️',
+                        game.world.TileType.CURSED_CHEST: '저주받은 상자 ⚠️',
+                        game.world.TileType.UNSTABLE_FLOOR: '불안정한 바닥 ⚠️',
+                        game.world.TileType.CHEST: f"{'잠긴 ' if getattr(tile, 'is_locked', False) else ''}보물상자",
+                        game.world.TileType.LOCKED_DOOR: '잠긴 문',
+                        game.world.TileType.SECRET_DOOR: '비밀 문',
+                        game.world.TileType.TRAP: '함정'
+                    }
+                    
+                    skill, classes = skill_map.get(tile.type, ('알 수 없음', []))
+                    tile_name = tile_names.get(tile.type, '신비한 물체')
+                    
+                    # 스킬 체크
+                    has_skill = skill is None or game.world._party_has_field_skill(skill)
+                    special_info = game.world.special_tiles.get((x, y), {})
+                    is_used = special_info.get('used', False)
+                    
+                    nearby_special_tiles.append({
+                        'pos': (x, y),
+                        'name': tile_name,
+                        'skill': skill,
+                        'classes': classes,
+                        'has_skill': has_skill,
+                        'used': is_used,
+                        'dangerous': tile.type in [game.world.TileType.CURSED_ALTAR, game.world.TileType.POISON_CLOUD, 
+                                                  game.world.TileType.DARK_PORTAL, game.world.TileType.CURSED_CHEST, 
+                                                  game.world.TileType.UNSTABLE_FLOOR]
+                    })
+        
+        # 상호작용 가능한 객체들과 특수 타일들 합치기
+        all_interactables = interactables + nearby_special_tiles
+        
+        if not all_interactables:
             print("💬 주변에 상호작용할 수 있는 것이 없습니다.")
             game.keyboard.wait_for_key("계속하려면 아무 키나 누르세요...")
             return
+        
+        # 상호작용 목록 표시
+        print("\n🔍 주변에서 발견한 물체들:")
+        for i, obj in enumerate(all_interactables):
+            if 'name' in obj:  # 특수 타일
+                status = ""
+                if obj['used']:
+                    status = " (이미 사용됨)"
+                elif not obj['has_skill'] and obj['skill']:
+                    status = f" (필요: {obj['skill']} - {', '.join(obj['classes'])})"
+                elif obj['dangerous']:
+                    status = " (위험!)"
+                
+                print(f"  [{i+1}] {obj['name']}{status}")
+            else:  # 일반 상호작용 객체
+                status = ""
+                if obj.get('required_skill') and not game.world._party_has_field_skill(obj['required_skill']):
+                    status = f" (필요: {obj['required_skill']} - {', '.join(obj.get('required_classes', []))})"
+                
+                print(f"  [{i+1}] {obj.get('name', '알 수 없는 물체')}{status}")
+        
+        print("\n어떤 물체와 상호작용하시겠습니까? (취소: q)")
+        
+        try:
+            choice = input("선택: ").strip().lower()
+            if choice == 'q':
+                return
+            
+            index = int(choice) - 1
+            if 0 <= index < len(all_interactables):
+                target = all_interactables[index]
+                
+                # 특수 타일인 경우
+                if 'name' in target:
+                    if target['used']:
+                        print("❌ 이미 사용된 물체입니다.")
+                        game.keyboard.wait_for_key("계속하려면 아무 키나 누르세요...")
+                        return
+                    
+                    if not target['has_skill'] and target['skill']:
+                        print(f"❌ {target['skill']} 스킬이 필요합니다. ({', '.join(target['classes'])} 직업이 보유)")
+                        print("💡 해당 스킬을 가진 동료를 영입하거나 스킬을 습득해보세요!")
+                        game.keyboard.wait_for_key("계속하려면 아무 키나 누르세요...")
+                        return
+                    
+                    if target['dangerous']:
+                        print(f"⚠️ 위험한 물체입니다! 정말 상호작용하시겠습니까? (y/n)")
+                        confirm = input("확인: ").strip().lower()
+                        if confirm != 'y':
+                            print("취소되었습니다.")
+                            return
+                
+                # 상호작용 실행
+                result = game.world.interact_with_tile(target['pos'])
+                
+                if result.get('success'):
+                    print(f"✅ {result.get('message', '상호작용 성공!')}")
+                else:
+                    print(f"❌ {result.get('message', '상호작용 실패!')}")
+                
+                if result.get('pause', False):
+                    game.keyboard.wait_for_key("계속하려면 아무 키나 누르세요...")
+            else:
+                print("❌ 잘못된 선택입니다.")
+                game.keyboard.wait_for_key("계속하려면 아무 키나 누르세요...")
+                
+        except (ValueError, IndexError):
+            print("❌ 잘못된 입력입니다.")
+            game.keyboard.wait_for_key("계속하려면 아무 키나 누르세요...")
+            
+    except Exception as e:
+        print(f"❌ 상호작용 처리 중 오류 발생: {e}")
+        game.keyboard.wait_for_key("계속하려면 아무 키나 누르세요...")
         
         # 상호작용 가능한 객체가 1개인 경우 바로 실행
         if len(interactables) == 1:
@@ -15536,12 +16748,17 @@ def handle_interaction(game):
 # ======================= MAIN FUNCTION =======================
 
 def main():
-    """메인 함수"""
+    """메인 함수 - 상태 보존 핫 리로드 지원"""
+    
+    # 상태 보존 핫 리로드 안내
+    if HOT_RELOAD_AVAILABLE:
+        print("🔥 상태 보존 핫 리로드 v2.0 활성화!")
+        print("💡 게임 중 'r' 키로 상태를 유지하며 모듈을 업데이트할 수 있습니다.")
     
     # 종료 처리 함수 정의
     def cleanup_and_exit(signum=None, frame=None):
         """안전한 종료 처리"""
-        try:
+        try:                
             import pygame
             if pygame.get_init():
                 pygame.mixer.quit()
@@ -15562,6 +16779,10 @@ def main():
     atexit.register(cleanup_and_exit)
     
     try:
+        # 상태 보존 핫 리로드 정보 표시
+        if HOT_RELOAD_AVAILABLE:
+            print("🎮 게임 중 'r' 키를 눌러 상태 보존 핫 리로드 메뉴를 사용하세요!")
+        
         # 윈도우 모드 EXE에서 오류 로깅 설정
         if getattr(sys, 'frozen', False):
             # PyInstaller 실행 파일인 경우 로그 파일 생성
@@ -15701,6 +16922,199 @@ def main():
                 sys.exit(0)
             except:
                 os._exit(0)
+
+    def check_position_interactions(self):
+        """현재 위치에서의 상호작용 체크 (적, 아이템, 오브젝트)"""
+        try:
+            player_x, player_y = self.world.player_pos
+            current_tile = self.world.tiles[player_y][player_x]
+            
+            # 1. 적과의 조우 체크
+            if hasattr(current_tile, 'has_enemy') and current_tile.has_enemy:
+                self.add_game_message("⚔️ 적과 마주쳤습니다!")
+                self.initiate_combat_at_position(player_x, player_y)
+                return
+            
+            # 2. 아이템 줍기 체크
+            if hasattr(current_tile, 'has_item') and current_tile.has_item:
+                if hasattr(self.world, 'floor_items') and (player_x, player_y) in self.world.floor_items:
+                    item = self.world.floor_items[(player_x, player_y)]
+                    self.add_game_message(f"💰 {item.name}을(를) 발견했습니다! (Space키로 줍기)")
+            
+            # 3. 계단 체크
+            if hasattr(current_tile, 'type') and current_tile.type and 'STAIRS' in str(current_tile.type):
+                self.add_game_message("🔻 계단을 발견했습니다! (Enter키로 이동)")
+            
+            # 4. 상점 체크
+            if hasattr(current_tile, 'has_shop') and current_tile.has_shop:
+                self.add_game_message("🏪 상점이 있습니다! (Enter키로 입장)")
+            
+            # 5. 특수 오브젝트 체크
+            if hasattr(current_tile, 'has_object') and current_tile.has_object:
+                self.add_game_message("🔍 상호작용 가능한 오브젝트가 있습니다! (Enter키로 조사)")
+            
+            # 6. 밟아서 작동하는 특수 타일들 자동 상호작용
+            if hasattr(current_tile, 'type') and current_tile.type:
+                from game.world import TileType
+                
+                # 자동으로 밟아서 작동하는 타일들
+                auto_trigger_tiles = [
+                    TileType.FOUNTAIN,  # 치유의 샘
+                    TileType.TRAP       # 함정 (피해 적용)
+                ]
+                
+                # 알림 후 상호작용하는 타일들  
+                notification_tiles = [
+                    TileType.ALTAR, TileType.CRYSTAL, TileType.GARDEN,
+                    TileType.CURSED_ALTAR, TileType.POISON_CLOUD, TileType.DARK_PORTAL, 
+                    TileType.UNSTABLE_FLOOR
+                ]
+                
+                if current_tile.type in auto_trigger_tiles:
+                    # 자동으로 상호작용 (함정, 치유의 샘 등)
+                    result = self.world.interact_with_tile((player_x, player_y))
+                    if result.get('success'):
+                        self.add_game_message(f"🦶 {result.get('message', '상호작용!')}")
+                    else:
+                        self.add_game_message(f"❌ {result.get('message', '상호작용 실패!')}")
+                    
+                    if result.get('pause', False):
+                        self.keyboard.wait_for_key("계속하려면 아무 키나 누르세요...")
+                        
+                elif current_tile.type in notification_tiles:
+                    # 특수 타일 알림 (Enter키로 상호작용 안내)
+                    tile_names = {
+                        TileType.ALTAR: '신성한 제단',
+                        TileType.CRYSTAL: '마법 수정',
+                        TileType.GARDEN: '신비한 정원',
+                        TileType.CURSED_ALTAR: '저주받은 제단 ⚠️',
+                        TileType.POISON_CLOUD: '독성 구름 ⚠️',
+                        TileType.DARK_PORTAL: '어둠의 포털 ⚠️',
+                        TileType.UNSTABLE_FLOOR: '불안정한 바닥 ⚠️'
+                    }
+                    
+                    tile_name = tile_names.get(current_tile.type, '특수한 타일')
+                    
+                    # 필요한 스킬 정보
+                    skill_requirements = {
+                        TileType.ALTAR: '신성마법 (성기사, 신관)',
+                        TileType.CRYSTAL: '정령술 (정령술사, 아크메이지)',
+                        TileType.GARDEN: '자연친화 (드루이드)',
+                        TileType.CURSED_ALTAR: '신성마법 (성기사, 신관) - 위험!',
+                        TileType.POISON_CLOUD: '자연친화 (드루이드) - 위험!',
+                        TileType.DARK_PORTAL: '정령술 (정령술사, 아크메이지) - 위험!',
+                        TileType.UNSTABLE_FLOOR: '기계조작 (기계공학자, 도적) - 위험!'
+                    }
+                    
+                    required_skill = skill_requirements.get(current_tile.type, '')
+                    
+                    # 사용 여부 체크
+                    special_info = self.world.special_tiles.get((player_x, player_y), {})
+                    if special_info.get('used', False):
+                        self.add_game_message(f"🚫 {tile_name}: 이미 사용됨")
+                    else:
+                        self.add_game_message(f"✨ {tile_name} 위에 있습니다! (Enter키로 상호작용)")
+                        if required_skill:
+                            self.add_game_message(f"💡 필요 스킬: {required_skill}")
+            
+        except Exception as e:
+            print(f"⚠️ 상호작용 체크 오류: {e}")
+
+    def initiate_combat_at_position(self, x, y):
+        """특정 위치에서 전투 시작"""
+        try:
+            if hasattr(self.world, 'floor_enemies') and (x, y) in self.world.floor_enemies:
+                enemy_data = self.world.floor_enemies[(x, y)]
+                
+                # 전투 시작
+                self.add_game_message("🗡️ 전투 시작!")
+                
+                # 간단한 전투 시스템 호출
+                if hasattr(self, 'combat_system'):
+                    combat_result = self.combat_system.start_combat([enemy_data])
+                    if combat_result == "victory":
+                        # 적 제거
+                        self.world.tiles[y][x].has_enemy = False
+                        if (x, y) in self.world.floor_enemies:
+                            del self.world.floor_enemies[(x, y)]
+                        if (x, y) in self.world.enemies_positions:
+                            self.world.enemies_positions.remove((x, y))
+                        self.add_game_message("🎉 전투 승리!")
+                else:
+                    # 기본 전투 처리
+                    print("⚔️ 전투가 시작됩니다!")
+                    self.keyboard.wait_for_key("아무 키나 눌러 계속...")
+                    
+                    # 임시로 적 제거 (실제 전투 시스템 구현 전까지)
+                    self.world.tiles[y][x].has_enemy = False
+                    if hasattr(self.world, 'floor_enemies') and (x, y) in self.world.floor_enemies:
+                        del self.world.floor_enemies[(x, y)]
+                    if (x, y) in self.world.enemies_positions:
+                        self.world.enemies_positions.remove((x, y))
+                    print("🎉 전투에서 승리했습니다!")
+                    
+        except Exception as e:
+            print(f"⚠️ 전투 시작 오류: {e}")
+
+    def show_error_logs(self):
+        """오류 로그 확인 화면"""
+        try:
+            from game.color_text import bright_cyan, bright_white, yellow, red
+            
+            print(f"\n{bright_cyan('═══════════════════════════════════════')}")
+            print(f"{bright_white('          📋 게임 로그 확인 📋')}")
+            print(f"{bright_cyan('═══════════════════════════════════════')}")
+            
+            logger = get_comprehensive_logger()
+            
+            # 로그 폴더 확인
+            import os
+            log_folder = "게임로그"
+            if os.path.exists(log_folder):
+                log_files = [f for f in os.listdir(log_folder) if f.endswith('.log')]
+                if log_files:
+                    print(f"{yellow('📁 사용 가능한 로그 파일들:')}")
+                    for i, log_file in enumerate(log_files[:10], 1):  # 최신 10개만
+                        print(f"  {i}. {log_file}")
+                    print(f"\n{bright_white('게임로그 폴더에서 자세한 내용을 확인하세요!')}")
+                else:
+                    print(f"{yellow('✅ 아직 로그 파일이 생성되지 않았습니다.')}")
+            else:
+                print(f"{yellow('✅ 아직 로그 폴더가 생성되지 않았습니다.')}")
+                print(f"{yellow('   게임을 플레이하면 자동으로 로그가 기록됩니다.')}")
+            
+            print(f"\n{bright_white('로그 종류:')}")
+            print(f"  🔴 오류로그: 게임 중 발생한 오류들")
+            print(f"  ⚔️ 전투로그: 전투 관련 모든 활동")
+            print(f"  👹 적로그: 적 생성 및 이동 정보")
+            print(f"  🎮 플레이어로그: 플레이어 행동 기록")
+            print(f"  🗺️ 월드로그: 맵 생성 및 월드 이벤트")
+            print(f"  🔧 시스템로그: 게임 시스템 동작 정보")
+            print(f"  🐛 디버그로그: 개발 및 디버깅 정보")
+            print()
+            
+            # 최근 오류 표시
+            try:
+                from game.error_logger import get_recent_errors
+                recent_errors = get_recent_errors(5)  # 최근 5개 오류
+                if recent_errors:
+                    print(f"{red('🚨 최근 오류들:')}")
+                    for error in recent_errors:
+                        print(f"  • {error}")
+                else:
+                    print(f"{green('✅ 최근 오류 없음')}")
+            except Exception as log_error:
+                print(f"{yellow('⚠️ 최근 오류 로드 실패:')} {log_error}")
+            
+            print()
+            print(f"{yellow('💡 팁: 오류가 지속적으로 발생하면 latest_errors.log 파일을 확인하세요.')}")
+            
+            print(f"{bright_cyan('═══════════════════════════════════════')}")
+            self.keyboard.wait_for_key("🔑 아무 키나 눌러 계속...")
+            
+        except Exception as e:
+            print(f"❌ 오류 로그 확인 중 문제가 발생했습니다: {e}")
+            self.keyboard.wait_for_key("아무 키나 눌러 계속...")
 
 
 if __name__ == "__main__":

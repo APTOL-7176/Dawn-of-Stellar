@@ -1,5 +1,5 @@
 """
-AI 파티원 게임모드 - 전체 시스템 통합 (성별/성격 대화 시스템 포함)
+클래식 파티원 게임모드 - 전체 시스템 통합 (성별/성격 대화 시스템 포함)
 플레이어가 선택한 캐릭터만 직접 조작하고, 나머지는 AI가 자동 조작
 저장시스템, 필드스킬, 요리시스템, 장비시스템, 성별 기반 대화시스템 모두 연동
 """
@@ -12,10 +12,10 @@ from .ai_companion_system import AICompanion, AIPersonality, AIRequest, ai_merce
 from .character import Character
 
 def setup_ai_combat_mode(combat_system):
-    """전투 시스템에 AI 모드 설정"""
+    """전투 시스템에 클래식 모드 설정"""
     if hasattr(combat_system, 'set_ai_game_mode'):
         combat_system.set_ai_game_mode(True)
-        print("🤖 AI 게임 모드 전투 설정 완료")
+        print("🤖 클래식 게임 모드 전투 설정 완료")
     return combat_system
 
 # 캐릭터 성별/성격 시스템
@@ -53,7 +53,7 @@ class CharacterTraits:
         "라이언", "제이콥", "게리", "니콜라스", "조나단", "래리", "저스틴", "스콧",
         "브랜든", "벤자민", "사무엘", "그레고리", "패트릭", "데니스", "제리", "타일러",
         "애런", "헨리", "더글러스", "네이선", "피터", "잭슨", "노아", "이단", "루카스",
-        "메이슨", "로건", "윌리엄", "엘리야", "웨인", "칼렙", "니콜라스", "조던",
+        "메이슨", "로건", "윌리엄", "엘리야", "웨인", "칼렙", "니콜라스", "조던","테오",
         "그레이슨", "헌터", "에이든", "카메론", "코너", "산티아고", "이사이야", "찰리",
         "이반", "오웬", "루크", "딜런", "잭슨", "가빈", "콜튼", "맥스", "브레이든",
         "카터", "다니엘", "아담", "엘라이", "핀", "코딘", "트리스탄", "로넌", "블레이크",
@@ -79,7 +79,7 @@ class CharacterTraits:
         "레슬리", "에리카", "카일린", "애나", "코트니", "루비", "메간", "알렉시스",
         "클로에", "이사벨", "에이바", "밀라", "아리아나", "라일라", "미아", "라일리",
         "클레어", "엘리아나", "나오미", "네이탈리", "헤일리", "브루클린", "앨리슨",
-        "자스민", "마야", "페넬로페", "오드리", "스카를릿", "애나스타샤", "베로니카",
+        "자스민", "마야", "페넬로페", "오를리", "스카를릿", "애나스타샤", "베로니카",
         "테레사", "앤젤라", "카르멘", "몰리", "웬디", "리사", "아니타", "리비",
         "알리시아", "알렉산드라", "키아라", "조아나", "마리사", "카렌", "스테이시",
         "다이애나", "로즈", "이솔데", "기네비어", "모르가나", "아르테미스", "아테나",
@@ -89,7 +89,7 @@ class CharacterTraits:
         "아리엘", "젤다", "세레나", "팬도라", "포에베", "셀레네", "헤카테", "님프",
         "오로라", "스텔라", "노바", "베가", "카시오페아", "라이라", "알타이르",
         "벨라트릭스", "리겔", "시리우스", "프로키온", "아크투루스", "스피카", "알데바란",
-        "카펠라", "폴룩스", "레굴루스", "안타레스"
+        "카펠라", "폴룩스", "레굴루스", "안타레스", "오즈","코린"
     ]
     
     # 성격별 대화 스타일 (대폭 확장)
@@ -562,11 +562,11 @@ class AIGameModeManager:
         self.pending_ai_requests = []           # AI의 요청/제안 목록
         self.coordination_opportunities = []    # 협동 공격 기회
         self.item_sharing_enabled = True       # 아이템 공유 허용
-        self.ai_mode_active = False             # AI 모드 활성화 상태
+        self.ai_mode_active = False             # 클래식 모드 활성화 상태
         
     def initialize_ai_mode(self, party_members: List[Character], controlled_count: int = 1):
-        """AI 모드 초기화"""
-        self.ai_mode_active = True  # AI 모드 활성화
+        """클래식 모드 초기화"""
+        self.ai_mode_active = True  # 클래식 모드 활성화
         
         if controlled_count >= len(party_members):
             print("⚠️ 모든 캐릭터를 직접 조작합니다.")
@@ -2909,7 +2909,7 @@ class AIGameModeManager:
         return True
     
     def get_ai_mode_status(self) -> Dict[str, any]:
-        """AI 모드 현재 상태 반환"""
+        """클래식 모드 현재 상태 반환"""
         status = {
             'mode': self.current_mode.value,
             'player_controlled': len(self.player_controlled_characters),
@@ -2939,7 +2939,7 @@ class AIGameModeManager:
         return status
     
     def save_ai_mode_state(self) -> Dict[str, any]:
-        """AI 모드 상태 저장"""
+        """클래식 모드 상태 저장"""
         save_data = {
             'current_mode': self.current_mode.value,
             'player_character_names': [char.name for char in self.player_controlled_characters],
@@ -2966,8 +2966,12 @@ class AIGameModeManager:
         if not character:
             return False
         
-        # AI 모드가 비활성화된 경우 모든 캐릭터는 플레이어 조작
+        # 클래식 모드가 비활성화된 경우 모든 캐릭터는 플레이어 조작
         if not hasattr(self, 'ai_mode_active') or not getattr(self, 'ai_mode_active', False):
+            return False
+        
+        # 주인공(플레이어)은 항상 플레이어가 제어
+        if getattr(character, 'name', '') == '핀' or getattr(character, 'is_main_character', False):
             return False
         
         # AI 동료 리스트에서 확인
@@ -2975,14 +2979,14 @@ class AIGameModeManager:
             if ai_companion.character == character:
                 return True
         
-        # 플레이어 조작 캐릭터가 아니고 AI 모드가 활성화된 경우에만 AI 조작으로 판단
+        # 플레이어 조작 캐릭터가 아니고 클래식 모드가 활성화된 경우에만 AI 조작으로 판단
         if character not in self.player_controlled_characters and len(self.ai_companions) > 0:
             return True
         
         return False
     
     def load_ai_mode_state(self, save_data: Dict[str, any], party: List[Character]):
-        """AI 모드 상태 로드"""
+        """클래식 모드 상태 로드"""
         # 모드 복원
         mode_value = save_data.get('current_mode', AIGameMode.SINGLE_CONTROL.value)
         self.current_mode = AIGameMode(mode_value)
@@ -3015,7 +3019,7 @@ class AIGameModeManager:
         settings = save_data.get('settings', {})
         self.item_sharing_enabled = settings.get('item_sharing_enabled', True)
         
-        print(f"✅ AI 모드 상태가 복원되었습니다.")
+        print(f"✅ 클래식 모드 상태가 복원되었습니다.")
         print(f"   플레이어 조작: {len(self.player_controlled_characters)}명")
         print(f"   AI 조작: {len(self.ai_companions)}명")
 
@@ -4576,9 +4580,9 @@ def respond_to_ai_request(request):
         return True
     
     def get_ai_mode_status(self) -> str:
-        """AI 모드 상태 정보"""
+        """클래식 모드 상태 정보"""
         status_lines = [
-            f"🎮 AI 게임모드: {self.current_mode.value}",
+            f"🎮 클래식 게임모드: {self.current_mode.value}",
             f"👤 플레이어 조작: {len(self.player_controlled_characters)}명",
             f"🤖 AI 조작: {len(self.ai_companions)}명",
             f"💬 대기 중인 요청: {len(self.pending_ai_requests)}개"

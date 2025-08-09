@@ -3,15 +3,7 @@ from typing import Dict, List, Any
 from enum import Enum
 import random
 
-# StatusType import
-try:
-    from .status_effects import StatusType
-except ImportError:
-    # 간단한 StatusType 정의
-    class StatusType:
-        POISON = "poison"
-        BURN = "burn"
-        BOOST_ATK = "boost_atk"
+# StatusType은 이 파일에서 정의됩니다 (아래에 있음)
 
 class SkillType(Enum):
     BRV_ATTACK = "BRV공격"
@@ -407,6 +399,12 @@ class PenetrationType(Enum):
     # 예: 20% TRUE_DAMAGE = 20%는 방어무시, 80%는 일반계산
 
 class StatusType(Enum):
+    # === 기본 효과 카테고리 ===
+    BUFF = "버프"           # 유익한 효과 일반
+    DEBUFF = "디버프"       # 해로운 효과 일반
+    DOT = "지속피해"        # 지속 피해 효과
+    HOT = "지속회복"        # 지속 회복 효과
+    
     # === 버프 상태 ===
     BOOST_ATK = "공격력증가"
     BOOST_DEF = "방어력증가"
@@ -2847,7 +2845,7 @@ def apply_special_effect(effect_name: str, caster, target=None, skill_data=None)
         
         # 공간술사 효과
         "dimension_cloak": lambda caster, target=None, skill_data=None: _dimension_cloak(caster),
-        "afterimage": lambda caster, target=None, skill_data=None: _afterimage(caster),
+        "afterimage": lambda caster, target=None, skill_data=None: _afterimage(caster, target, skill_data),
         "space_leap": lambda caster, target=None, skill_data=None: _space_leap(caster, target, skill_data),
         "dimension_maze": lambda caster, target=None, skill_data=None: _dimension_maze(caster, target),
         "evasion_counter": lambda caster, target=None, skill_data=None: _evasion_counter(caster, target, skill_data),
@@ -2980,7 +2978,7 @@ def apply_special_effect(effect_name: str, caster, target=None, skill_data=None)
         "spirit_bond": lambda caster, target=None, skill_data=None: _spirit_bond(caster),
         
         # 시간술사 효과  
-        "time_stop": lambda caster, target=None, skill_data=None: _time_stop(caster, target, skill_data),
+        "time_stop": lambda caster, target=None, skill_data=None: _time_stop(caster),
         
         # 연금술사 효과
         "chemical_reaction": lambda caster, target=None, skill_data=None: _chemical_reaction_safe(caster, target, skill_data),
@@ -3601,7 +3599,7 @@ def get_special_effect_handlers():
         "armor_pierce": _armor_pierce,
         "arrow_penetration": lambda caster, target=None, skill_data=None: _arrow_penetration(caster, target, skill_data),
         "assassination": _guaranteed_critical,
-        "atonement_stack": lambda caster, target=None, skill_data=None: _atonement_stack(caster, target, skill_data),
+        "atonement_stack": lambda caster, target=None, skill_data=None: _atonement_stack(caster),
         "auto_turret_install": lambda caster, target=None, skill_data=None: _auto_turret_install(caster),
         "blessing_beam": lambda caster, target=None, skill_data=None: _blessing_beam(caster),
         "blessing_sanctuary": lambda caster, target=None, skill_data=None: _blessing_sanctuary(caster),
@@ -3615,7 +3613,7 @@ def get_special_effect_handlers():
         "dark_dominion": lambda caster, target=None, skill_data=None: _dark_dominion(caster, target, skill_data),
         "dark_lord": lambda caster, target=None, skill_data=None: _dark_lord(caster, target, skill_data),
         "darkness_power": lambda caster, target=None, skill_data=None: _darkness_power(caster, target, skill_data),
-        "dimension_cloak": lambda caster, target=None, skill_data=None: _dimension_cloak(caster, target, skill_data),
+        "dimension_cloak": lambda caster, target=None, skill_data=None: _dimension_cloak(caster),
         "dimension_maze": lambda caster, target=None, skill_data=None: _dimension_maze(caster, target, skill_data),
         "divine_accumulation": lambda caster, target=None, skill_data=None: _divine_accumulation(caster, target, skill_data),
         "divine_judgment": lambda caster, target=None, skill_data=None: _divine_judgment(caster, target, skill_data),
@@ -3634,12 +3632,12 @@ def get_special_effect_handlers():
         "elemental_cycle": lambda caster, target=None, skill_data=None: _elemental_cycle(caster, target, skill_data),
         "elemental_weapon": lambda caster, target=None, skill_data=None: _elemental_weapon(caster, skill_data),
         "energy_discharge": lambda caster, target=None, skill_data=None: _energy_discharge(caster, target, skill_data),
-        "enlightenment": lambda caster, target=None, skill_data=None: _enlightenment(caster, target, skill_data),
+        "enlightenment": lambda caster, target=None, skill_data=None: _enlightenment(caster),
         "evasion_counter": lambda caster, target=None, skill_data=None: _evasion_counter(caster, target, skill_data),
         "existence_denial": lambda caster, target=None, skill_data=None: _existence_denial(caster, target, skill_data),
         "fire_count": lambda caster, target=None, skill_data=None: _fire_count(caster, target, skill_data),
         "four_elements": _all_elements_effect,
-        "future_sight": lambda caster, target=None, skill_data=None: _future_sight(caster, target, skill_data),
+        "future_sight": lambda caster, target=None, skill_data=None: _future_sight(caster),
         "gaia_wrath": lambda caster, target=None, skill_data=None: _gaia_wrath(caster, target, skill_data),
         "generate_shadow": lambda caster, target=None, skill_data=None: _generate_shadow(caster),
         "ghost_fleet": lambda caster, target=None, skill_data=None: _ghost_fleet(caster, target, skill_data),
@@ -3663,9 +3661,9 @@ def get_special_effect_handlers():
         "lightning_count": lambda caster, target=None, skill_data=None: _lightning_count(caster, target, skill_data),
         "lightning_storm": lambda caster, target=None, skill_data=None: _lightning_storm(caster, target, skill_data),
         "machine_charge": lambda caster, target=None, skill_data=None: _machine_charge(caster),
-        "magic_field": lambda caster, target=None, skill_data=None: _magic_field(caster, target, skill_data),
+        "magic_field": lambda caster, target=None, skill_data=None: _magic_field(caster),
         "magic_storm": lambda caster, target=None, skill_data=None: _magic_storm(caster, target, skill_data),
-        "martyrdom_path": lambda caster, target=None, skill_data=None: _martyrdom_path(caster, target, skill_data),
+        "martyrdom_path": lambda caster, target=None, skill_data=None: _martyrdom_path(caster),
         "minor_vampiric": _basic_vampiric,
         "mp_restore_15pct": lambda caster, target=None, skill_data=None: _mana_recovery_percent(caster, 0.15),
         "multi_missile": lambda caster, target=None, skill_data=None: _multi_missile(caster, target, skill_data),
@@ -3673,8 +3671,8 @@ def get_special_effect_handlers():
         "nature_bond": lambda caster, target=None, skill_data=None: _nature_bond(caster, target, skill_data),
         "nature_judgment": lambda caster, target=None, skill_data=None: _nature_judgment(caster, target, skill_data),
         "perfect_fusion": lambda caster, target=None, skill_data=None: _perfect_fusion(caster, target, skill_data),
-        "philosophers_stone": lambda caster, target=None, skill_data=None: _philosophers_stone(caster, target, skill_data),
-        "philosophical_thought": lambda caster, target=None, skill_data=None: _philosophical_thought(caster, target, skill_data),
+        "philosophers_stone": lambda caster, target=None, skill_data=None: _philosophers_stone(caster),
+        "philosophical_thought": lambda caster, target=None, skill_data=None: _philosophical_thought(caster),
         "pirate_plunder": lambda caster, target=None, skill_data=None: _pirate_plunder(caster, target, skill_data),
         "plague_spread": lambda caster, target=None, skill_data=None: _plague_spread(caster, target, skill_data),
         "poison_emperor": lambda caster, target=None, skill_data=None: _poison_emperor(caster, target, skill_data),
@@ -3691,7 +3689,7 @@ def get_special_effect_handlers():
         "sanctuary_expand": lambda caster, target=None, skill_data=None: _sanctuary_expand(caster, target, skill_data),
         "shadow_echo": lambda caster, target=None, skill_data=None: _shadow_echo(caster, target, skill_data),
         "shadow_execution": lambda caster, target=None, skill_data=None: _shadow_execution(caster, target, skill_data),
-        "smoke_bomb": lambda caster, target=None, skill_data=None: _smoke_bomb(caster, target, skill_data),
+        "smoke_bomb": lambda caster, target=None, skill_data=None: _smoke_bomb(caster),
         "sonic_burst": lambda caster, target=None, skill_data=None: _sonic_burst(caster),
         "soul_analysis": lambda caster, target=None, skill_data=None: _soul_analysis(caster, target),
         "soul_harvest": _soul_harvest,
@@ -3702,12 +3700,12 @@ def get_special_effect_handlers():
         "support_fire_activation": lambda caster, target=None, skill_data=None: _support_fire_activation(caster, target, skill_data),
         "survival_will": lambda caster, target=None, skill_data=None: _survival_will(caster, target, skill_data),
         "time_record_savepoint": lambda caster, target=None, skill_data=None: _time_record_savepoint(caster, target, skill_data),
-        "time_rewind_to_savepoint": lambda caster, target=None, skill_data=None: _time_rewind_to_savepoint(caster, target, skill_data),
-        "time_stop": lambda caster, target=None, skill_data=None: _time_stop(caster, target, skill_data),
+        "time_rewind_to_savepoint": lambda caster, target=None, skill_data=None: _time_rewind_to_savepoint(caster),
+        "time_stop": lambda caster, target=None, skill_data=None: _time_stop(caster),
         "toxic_cocktail": lambda caster, target=None, skill_data=None: _toxic_cocktail(caster, target, skill_data),
-        "transmute_item": lambda caster, target=None, skill_data=None: _transmute_item(caster, target, skill_data),
+        "transmute_item": lambda caster, target=None, skill_data=None: _transmute_item(caster),
         "treasure_hunt": lambda caster, target=None, skill_data=None: _treasure_hunt(caster, target, skill_data),
-        "untouchable_state": lambda caster, target=None, skill_data=None: _untouchable_state(caster, target, skill_data),
+        "untouchable_state": lambda caster, target=None, skill_data=None: _untouchable_state(caster),
         "vampire_slash": _basic_vampiric,
         "vampiric_strike": _basic_vampiric,
         "venom_absorption": lambda caster, target=None, skill_data=None: _venom_absorption(caster, target, skill_data),
@@ -3778,7 +3776,7 @@ def _armor_pierce(caster, target, skill_data):
         caster.add_temp_effect("armor_pierce", 1)
     return True
 
-def _berserker_rage(caster, skill_data):
+def _berserker_rage(caster, target=None, skill_data=None):
     """광전사 분노 효과"""
     if hasattr(caster, 'current_hp') and hasattr(caster, 'max_hp'):
         hp_ratio = caster.current_hp / caster.max_hp
@@ -4565,7 +4563,7 @@ def _sword_pressure(caster, target, skill_data):
         target.add_status(StatusType.REDUCE_ATK, duration=4, power=0.7)
     return True
 
-def _sword_unity(caster):
+def _sword_unity(caster, target=None, skill_data=None):
     """검심일체"""
     if hasattr(caster, 'add_status'):
         caster.add_status(StatusType.BOOST_ATK, duration=5, power=1.5)
@@ -4591,7 +4589,7 @@ def _sword_emperor(caster, target, skill_data):
 # 검투사 Special Effects
 # ========================================
 
-def _gladiator_honor(caster):
+def _gladiator_honor(caster, target=None, skill_data=None):
     """검투사의 명예"""
     if hasattr(caster, 'add_status'):
         caster.add_status(StatusType.BOOST_ATK, duration=4, power=1.3)
@@ -4874,7 +4872,7 @@ def _dimension_cloak(caster):
         caster.add_status(StatusType.BOOST_DODGE, duration=5, power=3.0)
     return True
 
-def _afterimage(caster):
+def _afterimage(caster, target=None, skill_data=None):
     """잔상 - 차원술사 특성 연동"""
     # 차원술사 특성: 잔상 스택 증가
     if hasattr(caster, 'character_class') and caster.character_class == "차원술사":
@@ -5081,9 +5079,7 @@ def _soul_analysis(caster, target):
     """영혼 분석 - 적의 약점과 상태를 파악"""
     try:
         if target and hasattr(target, 'status_manager') and target.status_manager:
-            # 적에게 영혼 결속과 분석 효과 부여
-            from game.status_effects import StatusType
-            target.status_manager.add_status(StatusType.SOUL_BOND, 999, 1.0)  # 영혼 결속 (받는 피해 증가)
+            # 적에게 영혼 결속과 분석 효과 부여            target.status_manager.add_status(StatusType.SOUL_BOND, 999, 1.0)  # 영혼 결속 (받는 피해 증가)
             target.status_manager.add_status(StatusType.ANALYZE, 999, 1.5)    # 분석됨 (크리티컬 확률 증가)
             print(f"🔮 {caster.name}이 {target.name}의 영혼을 파악했습니다!")
             print(f"   📍 약점 분석 완료 - 받는 피해 증가, 크리티컬 확률 증가")
@@ -5373,7 +5369,7 @@ def _shadow_clone(caster):
 # ========================================
 
 # === 검성 Special Effects ===
-def _sword_aura_gain(caster):
+def _sword_aura_gain(caster, target=None, skill_data=None):
     """검기 스택 획득 (최대 2스택)"""
     if not hasattr(caster, 'sword_aura_stacks'):
         caster.sword_aura_stacks = 0
@@ -5424,7 +5420,7 @@ def _sword_aura_wave(caster, target, skill_data):
         return True
     return False
 
-def _atb_refund(caster, skill_data):
+def _atb_refund(caster, target=None, skill_data=None):
     """ATB 게이지 20-60% 환급"""
     if not hasattr(caster, 'sword_aura_stacks'):
         refund_rate = 0.2
@@ -5439,7 +5435,7 @@ def _atb_refund(caster, skill_data):
         caster.atb_gauge = min(max_atb, caster.atb_gauge + refund_amount)
         print(f"⏱️ ATB 게이지 {int(refund_rate*100)}% 환급!")
 
-def _atb_refund_medium(caster, skill_data):
+def _atb_refund_medium(caster, target=None, skill_data=None):
     """ATB 게이지 30% 환급"""
     if hasattr(caster, 'atb_gauge'):
         # ATB_READY_THRESHOLD 사용 (1000)
@@ -5474,7 +5470,7 @@ def _gladiator_skill(caster, target, skill_data):
     if caster.kill_stacks > 0:
         print(f"🏆 처치 스택 {caster.kill_stacks}개로 능력치 강화 중!")
 
-def _parry_stance(caster):
+def _parry_stance(caster, target=None, skill_data=None):
     """패링 태세"""
     if hasattr(caster, 'add_status'):
         # 기본 지속시간 3턴
@@ -5512,7 +5508,7 @@ def _honor_strike(caster, target, skill_data):
         return bonus_power
     return 0
 
-def _warrior_roar(caster):
+def _warrior_roar(caster, target=None, skill_data=None):
     """투사의 함성 - MP, HP 회복"""
     if hasattr(caster, 'mp') and hasattr(caster, 'hp'):
         caster_max_mp = getattr(caster, 'max_mp', 100)
@@ -6599,27 +6595,16 @@ def _lethal_strike(caster, target):
 def _generate_shadow(caster):
     """그림자 생성 - 암살자 기본 BRV 공격"""
     if hasattr(caster, 'character_class') and caster.character_class == "암살자":
-        # 그림자 생성 전 상태 로그
-        old_shadows = getattr(caster, 'shadow_count', 0)
-        print(f"🌙 [SHADOW LOG] {caster.name} - 그림자 생성 전: {old_shadows}/5")
-        
         # 그림자 스택 생성
         if hasattr(caster, 'shadow_count'):
             caster.shadow_count = min(caster.shadow_count + 1, 5)
         else:
             caster.shadow_count = 1
         
-        # 그림자 생성 후 상태 로그
-        new_shadows = getattr(caster, 'shadow_count', 0)
-        print(f"🌙 [SHADOW LOG] {caster.name} - 그림자 생성 후: {new_shadows}/5 (+{new_shadows - old_shadows})")
-        
         # 그림자 수에 비례한 회피율 증가 (배율 방식)
         shadow_count = getattr(caster, 'shadow_count', 0)
         evasion_multiplier = 1.0 + (shadow_count * 0.1)  # 그림자당 +10% 회피율
         caster.temp_evasion_multiplier = getattr(caster, 'temp_evasion_multiplier', 1.0) * evasion_multiplier
-        print(f"🌙 [SHADOW LOG] 그림자 생성! 현재 {shadow_count}개 - 회피율 배율: {evasion_multiplier:.1f}x")
-    else:
-        print(f"🚫 [SHADOW LOG] {getattr(caster, 'name', 'Unknown')} - 암살자가 아니므로 그림자 생성 불가 (직업: {getattr(caster, 'character_class', 'Unknown')})")
     return True
 
 def _shadow_execution(caster, target):
@@ -7387,7 +7372,7 @@ def _guaranteed_critical(caster, target=None, skill_data=None):
     """다음 공격 크리티컬 확정"""
     try:
         if hasattr(caster, 'status_manager'):
-            critical_effect = StatusEffect("크리티컬_확정", "크리티컬_확정", 1, 100)
+            critical_effect = StatusEffect("크리티컬_확정", StatusType.BUFF, 1, 100)
             caster.status_manager.add_status(critical_effect)
         print(f"{caster.name}의 다음 공격이 크리티컬로 확정되었습니다!")
         return True
@@ -7399,12 +7384,13 @@ def _never_miss(caster, target=None, skill_data=None):
     """절대 명중"""
     try:
         if hasattr(caster, 'status_manager'):
-            miss_effect = StatusEffect("절대_명중", "절대_명중", 3, 100)
+            miss_effect = StatusEffect("절대_명중", StatusType.BUFF, 3, 100)
             caster.status_manager.add_status(miss_effect)
         print(f"{caster.name}의 공격이 절대 빗나가지 않습니다!")
         return True
     except Exception as e:
         print(f"절대 명중 효과 적용 중 오류: {e}")
+        return False
         return False
 
 def _perfect_accuracy(caster, target=None, skill_data=None):
@@ -8736,9 +8722,7 @@ def _balanced_bonus(caster, target=None, skill_data=None):
     """균형 보너스 - 모든 능력치 균등 증가"""
     try:
         if hasattr(caster, 'status_manager') and caster.status_manager:
-            # StatusType enum을 사용하여 상태 추가
-            from game.status_effects import StatusType
-            caster.status_manager.add_status(StatusType.BUFF, 10, 20)  # 모든 능력치 20% 증가
+            # StatusType enum을 사용하여 상태 추가            caster.status_manager.add_status(StatusType.BUFF, 10, 20)  # 모든 능력치 20% 증가
             print(f"{caster.name}이 완벽한 균형을 이뤘습니다!")
         elif hasattr(caster, 'add_status'):
             # 기본적인 상태 추가
@@ -10209,7 +10193,7 @@ def _time_warp(caster, target=None, skill_data=None):
         if hasattr(caster, 'status_manager'):
             # 시전자는 시간 왜곡의 주인이므로 이득 효과
             from .character import StatusEffect
-            time_effect = StatusEffect(StatusType.TIME_DISTORTION, 5, 1.0)
+            time_effect = StatusEffect("시간_왜곡", StatusType.TIME_DISTORTION, 5, 1.0)
             caster.status_manager.add_status(time_effect)
             print(f"⏰ {caster.name}은(는) 시간 왜곡의 중심에서 시공간을 조작합니다!")
         
@@ -10879,10 +10863,8 @@ def _emp_explosion(caster, target, skill_data):
                     # 피해 적용
                     enemy.take_damage(500, "EMP 폭발")
                     # 적의 장비 효과 무력화 (임시)
-                    if hasattr(enemy, 'status_manager'):
-                        from .status_effects import StatusEffect
-                        enemy.status_manager.add_status(
-                            StatusEffect("장비무력화", "장비무력화", 2, -50)
+                    if hasattr(enemy, 'status_manager'):                        enemy.status_manager.add_status(
+                            StatusEffect("장비무력화", StatusType.DEBUFF, 2, -50)
                         )
                     print(f"💥 {enemy.name}의 장비가 무력화되었습니다!")
         return True
@@ -10912,10 +10894,8 @@ def _note_attack(caster, target, skill_data):
     try:
         if target and target.is_alive:
             target.take_damage(180, "음표 공격")
-            if hasattr(target, 'status_manager'):
-                from .status_effects import StatusEffect
-                target.status_manager.add_status(
-                    StatusEffect("혼란", "혼란", 2, -20)
+            if hasattr(target, 'status_manager'):                target.status_manager.add_status(
+                    StatusEffect("혼란", StatusType.DEBUFF, 2, -20)
                 )
             print(f"🎵 {target.name}이(가) 음표 공격으로 혼란에 빠졌습니다!")
         return True
@@ -10930,10 +10910,8 @@ def _sound_amplification(caster, target, skill_data):
             for enemy in enemies:
                 if enemy and enemy.is_alive:
                     enemy.take_damage(120, "음향 증폭")
-                    if hasattr(enemy, 'status_manager'):
-                        from .status_effects import StatusEffect
-                        enemy.status_manager.add_status(
-                            StatusEffect("기절", "기절", 1, -100)
+                    if hasattr(enemy, 'status_manager'):                        enemy.status_manager.add_status(
+                            StatusEffect("기절", StatusType.DEBUFF, 1, -100)
                         )
             print(f"🔊 음향 증폭으로 적들이 기절했습니다!")
         return True
@@ -10993,10 +10971,8 @@ def _soul_separation(caster, target, skill_data):
                 damage = 400 + int(magic_bonus * 0.8)
                 target.take_damage(damage, "영혼 분리", damage_type="magic")
                 
-                if hasattr(target, 'status_manager'):
-                    from .status_effects import StatusEffect
-                    target.status_manager.add_status(
-                        StatusEffect("마비", "마비", 2, -80)
+                if hasattr(target, 'status_manager'):                    target.status_manager.add_status(
+                        StatusEffect("마비", StatusType.DEBUFF, 2, -80)
                     )
                 print(f"👻 {target.name}이(가) 영혼 분리로 {damage} 피해 + 마비!")
         return True
@@ -11035,7 +11011,6 @@ def _dragon_awakening(caster, target, skill_data):
     """용의 각성 - 용기사 궁극 변신"""
     try:
         if hasattr(caster, 'status_manager'):
-            from .status_effects import StatusType
             caster.status_manager.add_status(StatusType.BUFF, 10, 100)  # 10턴간 모든 능력치 2배
             print(f"🐉 {caster.name}이 용의 힘으로 각성합니다!")
         return True
@@ -11069,10 +11044,8 @@ def _shadow_echo(caster, target, skill_data):
 def _absolute_defense(caster, target, skill_data):
     """절대 방어 - 완전 무적"""
     try:
-        if hasattr(caster, 'status_manager'):
-            from .status_effects import StatusType
-            caster.status_manager.add_status(StatusType.INVINCIBLE, 3, 1.0)  # 3턴간 무적
-            print(f"🛡️ {caster.name}이 절대 방어 상태가 됩니다!")
+        if hasattr(caster, 'status_manager'):            caster.status_manager.add_status(StatusType.INVINCIBLE, 3, 1.0)  # 3턴간 무적
+        print(f"🛡️ {caster.name}이 절대 방어 상태가 됩니다!")
         return True
     except:
         return False
@@ -11080,10 +11053,8 @@ def _absolute_defense(caster, target, skill_data):
 def _dark_blessing(caster, target, skill_data):
     """어둠의 축복 - 어둠 속성 강화"""
     try:
-        if hasattr(caster, 'status_manager'):
-            from .status_effects import StatusType
-            caster.status_manager.add_status(StatusType.DARK_POWER, 5, 50)  # 5턴간 어둠 공격력 +50%
-            print(f"🌑 {caster.name}이 어둠의 힘을 받습니다!")
+        if hasattr(caster, 'status_manager'):            caster.status_manager.add_status(StatusType.DARK_POWER, 5, 50)  # 5턴간 어둠 공격력 +50%
+        print(f"🌑 {caster.name}이 어둠의 힘을 받습니다!")
         return True
     except:
         return False
@@ -11112,10 +11083,8 @@ def _soul_song(caster, target, skill_data):
                 print(f"🎵 영혼의 노래로 {target.name}이 {heal} 회복!")
             else:
                 # 적이면 혼란
-                if hasattr(target, 'status_manager'):
-                    from .status_effects import StatusType
-                    target.status_manager.add_status(StatusType.CONFUSION, 3, 1.0)
-                    print(f"🎵 영혼의 노래로 {target.name}이 혼란에 빠집니다!")
+                if hasattr(target, 'status_manager'):                    target.status_manager.add_status(StatusType.CONFUSION, 3, 1.0)
+                print(f"🎵 영혼의 노래로 {target.name}이 혼란에 빠집니다!")
         return True
     except:
         return False
@@ -11162,9 +11131,7 @@ def _spirit_strike(caster, target, skill_data):
         damage = int(caster.magic_attack * 1.4)
         if target and hasattr(target, 'current_hp'):
             target.current_hp = max(0, target.current_hp - damage)
-            if hasattr(target, 'status_manager'):
-                from .status_effects import StatusType
-                target.status_manager.add_status(StatusType.FEAR, 2, 1.0)
+            if hasattr(target, 'status_manager'):                target.status_manager.add_status(StatusType.FEAR, 2, 1.0)
             print(f"👻 영령 타격으로 {target.name}에게 {damage} 피해 + 공포!")
         return True
     except:
@@ -11195,11 +11162,9 @@ def _nature_wrath(caster, target, skill_data):
 def _logical_refutation(caster, target, skill_data):
     """논리적 반박 - 적의 능력 무력화"""
     try:
-        if target and hasattr(target, 'status_manager'):
-            from .status_effects import StatusType
-            target.status_manager.add_status(StatusType.SILENCE, 3, 1.0)  # 침묵
-            target.status_manager.add_status(StatusType.REDUCE_ALL_STATS, 3, 0.5)  # 능력치 반감
-            print(f"🤔 논리적 반박으로 {target.name}의 능력이 무력화됩니다!")
+        if target and hasattr(target, 'status_manager'):            target.status_manager.add_status(StatusType.SILENCE, 3, 1.0)  # 침묵
+        target.status_manager.add_status(StatusType.REDUCE_ALL_STATS, 3, 0.5)  # 능력치 반감
+        print(f"🤔 논리적 반박으로 {target.name}의 능력이 무력화됩니다!")
         return True
     except:
         return False
@@ -11207,10 +11172,8 @@ def _logical_refutation(caster, target, skill_data):
 def _truth_enlightenment(caster, target, skill_data):
     """진리의 깨달음 - 궁극의 지혜"""
     try:
-        if hasattr(caster, 'status_manager'):
-            from .status_effects import StatusType
-            caster.status_manager.add_status(StatusType.OMNISCIENCE, 5, 1.0)  # 전지전능
-            print(f"✨ {caster.name}이 진리를 깨달아 전지전능한 상태가 됩니다!")
+        if hasattr(caster, 'status_manager'):            caster.status_manager.add_status(StatusType.OMNISCIENCE, 5, 1.0)  # 전지전능
+        print(f"✨ {caster.name}이 진리를 깨달아 전지전능한 상태가 됩니다!")
         return True
     except:
         return False
@@ -11264,10 +11227,8 @@ def _blessing_light(caster, target, skill_data):
 def _magic_sword_aura(caster, target, skill_data):
     """마검 오라 - 마법검사 버프"""
     try:
-        if hasattr(caster, 'status_manager'):
-            from .status_effects import StatusType
-            caster.status_manager.add_status(StatusType.MAGIC_WEAPON, 5, 50)  # 5턴간 마법 공격력 +50%
-            print(f"⚔️ {caster.name}의 검에 마법 오라가 깃듭니다!")
+        if hasattr(caster, 'status_manager'):            caster.status_manager.add_status(StatusType.MAGIC_WEAPON, 5, 50)  # 5턴간 마법 공격력 +50%
+        print(f"⚔️ {caster.name}의 검에 마법 오라가 깃듭니다!")
         return True
     except:
         return False
@@ -11276,9 +11237,8 @@ def _magic_sword_mastery(caster, target, skill_data):
     """마검 숙련 - 마법검사 궁극 숙련"""
     try:
         if hasattr(caster, 'status_manager'):
-            from .status_effects import StatusType
             caster.status_manager.add_status(StatusType.MASTER_SWORDSMAN, 10, 1.0)  # 검술 달인
-            print(f"🗡️ {caster.name}이 마검술의 달인이 됩니다!")
+        print(f"🗡️ {caster.name}이 마검술의 달인이 됩니다!")
         return True
     except:
         return False
@@ -11289,9 +11249,7 @@ def _shield_bash(caster, target, skill_data):
         damage = int(caster.defense * 1.2)  # 방어력 기반 피해
         if target and hasattr(target, 'current_hp'):
             target.current_hp = max(0, target.current_hp - damage)
-            if hasattr(target, 'status_manager'):
-                from .status_effects import StatusType
-                target.status_manager.add_status(StatusType.STUN, 1, 1.0)
+            if hasattr(target, 'status_manager'):                target.status_manager.add_status(StatusType.STUN, 1, 1.0)
             print(f"🛡️ 방패 강타로 {target.name}에게 {damage} 피해 + 기절!")
         return True
     except:

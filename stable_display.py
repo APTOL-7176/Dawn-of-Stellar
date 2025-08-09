@@ -2,6 +2,7 @@
 안정적인 화면 표시 시스템 - 깜빡임 방지
 """
 import os
+import sys
 import time
 from typing import Dict, Any
 
@@ -47,8 +48,20 @@ class StableDisplay:
         if current_frame == self.last_frame:
             return
             
-        # 화면 지우기 (Windows용)
-        os.system('cls' if os.name == 'nt' else 'clear')
+        # PowerShell 호환 화면 지우기 - 스택 현상 방지를 위해 비활성화
+        try:
+            # PowerShell에서 화면 클리어로 인한 스택 현상 방지
+            # if os.name == 'nt':
+            #     # Windows에서는 항상 cls 사용 (PowerShell 호환)
+            #     os.system('cls')
+            # else:
+            #     os.system('clear')
+            
+            # 대신 버퍼 플러시만 사용
+            sys.stdout.flush()
+        except Exception:
+            # 폴백: 간단한 출력
+            print("\n" * 2)  # 스택 현상 방지를 위해 줄 수 감소
         
         # 내용 출력
         print(current_frame, end='', flush=True)
