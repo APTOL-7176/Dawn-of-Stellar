@@ -34,10 +34,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Python 3.11
+    - name: Set up Python 3.10
       uses: actions/setup-python@v4
       with:
-        python-version: '3.11'
+        python-version: '3.10'
 
     - name: Install dependencies
       run: |
@@ -45,9 +45,12 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller
 
-    - name: Create sounds directory (for audio system)
+    - name: Create sounds directory and dummy files (for audio system)
       run: |
         mkdir -p sounds/bgm sounds/sfx
+        echo "# Audio files will be included in the build" > sounds/README.txt
+        # Create dummy audio files to prevent build errors
+        touch sounds/bgm/dummy.ogg sounds/sfx/dummy.wav || echo "Skip dummy file creation"
       shell: bash
 
     - name: Build with PyInstaller (Windows)
@@ -57,7 +60,19 @@ jobs:
         echo "🎵 사운드 파일 크기 확인..."
         du -sh sounds/ || echo "sounds 폴더 없음"
         echo "⚡ PyInstaller 빌드 시작 (사운드 포함)..."
-        pyinstaller ${{ matrix.build_options }} --add-data "sounds;sounds" --distpath dist --workpath build main.py
+        pyinstaller ${{ matrix.build_options }} \
+          --add-data "sounds;sounds" \
+          --add-data "game;game" \
+          --hidden-import=game.brave_combat \
+          --hidden-import=game.character \
+          --hidden-import=game.world \
+          --hidden-import=game.items \
+          --hidden-import=game.cooking_system \
+          --hidden-import=game.ai_game_mode \
+          --hidden-import=pygame \
+          --distpath dist --workpath build \
+          --collect-submodules game \
+          main.py
 
     - name: Build with PyInstaller (Linux/Mac)
       if: matrix.os != 'windows-latest'
@@ -66,7 +81,19 @@ jobs:
         echo "🎵 사운드 파일 크기 확인..."
         du -sh sounds/ || echo "sounds 폴더 없음"
         echo "⚡ PyInstaller 빌드 시작 (사운드 포함)..."
-        pyinstaller ${{ matrix.build_options }} --add-data "sounds:sounds" --distpath dist --workpath build main.py
+        pyinstaller ${{ matrix.build_options }} \
+          --add-data "sounds:sounds" \
+          --add-data "game:game" \
+          --hidden-import=game.brave_combat \
+          --hidden-import=game.character \
+          --hidden-import=game.world \
+          --hidden-import=game.items \
+          --hidden-import=game.cooking_system \
+          --hidden-import=game.ai_game_mode \
+          --hidden-import=pygame \
+          --distpath dist --workpath build \
+          --collect-submodules game \
+          main.py
 
     - name: Prepare release files
       shell: bash
