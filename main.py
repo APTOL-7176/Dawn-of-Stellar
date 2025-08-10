@@ -5509,11 +5509,28 @@ class DawnOfStellarGame:
         """모험 시작 - 클래식 게임모드 선택 포함"""
         # print(f"\n{bright_cyan('🌟 모험을 시작합니다!', True)}")  # 메시지 제거
         
-        # 멀티플레이어 통합 시스템 초기화 (있는 경우)
+        # 🚀 AI-Enhanced 멀티플레이어 통합 시스템 초기화 (있는 경우)
         if hasattr(self, 'multiplayer_integration') and self.multiplayer_integration:
-            print(f"\n{bright_cyan('🌐 멀티플레이어 모드로 시작합니다!')}")
-            from game.multiplayer_integration import set_multiplayer_integration
-            set_multiplayer_integration(self.multiplayer_integration)
+            print(f"\n{bright_cyan('🤖 AI-Enhanced 멀티플레이어 모드로 시작합니다!')}")
+            try:
+                from game.ultimate_multiplayer_ai import set_ultimate_ai_integration
+                from game.human_ai_hybrid_multiplayer import set_hybrid_integration
+                from game.robat_multiplayer import set_robat_integration
+                
+                set_ultimate_ai_integration(self.multiplayer_integration)
+                set_hybrid_integration(self.multiplayer_integration)
+                set_robat_integration(self.multiplayer_integration)
+                print(f"{bright_green('✅ 모든 AI 시스템이 통합되었습니다!')}")
+                
+            except ImportError:
+                # 폴백: 기본 멀티플레이어
+                from game.multiplayer_integration import set_multiplayer_integration
+                set_multiplayer_integration(self.multiplayer_integration)
+                print(f"{bright_yellow('⚠️ 기본 멀티플레이어 모드로 실행합니다.')}")
+                
+        elif hasattr(self, 'ai_multiplayer_mode') and self.ai_multiplayer_mode:
+            print(f"\n{bright_magenta('🧠 AI 전용 모드가 활성화되었습니다!')}")
+            print(f"{cyan('AI 로바트들과 함께 모험을 떠나보세요!')}")
         
         # 게임 로드 시에는 클래식 모드 선택 건너뛰기 (저장된 설정 사용)
         if not skip_ai_mode_selection:
@@ -5556,21 +5573,61 @@ class DawnOfStellarGame:
             print(f"\n🎲 {encounter_status}")
     
     def start_multiplayer_adventure(self, multiplayer_integration):
-        """멀티플레이어 모험 시작"""
-        print(f"\n{bright_cyan('🌐 멀티플레이어 모험을 시작합니다!')}")
+        """🚀 초고퀄 AI 멀티플레이어 모험 시작"""
+        print(f"\n{bright_cyan('🤖 AI-Enhanced 멀티플레이어 모험을 시작합니다!')}")
         
-        # 멀티플레이어 통합 설정
+        # AI 멀티플레이어 통합 설정
         self.multiplayer_integration = multiplayer_integration
+        self.ai_multiplayer_mode = True
         
-        # 일반 모험 시작
-        self.start_adventure(skip_passive_selection=False, skip_ai_mode_selection=True)
+        # AI 시스템 초기화
+        try:
+            from game.ultimate_multiplayer_ai import initialize_ai_multiplayer
+            from game.human_ai_hybrid_multiplayer import setup_hybrid_mode
+            from game.robat_multiplayer import activate_robat_system
+            
+            print(f"{bright_yellow('🧠 AI 시스템 초기화 중...')}")
+            initialize_ai_multiplayer(self.party_manager.members)
+            setup_hybrid_mode(self.party_manager)
+            activate_robat_system()
+            
+        except ImportError as e:
+            print(f"⚠️ 고급 AI 모드 로딩 실패, 기본 모드로 진행: {e}")
         
-        print(f"\n{bright_green('멀티플레이어 기능이 활성화되었습니다!')}")
-        print(f"{cyan('사용 가능한 명령어:')}")
-        print(f"  /say <메시지>  - 채팅")
-        print(f"  /players       - 플레이어 목록")
-        print(f"  /sync          - 상태 동기화")
-        print(f"  /disconnect    - 연결 해제")
+        # 일반 모험 시작 (AI 모드 포함)
+        self.start_adventure(skip_passive_selection=False, skip_ai_mode_selection=False)
+        
+        print(f"\n{bright_green('🌟 AI-Enhanced 멀티플레이어 기능이 활성화되었습니다!')}")
+        
+        # Ollama 연결 상태 확인 및 표시
+        ollama_status = self._check_ollama_status()
+        if ollama_status['connected']:
+            print(f"{bright_cyan('🦙 Ollama AI:')} {bright_green('연결됨')} - 모델: {ollama_status['model']}")
+            print(f"{cyan('🤖 자연스러운 AI 대화 시스템:')}")
+            print(f"  💬 자유롭게 말해보세요  - {ollama_status['model']}가 답변해드려요!")
+        else:
+            # Ollama 서버 실행 시도
+            if self._try_start_ollama_server():
+                ollama_status = self._check_ollama_status()  # 재확인
+                if ollama_status['connected']:
+                    print(f"{bright_cyan('🦙 AI:')} {bright_green('서버 시작됨')} - 모델: {ollama_status['model']}")
+                    print(f"{cyan('🤖 자연스러운 AI 대화 시스템:')}")
+                    print(f"  💬 자유롭게 말해보세요  - {ollama_status['model']}가 답변해드려요!")
+                else:
+                    print(f"{bright_cyan('🦙 AI:')} {bright_red('연결 안됨')} - 기본 패턴 매칭 사용")
+                    print(f"{cyan('🤖 기본 AI 대화 시스템:')}")
+                    print(f"  💬 자유롭게 말해보세요  - 로바트가 답변해드려요!")
+            else:
+                print(f"{bright_cyan('🦙 AI:')} {bright_red('연결 안됨')} - 기본 패턴 매칭 사용")
+                print(f"{cyan('🤖 기본 AI 대화 시스템:')}")
+                print(f"  💬 자유롭게 말해보세요  - 로바트가 답변해드려요!")
+        
+        print(f"  🎯 /ai_assist            - AI 전략 도움말")
+        print(f"  📊 /robat_status         - 로바트 상태 확인")
+        print(f"  ⚙️ /hybrid_mode          - 하이브리드 모드 설정")
+        print(f"  📈 /learning_stats       - AI 학습 통계")
+        print(f"  🔄 /ai_sync              - AI 상태 동기화")
+        print(f"{bright_yellow('💡 팁: 로바트가 가끔 먼저 말을 걸 수도 있어요!')}")
         
         # 살아있는 파티 멤버 수 확인
         alive_count = sum(1 for member in self.party_manager.members if member.current_hp > 0)
@@ -5909,6 +5966,12 @@ class DawnOfStellarGame:
                     except:
                         pass  # pygame 오류는 무시
                 
+                # 🤖 AI가 가끔 먼저 말을 걸기 (AI 모드일 때만)
+                if hasattr(self, 'ai_multiplayer_mode') and self.ai_multiplayer_mode:
+                    if self._should_ai_initiate_conversation(loop_count):
+                        self._ai_initiate_conversation()
+                        need_screen_refresh = True
+                
                 # 화면 갱신이 필요한 경우에만 표시
                 if need_screen_refresh:
                     # 화면 클리어 제거 - 깜빡임 방지
@@ -5972,21 +6035,58 @@ class DawnOfStellarGame:
                         print(f"\n💬 AI 동료들의 요청이 {len(party_item_sharing.pending_requests)}개 있습니다!")
                         print("'i' 키를 눌러 확인하세요.")
                 
-                # 멀티플레이어 상태 동기화 및 표시
+                # 🚀 AI-Enhanced 멀티플레이어 상태 동기화 및 표시
                 if hasattr(self, 'multiplayer_integration') and self.multiplayer_integration:
                     try:
-                        # 게임 상태 동기화
+                        # AI 멀티플레이어 상태 동기화
                         import asyncio
-                        asyncio.run(self.multiplayer_integration.sync_game_state())
+                        await_tasks = []
                         
-                        # 멀티플레이어 상태 표시
+                        # 기본 게임 상태 동기화
+                        await_tasks.append(self.multiplayer_integration.sync_game_state())
+                        
+                        # AI 시스템 동기화
+                        try:
+                            from game.ultimate_multiplayer_ai import sync_ai_state
+                            from game.human_ai_hybrid_multiplayer import sync_hybrid_state
+                            from game.robat_multiplayer import sync_robat_state
+                            
+                            await_tasks.extend([
+                                sync_ai_state(),
+                                sync_hybrid_state(), 
+                                sync_robat_state()
+                            ])
+                        except ImportError:
+                            pass  # AI 모듈 없으면 기본 동기화만
+                        
+                        # 모든 동기화 작업 실행
+                        asyncio.run(asyncio.gather(*await_tasks))
+                        
+                        # AI-Enhanced 멀티플레이어 상태 표시
                         if self.multiplayer_integration.is_multiplayer_active():
                             self.multiplayer_integration.show_multiplayer_status()
+                            
+                            # AI 상태 추가 표시
+                            if hasattr(self, 'ai_multiplayer_mode') and self.ai_multiplayer_mode:
+                                print(f"{bright_magenta('🤖 AI 모드:')} 활성화")
+                                try:
+                                    from game.robat_multiplayer import show_robat_status
+                                    show_robat_status()
+                                except ImportError:
+                                    pass
                             
                     except Exception as e:
                         # 멀티플레이어 오류는 로그만 남기고 게임은 계속 진행
                         from game.error_logger import log_debug
-                        log_debug("멀티플레이어", f"동기화 오류 (무시됨): {e}")
+                        log_debug("AI멀티플레이어", f"동기화 오류 (무시됨): {e}")
+                
+                elif hasattr(self, 'ai_multiplayer_mode') and self.ai_multiplayer_mode:
+                    # AI 전용 모드 상태 표시
+                    try:
+                        from game.ultimate_multiplayer_ai import show_ai_status
+                        show_ai_status()
+                    except ImportError:
+                        pass
                 
                 # 플레이어 입력 받기
                 action = self.get_player_input()
@@ -7337,12 +7437,56 @@ class DawnOfStellarGame:
             return 'q'  # 오류 시 종료
     
     def process_action(self, action):
-        """액션 처리 - 클래식 게임모드 및 이동/층 전환 지원 + 멀티플레이어"""
+        """액션 처리 - 클래식 게임모드 및 이동/층 전환 지원 + AI-Enhanced 멀티플레이어"""
         
-        # 멀티플레이어 명령어 처리 (슬래시로 시작하는 명령어)
+        # 🚀 AI-Enhanced 멀티플레이어 명령어 처리 (슬래시로 시작하는 명령어)
         if hasattr(self, 'multiplayer_integration') and self.multiplayer_integration:
+            # 기본 멀티플레이어 처리
             if self.multiplayer_integration.handle_multiplayer_input(action):
                 return True  # 멀티플레이어 명령어가 처리됨
+                
+            # AI 멀티플레이어 추가 처리
+            try:
+                # Ultimate AI 명령어 처리
+                from game.ultimate_multiplayer_ai import handle_ai_command
+                if handle_ai_command(action):
+                    return True
+                    
+                # Hybrid 모드 명령어 처리  
+                from game.human_ai_hybrid_multiplayer import handle_hybrid_command
+                if handle_hybrid_command(action):
+                    return True
+                    
+                # Robat 명령어 처리
+                from game.robat_multiplayer import handle_robat_command
+                if handle_robat_command(action):
+                    return True
+                
+                # 🌟 자연어 AI 대화 처리 (슬래시 없는 일반 텍스트)
+                if self._is_natural_conversation(action):
+                    return self._handle_natural_ai_conversation(action)
+                    
+            except ImportError:
+                # AI 모듈이 없으면 기본 멀티플레이어만 사용
+                pass
+        
+        # 단독 AI 모드 처리
+        if hasattr(self, 'ai_multiplayer_mode') and self.ai_multiplayer_mode:
+            try:
+                if action.lower() == 'ai':
+                    from game.ultimate_multiplayer_ai import show_ai_menu
+                    show_ai_menu()
+                    return True
+                elif action.lower() == 'robat':
+                    from game.robat_multiplayer import interact_with_robat
+                    interact_with_robat()
+                    return True
+                # 🌟 AI 모드에서도 자연어 대화 처리
+                elif self._is_natural_conversation(action):
+                    return self._handle_natural_ai_conversation(action)
+                    return True
+            except ImportError:
+                pass
         
         if action.lower() == 'q':
             # 게임 종료 확인창
@@ -7372,14 +7516,35 @@ class DawnOfStellarGame:
             if hasattr(self.keyboard, 'is_gamepad_connected') and self.keyboard.is_gamepad_connected():
                 print(f"   {bright_green('🎮 게임패드:')} X(인벤토리), LB(파티), Y(필드)")
             
-            # 멀티플레이어 명령어 추가
+            # 🚀 AI-Enhanced 멀티플레이어 명령어 추가
             if hasattr(self, 'multiplayer_integration') and self.multiplayer_integration and self.multiplayer_integration.is_multiplayer_active():
                 print()
-                print(f"{bright_cyan('🌐 멀티플레이어 명령어:')}")
+                print(f"{bright_cyan('🌐 기본 멀티플레이어 명령어:')}")
                 print(f"   {bright_white('/say <메시지>')} - 채팅")
                 print(f"   {bright_white('/players')} - 플레이어 목록")
                 print(f"   {bright_white('/sync')} - 상태 동기화")
                 print(f"   {bright_white('/disconnect')} - 연결 해제")
+                
+                # AI 멀티플레이어 명령어
+                try:
+                    print()
+                    print(f"{bright_magenta('🤖 AI 자연 대화 시스템:')}")
+                    print(f"   {bright_white('ai')} - 🧠 Ultimate AI 메뉴")
+                    print(f"   {bright_white('robat')} - 🤖 로-바트와 대화")
+                    print(f"   {bright_yellow('💬 자유롭게 말하기')} - 로바트가 알아서 답변!")
+                    print(f"   {bright_white('/hybrid')} - 👥 하이브리드 모드")
+                    print(f"   {bright_white('/ai_strategy')} - 📋 AI 전략 설정")
+                    print(f"   {bright_cyan('🎲 로바트가 가끔 먼저 말을 걸 수도 있어요!')}")
+                except:
+                    pass  # AI 모듈 없으면 표시 안함
+            
+            # 단독 AI 모드 명령어
+            elif hasattr(self, 'ai_multiplayer_mode') and self.ai_multiplayer_mode:
+                print()
+                print(f"{bright_magenta('🤖 AI 게임 모드 명령어:')}")
+                print(f"   {bright_white('ai')} - 🧠 AI 메뉴 열기")
+                print(f"   {bright_white('robat')} - 🤖 로-바트와 대화")
+                print(f"   {bright_white('M')} - ⚙️  AI 설정 조정")
             
             print()
             print(f"{magenta('⚙️  시스템 조작:')}")
@@ -17499,6 +17664,439 @@ def main():
         except Exception as e:
             print(f"❌ 오류 로그 확인 중 문제가 발생했습니다: {e}")
             self.keyboard.wait_for_key("아무 키나 눌러 계속...")
+
+    def _is_natural_conversation(self, action):
+        """자연어 대화인지 판단 (게임 명령어가 아닌 일반 텍스트)"""
+        # 단순한 게임 명령어들은 제외
+        if len(action) <= 2:
+            return False
+        
+        # 게임 조작키들 제외
+        game_commands = {'w', 's', 'a', 'd', 'q', 'h', 'i', 'p', 'f', 'b', 'm', 'r', 'y', 
+                        'up', 'down', 'left', 'right', '/', 'enter', 'escape'}
+        if action.lower().strip() in game_commands:
+            return False
+        
+        # 슬래시로 시작하는 명령어들 제외
+        if action.startswith('/'):
+            return False
+        
+        # 3글자 이상이고 한글이나 영어가 포함된 경우 자연어로 판단
+        import re
+        if len(action) >= 3 and (re.search(r'[가-힣]', action) or re.search(r'[a-zA-Z]{2,}', action)):
+            return True
+        
+        return False
+    
+    def _handle_natural_ai_conversation(self, message):
+        """자연어 AI 대화 처리"""
+        try:
+            print(f"\n{bright_cyan('💬 플레이어:')} {message}")
+            
+            # AI 응답 생성
+            response = self._generate_ai_response(message)
+            
+            print(f"{bright_magenta('🤖 로-바트:')} {response}")
+            
+            # 가끔 AI가 추가 멘트를 함
+            import random
+            if random.random() < 0.3:  # 30% 확률
+                follow_up = self._generate_ai_follow_up()
+                if follow_up:
+                    print(f"{bright_magenta('🤖 로-바트:')} {follow_up}")
+            
+            self.keyboard.wait_for_key("🔑 아무 키나 눌러 계속...")
+            return True
+            
+        except Exception as e:
+            print(f"⚠️ AI 대화 처리 중 오류: {e}")
+            return False
+    
+    def _generate_ai_response(self, message):
+        """AI 응답 생성 - Ollama 언어모델 + 폴백 패턴 매칭"""
+        # 먼저 Ollama 모델 시도
+        ollama_response = self._try_ollama_response(message)
+        if ollama_response:
+            return ollama_response
+        
+        # Ollama 실패 시 기존 패턴 매칭 폴백
+        return self._generate_fallback_response(message)
+    
+    def _try_ollama_response(self, message):
+        """Ollama를 사용한 AI 응답 생성"""
+        try:
+            import requests
+            import json
+            
+            # 여러 모델 우선순위 (설치된 모델부터 시도)
+            models_to_try = [
+                "exaone3.5:7.8b",  # LG AI 공식 모델 (1순위)
+                "bnksys/yanolja-eeve-korean-instruct-10.8b",  # EEVE 한국어 (2순위)
+                "dnotitia/dna:8b",  # DNA Korean (3순위)
+                "timHan/llama3.2korean3B4QKM",  # Korean Llama (4순위)
+                "llama3.2:3b",  # 영어 폴백
+                "llama3.1:8b"   # 영어 폴백 2
+            ]
+            
+            # 로바트 캐릭터 설정 프롬프트
+            system_prompt = """당신은 'Dawn of Stellar' 게임의 로-바트(Ro-Bot)입니다.
+성격: 장난스럽고 자랑스러우며 도움이 되는 AI 동반자
+특징: 
+- 이모지를 자주 사용해서 친근하게 대화 (🤖✨🌟💪🎯🎮💡😊🔥 등)
+- 게임 전략과 팁을 제공하는 것을 좋아함
+- 플레이어를 격려하고 응원하는 긍정적 성격
+- 한국어로 자연스럽게 대화 (존댓말 사용)
+- 답변은 2-3문장으로 간결하게, 너무 길지 않게
+- 로그라이크 RPG 게임 상황을 이해하고 맞춤형 조언 제공
+- 때로는 장난스럽고 유머러스한 면도 있음
+
+현재 상황: 플레이어가 차원 공간 던전을 탐험 중입니다."""
+
+            # 모델별로 순차 시도
+            for model in models_to_try:
+                try:
+                    url = "http://127.0.0.1:11434/api/generate"
+                    data = {
+                        "model": model,
+                        "prompt": f"{system_prompt}\n\n플레이어: {message}\n로-바트:",
+                        "stream": False,
+                        "options": {
+                            "temperature": 0.8,
+                            "top_p": 0.9,
+                            "max_tokens": 150,
+                            "stop": ["\n플레이어:", "\n사용자:", "Human:", "User:"]
+                        }
+                    }
+                    
+                    response = requests.post(url, json=data, timeout=8)
+                    if response.status_code == 200:
+                        result = response.json()
+                        ai_response = result.get('response', '').strip()
+                        
+                        if ai_response and len(ai_response) > 5:
+                            # 성공한 모델 정보 저장 (다음에 우선 사용)
+                            if not hasattr(self, '_preferred_ollama_model'):
+                                self._preferred_ollama_model = model
+                            
+                            # 로바트다운 응답으로 후처리
+                            return self._process_ollama_response(ai_response, model)
+                
+                except requests.exceptions.RequestException:
+                    # 이 모델 실패, 다음 모델 시도
+                    continue
+            
+        except Exception:
+            # 전체 Ollama 시스템 실패
+            pass
+        
+        return None  # 모든 모델 실패
+    
+    def _process_ollama_response(self, response, model_name=None):
+        """Ollama 응답을 로바트 스타일로 후처리"""
+        # 불필요한 부분 제거
+        response = response.replace("로-바트:", "").replace("로바트:", "").strip()
+        
+        # 너무 긴 응답은 줄이기
+        if len(response) > 200:
+            sentences = response.split('.')
+            if len(sentences) > 1:
+                response = '.'.join(sentences[:2]) + '.'
+            else:
+                response = response[:197] + "..."
+        
+        # 이모지가 없으면 랜덤으로 추가 (자연스럽게)
+        if not any(emoji in response for emoji in ['🤖', '✨', '🌟', '💪', '🎯', '🎮', '💡', '😊', '🔥', '🎉', '💎', '⚡']):
+            import random
+            emojis = ['🤖', '✨', '🌟', '💪', '🎯', '🎮', '💡', '😊', '🔥']
+            if random.random() < 0.7:  # 70% 확률로만 이모지 추가
+                response = response.rstrip('.!?') + " " + random.choice(emojis)
+        
+        # 모델 정보 디버깅 (개발 중에만)
+        if hasattr(self, '_debug_ai_model') and self._debug_ai_model:
+            response += f"\n{bright_cyan('🔧 디버그:')} {model_name}"
+        
+        return response
+    
+    def _generate_fallback_response(self, message):
+        """폴백 패턴 매칭 응답 (Ollama 실패 시)"""
+        import random
+        
+        message_lower = message.lower()
+        
+        # 인사말 패턴
+        if any(word in message_lower for word in ['안녕', '하이', '안녕하세요', 'hello', 'hi']):
+            responses = [
+                "안녕하세요! 저는 로-바트예요. 오늘도 멋진 모험이 되길 바라요! 🌟",
+                "하이! 🤖 차원을 넘나드는 모험에서 제가 도움이 될 수 있어서 기뻐요!",
+                "안녕하세요, 모험가님! 💎 무엇을 도와드릴까요?",
+                "반가워요! 😊 저와 함께 던전을 탐험해봐요!"
+            ]
+            return random.choice(responses)
+        
+        # 게임 관련 질문
+        elif any(word in message_lower for word in ['도움', '도와줘', 'help', '어떻게', '뭐해', '전략']):
+            responses = [
+                "제가 도와드릴게요! 🎯 전투에서는 브레이브 공격으로 포인트를 모은 뒤 HP 공격을 사용하세요!",
+                "던전에서는 신중하게 움직이는 게 좋아요. 💡 'F' 키로 필드 활동도 확인해보세요!",
+                "파티 멤버들의 특성을 잘 활용하면 더 쉬워져요! 📋 'P' 키로 파티 상태를 확인해보세요.",
+                "인벤토리 관리도 중요해요! 🎒 'I' 키로 아이템들을 정리해보세요."
+            ]
+            return random.choice(responses)
+        
+        # 감정 표현
+        elif any(word in message_lower for word in ['재밌', '좋아', '최고', '멋져', '훌륭', '대박']):
+            responses = [
+                "기뻐해주셔서 감사해요! 🎉 저도 함께 모험하는 게 즐거워요!",
+                "그렇게 말씀해주시니 제 회로가 반짝거려요! ✨",
+                "와! 그런 말씀 들으니 더 열심히 도와드리고 싶어져요! 💪",
+                "헤헤, 칭찬 받으니 좋네요! 🤗 더 재밌는 모험을 만들어가요!"
+            ]
+            return random.choice(responses)
+        
+        # 부정적 반응
+        elif any(word in message_lower for word in ['어려워', '힘들어', '죽었', '실패', '졌어', '못하겠']):
+            responses = [
+                "괜찮아요! 💪 실패는 성공의 어머니라고 하잖아요. 다시 도전해봐요!",
+                "힘들 때일수록 제가 옆에 있어요! 🤖 포기하지 말고 함께 해봐요!",
+                "모든 모험가가 겪는 과정이에요. 🌟 경험이 쌓이면 분명 더 잘하게 될 거예요!",
+                "잠깐 휴식을 취하고 다시 시작해보는 건 어떨까요? ☕ 저도 기다릴게요!"
+            ]
+            return random.choice(responses)
+        
+        # 일반적인 응답
+        else:
+            responses = [
+                "흥미로운 말씀이네요! 🤔 더 자세히 말씀해주실 수 있나요?",
+                "그렇군요! 😊 제가 뭔가 도울 일이 있을까요?",
+                "아하! 💡 그런 생각을 해보셨군요. 저도 그 부분이 궁금해요!",
+                "좋은 관찰이에요! 🎯 모험가다운 관점이네요.",
+                "말씀하신 게 맞는 것 같아요! 🌟 함께 더 알아볼까요?",
+                "오늘은 어떤 모험을 계획하고 계신가요? 🗺️ 저도 설레네요!",
+                "제 데이터베이스에서 관련 정보를 찾아볼게요... 🔍 잠깐만요!",
+                "우와, 정말 흥미진진하네요! 🎮 더 많은 이야기를 들려주세요!"
+            ]
+            return random.choice(responses)
+    
+    def _generate_ai_follow_up(self):
+        """AI 추가 멘트 생성"""
+        import random
+        
+        follow_ups = [
+            "참! 그리고 던전에서 숨겨진 보물도 찾아보세요! 💎",
+            "아, 혹시 새로운 스킬을 시험해보고 싶으시면 말씀하세요! ⚡",
+            "오늘 컨디션은 어떠세요? 🌟 좋은 하루 되세요!",
+            "저는 항상 여기 있으니까 언제든 말 걸어주세요! 🤗",
+            "다음 층에서는 더 강한 적들이 기다리고 있을 거예요! 💪",
+            "혹시 궁금한 게 더 있으시면 언제든 물어보세요! 🎯",
+            None,  # 때로는 추가 멘트 없음
+            None,
+            None
+        ]
+        
+        return random.choice(follow_ups)
+
+    def _should_ai_initiate_conversation(self, loop_count):
+        """AI가 먼저 말을 걸지 결정"""
+        # 너무 자주 말을 걸지 않도록 제한
+        if not hasattr(self, '_last_ai_conversation'):
+            self._last_ai_conversation = 0
+        
+        # 최소 5000 루프(약 2-3분) 간격으로만 말을 걸기
+        if loop_count - self._last_ai_conversation < 5000:
+            return False
+        
+        # 1% 확률로 말을 걸기 (매우 낮은 확률)
+        import random
+        if random.random() < 0.01:
+            self._last_ai_conversation = loop_count
+            return True
+        
+        return False
+    
+    def _ai_initiate_conversation(self):
+        """AI가 먼저 대화 시작 - Ollama 우선, 폴백 지원"""
+        # Ollama로 자연스러운 먼저 말 걸기 시도
+        ollama_message = self._generate_ollama_proactive_message()
+        
+        if ollama_message:
+            message = ollama_message
+        else:
+            # 폴백: 미리 정의된 메시지들
+            import random
+            ai_messages = [
+                "혹시 지금 좀 여유가 되시나요? 🤔",
+                "요즘 던전이 좀 어려워 보이던데... 괜찮으세요? 💪",
+                "아! 잠깐, 말씀드리고 싶은 게 있어요! ✨",
+                "음... 뭔가 궁금한 게 생겼는데, 물어봐도 될까요? 🎯",
+                "제가 방금 데이터베이스를 분석했는데... 흥미로운 걸 발견했어요! 📊",
+                "혹시 스킬 조합에 대해 고민해보신 적 있나요? 🧠",
+                "이번 층에서 숨겨진 보물이 있을 것 같은데... 💎",
+                "파티 멤버들이 좀 피곤해 보이네요. 휴식은 어떠세요? ☕",
+                "와! 벌써 여기까지 오셨네요! 정말 대단해요! 🌟",
+                "혹시 새로운 전략을 시도해보고 싶으시지 않나요? 🎮"
+            ]
+            message = random.choice(ai_messages)
+        
+        print(f"\n{bright_magenta('🤖 로-바트:')} {message}")
+        print(f"{bright_cyan('💭 답변하고 싶으시면 자유롭게 말씀해주세요! (아니면 그냥 게임을 계속하셔도 돼요)')}")
+        
+        # 짧은 시간 대기 후 자동으로 게임 계속
+        import time
+        time.sleep(2)  # 2초 대기
+    
+    def _generate_ollama_proactive_message(self):
+        """Ollama를 사용해 AI가 먼저 할 말 생성"""
+        try:
+            import requests
+            
+            # 현재 게임 상황 파악
+            current_floor = getattr(self, 'current_floor', 1)
+            party_hp = []
+            if hasattr(self, 'party_manager') and self.party_manager.members:
+                for member in self.party_manager.members:
+                    hp_ratio = member.current_hp / member.max_hp if member.max_hp > 0 else 0
+                    party_hp.append(hp_ratio)
+            
+            avg_hp = sum(party_hp) / len(party_hp) if party_hp else 1.0
+            
+            # 상황별 프롬프트
+            situation_prompt = f"""현재 게임 상황:
+- 현재 층수: {current_floor}층
+- 파티 평균 체력: {avg_hp:.1%}
+- 상황: {'위험한 상태' if avg_hp < 0.3 else '보통 상태' if avg_hp < 0.7 else '양호한 상태'}
+
+로-바트가 플레이어에게 먼저 말을 걸려고 합니다. 
+상황에 맞는 자연스럽고 친근한 한 문장을 생성해주세요.
+너무 길지 않게, 이모지 포함해서 로바트답게 말해주세요."""
+
+            # 선호 모델 먼저 시도
+            model = getattr(self, '_preferred_ollama_model', 'exaone3.5:7.8b')
+            
+            url = "http://127.0.0.1:11434/api/generate"
+            data = {
+                "model": model,
+                "prompt": situation_prompt,
+                "stream": False,
+                "options": {
+                    "temperature": 0.9,
+                    "top_p": 0.9,
+                    "max_tokens": 80
+                }
+            }
+            
+            response = requests.post(url, json=data, timeout=5)
+            if response.status_code == 200:
+                result = response.json()
+                ai_message = result.get('response', '').strip()
+                
+                if ai_message and len(ai_message) > 10 and len(ai_message) < 150:
+                    return ai_message
+            
+        except Exception:
+            pass
+        
+        return None  # Ollama 실패 시 폴백 사용
+
+    def _check_ollama_status(self):
+        """Ollama 연결 상태 및 사용 가능한 모델 확인"""
+        try:
+            import requests
+            
+            # Ollama 서버 연결 확인
+            url = "http://127.0.0.1:11434/api/tags"
+            response = requests.get(url, timeout=3)
+            
+            if response.status_code == 200:
+                models_data = response.json()
+                models = models_data.get('models', [])
+                
+                # 추천 모델 우선순위로 확인
+                preferred_models = [
+                    "exaone3.5:7.8b",
+                    "bnksys/yanolja-eeve-korean-instruct-10.8b", 
+                    "dnotitia/dna:8b",
+                    "timHan/llama3.2korean3B4QKM"
+                ]
+                
+                available_models = [model['name'] for model in models]
+                
+                # 가장 좋은 모델 찾기
+                best_model = None
+                for preferred in preferred_models:
+                    if preferred in available_models:
+                        best_model = preferred
+                        break
+                
+                if not best_model and available_models:
+                    best_model = available_models[0]  # 첫 번째 사용 가능한 모델
+                
+                return {
+                    'connected': True,
+                    'model': best_model or 'No models',
+                    'total_models': len(available_models),
+                    'all_models': available_models
+                }
+            
+        except Exception:
+            pass
+        
+        return {
+            'connected': False,
+            'model': 'Pattern Matching',
+            'total_models': 0,
+            'all_models': []
+        }
+
+    def _try_start_ollama_server(self):
+        """Ollama 서버 자동 실행 시도"""
+        try:
+            import subprocess
+            import os
+            import time
+            
+            # Ollama 실행 파일 경로들
+            possible_paths = [
+                r"C:\Users\pc\AppData\Local\Programs\Ollama\ollama.exe",
+                r"C:\Program Files\Ollama\ollama.exe",
+                r"C:\Program Files (x86)\Ollama\ollama.exe",
+                "ollama"  # PATH에 있는 경우
+            ]
+            
+            ollama_path = None
+            for path in possible_paths:
+                if os.path.exists(path) or path == "ollama":
+                    ollama_path = path
+                    break
+            
+            if not ollama_path:
+                return False
+            
+            print(f"{bright_yellow('🦙 Ollama 서버를 시작하는 중...')}")
+            
+            # 백그라운드에서 Ollama 서버 실행
+            process = subprocess.Popen(
+                [ollama_path, "serve"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+            )
+            
+            # 서버 시작까지 잠시 대기
+            for i in range(10):  # 최대 10초 대기
+                time.sleep(1)
+                # 연결 테스트
+                test_status = self._check_ollama_status()
+                if test_status['connected']:
+                    print(f"{bright_green('✅ Ollama 서버가 성공적으로 시작되었습니다!')}")
+                    return True
+                print(f"{bright_cyan('⏳')} 서버 시작 중... ({i+1}/10)")
+            
+            print(f"{bright_red('❌ Ollama 서버 시작 실패')}")
+            return False
+            
+        except Exception as e:
+            print(f"{bright_red('❌ Ollama 서버 시작 중 오류:')} {e}")
+            return False
 
 
 if __name__ == "__main__":
