@@ -20,7 +20,7 @@ import random
 import hashlib
 
 class JobClass(Enum):
-    """28개 전체 직업"""
+    """27개 전체 직업"""
     # 전투 직업군 (8개)
     WARRIOR = "전사"
     ARCHMAGE = "아크메이지"
@@ -223,6 +223,87 @@ class PermanentLearningDatabase:
             knowledge[row[0]] = json.loads(row[1])
         
         return knowledge
+    
+    def get_job_skills(self, job_name: str) -> List[str]:
+        """직업별 스킬 목록 가져오기"""
+        try:
+            # AI별 지식에서 스킬 정보 추출
+            ai_name = f"{job_name}_AI"
+            knowledge = self.load_knowledge(ai_name, job_name, "job_specific_knowledge")
+            
+            if knowledge and "signature_skills" in knowledge:
+                # signature_skills가 딕셔너리인 경우 (PermanentSkillData 형태)
+                skills = knowledge["signature_skills"]
+                if isinstance(skills, dict):
+                    return list(skills.keys())
+                # 리스트인 경우
+                elif isinstance(skills, list):
+                    return skills
+            
+            # 기본 스킬 목록 반환 (더미 데이터)
+            return [f"{job_name}_기본공격", f"{job_name}_특수기"]
+            
+        except Exception as e:
+            # 오류 발생 시 빈 목록 반환
+            return []
+    
+    def get_job_strategies(self, job_name: str) -> List[str]:
+        """직업별 전략 목록 가져오기"""
+        try:
+            # AI별 지식에서 전략 정보 추출
+            ai_name = f"{job_name}_AI"
+            knowledge = self.load_knowledge(ai_name, job_name, "job_specific_knowledge")
+            
+            if knowledge and "unique_strategies" in knowledge:
+                # unique_strategies가 리스트인 경우
+                strategies = knowledge["unique_strategies"]
+                if isinstance(strategies, list):
+                    return strategies
+                # 딕셔너리인 경우
+                elif isinstance(strategies, dict):
+                    return list(strategies.keys())
+            
+            # 기본 전략 목록 반환 (더미 데이터)
+            return [f"{job_name}_공격전략", f"{job_name}_방어전략"]
+            
+        except Exception as e:
+            # 오류 발생 시 빈 목록 반환
+            return []
+    
+    def get_learning_statistics(self) -> Dict[str, Any]:
+        """학습 통계 가져오기"""
+        try:
+            cursor = self.connection.execute("""
+                SELECT COUNT(*) as total_knowledge,
+                       COUNT(DISTINCT ai_name) as unique_ais,
+                       COUNT(DISTINCT job_class) as learned_jobs
+                FROM ai_knowledge
+            """)
+            
+            stats = cursor.fetchone()
+            return {
+                "total_knowledge": stats[0] if stats else 0,
+                "unique_ais": stats[1] if stats else 0,
+                "learned_jobs": stats[2] if stats else 0
+            }
+        except Exception as e:
+            return {
+                "total_knowledge": 0,
+                "unique_ais": 0, 
+                "learned_jobs": 0
+            }
+    
+    def cleanup_old_data(self, days_old: int = 30):
+        """오래된 데이터 정리"""
+        try:
+            cutoff_date = (datetime.now() - timedelta(days=days_old)).isoformat()
+            self.connection.execute("""
+                DELETE FROM ai_knowledge 
+                WHERE updated_at < ? AND knowledge_type = 'temporary_data'
+            """, (cutoff_date,))
+            self.connection.commit()
+        except Exception as e:
+            print(f"데이터 정리 실패: {e}")
 
 class JobSpecificDatasetGenerator:
     """직업별 전문 데이터셋 생성기"""
@@ -234,8 +315,8 @@ class JobSpecificDatasetGenerator:
         print("📊 직업별 데이터셋 생성기 초기화!")
     
     def generate_all_job_datasets(self):
-        """28개 직업 전체 데이터셋 생성"""
-        print("🏭 === 28개 직업 데이터셋 대량 생성 시작! ===")
+        """27개 직업 전체 데이터셋 생성"""
+        print("🏭 === 27개 직업 데이터셋 대량 생성 시작! ===")
         
         for job_class in JobClass:
             print(f"📊 {job_class.value} 데이터셋 생성 중...")
@@ -250,7 +331,7 @@ class JobSpecificDatasetGenerator:
                 asdict(dataset)
             )
         
-        print(f"✅ 28개 직업 데이터셋 생성 완료!")
+        print(f"✅ 27개 직업 데이터셋 생성 완료!")
         self._generate_summary_report()
     
     def _generate_job_dataset(self, job_class: JobClass) -> JobSpecificKnowledge:

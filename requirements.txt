@@ -1,5 +1,5 @@
 # Dawn of Stellar - Requirements
-# v3.1.1+ - 완전체 로그라이크 RPG 게임 (멀티플레이어 준비)
+# v4.1.0 - 완전체 로그라이크 RPG + AI 채팅 시스템
 
 # 🎮 게임 엔진 핵심
 pygame>=2.5.0                # 오디오 시스템
@@ -28,6 +28,14 @@ websockets>=11.0            # WebSocket 통신
 python-socketio>=5.8        # 실시간 통신
 aiohttp>=3.8                # 비동기 HTTP
 upnpclient>=0.0.8           # UPnP 포트 포워딩
+
+# 🤖 AI 채팅 시스템 (v4.1.0 NEW!)
+openai>=1.0.0               # OpenAI GPT API
+anthropic>=0.25.0           # Claude API
+google-generativeai>=0.4.0  # Gemini API
+ollama>=0.1.7               # Ollama 로컬 모델
+pydantic>=2.0.0             # AI 응답 검증
+dataclasses-json>=0.6.0     # JSON 직렬화
 
 # 📡 직렬화 및 프로토콜 (멀티플레이어용)
 msgpack>=1.0.5              # 고성능 바이너리 직렬화
