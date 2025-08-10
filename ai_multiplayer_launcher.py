@@ -76,6 +76,10 @@ class AIMultiplayerLauncher:
         else:
             print(f"{YELLOW}⚠️ 독립 실행 모드 (게임 시스템 미연동){RESET}")
     
+    def run(self):
+        """AI 멀티플레이 모드 실행"""
+        return self.start_ai_multiplayer_mode()
+    
     def start_ai_multiplayer_mode(self):
         """AI 멀티플레이 모드 시작"""
         print(f"\n{BRIGHT_CYAN}🌟 Dawn of Stellar - AI 멀티플레이 모드{RESET}")

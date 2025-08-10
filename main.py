@@ -12301,6 +12301,19 @@ class DawnOfStellarGame:
             self._ascii_art_displayed = False  # 아스키 아트 다시 표시하도록 플래그 리셋
             return True
 
+    def run_classic_mode(self):
+        """클래식 게임 모드 실행"""
+        print(f"\n{bright_cyan('🎮 클래식 게임 모드')}")
+        print(f"{white('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')}")
+        print(f"{yellow('기본 게임 모드로 실행합니다.')}")
+        
+        # 기본 게임 시작
+        try:
+            self.run_game()
+        except Exception as e:
+            print(f"❌ 게임 실행 오류: {e}")
+            safe_korean_input("Enter를 눌러 메인 메뉴로 돌아가기...")
+
     def _start_ai_multiplayer_mode(self):
         """EXAONE 3.5 기반 AI 멀티플레이어 모드 - 클래식 모드 완전 대체"""
         try:
