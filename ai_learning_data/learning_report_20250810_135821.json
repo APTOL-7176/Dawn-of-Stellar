@@ -1,0 +1,140 @@
+{
+  "report_date": "2025-08-10T13:58:21.451221",
+  "ai_models": {
+    "궁극의전사AI": {
+      "performance": {
+        "games_played": 0,
+        "wins": 0,
+        "losses": 0,
+        "average_completion_time": 0.0,
+        "efficiency_score": 0.0,
+        "creativity_score": 0.0,
+        "cooperation_score": 0.0,
+        "last_updated": ""
+      },
+      "intelligence_level": "🥚 기초AI",
+      "learning_hours": 0.0,
+      "generation": 1
+    },
+    "궁극의아크메이지AI": {
+      "performance": {
+        "games_played": 0,
+        "wins": 0,
+        "losses": 0,
+        "average_completion_time": 0.0,
+        "efficiency_score": 0.0,
+        "creativity_score": 0.0,
+        "cooperation_score": 0.0,
+        "last_updated": ""
+      },
+      "intelligence_level": "🥚 기초AI",
+      "learning_hours": 0.0,
+      "generation": 1
+    },
+    "궁극의도적AI": {
+      "performance": {
+        "games_played": 0,
+        "wins": 0,
+        "losses": 0,
+        "average_completion_time": 0.0,
+        "efficiency_score": 0.0,
+        "creativity_score": 0.0,
+        "cooperation_score": 0.0,
+        "last_updated": ""
+      },
+      "intelligence_level": "🥚 기초AI",
+      "learning_hours": 0.0,
+      "generation": 1
+    },
+    "궁극의궁수AI": {
+      "performance": {
+        "games_played": 2,
+        "wins": 0,
+        "losses": 2,
+        "average_completion_time": 0.0,
+        "efficiency_score": 0.06814211132668813,
+        "creativity_score": 0.0,
+        "cooperation_score": 0.0,
+        "last_updated": "2025-08-10T13:58:21.451221"
+      },
+      "intelligence_level": "🥚 기초AI",
+      "learning_hours": 0.2,
+      "generation": 1
+    },
+    "궁극의바드AI": {
+      "performance": {
+        "games_played": 0,
+        "wins": 0,
+        "losses": 0,
+        "average_completion_time": 0.0,
+        "efficiency_score": 0.0,
+        "creativity_score": 0.0,
+        "cooperation_score": 0.0,
+        "last_updated": ""
+      },
+      "intelligence_level": "🥚 기초AI",
+      "learning_hours": 0.0,
+      "generation": 1
+    },
+    "궁극의기계공학자AI": {
+      "performance": {
+        "games_played": 0,
+        "wins": 0,
+        "losses": 0,
+        "average_completion_time": 0.0,
+        "efficiency_score": 0.0,
+        "creativity_score": 0.0,
+        "cooperation_score": 0.0,
+        "last_updated": ""
+      },
+      "intelligence_level": "🥚 기초AI",
+      "learning_hours": 0.0,
+      "generation": 1
+    },
+    "전사로바트_1": {
+      "performance": {
+        "games_played": 0,
+        "wins": 0,
+        "losses": 0,
+        "average_completion_time": 0.0,
+        "efficiency_score": 0.0,
+        "creativity_score": 0.0,
+        "cooperation_score": 0.0,
+        "last_updated": ""
+      },
+      "intelligence_level": "🥚 기초AI",
+      "learning_hours": 0.0,
+      "generation": 1
+    },
+    "아크메이지로바트_2": {
+      "performance": {
+        "games_played": 0,
+        "wins": 0,
+        "losses": 0,
+        "average_completion_time": 0.0,
+        "efficiency_score": 0.0,
+        "creativity_score": 0.0,
+        "cooperation_score": 0.0,
+        "last_updated": ""
+      },
+      "intelligence_level": "🥚 기초AI",
+      "learning_hours": 0.0,
+      "generation": 1
+    },
+    "도적로바트_3": {
+      "performance": {
+        "games_played": 0,
+        "wins": 0,
+        "losses": 0,
+        "average_completion_time": 0.0,
+        "efficiency_score": 0.0,
+        "creativity_score": 0.0,
+        "cooperation_score": 0.0,
+        "last_updated": ""
+      },
+      "intelligence_level": "🥚 기초AI",
+      "learning_hours": 0.0,
+      "generation": 1
+    }
+  }
+}

@@ -8,6 +8,43 @@ from typing import Dict, List, Any, Optional
 from enum import Enum
 import random
 
+
+# 안전한 색상 상수 정의
+COLORS = {
+    'RESET': '\033[0m',
+    'BOLD': '\033[1m',
+    'DIM': '\033[2m', 
+    'UNDERLINE': '\033[4m',
+    'BLACK': '\033[30m',
+    'RED': '\033[31m',
+    'GREEN': '\033[32m',
+    'YELLOW': '\033[33m',
+    'BLUE': '\033[34m',
+    'MAGENTA': '\033[35m',
+    'CYAN': '\033[36m',
+    'WHITE': '\033[37m',
+    'BRIGHT_BLACK': '\033[90m',
+    'BRIGHT_RED': '\033[91m',
+    'BRIGHT_GREEN': '\033[92m',
+    'BRIGHT_YELLOW': '\033[93m',
+    'BRIGHT_BLUE': '\033[94m',
+    'BRIGHT_MAGENTA': '\033[95m',
+    'BRIGHT_CYAN': '\033[96m',
+    'BRIGHT_WHITE': '\033[97m',
+    'BG_BLACK': '\033[40m',
+    'BG_RED': '\033[41m',
+    'BG_GREEN': '\033[42m',
+    'BG_YELLOW': '\033[43m',
+    'BG_BLUE': '\033[44m',
+    'BG_MAGENTA': '\033[45m',
+    'BG_CYAN': '\033[46m',
+    'BG_WHITE': '\033[47m'
+}
+
+def get_color(color_name):
+    """안전한 색상 코드 반환"""
+    return COLORS.get(color_name, '')
+
 # StatusType을 new_skill_system에서 import
 try:
     from .new_skill_system import StatusType
@@ -65,7 +102,7 @@ class StatusEffect:
                 
                 remaining_duration = max(0, self.duration)
                 remaining_damage = self._calculate_total_poison_damage()
-                result["message"] = f"{Color.BRIGHT_GREEN}☠️ {character.name}이(가) 독으로 {Color.RED}{actual_damage}{Color.BRIGHT_GREEN} 피해! (남은 독: {Color.YELLOW}{remaining_damage}점{Color.BRIGHT_GREEN} / {remaining_duration}턴){Color.RESET}"
+                result["message"] = f"{Color.BRIGHT.value_GREEN.value}☠️ {character.name}이(가) 독으로 {get_color('RED')}{actual_damage}{get_color('BRIGHT_GREEN')} 피해! (남은 독: {get_color('YELLOW')}{remaining_damage}점{get_color('BRIGHT_GREEN')} / {remaining_duration}턴){get_color('RESET')}"
             else:
                 # 기존 DOT 시스템 (화상 등)
                 damage = self._calculate_dot_damage(character)

@@ -1,0 +1,14 @@
+{
+  "name": "궁극의아크메이지AI",
+  "job_class": "아크메이지",
+  "intelligence_level": "AIIntelligenceLevel.BASIC",
+  "learning_types": [
+    "AILearningType.OBSERVATION",
+    "AILearningType.EXPERIENCE"
+  ],
+  "memory": "AIMemory(combat_patterns={}, successful_strategies=[], failed_actions=[], item_usage_efficiency={}, exploration_preferences={}, human_observed_actions=[])",
+  "performance": "AIPerformanceStats(games_played=0, wins=0, losses=0, average_completion_time=0.0, efficiency_score=0.0, creativity_score=0.0, cooperation_score=0.0, last_updated='')",
+  "creation_time": "2025-08-10T14:07:36.413732",
+  "total_learning_hours": 0.0,
+  "evolution_generation": 1
+}

@@ -9,6 +9,43 @@ import time
 from typing import List, Dict, Any
 from enum import Enum
 
+
+# 안전한 색상 상수 정의
+COLORS = {
+    'RESET': '\033[0m',
+    'BOLD': '\033[1m',
+    'DIM': '\033[2m', 
+    'UNDERLINE': '\033[4m',
+    'BLACK': '\033[30m',
+    'RED': '\033[31m',
+    'GREEN': '\033[32m',
+    'YELLOW': '\033[33m',
+    'BLUE': '\033[34m',
+    'MAGENTA': '\033[35m',
+    'CYAN': '\033[36m',
+    'WHITE': '\033[37m',
+    'BRIGHT_BLACK': '\033[90m',
+    'BRIGHT_RED': '\033[91m',
+    'BRIGHT_GREEN': '\033[92m',
+    'BRIGHT_YELLOW': '\033[93m',
+    'BRIGHT_BLUE': '\033[94m',
+    'BRIGHT_MAGENTA': '\033[95m',
+    'BRIGHT_CYAN': '\033[96m',
+    'BRIGHT_WHITE': '\033[97m',
+    'BG_BLACK': '\033[40m',
+    'BG_RED': '\033[41m',
+    'BG_GREEN': '\033[42m',
+    'BG_YELLOW': '\033[43m',
+    'BG_BLUE': '\033[44m',
+    'BG_MAGENTA': '\033[45m',
+    'BG_CYAN': '\033[46m',
+    'BG_WHITE': '\033[47m'
+}
+
+def get_color(color_name):
+    """안전한 색상 코드 반환"""
+    return COLORS.get(color_name, '')
+
 class Color:
     """ANSI 컬러 코드"""
     # 기본 색상
@@ -222,9 +259,9 @@ class CombatVisualizer:
             # 상태 아이콘
             status = ""
             if hasattr(char, 'is_broken') and char.is_broken:
-                status = f"{Color.BRIGHT_RED}[BREAK]{Color.RESET}"
+                status = f"{get_color('BRIGHT_RED')}[BREAK]{get_color('RESET')}"
             elif hasattr(char, 'status_manager') and char.status_manager.effects:
-                status = f"{Color.YELLOW}[BUFF]{Color.RESET}"
+                status = f"{get_color('YELLOW')}[BUFF]{get_color('RESET')}"
             
             # HP 상태
             hp_ratio = char.current_hp / char.max_hp if char.max_hp > 0 else 0
@@ -237,18 +274,18 @@ class CombatVisualizer:
             # ATB 게이지
             atb_gauge = getattr(char, 'atb_gauge', 0)
             if atb_gauge >= 1000:
-                atb_bar = f"[{Color.BRIGHT_CYAN}██████████{Color.RESET}]"
-                atb_status = f"{Color.BRIGHT_CYAN}⚡READY{Color.RESET}"
+                atb_bar = f"[{get_color('BRIGHT_CYAN')}██████████{get_color('RESET')}]"
+                atb_status = f"{get_color('BRIGHT_CYAN')}⚡READY{get_color('RESET')}"
             else:
                 atb_percent = int(atb_gauge / 10)  # 1000 스케일을 100%로 변환
                 filled = "█" * (atb_percent // 10)
                 empty = "░" * (10 - atb_percent // 10)
                 if atb_gauge >= 750:  # 75% = 750/1000
-                    atb_bar = f"[{Color.CYAN}{filled}{Color.RESET}{empty}]"
-                    atb_status = f"{Color.CYAN}{atb_percent:3}%{Color.RESET}"
+                    atb_bar = f"[{get_color('CYAN')}{filled}{get_color('RESET')}{empty}]"
+                    atb_status = f"{get_color('CYAN')}{atb_percent:3}%{get_color('RESET')}"
                 else:
-                    atb_bar = f"[{Color.BLUE}{filled}{Color.RESET}{empty}]"
-                    atb_status = f"{Color.BLUE}{atb_percent:3}%{Color.RESET}"
+                    atb_bar = f"[{get_color('BLUE')}{filled}{get_color('RESET')}{empty}]"
+                    atb_status = f"{get_color('BLUE')}{atb_percent:3}%{get_color('RESET')}"
             
             # 현재 캐릭터 표시
             current_marker = f" ⚡ " if char == current_char else "   "
@@ -257,8 +294,8 @@ class CombatVisualizer:
             level_display = f"Lv.{getattr(char, 'level', 1):2}"
             
             # 첫 번째 줄: 이름, 레벨, HP/MP/BRV
-            name_line = f"{current_marker}{name_color}{char.name[:12]:12}{Color.RESET} {Color.BRIGHT_WHITE}{level_display}{Color.RESET}"
-            stats_line = f"HP:{hp_color}{char.current_hp:3}/{char.max_hp:3}{Color.RESET} MP:{mp_color}{char.current_mp:3}/{char.max_mp:3}{Color.RESET} BRV:{Color.YELLOW}{char.brave_points:4}{Color.RESET}"
+            name_line = f"{current_marker}{name_color}{char.name[:12]:12}{get_color('RESET')} {get_color('BRIGHT_WHITE')}{level_display}{get_color('RESET')}"
+            stats_line = f"HP:{hp_color}{char.current_hp:3}/{char.max_hp:3}{get_color('RESET')} MP:{mp_color}{char.current_mp:3}/{char.max_mp:3}{get_color('RESET')} BRV:{get_color('YELLOW')}{char.brave_points:4}{get_color('RESET')}"
             
             # 두 번째 줄: ATB 게이지 (퍼센트/READY를 오른쪽으로)
             atb_line = f"       ATB: {atb_bar}   {atb_status}"
@@ -279,7 +316,7 @@ class CombatVisualizer:
             # 상태
             status = ""
             if hasattr(enemy, 'is_broken') and enemy.is_broken:
-                status = f"{Color.BRIGHT_RED}[BREAK]{Color.RESET}"
+                status = f"{get_color('BRIGHT_RED')}[BREAK]{get_color('RESET')}"
             
             # HP 상태
             hp_ratio = enemy.current_hp / enemy.max_hp if enemy.max_hp > 0 else 0
@@ -288,18 +325,18 @@ class CombatVisualizer:
             # ATB 게이지
             atb_gauge = getattr(enemy, 'atb_gauge', 0)
             if atb_gauge >= 1000:
-                atb_bar = f"[{Color.BRIGHT_CYAN}██████████{Color.RESET}]"
-                atb_status = f"{Color.BRIGHT_CYAN}⚡READY{Color.RESET}"
+                atb_bar = f"[{get_color('BRIGHT_CYAN')}██████████{get_color('RESET')}]"
+                atb_status = f"{get_color('BRIGHT_CYAN')}⚡READY{get_color('RESET')}"
             else:
                 atb_percent = int(atb_gauge / 10)  # 1000 스케일을 100%로 변환
                 filled = "█" * (atb_percent // 10)
                 empty = "░" * (10 - atb_percent // 10)
                 if atb_gauge >= 750:  # 75% = 750/1000
-                    atb_bar = f"[{Color.CYAN}{filled}{Color.RESET}{empty}]"
-                    atb_status = f"{Color.CYAN}{atb_percent:3}%{Color.RESET}"
+                    atb_bar = f"[{get_color('CYAN')}{filled}{get_color('RESET')}{empty}]"
+                    atb_status = f"{get_color('CYAN')}{atb_percent:3}%{get_color('RESET')}"
                 else:
-                    atb_bar = f"[{Color.BLUE}{filled}{Color.RESET}{empty}]"
-                    atb_status = f"{Color.BLUE}{atb_percent:3}%{Color.RESET}"
+                    atb_bar = f"[{get_color('BLUE')}{filled}{get_color('RESET')}{empty}]"
+                    atb_status = f"{get_color('BLUE')}{atb_percent:3}%{get_color('RESET')}"
             
             # 현재 적 표시
             current_marker = f" ⚡ " if enemy == current_char else "   "
@@ -308,8 +345,8 @@ class CombatVisualizer:
             level_display = f"Lv.{getattr(enemy, 'level', 1):2}"
             
             # 첫 번째 줄: 이름, 레벨과 HP/BRV
-            name_line = f"{current_marker}{name_color}{enemy.name[:15]:15}{Color.RESET} {Color.BRIGHT_WHITE}{level_display}{Color.RESET}"
-            stats_line = f"HP:{hp_color}{enemy.current_hp:3}/{enemy.max_hp:3}{Color.RESET} BRV:{Color.YELLOW}{enemy.brave_points:4}{Color.RESET}"
+            name_line = f"{current_marker}{name_color}{enemy.name[:15]:15}{get_color('RESET')} {get_color('BRIGHT_WHITE')}{level_display}{get_color('RESET')}"
+            stats_line = f"HP:{hp_color}{enemy.current_hp:3}/{enemy.max_hp:3}{get_color('RESET')} BRV:{get_color('YELLOW')}{enemy.brave_points:4}{get_color('RESET')}"
             
             # 두 번째 줄: ATB 게이지 (퍼센트/READY를 오른쪽으로)
             atb_line = f"       ATB: {atb_bar}   {atb_status}"
@@ -351,18 +388,18 @@ class CombatVisualizer:
             action_text = skill_name or "행동"
         
         # 간단한 이펙트 출력 (로그 제거)
-        # print(f"\n{color}{Color.BOLD}")
+        # print(f"\n{color}{get_color('BOLD')}")
         # action_line = f"{attacker_sprite} {attacker.name} {effect_icon} {action_text} → {target_sprite} {target.name}"
         # print(f"  {action_line}")
         
         # 데미지/효과 표시 (로그 제거)
         # if damage > 0:
         #     damage_color = Color.BRIGHT_RED if effect_type == EffectType.CRITICAL else Color.RED
-        #     print(f"  {damage_color}💢 {damage} 데미지!{Color.RESET}")
+        #     print(f"  {damage_color}💢 {damage} 데미지!{get_color('RESET')}")
         # elif effect_type == EffectType.HEAL and damage < 0:
-        #     print(f"  {Color.BRIGHT_GREEN}💚 {-damage} 회복!{Color.RESET}")
+        #     print(f"  {get_color('BRIGHT_GREEN')}💚 {-damage} 회복!{get_color('RESET')}")
         
-        # print(f"{Color.RESET}")
+        # print(f"{get_color('RESET')}")
         
         # 짧은 대기 시간
         time.sleep(0.5)
@@ -388,9 +425,9 @@ class CombatVisualizer:
         
         icon = skill_icons.get(skill_name, '✨')
         
-        print(f"\n{color}{Color.BOLD}")
+        print(f"\n{color}{get_color('BOLD')}")
         print(f"  {caster_sprite} {caster.name} - {icon} {skill_name}")
-        print(f"{Color.RESET}")
+        print(f"{get_color('RESET')}")
         
         # 짧은 대기
         time.sleep(0.3)
@@ -408,18 +445,18 @@ class CombatVisualizer:
             color = Color.BRIGHT_YELLOW
             symbol = ""  # "+" 기호 제거
             effect = "💰"
-            print(f"  {color}{sprite} {character.name} {effect} Brave: {change} → {new_brave}{Color.RESET}")
+            print(f"  {color}{sprite} {character.name} {effect} Brave: {change} → {new_brave}{get_color('RESET')}")
         elif change < 0:
             color = Color.BRIGHT_RED
             symbol = ""
             effect = "💸"
             # HP 공격의 경우 특별 처리 (전체 소모)
             if old_brave > new_brave and old_brave > 1000:
-                print(f"  {color}{sprite} {character.name} {effect} Brave: {old_brave} → 0{Color.RESET}")
+                print(f"  {color}{sprite} {character.name} {effect} Brave: {old_brave} → 0{get_color('RESET')}")
             else:
                 # 음수 값을 절댓값으로 표시
                 abs_change = abs(change)
-                print(f"  {color}{sprite} {character.name} {effect} Brave: {abs_change} → {new_brave}{Color.RESET}")
+                print(f"  {color}{sprite} {character.name} {effect} Brave: {abs_change} → {new_brave}{get_color('RESET')}")
         # change가 0이면 출력하지 않음
     
     def show_status_change(self, character, status_name: str, is_positive: bool = True):
@@ -432,7 +469,7 @@ class CombatVisualizer:
         color = Color.BRIGHT_GREEN if is_positive else Color.BRIGHT_RED
         effect = "✨" if is_positive else "💀"
         
-        print(f"  {color}{sprite} {character.name} {effect} {status_name}{Color.RESET}")
+        print(f"  {color}{sprite} {character.name} {effect} {status_name}{get_color('RESET')}")
     
     def show_miss_effect(self, attacker, target):
         """회피 효과 표시 - 중복 메시지 방지를 위해 비주얼 효과만"""
@@ -455,7 +492,7 @@ class CombatVisualizer:
             return
             
         sprite = self.get_character_sprite(character)
-        print(f"  {Color.BRIGHT_BLACK}💀 {sprite} {character.name}이(가) 쓰러졌습니다!{Color.RESET}")
+        print(f"  {get_color('BRIGHT_BLACK')}💀 {sprite} {character.name}이(가) 쓰러졌습니다!{get_color('RESET')}")
         time.sleep(0.5)
 
 # 전역 인스턴스

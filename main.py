@@ -5509,6 +5509,12 @@ class DawnOfStellarGame:
         """모험 시작 - 클래식 게임모드 선택 포함"""
         # print(f"\n{bright_cyan('🌟 모험을 시작합니다!', True)}")  # 메시지 제거
         
+        # 멀티플레이어 통합 시스템 초기화 (있는 경우)
+        if hasattr(self, 'multiplayer_integration') and self.multiplayer_integration:
+            print(f"\n{bright_cyan('🌐 멀티플레이어 모드로 시작합니다!')}")
+            from game.multiplayer_integration import set_multiplayer_integration
+            set_multiplayer_integration(self.multiplayer_integration)
+        
         # 게임 로드 시에는 클래식 모드 선택 건너뛰기 (저장된 설정 사용)
         if not skip_ai_mode_selection:
             # 클래식 게임모드 선택
@@ -5548,6 +5554,26 @@ class DawnOfStellarGame:
             current_floor = getattr(self, 'current_floor', 1)
             encounter_status = self.encounter_manager.get_floor_encounter_status(current_floor)
             print(f"\n🎲 {encounter_status}")
+    
+    def start_multiplayer_adventure(self, multiplayer_integration):
+        """멀티플레이어 모험 시작"""
+        print(f"\n{bright_cyan('🌐 멀티플레이어 모험을 시작합니다!')}")
+        
+        # 멀티플레이어 통합 설정
+        self.multiplayer_integration = multiplayer_integration
+        
+        # 일반 모험 시작
+        self.start_adventure(skip_passive_selection=False, skip_ai_mode_selection=True)
+        
+        print(f"\n{bright_green('멀티플레이어 기능이 활성화되었습니다!')}")
+        print(f"{cyan('사용 가능한 명령어:')}")
+        print(f"  /say <메시지>  - 채팅")
+        print(f"  /players       - 플레이어 목록")
+        print(f"  /sync          - 상태 동기화")
+        print(f"  /disconnect    - 연결 해제")
+        
+        # 살아있는 파티 멤버 수 확인
+        alive_count = sum(1 for member in self.party_manager.members if member.current_hp > 0)
         
         if alive_count == 0:
             print(f"{bright_red('❌ 모든 파티 멤버가 사망 상태입니다!')}")
@@ -5945,6 +5971,22 @@ class DawnOfStellarGame:
                     if party_item_sharing.pending_requests:
                         print(f"\n💬 AI 동료들의 요청이 {len(party_item_sharing.pending_requests)}개 있습니다!")
                         print("'i' 키를 눌러 확인하세요.")
+                
+                # 멀티플레이어 상태 동기화 및 표시
+                if hasattr(self, 'multiplayer_integration') and self.multiplayer_integration:
+                    try:
+                        # 게임 상태 동기화
+                        import asyncio
+                        asyncio.run(self.multiplayer_integration.sync_game_state())
+                        
+                        # 멀티플레이어 상태 표시
+                        if self.multiplayer_integration.is_multiplayer_active():
+                            self.multiplayer_integration.show_multiplayer_status()
+                            
+                    except Exception as e:
+                        # 멀티플레이어 오류는 로그만 남기고 게임은 계속 진행
+                        from game.error_logger import log_debug
+                        log_debug("멀티플레이어", f"동기화 오류 (무시됨): {e}")
                 
                 # 플레이어 입력 받기
                 action = self.get_player_input()
@@ -7295,7 +7337,13 @@ class DawnOfStellarGame:
             return 'q'  # 오류 시 종료
     
     def process_action(self, action):
-        """액션 처리 - 클래식 게임모드 및 이동/층 전환 지원"""
+        """액션 처리 - 클래식 게임모드 및 이동/층 전환 지원 + 멀티플레이어"""
+        
+        # 멀티플레이어 명령어 처리 (슬래시로 시작하는 명령어)
+        if hasattr(self, 'multiplayer_integration') and self.multiplayer_integration:
+            if self.multiplayer_integration.handle_multiplayer_input(action):
+                return True  # 멀티플레이어 명령어가 처리됨
+        
         if action.lower() == 'q':
             # 게임 종료 확인창
             if self.confirm_quit():
@@ -7323,6 +7371,15 @@ class DawnOfStellarGame:
             # 게임패드 메뉴 조작법
             if hasattr(self.keyboard, 'is_gamepad_connected') and self.keyboard.is_gamepad_connected():
                 print(f"   {bright_green('🎮 게임패드:')} X(인벤토리), LB(파티), Y(필드)")
+            
+            # 멀티플레이어 명령어 추가
+            if hasattr(self, 'multiplayer_integration') and self.multiplayer_integration and self.multiplayer_integration.is_multiplayer_active():
+                print()
+                print(f"{bright_cyan('🌐 멀티플레이어 명령어:')}")
+                print(f"   {bright_white('/say <메시지>')} - 채팅")
+                print(f"   {bright_white('/players')} - 플레이어 목록")
+                print(f"   {bright_white('/sync')} - 상태 동기화")
+                print(f"   {bright_white('/disconnect')} - 연결 해제")
             
             print()
             print(f"{magenta('⚙️  시스템 조작:')}")
@@ -11331,8 +11388,8 @@ class DawnOfStellarGame:
             
             try:
                 # 간단한 입력 기반 메뉴 시스템 사용 (커서 메뉴 문제 해결)
-                # 최소 출력 모드: 옵션만 한 줄 요약 (배너 제거)
-                print("[1]시작 [2]불러오기 [T]트레이닝 [M]메타 [4]레시피 [B]가이드 [6]설정 [0]종료")
+                # 최소 출력 모드: 옵션만 한 줄 요약 (배너 제거) - 핫시트 멀티플레이어 추가
+                print("[1]시작 [2]불러오기 [3]핫시트멀티 [T]트레이닝 [M]메타 [4]레시피 [B]가이드 [6]설정 [0]종료")
                 
                 # 사용자 입력 받기
                 try:
@@ -11352,6 +11409,8 @@ class DawnOfStellarGame:
                     result = 0  # 게임 시작
                 elif choice.lower() == '2':
                     result = 1  # 게임 불러오기
+                elif choice.lower() == '3':
+                    result = 8  # 핫시트 멀티플레이어 (수정됨)
                 elif choice.lower() == 't':
                     result = 2  # 트레이닝 룸
                 elif choice.lower() == 'm':
@@ -11376,6 +11435,8 @@ class DawnOfStellarGame:
                     choice = '1'
                 elif result == 1:  # 게임 불러오기
                     choice = '2'
+                elif result == 8:  # 핫시트 멀티플레이어 (수정됨)
+                    choice = '3'
                 elif result == 2:  # 트레이닝 룸
                     choice = 'T'
                 elif result == 3:  # 메타 진행
@@ -11427,7 +11488,8 @@ class DawnOfStellarGame:
                     time.sleep(2)  # 아스키 아트 표시 후 대기
                 
                 print(f"{cyan('1️⃣')}  게임 시작")
-                print(f"{blue('2️⃣')}  게임 불러오기") 
+                print(f"{blue('2️⃣')}  게임 불러오기")
+                print(f"{bright_green('3️⃣')}  핫시트 멀티플레이어") 
                 print(f"{bright_magenta('T️⃣')}  트레이닝 룸")
                 print(f"{yellow('M️⃣')}  메타 진행")
                 print(f"{green('4️⃣')}  레시피 컬렉션")
@@ -11548,10 +11610,11 @@ class DawnOfStellarGame:
             try:
                 from game.cursor_menu_system import create_simple_menu
                 
-                # 메뉴 옵션 설정
+                # 메뉴 옵션 설정 - 핫시트 멀티플레이어 추가
                 options = [
                     "🚀 게임 시작",
-                    "📁 게임 불러오기", 
+                    "📁 게임 불러오기",
+                    "� 핫시트 멀티플레이어",
                     "⭐ 메타 진행",
                     "📖 레시피 컬렉션",
                     "👶 초보자 가이드",
@@ -11562,6 +11625,7 @@ class DawnOfStellarGame:
                 descriptions = [
                     "새로운 모험을 시작합니다",
                     "이전에 저장된 게임을 불러옵니다",
+                    "한 컴퓨터에서 여러 명이 함께 플레이합니다",
                     "캐릭터 해금, 특성 해금, 영구 강화 등 메타 시스템을 관리합니다",
                     "발견한 레시피들을 확인합니다",
                     "게임이 처음이신 분을 위한 친절한 가이드와 튜토리얼입니다",
@@ -11634,20 +11698,22 @@ class DawnOfStellarGame:
                 
                 result = menu.run()
                 
-                # 선택 결과 처리
+                # 선택 결과 처리 - 핫시트 멀티플레이어 추가 (수정됨)
                 if result == 0:  # 게임 시작
                     choice = '1'
                 elif result == 1:  # 게임 불러오기
                     choice = '2'
-                elif result == 2:  # 메타 진행
+                elif result == 2:  # 핫시트 멀티플레이어 (수정됨)
+                    choice = '3'
+                elif result == 3:  # 메타 진행
                     choice = 'M'
-                elif result == 3:  # 레시피 컬렉션
+                elif result == 4:  # 레시피 컬렉션
                     choice = '4'
-                elif result == 4:  # 초보자 가이드
+                elif result == 5:  # 초보자 가이드
                     choice = 'B'
-                elif result == 5:  # 설정
+                elif result == 6:  # 설정
                     choice = '6'
-                elif result == 6:  # 종료
+                elif result == 7:  # 종료
                     if self.confirm_quit_main_menu():
                         choice = '0'
                     else:
@@ -11804,7 +11870,121 @@ class DawnOfStellarGame:
             self._ascii_art_displayed = False  # 아스키 아트 다시 표시하도록 플래그 리셋
             return True
         
-        elif choice == '3' or choice == 'M' or choice == 'm':
+        elif choice == '3':
+            # 핫시트 멀티플레이어 (수정됨)
+            self.safe_play_sfx("menu_select")
+            try:
+                from game.hotseat_multiplayer import setup_hotseat_multiplayer, get_hotseat_manager
+                
+                print(f"\n{bright_cyan('🎮 핫시트 멀티플레이어')}")
+                print("=" * 30)
+                print()
+                print(f"{bright_yellow('핫시트 멀티플레이어란?')}")
+                print("• 한 컴퓨터에서 여러 명이 번갈아가며 플레이")
+                print("• 각자 파티 멤버를 배정받아 조종")
+                print("• 탐험은 한 명이 담당, 전투는 각자 조종")
+                print("• 기존 세이브파일과 완전 호환")
+                print()
+                
+                # 새 게임 vs 불러오기 선택
+                print("1. 새 게임으로 핫시트 시작")
+                print("2. 기존 세이브를 핫시트로 변환")
+                print("0. 메인 메뉴로 돌아가기")
+                print()
+                
+                hotseat_choice = input(f"{bright_yellow('선택하세요: ')}")
+                
+                if hotseat_choice == '1':
+                    # 새 게임으로 핫시트 시작
+                    print(f"\n{cyan('새 게임으로 핫시트 멀티플레이어를 시작합니다.')}")
+                    
+                    # 핫시트 설정
+                    if setup_hotseat_multiplayer(self):
+                        # 난이도 선택
+                        game = DawnOfStellarGame()
+                        if hasattr(self, 'sound_manager') and self.sound_manager:
+                            game.audio_system = self.sound_manager
+                            game.sound_manager = self.sound_manager
+                        game.permanent_progression = self.permanent_progression
+                        
+                        selected_difficulty = game.select_difficulty()
+                        if selected_difficulty is None:
+                            print(f"\n{bright_cyan('메인 메뉴로 돌아갑니다.')}")
+                            self._smart_play_main_menu_bgm()
+                            del game
+                            return True
+                        
+                        # 캐릭터 선택
+                        if game.show_character_selection():
+                            # 핫시트 매니저 연결
+                            hotseat_manager = get_hotseat_manager()
+                            game.hotseat_manager = hotseat_manager
+                            
+                            # 캐릭터 배정
+                            if hotseat_manager.assign_characters(game.party_manager.members):
+                                game.selected_difficulty = selected_difficulty
+                                print(f"\n{bright_green('🎮 핫시트 멀티플레이어 게임을 시작합니다!')}")
+                                game.start_adventure()
+                            else:
+                                print(f"\n{bright_red('캐릭터 배정 실패. 메인 메뉴로 돌아갑니다.')}")
+                        else:
+                            print(f"\n{bright_cyan('메인 메뉴로 돌아갑니다.')}")
+                        
+                        self._play_main_menu_bgm()
+                        del game
+                    
+                elif hotseat_choice == '2':
+                    # 기존 세이브를 핫시트로 변환
+                    print(f"\n{cyan('기존 세이브파일을 핫시트 모드로 불러옵니다.')}")
+                    
+                    load_game = DawnOfStellarGame()
+                    if hasattr(self, 'sound_manager') and self.sound_manager:
+                        load_game.audio_system = self.sound_manager
+                        load_game.sound_manager = self.sound_manager
+                    load_game.permanent_progression = self.permanent_progression
+                    
+                    if load_game.load_game():
+                        party_count = len(load_game.party_manager.members)
+                        if party_count > 0:
+                            # 핫시트 설정
+                            if setup_hotseat_multiplayer(load_game):
+                                hotseat_manager = get_hotseat_manager()
+                                load_game.hotseat_manager = hotseat_manager
+                                
+                                # 기존 캐릭터에 플레이어 배정
+                                if hotseat_manager.assign_characters(load_game.party_manager.members):
+                                    print(f"\n{bright_green('🎮 핫시트 모드로 게임을 재개합니다!')}")
+                                    load_game.start_adventure(skip_passive_selection=True, skip_ai_mode_selection=True)
+                                else:
+                                    print(f"\n{bright_red('캐릭터 배정 실패.')}")
+                            else:
+                                print(f"\n{bright_red('핫시트 설정 실패.')}")
+                        else:
+                            print(f"\n{bright_red('파티 정보가 없습니다.')}")
+                    else:
+                        print(f"\n{bright_red('세이브파일 로드 실패.')}")
+                    
+                    self._play_main_menu_bgm()
+                    del load_game
+                
+                elif hotseat_choice == '0':
+                    print(f"\n{bright_cyan('메인 메뉴로 돌아갑니다.')}")
+                else:
+                    print(f"{bright_red('잘못된 선택입니다.')}")
+                    
+            except Exception as e:
+                print(f"{bright_red(f'핫시트 멀티플레이어 오류: {e}')}")
+                print("📋 가능한 원인:")
+                print("   - 핫시트 모듈 로딩 실패")
+                print("   - 설정 과정에서 오류")
+                input("메인 메뉴로 돌아가려면 Enter를 누르세요...")
+                
+            # 화면 클리어하고 아스키 아트 다시 표시
+            print("\033[2J\033[H")  # 화면 클리어
+            self._ascii_art_displayed = False  # 아스키 아트 다시 표시하도록 플래그 리셋
+            return True
+        
+        elif choice == 'M' or choice == 'm':
             # 메타 진행 (통합 메뉴)
             self.safe_play_sfx("menu_select")
             if hasattr(self, 'meta_progression') and self.meta_progression:

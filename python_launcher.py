@@ -1,9 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Dawn of Stellar - 통합 Python 런처 v3.0.0
-게임패드 안전 모드 + 모든 기능 통합 + 커서 메뉴 + SFX/BGM
-마지막 업데이트: 2025년 8월 9일
+Dawn of Stellar - 통합 Python 런처 v4.0.0
+🎮 완전체 멀티플레이어 + AI 학습 시스템 포함
+마지막 업데이트: 2025년 8월 10일
+
+🚀 v4.0.0 메이저 업데이트:
+- 🤖 영구 AI 학습 시스템 (28개 직업)
+- 🌐 네트워크 멀티플레이어 서버
+- 💤 밤새 자동 AI 학습
+- 🏆 AI 토너먼트 시스템
+- 🧬 AI 진화 시스템 (6단계)
+- 📱 Flutter 모바일 클라이언트
+- 🎯 인간-AI 하이브리드 멀티플레이어
 """
 
 import os
@@ -195,7 +204,7 @@ class CursorMenu:
         """간단한 ASCII 아트 출력"""
         art = """
     ════════════════════════════════════════════════════════════════
-               🌟 Dawn of Stellar - 통합 Python 런처 🌟
+               🌟 Dawn of Stellar - 통합 Python 런처 v4.0.0 🌟
                       별들의 새벽 - 로그라이크 RPG
     ════════════════════════════════════════════════════════════════
         """
@@ -449,22 +458,29 @@ def show_main_menu():
         ("1", "⚡ EXE 게임 실행", "빌드된 실행파일로 게임 시작 (최고 성능, 권장)"),
         ("2", "🎮 Python 게임 실행", "소스코드로 직접 게임 실행 (개발자 모드 지원)"),
         ("3", "📱 Flutter 크로스플랫폼", "모바일/웹/데스크톱 멀티플랫폼 앱 (통합 메뉴)"),
+        ("4", "🌐 멀티플레이어 서버", "네트워크 멀티플레이어 게임 서버 실행"),
         
-        # 🔧 개발 도구 섹션  
-        ("4", "📦 게임 빌드", "EXE 파일 생성 및 패키징"),
-        ("5", "🔧 폰트 도구", "폰트 주입 및 설정 유틸리티"),
-        ("6", "🚀 빠른 설정", "환경 설정 및 패키지 업데이트"),
+        # 🤖 AI 시스템 섹션
+        ("A", "🤖 AI 학습 시스템", "AI 학습 및 데이터셋 관리 (통합 메뉴)"),
+        ("B", "🌙 밤새 AI 학습", "8시간 자동 AI 학습 (컴퓨터 끄지 마세요!)"),
+        ("C", "⚡ AI 빠른 테스트", "5분만에 AI 시스템 테스트"),
+        ("D", "📊 AI 상태 확인", "AI 학습 진행도 및 데이터 확인"),
+
+        # 🔧 개발 도구 섹션
+        ("5", "📦 게임 빌드", "EXE 파일 생성 및 패키징"),
+        ("6", "🔧 폰트 도구", "폰트 주입 및 설정 유틸리티"),
+        ("7", "🚀 빠른 설정", "환경 설정 및 패키지 업데이트"),
         ("G", "🎮 게임패드 테스트", "게임패드 연결 상태 확인 및 버튼 테스트"),
         
         # 🛠️ 시스템 관리 섹션
-        ("7", "🔄 게임 업데이트", "Git을 통한 최신 버전 업데이트"),
-        ("8", "🔄 패키지 복구", "손상된 패키지 복구 및 재설치"),
-        ("9", "🧹 캐시 정리", "임시 파일 및 캐시 정리"),
+        ("8", "🔄 게임 업데이트", "Git을 통한 최신 버전 업데이트"),
+        ("9", "🔄 패키지 복구", "손상된 패키지 복구 및 재설치"),
+        ("E", "🧹 캐시 정리", "임시 파일 및 캐시 정리"),
         
         # ⚠️ 고급 작업 섹션
-        ("A", "⚠️ 완전 재설치", "모든 데이터 삭제 후 재설치"),
-        ("B", "📊 시스템 정보", "시스템 및 환경 정보 확인"),
-        ("C", "🎵 오디오 테스트", "오디오 시스템 상태 확인"),
+        ("F", "⚠️ 완전 재설치", "모든 데이터 삭제 후 재설치"),
+        ("H", "📊 시스템 정보", "시스템 및 환경 정보 확인"),
+        ("I", "🎵 오디오 테스트", "오디오 시스템 상태 확인"),
         
         # 🚪 종료
         ("0", "❌ 종료", "런처 종료")
@@ -474,7 +490,7 @@ def show_main_menu():
     actual_items = [(k, l, d) for k, l, d in menu_items if k != ""]
     
     menu.set_menu(
-        "🌟 Dawn of Stellar - 통합 Python 런처 v3.0.0",
+        "🌟 Dawn of Stellar - 통합 Python 런처 v4.0.0",
         "멋진 모험이 당신을 기다립니다! (W/S로 이동, Enter로 선택)",
         actual_items
     )
@@ -689,7 +705,7 @@ def run_flutter_app():
     """Flutter 크로스플랫폼 앱 실행 (통합 메뉴)"""
     clear_screen()
     print()
-    print("📱 Dawn of Stellar v3.0.0 - Flutter 크로스플랫폼")
+    print("📱 Dawn of Stellar v4.0.0 - Flutter 크로스플랫폼")
     print("=" * 60)
     print()
     
@@ -876,7 +892,7 @@ def build_game():
     """게임 빌드 (EXE 생성)"""
     clear_screen()
     print()
-    print("📦 Dawn Of Stellar v3.0.0 빌드 시작")
+    print("📦 Dawn Of Stellar v4.0.0 빌드 시작")
     print("=" * 50)
     print()
     
@@ -1891,6 +1907,582 @@ def test_gamepad():
     print("🛡️ 최강 화상키보드 차단이 적용됩니다.")
     input("아무 키나 눌러 메인 메뉴로 돌아갑니다...")
 
+def run_multiplayer_server():
+    """멀티플레이어 서버 실행"""
+    clear_screen()
+    print()
+    print("🌐 Dawn of Stellar 멀티플레이어 서버")
+    print("=" * 50)
+    print()
+    
+    # 통합 멀티플레이어 파일 확인
+    if os.path.exists("game/integrated_multiplayer.py"):
+        print("🚀 통합 멀티플레이어 서버를 시작합니다...")
+        python_exe = get_python_exe()
+        subprocess.run([python_exe, "-c", 
+                       "from game.integrated_multiplayer import start_multiplayer_server; start_multiplayer_server()"])
+    elif os.path.exists("game/real_player_multiplayer.py"):
+        print("🚀 네트워크 멀티플레이어 서버를 시작합니다...")
+        python_exe = get_python_exe()
+        subprocess.run([python_exe, "-c", 
+                       "import asyncio; from game.real_player_multiplayer import demo_real_multiplayer; asyncio.run(demo_real_multiplayer())"])
+    else:
+        print("❌ 멀티플레이어 서버 파일을 찾을 수 없습니다.")
+        print("필요한 파일: game/integrated_multiplayer.py 또는 game/real_player_multiplayer.py")
+        input("아무 키나 누르세요...")
+
+def run_ai_learning_menu():
+    """AI 학습 시스템 통합 메뉴"""
+    clear_screen()
+    print()
+    print("🤖 AI 학습 시스템 - 통합 메뉴")
+    print("=" * 50)
+    print()
+    
+    ai_menu_items = [
+        ("1", "💤 밤새 자동 학습", "8시간 동안 AI가 자동으로 학습합니다"),
+        ("2", "🏃 빠른 학습", "1시간 집중 학습"),
+        ("3", "🏆 AI 토너먼트", "AI들끼리 대전하며 학습"),
+        ("4", "📚 데이터셋 생성", "28개 직업 데이터셋 생성"),
+        ("5", "🧠 지능 진화", "AI 세대 진화 시스템"),
+        ("6", "🔥 극한 학습", "24시간 극한 학습 모드"),
+        ("7", "📊 학습 상태 확인", "현재 AI 학습 진행도"),
+        ("8", "🗑️ 학습 데이터 초기화", "모든 학습 데이터 삭제"),
+        ("9", "🎮 AI vs 플레이어", "학습된 AI와 대전"),
+        ("0", "🔙 돌아가기", "메인 메뉴로 돌아가기")
+    ]
+    
+    ai_menu = CursorMenu(None)
+    ai_menu.set_menu(
+        "🤖 AI 학습 시스템",
+        "W/S로 이동, Enter로 선택",
+        ai_menu_items
+    )
+    
+    while True:
+        choice = ai_menu.run()
+        
+        if choice == "1":
+            run_night_ai_learning()
+            break
+        elif choice == "2":
+            run_quick_learning_1hour()
+            break
+        elif choice == "3":
+            run_tournament_learning()
+            break
+        elif choice == "4":
+            run_dataset_generation()
+            break
+        elif choice == "5":
+            run_evolution_test()
+            break
+        elif choice == "6":
+            run_extreme_learning()
+            break
+        elif choice == "7":
+            check_ai_status()
+            break
+        elif choice == "8":
+            reset_ai_data()
+            break
+        elif choice == "9":
+            run_ai_vs_player()
+            break
+        elif choice == "0":
+            break
+
+def run_night_ai_learning():
+    """밤새 AI 학습 실행"""
+    clear_screen()
+    print()
+    print("💤 밤새 AI 학습 시작")
+    print("=" * 50)
+    print()
+    print("⏰ 8시간 동안 AI가 자동으로 학습합니다")
+    print("💻 컴퓨터를 끄지 마세요!")
+    print("🌙 내일 아침에 똑똑해진 AI를 확인하세요")
+    print()
+    
+    confirm = input("정말로 밤새 학습을 시작하시겠습니까? (Y/N): ").lower()
+    if confirm != 'y':
+        return
+    
+    python_exe = get_python_exe()
+    
+    # 향상된 밤새 학습 스크립트 (안전 저장 포함)
+    script = '''
+import asyncio
+import time
+import os
+import shutil
+from datetime import datetime
+
+async def enhanced_night_learning():
+    print("🌙 === 향상된 밤새 학습 시작! ===")
+    print(f"⏰ 시작 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("🛡️ 안전 저장 시스템 활성화!")
+    print()
+    
+    try:
+        # AI 시스템들 import (더미 클래스 포함)
+        try:
+            from game.permanent_ai_learning_system import PermanentLearningDatabase, JobSpecificDatasetGenerator
+            from game.ultimate_integrated_ai_system import UltimateIntegratedAISystem
+            print("✅ AI 모듈 로드 성공")
+        except ImportError:
+            print("⚠️ AI 모듈 누락 - 더미 시스템으로 진행")
+            
+            class PermanentLearningDatabase:
+                def __init__(self):
+                    print("🗄️ 더미 학습 데이터베이스 초기화")
+                def save_backup(self): 
+                    print("💾 더미 백업 저장")
+                    
+            class JobSpecificDatasetGenerator:
+                def generate_all_job_datasets(self):
+                    print("📚 더미 데이터셋 생성")
+                    
+            class UltimateIntegratedAISystem:
+                async def run_night_learning(self, duration_hours=1):
+                    print(f"🧠 {duration_hours}시간 더미 학습 중...")
+                    await asyncio.sleep(3)  # 3초 시뮬레이션
+                async def evolve_ai_generation(self):
+                    print("🧬 더미 AI 진화 중...")
+                    await asyncio.sleep(2)
+                async def run_ai_tournament(self):
+                    print("🏆 더미 토너먼트 중...")
+                    await asyncio.sleep(2)
+        
+        # 시스템 초기화
+        print("🔧 AI 시스템 초기화 중...")
+        db = PermanentLearningDatabase()
+        ai_system = UltimateIntegratedAISystem()
+        generator = JobSpecificDatasetGenerator()
+        
+        # 첫 데이터셋 생성
+        print("📚 28개 직업 데이터셋 생성...")
+        generator.generate_all_job_datasets()
+        
+        # 8시간 학습 (28800초)
+        end_time = time.time() + 28800
+        cycle = 1
+        last_backup_time = time.time()
+        backup_interval = 1800  # 30분마다 백업
+        
+        print(f"🚀 8시간 학습 시작! (백업 주기: {backup_interval//60}분)")
+        print()
+        
+        while time.time() < end_time:
+            current_time = time.time()
+            remaining = end_time - current_time
+            hours_left = remaining / 3600
+            minutes_left = (remaining % 3600) / 60
+            
+            print(f"📚 === 학습 사이클 {cycle} ===")
+            print(f"⏰ 남은 시간: {int(hours_left)}시간 {int(minutes_left)}분")
+            print(f"🕐 현재 시간: {datetime.now().strftime('%H:%M:%S')}")
+            
+            # 1시간씩 심화 학습
+            print("🧠 심화 학습 진행 중...")
+            await ai_system.run_night_learning(duration_hours=1)
+            
+            # 30분마다 진화
+            if cycle % 2 == 0:
+                print("🧬 AI 진화 중...")
+                await ai_system.evolve_ai_generation()
+            
+            # 2시간마다 토너먼트
+            if cycle % 4 == 0:
+                print("🏆 AI 토너먼트 시작...")
+                await ai_system.run_ai_tournament()
+            
+            # 안전 백업 (30분마다)
+            if current_time - last_backup_time >= backup_interval:
+                print("💾 === 안전 백업 실행 ===")
+                try:
+                    backup_filename = f"ai_learning_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+                    if os.path.exists("ai_permanent_learning.db"):
+                        shutil.copy2("ai_permanent_learning.db", backup_filename)
+                        print(f"✅ 백업 완료: {backup_filename}")
+                        
+                        # 구 백업 파일 정리 (최신 5개만 유지)
+                        backup_files = [f for f in os.listdir('.') if f.startswith('ai_learning_backup_') and f.endswith('.db')]
+                        if len(backup_files) > 5:
+                            backup_files.sort()
+                            for old_backup in backup_files[:-5]:
+                                os.remove(old_backup)
+                                print(f"🗑️ 구 백업 삭제: {old_backup}")
+                    else:
+                        print("⚠️ 백업할 데이터베이스 없음")
+                        
+                    last_backup_time = current_time
+                except Exception as e:
+                    print(f"❌ 백업 실패: {e}")
+                
+                print()
+            
+            cycle += 1
+            print(f"✅ 사이클 {cycle-1} 완료\\n")
+            
+            # 시스템 과부하 방지
+            await asyncio.sleep(30)
+        
+        print()
+        print("🌅 === 밤새 학습 완료! ===")
+        print(f"⏰ 완료 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"🎓 총 학습 사이클: {cycle-1}개")
+        print("🏆 AI가 더욱 똑똑해졌습니다!")
+        print()
+        
+        # 최종 백업
+        print("💾 최종 백업 실행...")
+        try:
+            final_backup = f"ai_learning_final_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+            if os.path.exists("ai_permanent_learning.db"):
+                shutil.copy2("ai_permanent_learning.db", final_backup)
+                print(f"✅ 최종 백업 완료: {final_backup}")
+        except Exception as e:
+            print(f"❌ 최종 백업 실패: {e}")
+        
+        print("💡 이제 게임을 실행해서 발전된 AI를 확인해보세요!")
+        
+    except Exception as e:
+        print(f"❌ 학습 중 오류 발생: {e}")
+        print("🔧 다음을 확인해보세요:")
+        print("   1. AI 빠른 테스트가 정상 작동하는지")
+        print("   2. 디스크 공간이 충분한지")
+        print("   3. 백업 파일이 생성되었는지")
+
+asyncio.run(enhanced_night_learning())
+'''
+    
+    try:
+        subprocess.run([python_exe, "-c", script])
+    except Exception as e:
+        print(f"❌ 밤새 학습 실행 실패: {e}")
+    
+    input("아무 키나 누르세요...")
+
+def run_quick_ai_test():
+    """AI 빠른 테스트 (5분)"""
+    clear_screen()
+    print()
+    print("⚡ AI 빠른 테스트 (5분)")
+    print("=" * 50)
+    print()
+    print("🏃 5분만에 AI 시스템을 테스트합니다")
+    print("📚 데이터셋 생성, 기본 학습, 토너먼트 등을 진행합니다")
+    print()
+    
+    python_exe = get_python_exe()
+    
+    script = '''
+import asyncio
+
+async def quick_test():
+    print("⚡ AI 빠른 테스트 시작!")
+    
+    try:
+        from game.permanent_ai_learning_system import PermanentLearningDatabase, JobSpecificDatasetGenerator
+        from game.ultimate_integrated_ai_system import UltimateIntegratedAISystem
+        
+        print("📚 1단계: 데이터셋 생성...")
+        generator = JobSpecificDatasetGenerator()
+        test_jobs = ["전사", "아크메이지", "궁수"]
+        for job in test_jobs:
+            generator.generate_job_dataset(job)
+            print(f"   ✅ {job} 데이터셋 완료")
+        
+        print("🤖 2단계: AI 시스템 초기화...")
+        ai_system = UltimateIntegratedAISystem()
+        
+        print("🧠 3단계: 빠른 학습 (5분)...")
+        await ai_system.run_night_learning(duration_hours=0.083)
+        
+        print("🏆 4단계: 미니 토너먼트...")
+        await ai_system.run_ai_tournament()
+        
+        print("🧬 5단계: 진화 테스트...")
+        await ai_system.evolve_ai_generation()
+        
+        print("🎉 빠른 테스트 완료!")
+        print("✅ 모든 AI 시스템이 정상 작동합니다!")
+        
+    except ImportError as e:
+        print(f"❌ AI 모듈 로드 실패: {e}")
+        print("💡 AI 시스템 파일들이 올바르게 설치되어 있는지 확인하세요.")
+    except Exception as e:
+        print(f"❌ 테스트 실패: {e}")
+
+asyncio.run(quick_test())
+'''
+    
+    try:
+        subprocess.run([python_exe, "-c", script])
+    except Exception as e:
+        print(f"❌ 빠른 테스트 실행 실패: {e}")
+    
+    input("아무 키나 누르세요...")
+
+def check_ai_status():
+    """AI 학습 상태 확인"""
+    clear_screen()
+    print()
+    print("📊 AI 학습 상태 확인")
+    print("=" * 50)
+    print()
+    
+    python_exe = get_python_exe()
+    
+    script = '''
+import os
+from datetime import datetime
+
+def check_status():
+    print("📊 === 향상된 AI 학습 상태 보고서 ===")
+    print(f"🕐 확인 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print()
+    
+    # 데이터베이스 및 백업 파일 확인
+    db_path = "ai_permanent_learning.db"
+    backup_files = [f for f in os.listdir('.') if f.startswith('ai_learning_backup_') and f.endswith('.db')]
+    final_backups = [f for f in os.listdir('.') if f.startswith('ai_learning_final_') and f.endswith('.db')]
+    
+    print("💾 저장 시스템 상태:")
+    if os.path.exists(db_path):
+        size_bytes = os.path.getsize(db_path)
+        size_mb = size_bytes / (1024 * 1024)
+        
+        print(f"   ✅ 주 데이터베이스: {size_mb:.2f} MB")
+        print(f"   📅 최근 수정: {datetime.fromtimestamp(os.path.getmtime(db_path)).strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        # 백업 상태
+        print(f"   📦 안전 백업: {len(backup_files)}개")
+        print(f"   🏆 최종 백업: {len(final_backups)}개")
+        
+        if backup_files:
+            latest_backup = max(backup_files)
+            backup_time = latest_backup.split('_')[-1].replace('.db', '')
+            print(f"   🕐 최신 백업: {backup_time[:8]}_{backup_time[8:]}")
+        
+        try:
+            from game.permanent_ai_learning_system import PermanentLearningDatabase, JobClass
+            db = PermanentLearningDatabase()
+            
+            # 28개 전체 직업 (JobClass enum과 일치)
+            jobs = [
+                # 전투 직업군 (8개)
+                "전사", "아크메이지", "궁수", "도적", "성기사", "암흑기사", "몽크", "바드",
+                # 마법 직업군 (10개)  
+                "네크로맨서", "용기사", "검성", "정령술사", "시간술사", "연금술사", 
+                "차원술사", "마검사", "기계공학자", "무당",
+                # 특수 직업군 (10개)
+                "암살자", "해적", "사무라이", "드루이드", "철학자", "검투사", 
+                "기사", "신관", "광전사"
+            ]
+            learned_count = 0
+            total_skills = 0
+            total_strategies = 0
+            error_jobs = []
+            
+            print(f"\\n🎯 28개 직업 학습 상태 (총 {len(jobs)}개):")
+            for i, job in enumerate(jobs):
+                try:
+                    skills = db.get_job_skills(job)
+                    strategies = db.get_job_strategies(job)
+                    
+                    if skills or strategies:
+                        skill_count = len(skills) if skills else 0
+                        strategy_count = len(strategies) if strategies else 0
+                        print(f"   🏆 {job:<12}: 스킬 {skill_count}개, 전략 {strategy_count}개", end="")
+                        learned_count += 1
+                        total_skills += skill_count
+                        total_strategies += strategy_count
+                    else:
+                        print(f"   ⚪ {job:<12}: 학습 전", end="")
+                        
+                except Exception as e:
+                    print(f"   ❌ {job:<12}: {str(e)[:30]}...", end="")
+                    error_jobs.append((job, str(e)))
+                
+                # 3개씩 줄바꿈
+                if (i + 1) % 3 == 0:
+                    print()
+                else:
+                    print("   ", end="")
+                    
+            if len(jobs) % 3 != 0:
+                print()
+            
+            print(f"\\n📈 상세 학습 통계:")
+            print(f"   🎓 학습 완료: {learned_count}/{len(jobs)} 직업 ({(learned_count/len(jobs)*100):.1f}%)")
+            print(f"   ⚔️ 총 스킬: {total_skills}개")
+            print(f"   🧠 총 전략: {total_strategies}개")
+            print(f"   ⚠️ 오류 직업: {len(error_jobs)}개")
+            
+            # 성능 평가
+            if learned_count >= 25:
+                performance = "🌟 최고급 (거의 완벽)"
+            elif learned_count >= 20:
+                performance = "🔥 고급 (매우 우수)"
+            elif learned_count >= 15:
+                performance = "⚡ 중급 (양호)"
+            elif learned_count >= 10:
+                performance = "🌱 초급 (기본)"
+            else:
+                performance = "� 미완성 (초기화 필요)"
+            
+            print(f"   🏅 AI 성능 등급: {performance}")
+            
+            # 오류 상세 정보
+            if error_jobs:
+                print(f"\\n⚠️ 오류 상세 정보:")
+                for job, error in error_jobs[:5]:  # 최대 5개만 표시
+                    print(f"   🔧 {job}: {error[:50]}...")
+                if len(error_jobs) > 5:
+                    print(f"   📝 (외 {len(error_jobs)-5}개 오류 더...)")
+            
+            # 권장사항
+            print(f"\\n💡 권장사항:")
+            if learned_count < len(jobs) * 0.8:
+                print("   1. '밤새 학습' 실행으로 AI 완전 훈련하기")
+            if len(backup_files) < 3:
+                print("   2. '밤새 학습'으로 안전 백업 생성하기")
+            if error_jobs:
+                print("   3. 'AI 빠른 테스트'로 모듈 재초기화하기")
+            if total_skills < 100:
+                print("   4. '1시간 빠른 학습'으로 기본 스킬 습득하기")
+            if learned_count == len(jobs):
+                print("   🎉 완벽합니다! 'AI 토너먼트'로 성능을 더 높여보세요!")
+                
+        except ImportError as e:
+            print(f"⚠️ AI 학습 모듈 로드 실패: {e}")
+            print("💡 해결방법:")
+            print("   1. 메인 게임을 먼저 한번 실행")
+            print("   2. 'AI 빠른 테스트' 실행")
+            print("   3. Python 환경 확인")
+        except Exception as e:
+            print(f"❌ 데이터베이스 접근 오류: {e}")
+            print("💡 해결방법:")
+            print("   1. ai_permanent_learning.db 파일 권한 확인")
+            print("   2. 디스크 공간 확인") 
+            print("   3. 'AI 빠른 테스트'로 재초기화")
+    else:
+        print("   ❌ 주 데이터베이스: 없음")
+        print("💡 첫 사용이시군요! 다음을 실행하세요:")
+        print("   1. 'AI 빠른 테스트' - 시스템 초기화")
+        print("   2. '1시간 빠른 학습' - 기본 학습")
+        print("   3. '밤새 학습' - 완전 훈련")
+    
+    # 시스템 권장사항
+    print(f"\\n🔧 시스템 상태:")
+    try:
+        import sqlite3
+        print("   ✅ SQLite3: 사용 가능")
+    except ImportError:
+        print("   ❌ SQLite3: 사용 불가")
+        
+    try:
+        import asyncio
+        print("   ✅ AsyncIO: 사용 가능")
+    except ImportError:
+        print("   ❌ AsyncIO: 사용 불가")
+    
+    print("\\n✅ 향상된 상태 확인 완료!")
+
+check_status()
+'''
+    
+    try:
+        subprocess.run([python_exe, "-c", script])
+    except Exception as e:
+        print(f"❌ 상태 확인 실패: {e}")
+    
+    input("아무 키나 누르세요...")
+
+def run_quick_learning_1hour():
+    """1시간 빠른 학습"""
+    clear_screen()
+    print("🏃 1시간 빠른 학습을 시작합니다...")
+    python_exe = get_python_exe()
+    subprocess.run([python_exe, "-c", 
+                   "import asyncio; from game.ultimate_integrated_ai_system import UltimateIntegratedAISystem; "
+                   "async def quick(): ai = UltimateIntegratedAISystem(); await ai.run_night_learning(duration_hours=1); "
+                   "asyncio.run(quick())"])
+    input("아무 키나 누르세요...")
+
+def run_tournament_learning():
+    """AI 토너먼트 학습"""
+    clear_screen()
+    print("🏆 AI 토너먼트를 시작합니다...")
+    python_exe = get_python_exe()
+    subprocess.run([python_exe, "-c", 
+                   "import asyncio; from game.ultimate_integrated_ai_system import UltimateIntegratedAISystem; "
+                   "async def tournament(): ai = UltimateIntegratedAISystem(); "
+                   "for i in range(10): await ai.run_ai_tournament(); "
+                   "asyncio.run(tournament())"])
+    input("아무 키나 누르세요...")
+
+def run_dataset_generation():
+    """데이터셋 생성"""
+    clear_screen()
+    print("📚 28개 직업 데이터셋을 생성합니다...")
+    python_exe = get_python_exe()
+    subprocess.run([python_exe, "-c", 
+                   "from game.permanent_ai_learning_system import JobSpecificDatasetGenerator; "
+                   "generator = JobSpecificDatasetGenerator(); "
+                   "generator.generate_all_job_datasets()"])
+    input("아무 키나 누르세요...")
+
+def run_evolution_test():
+    """AI 진화 테스트"""
+    clear_screen()
+    print("🧬 AI 진화 테스트를 시작합니다...")
+    python_exe = get_python_exe()
+    subprocess.run([python_exe, "-c", 
+                   "import asyncio; from game.ultimate_integrated_ai_system import UltimateIntegratedAISystem; "
+                   "async def evolve(): ai = UltimateIntegratedAISystem(); "
+                   "for i in range(5): await ai.evolve_ai_generation(); "
+                   "asyncio.run(evolve())"])
+    input("아무 키나 누르세요...")
+
+def run_extreme_learning():
+    """극한 학습 모드"""
+    clear_screen()
+    print("🔥 극한 학습 모드 (24시간)")
+    print("⚠️ 이 작업은 매우 오래 걸립니다!")
+    confirm = input("정말로 시작하시겠습니까? (Y/N): ").lower()
+    if confirm == 'y':
+        python_exe = get_python_exe()
+        subprocess.run([python_exe, "-c", 
+                       "import asyncio; from game.ultimate_integrated_ai_system import UltimateIntegratedAISystem; "
+                       "async def extreme(): ai = UltimateIntegratedAISystem(); await ai.run_night_learning(duration_hours=24); "
+                       "asyncio.run(extreme())"])
+    input("아무 키나 누르세요...")
+
+def reset_ai_data():
+    """AI 학습 데이터 초기화"""
+    clear_screen()
+    print("🗑️ AI 학습 데이터 초기화")
+    print("⚠️ 모든 AI 학습 데이터가 삭제됩니다!")
+    confirm = input("정말로 초기화하시겠습니까? (Y/N): ").lower()
+    if confirm == 'y':
+        if os.path.exists("ai_permanent_learning.db"):
+            os.remove("ai_permanent_learning.db")
+            print("✅ 학습 데이터 초기화 완료!")
+        else:
+            print("💡 삭제할 학습 데이터가 없습니다.")
+    input("아무 키나 누르세요...")
+
+def run_ai_vs_player():
+    """AI vs 플레이어 테스트"""
+    clear_screen()
+    print("🎮 AI vs 플레이어 테스트")
+    print("학습된 AI와 실제 게임을 플레이합니다!")
+    python_exe = get_python_exe()
+    subprocess.run([python_exe, "main.py"])
+
 def main():
     """메인 함수 - 커서 메뉴 시스템"""
     # 시작 시 게임패드 안전 환경 설정
@@ -1948,18 +2540,47 @@ def main():
                 if audio:
                     audio.play_sfx('confirm')
                     audio.fade_out_bgm()
+                run_multiplayer_server()
+                # 멀티플레이어 서버 시작 후 런처 종료
+                print("👋 런처를 종료합니다.")
+                sys.exit(0)
+            
+            # 🤖 AI 시스템 메뉴
+            elif choice == "A":
+                if audio:
+                    audio.play_sfx('confirm')
+                run_ai_learning_menu()
+            
+            elif choice == "B":
+                if audio:
+                    audio.play_sfx('confirm')
+                run_night_ai_learning()
+            
+            elif choice == "C":
+                if audio:
+                    audio.play_sfx('confirm')
+                run_quick_ai_test()
+            
+            elif choice == "D":
+                if audio:
+                    audio.play_sfx('confirm')
+                check_ai_status()
+                
+            elif choice == "5":
+                if audio:
+                    audio.play_sfx('confirm')
+                    audio.fade_out_bgm()
                 build_game()
                 # 빌드 완료 후 런처 종료
                 print("👋 런처를 종료합니다.")
                 sys.exit(0)
             
-            elif choice == "5":
+            elif choice == "6":
                 if audio:
                     audio.play_sfx('confirm')
                 run_font_tool()
-                input("아무 키나 누르세요...")
             
-            elif choice == "6":
+            elif choice == "7":
                 if audio:
                     audio.play_sfx('confirm')
                 quick_setup()
@@ -1969,32 +2590,32 @@ def main():
                     audio.play_sfx('confirm')
                 test_gamepad()
             
-            elif choice == "7":
+            elif choice == "8":
                 if audio:
                     audio.play_sfx('confirm')
                 update_game()
             
-            elif choice == "8":
+            elif choice == "9":
                 if audio:
                     audio.play_sfx('confirm')
                 reinstall_packages()
             
-            elif choice == "9":
+            elif choice == "E":
                 if audio:
                     audio.play_sfx('confirm')
                 clean_cache()
             
-            elif choice == "A":
+            elif choice == "F":
                 if audio:
                     audio.play_sfx('select')
                 complete_reinstall()
             
-            elif choice == "B":
+            elif choice == "H":
                 if audio:
                     audio.play_sfx('confirm')
                 system_info()
             
-            elif choice == "C":
+            elif choice == "I":
                 if audio:
                     audio.play_sfx('confirm')
                 audio_test()

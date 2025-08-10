@@ -22,13 +22,13 @@ class KeyboardInput:
         # 키 반복 입력을 위한 상태 추적
         self.key_press_time = {}
         self.key_last_repeat = {}
-        self.initial_delay = 0.5      # 처음 입력 후 0.5초 대기
-        self.repeat_delay = 0.1       # 이후 0.1초마다 반복 (1초에 10번)
+        self.initial_delay = 0.2      # 처음 입력 후 0.2초 대기 (0.5초 → 0.2초)
+        self.repeat_delay = 0.033     # 이후 0.033초마다 반복 (0.1초 → 0.033초, 약 30Hz)
         
         # 디바운싱을 위한 변수들
         self.last_key = ""
         self.last_key_time = 0
-        self.debounce_time = 0.1      # 100ms 디바운싱
+        self.debounce_time = 0.033    # 33ms 디바운싱 (100ms → 33ms)
             
         # 오디오 매니저 자동 설정
         if not sound_manager:
@@ -248,8 +248,8 @@ class GamepadInput:
         self.button_cooldown = {}
         
         # 키보드 스타일 반복 입력 설정
-        self.initial_delay = 0.5      # 처음 입력 후 0.5초 대기
-        self.repeat_delay = 0.1       # 이후 0.1초마다 반복 (1초에 10번)
+        self.initial_delay = 0.2      # 처음 입력 후 0.2초 대기 (0.5초 → 0.2초)
+        self.repeat_delay = 0.033     # 이후 0.033초마다 반복 (0.1초 → 0.033초, 약 30Hz)
         self.button_press_time = {}   # 버튼이 처음 눌린 시간
         self.button_last_repeat = {}  # 마지막 반복 입력 시간
         

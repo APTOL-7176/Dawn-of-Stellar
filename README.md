@@ -1,19 +1,22 @@
-# ⭐ Dawn Of Stellar - 별빛의 여명 v3.1.1
+# ⭐ Dawn Of Stellar - 별빛의 여명 v4.0.0
 
 <div align="center">
 
 ![Python](https://img.shields.io/badge/python-v3.8+-blue.svg)
-![Platform](https://img.shields.io/badge/platform-windows%20%7C%20linux%20%7C%20macos-lightgrey.svg)
+![Platform](https://img.shields.io/badge/platform-windows%20%7C%20linux%20%7C%20macos%20%7C%20mobile-lightgrey.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Game](https://img.shields.io/badge/genre-roguelike%20%7C%20rpg-orange.svg)
-![Version](https://img.shields.io/badge/version-3.1.1-brightgreen.svg)
+![Game](https://img.shields.io/badge/genre-roguelike%20%7C%20rpg%20%7C%20multiplayer-orange.svg)
+![Version](https://img.shields.io/badge/version-4.0.0-brightgreen.svg)
+![AI](https://img.shields.io/badge/AI-learning%20system-purple.svg)
+![Multiplayer](https://img.shields.io/badge/multiplayer-network%20ready-blue.svg)
 
-**차세대 ASCII 기반 콘솔 로그라이크 RPG**
+**🎮 차세대 AI 학습 멀티플레이어 로그라이크 RPG**
 
-Final Fantasy 스타일의 혁신적인 Brave 전투 시스템과  
-완전한 메타 진행 시스템을 구현한 순수 파이썬 콘솔 게임
+Final Fantasy 스타일 Brave 전투 + 영구 AI 학습 시스템 +  
+네트워크 멀티플레이어 + Flutter 모바일 클라이언트가 결합된  
+세계 최초의 완전체 로그라이크 게임
 
-[🚀 원클릭 설치](#-원클릭-자동-설치) • [🎮 플레이 가이드](#-게임-시스템) • [📱 모바일](#-모바일-지원) • [🤝 기여하기](#-기여하기)
+[🚀 원클릭 설치](#-원클릭-자동-설치) • [🤖 AI 학습](#-ai-학습-시스템) • [🌐 멀티플레이어](#-멀티플레이어) • [📱 모바일](#-모바일-지원)
 
 </div>
 
@@ -21,33 +24,38 @@ Final Fantasy 스타일의 혁신적인 Brave 전투 시스템과
 
 ## 🌟 게임 소개
 
-Dawn Of Stellar v3.1.1은 클래식한 로그라이크의 재미와 현대적인 전투 시스템, 그리고 **메타 진행 시스템**을 결합한 혁신적인 ASCII 콘솔 RPG입니다. 
-28개의 개성 넘치는 직업군으로 구성된 파티와 함께 무작위 생성되는 차원 공간을 탐험하며, 전략적인 BRV/HP 전투 시스템으로 강력한 적들을 물리쳐보세요!
+Dawn Of Stellar v4.0.0은 **세계 최초의 완전체 AI 학습 로그라이크 RPG**입니다! 
+28개 직업군으로 구성된 파티와 함께 무작위 생성되는 차원 공간을 탐험하며, 
+**영구 학습하는 AI**와 **실시간 네트워크 멀티플레이어**를 경험해보세요!
 
-## 🚀 v3.1.1 주요 업데이트 (2025-08-10)
+## 🚀 v4.0.0 메이저 업데이트 (2025-08-10)
 
-### 🔧 완전 자동화된 전투 시스템
-- **Enter 입력 대기 완전 제거**: 승리/패배 시 자동 진행
-- **전투 속도 대폭 향상**: 모든 대기 시간 단축 (2초 → 0.5초)
-- **915개 Color.value 오류 완전 해결**: 안정적인 색상 시스템
-- **log_debug 메서드 인수 오류 수정**: 완벽한 로깅 시스템
+### 🤖 **혁신적인 AI 학습 시스템**
+- **영구 AI 학습**: 컴퓨터 재시작해도 학습 데이터 유지 (SQLite 기반)
+- **28개 직업 특화 AI**: 각 직업마다 64개 스킬 + 64개 전략 학습
+- **밤새 자동 학습**: 8시간 무인 학습으로 AI 지능 대폭 향상
+- **AI 진화 시스템**: 6단계 지능 레벨 (Basic → God-tier)
+- **AI 토너먼트**: AI들끼리 대전하며 상호 학습
+- **한 번의 클릭**: `AI_학습_시작.bat`로 모든 AI 기능 접근
 
-### 🎮 사용자 경험 개선
-- **전투 화면 최적화**: 상단 여백 3줄로 깔끔한 UI
-- **자동 진행 시스템**: 공격/스킬 사용 후 즉시 다음 단계
-- **AI 턴 처리 최적화**: 빠른 AI 행동 처리
+### � **완전한 네트워크 멀티플레이어**
+- **WebSocket 기반**: 안정적인 실시간 통신
+- **크로스 플랫폼**: PC, 모바일, 웹 브라우저 모두 지원
+- **AI 테스트 도우미**: 로바트 AI가 테스트 플레이어로 참가
+- **QR 코드 연결**: 모바일에서 간편 접속
+- **실시간 채팅**: 플레이어 간 실시간 소통
+- **턴제 전투**: 공정한 턴 기반 멀티플레이어 전투
 
-## 📊 v3.1.0 주요 업데이트
+### � **Flutter 모바일 클라이언트**
+- **터미널 스타일 UI**: 레트로 ASCII 감성을 모바일로
+- **제스처 컨트롤**: 스와이프로 이동, 탭으로 액션
+- **실시간 동기화**: PC와 모바일 간 완벽한 데이터 동기화
+- **WebSocket 통신**: 끊김 없는 네트워크 플레이
 
-### 🚀 완전한 로깅 시스템 구현
-- **세션별 한국어 로그 파일**: `게임로그/세션_YYYYMMDD_HHMMSS/`
-- **7개 카테고리 로그**: 오류, 전투, 적, 플레이어, 월드, 시스템, 디버그
-- **즉시 문제 진단**: `latest_errors.log`로 실시간 오류 추적
-
-### 🐛 핵심 시스템 안정화
-- **이동 시스템 완전 수정**: 플레이어/적 이동 문제 해결
-- **ATB 밸런스 조정**: 게임 속도 최적화
-- **화면 깜빡임 방지**: 부드러운 UI 경험
+### 🎯 **인간-AI 하이브리드 시스템**
+- **5가지 AI 성격**: 공식적, 캐주얼, 전문적, 귀여운, 로봇틱
+- **AI 동료 시스템**: 똑똑한 AI가 파티원으로 참가
+- **학습 기반 전략**: 플레이어 패턴을 학습하여 적응
 - **AI 모드 검증 강화**: 일반 게임모드 AI 오작동 방지
 
 ## 📚 문서 & 위키

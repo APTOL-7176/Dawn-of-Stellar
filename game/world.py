@@ -194,8 +194,15 @@ class GameWorld:
         self.actions_taken = 0            # 총 액션 수 (AFK 방지)
         self.combat_count = 0             # 전투 횟수
         
+        # 층별 걸음수 추적 (인카운트 강제 발생용)
+        self.floor_steps = {}             # {floor: steps_count}
+        self.current_floor_steps = 0      # 현재 층에서의 걸음수
+        
         # 현재 층의 시드 저장 (세이브 파일에 포함)
         self.current_level_seed = None
+        
+        # 🎲 게임 세션 시드 (게임 시작 시 한 번만 생성, 일관된 랜덤 보장)
+        self.game_session_seed = None
         
         # 성과 기반 보상 시스템
         self.performance_metrics = {
@@ -243,15 +250,23 @@ class GameWorld:
             import hashlib
             
             # 파티 구성을 시드에 반영
-            party_hash = ""
-            if hasattr(self, 'party_manager') and self.party_manager and self.party_manager.members:
-                party_names = [member.name for member in self.party_manager.members]
-                party_hash = "".join(party_names)
+            # 🎲 게임 세션 시드가 없으면 생성 (게임 시작 시 한 번만)
+            if self.game_session_seed is None:
+                # 파티 구성만으로 시드 생성 (시간 제외로 일관성 보장)
+                party_hash = ""
+                if hasattr(self, 'party_manager') and self.party_manager and self.party_manager.members:
+                    party_names = [member.name for member in self.party_manager.members]
+                    party_hash = "".join(party_names)
+                
+                # 파티 구성 + 고정 문자열로 세션 시드 생성 (time.time() 제거)
+                session_string = f"DawnOfStellar_{party_hash}_Session2025"
+                self.game_session_seed = int(hashlib.md5(session_string.encode()).hexdigest()[:8], 16)
+                print(f"🎲 게임 세션 시드 생성: {self.game_session_seed}")
             
-            # 시간 + 층수 + 파티 구성 조합으로 시드 생성
-            seed_string = f"{time.time()}_{self.current_level}_{party_hash}_{random.randint(1, 10000)}"
+            # 세션 시드 + 층수만으로 층별 시드 생성 (random.randint 제거)
+            seed_string = f"{self.game_session_seed}_{self.current_level}"
             level_seed = int(hashlib.md5(seed_string.encode()).hexdigest()[:8], 16)
-            print(f"레벨 {self.current_level} 차원 공간 생성 (동적 씨드: {level_seed})")
+            print(f"레벨 {self.current_level} 차원 공간 생성 (일관된 씨드: {level_seed})")
         
         # 현재 층의 씨드 저장
         self.current_level_seed = level_seed
@@ -842,6 +857,65 @@ class GameWorld:
             
             # 이동 가능한지 확인
             if not self.can_move(dx, dy):
+                # 🎯 모든 상호작용 가능한 타일과 충돌한 경우 자동으로 상호작용 시도
+                target_tile = self.tiles[new_y][new_x] if self.is_valid_pos(new_x, new_y) else None
+                
+                # 밟아서 작동하는 타일들 (FOUNTAIN, TRAP) - 자동 상호작용 제외
+                auto_step_tiles = [TileType.FOUNTAIN, TileType.TRAP]
+                
+                # 모든 상호작용 가능한 타일들
+                interactive_tiles = [
+                    TileType.ALTAR, TileType.LEVER, TileType.BOOKSHELF, TileType.FORGE, 
+                    TileType.GARDEN, TileType.CRYSTAL, TileType.CURSED_ALTAR, 
+                    TileType.POISON_CLOUD, TileType.DARK_PORTAL, TileType.CURSED_CHEST, 
+                    TileType.UNSTABLE_FLOOR, TileType.LOCKED_DOOR, TileType.SECRET_DOOR, 
+                    TileType.CHEST, TileType.BOSS
+                ]
+                
+                if target_tile and target_tile.type in interactive_tiles:
+                    
+                    tile_names = {
+                        TileType.ALTAR: "제단",
+                        TileType.LEVER: "레버", 
+                        TileType.BOOKSHELF: "서고",
+                        TileType.FORGE: "대장간",
+                        TileType.GARDEN: "정원",
+                        TileType.CRYSTAL: "수정",
+                        TileType.CURSED_ALTAR: "저주받은 제단",
+                        TileType.POISON_CLOUD: "독성 구름",
+                        TileType.DARK_PORTAL: "어둠의 포털",
+                        TileType.CURSED_CHEST: "저주받은 상자",
+                        TileType.UNSTABLE_FLOOR: "불안정한 바닥",
+                        TileType.LOCKED_DOOR: "잠긴 문",
+                        TileType.SECRET_DOOR: "비밀 문",
+                        TileType.CHEST: "보물상자",
+                        TileType.BOSS: "보스"
+                    }
+                    
+                    tile_name = tile_names.get(target_tile.type, "특수 객체")
+                    print(f"🔮 {tile_name}에 도달! 자동으로 상호작용을 시도합니다...")
+                    
+                    interaction_result = self.interact_with_tile((new_x, new_y))
+                    if interaction_result.get('success'):
+                        print(f"✨ {interaction_result.get('message', '상호작용 성공!')}")
+                        log_player("자동상호작용", f"{tile_name} 자동 상호작용 성공: ({new_x}, {new_y})", {
+                            "플레이어위치": self.player_pos,
+                            "타일위치": (new_x, new_y),
+                            "타일타입": target_tile.type.name,
+                            "상호작용결과": interaction_result.get('message', '성공')
+                        })
+                        return {"type": "tile_interaction", "result": interaction_result, "position": (new_x, new_y), "tile_type": target_tile.type}
+                    else:
+                        print(f"❌ {interaction_result.get('message', '상호작용 실패')}")
+                        log_player("자동상호작용실패", f"{tile_name} 상호작용 실패: ({new_x}, {new_y})", {
+                            "플레이어위치": self.player_pos,
+                            "타일위치": (new_x, new_y),
+                            "타일타입": target_tile.type.name,
+                            "실패이유": interaction_result.get('message', '알 수 없음')
+                        })
+                        return {"type": "tile_interaction_failed", "result": interaction_result, "position": (new_x, new_y), "tile_type": target_tile.type}
+                
+                # 기존 이동 실패 로깅
                 log_player("이동실패", f"이동 불가능: ({self.player_pos[0]}, {self.player_pos[1]}) → ({new_x}, {new_y})", {
                     "현재위치": self.player_pos,
                     "목표위치": (new_x, new_y),
@@ -903,6 +977,28 @@ class GameWorld:
             self.total_movement_distance += movement_distance
             self.current_run_movement += movement_distance
             self.actions_taken += 1  # 액션 수 증가
+            
+            # 현재 층 걸음수 증가
+            self.current_floor_steps += movement_distance
+            self.floor_steps[self.current_level] = self.current_floor_steps
+            
+            # 🎯 랜덤 인카운트 체크 (층별 걸음수 전달)
+            if hasattr(self, 'encounter_manager'):
+                try:
+                    from .random_encounters import get_encounter_manager
+                    encounter_result = get_encounter_manager().check_encounter(
+                        [], self.current_level, self.current_floor_steps
+                    )
+                    if encounter_result:
+                        print(f"🎲 랜덤 인카운트 발생! (걸음수: {self.current_floor_steps})")
+                        log_player("랜덤인카운트", f"층 {self.current_level}에서 인카운트 발생", {
+                            "층": self.current_level,
+                            "걸음수": self.current_floor_steps,
+                            "인카운트타입": encounter_result.get('type', 'unknown')
+                        })
+                        return {"type": "random_encounter", "encounter": encounter_result}
+                except Exception as e:
+                    print(f"⚠️ 랜덤 인카운트 체크 오류: {e}")
             
             # 탐험 추적
             self.track_exploration(new_x, new_y)
@@ -1309,6 +1405,11 @@ class GameWorld:
     def generate_next_level(self):
         """다음 레벨 생성"""
         self.current_level += 1
+        
+        # 새 층 시작 시 걸음수 리셋
+        self.current_floor_steps = 0
+        print(f"🚶 새 층 시작! 걸음수 리셋: {self.current_floor_steps}")
+        
         self.initialize_world()
         self.generate_level()
         print(f"레벨 {self.current_level}로 이동했습니다!")
@@ -2270,6 +2371,10 @@ class GameWorld:
             'combat_count': self.combat_count,
             'performance_metrics': self.performance_metrics,
             'current_level_seed': self.current_level_seed,  # 현재 층 시드 저장
+            'game_session_seed': self.game_session_seed,   # 🎲 게임 세션 시드 저장
+            # 걸음수 추적 데이터 추가
+            'floor_steps': self.floor_steps,
+            'current_floor_steps': self.current_floor_steps,
             'current_floor_stats': {
                 'enemies_on_floor': self.current_floor_stats['enemies_on_floor'],
                 'enemies_defeated_on_floor': self.current_floor_stats['enemies_defeated_on_floor'],
@@ -2302,6 +2407,11 @@ class GameWorld:
         
         # 시드 정보 복원 (호환성 확인)
         self.current_level_seed = data.get('current_level_seed', None)
+        self.game_session_seed = data.get('game_session_seed', None)  # 🎲 게임 세션 시드 복원
+        
+        # 걸음수 데이터 복원 (호환성 확인)
+        self.floor_steps = data.get('floor_steps', {})
+        self.current_floor_steps = data.get('current_floor_steps', 0)
         
         # 타일 복원
         self.tiles = []

@@ -9589,8 +9589,8 @@ class BraveCombatSystem:
         total_speed = sum(getattr(c, 'speed', 100) for c in alive_combatants)
         avg_speed = total_speed / len(alive_combatants)
         
-        # ATB 게이지 충전 속도 - 속도에 완전 정비례 (단순하고 명확하게) - 4배 적절히!
-        base_increase = 1.0  # ⚡ 메인 ATB 증가량만 4배! (0.25 → 1.0)
+        # ATB 게이지 충전 속도 - 속도에 완전 정비례 (단순하고 명확하게)
+        base_increase = 0.6  # ⚡ 메인 ATB 증가량만 4배! (0.25 → 0.6)
         
         # 이전 ATB 값들 저장
         previous_atb = {}

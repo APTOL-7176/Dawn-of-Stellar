@@ -1140,8 +1140,8 @@ class RobotAIMaster:
             mp_ratios = []
             
             for member in members:
-                hp_ratio = getattr(member, 'hp', 0) / getattr(member, 'max_hp', 1)
-                mp_ratio = getattr(member, 'mp', 0) / getattr(member, 'max_mp', 1)
+                hp_ratio = getattr(member, 'current_hp', 0) / getattr(member, 'max_hp', 1)
+                mp_ratio = getattr(member, 'current_mp', 0) / getattr(member, 'max_mp', 1)
                 health_ratios.append(hp_ratio)
                 mp_ratios.append(mp_ratio)
             
@@ -1798,47 +1798,76 @@ class GameDisplay:
         self.screen_width = 120  # 화면 너비 증가
         self.screen_height = 35  # 화면 높이 증가
         self._last_clear_time = 0  # 화면 클리어 디바운싱
+        self._frame_time_limit = 1.0 / 20.0  # 20fps = 0.05초당 1프레임
+        self._last_frame_time = 0
+        self._frame_buffer = []  # 화면 스택 방지용 버퍼
         
     def clear_screen(self):
-        """화면 지우기 - 텍스트 스택 방지 강화"""
+        """화면 지우기 - 텍스트 스택 방지 강화 및 20fps 제한"""
         import time
         
-        # 디바운싱: 빠른 이동 시에도 화면 클리어 허용 (0.025초로 단축)
         current_time = time.time()
+        
+        # 20fps 제한: 프레임 간격 체크
+        if current_time - self._last_frame_time < self._frame_time_limit:
+            # 프레임 제한에 걸렸을 때는 버퍼만 업데이트
+            return
+        
+        self._last_frame_time = current_time
+        
+        # 화면 스택 방지: 이전 버퍼 완전 클리어
+        self._frame_buffer.clear()
+        
+        # 디바운싱: 너무 빈번한 클리어 방지
         if current_time - self._last_clear_time < 0.025:
-            # 너무 빈번한 클리어 시에도 소프트 클리어는 수행
             try:
-                print("\n" * 2)  # 최소한의 공간 확보
+                # 소프트 클리어: 기존 텍스트를 밀어내기
+                print("\n" * 5)
+                print("─" * 80)  # 구분선
             except:
                 pass
             return
         self._last_clear_time = current_time
         
-        # 파이프/모바일 모드에서도 텍스트 스택 방지
+        # 파이프/모바일 모드에서 텍스트 스택 완전 방지
         if os.getenv('SUBPROCESS_MODE') == '1':
             try:
-                # 강화된 소프트 클리어: 더 많은 줄로 이전 텍스트 밀어내기
-                print("\n" * 10)
-                # 구분선으로 명확한 화면 분리
-                print("=" * 80)
+                # 강력한 소프트 클리어: 화면을 완전히 밀어내기
+                print("\n" * 25)  # 충분한 줄 수로 이전 내용 밀어내기
+                print("═" * 80)   # 명확한 구분선
+                print("🎮 Dawn of Stellar - 새 프레임")
+                print("═" * 80)
                 return
             except Exception:
                 return
                 
-        # 일반 모드에서는 강력한 화면 클리어
+        # 일반 모드에서는 확실한 화면 클리어
         try:
             if platform.system() == "Windows":
-                # Windows에서 더 확실한 클리어
+                # Windows에서 확실한 클리어 + 스택 방지
                 os.system('cls')
-                # 클리어 후 약간의 지연으로 안정성 확보
-                time.sleep(0.05)
+                print()  # 첫 줄 공백으로 여백 확보
             else:
                 os.system('clear')
-                time.sleep(0.05)
+                print()
         except Exception:
-            # OS 명령어 실패 시 강력한 새 라인으로 대체
-            print("\n" * 60)
-            print("=" * 80)  # 구분선 추가
+            # OS 명령어 실패 시 강력한 텍스트 클리어
+            print("\033[2J\033[H")  # ANSI 이스케이프 시퀀스로 화면 클리어
+            print("\n" * 30)
+            print("═" * 80)
+    
+    def update_display_with_fps_limit(self, content):
+        """20fps 제한이 적용된 디스플레이 업데이트"""
+        import time
+        
+        current_time = time.time()
+        if current_time - self._last_frame_time >= self._frame_time_limit:
+            self.clear_screen()
+            print(content)
+            self._last_frame_time = current_time
+        else:
+            # 프레임 제한에 걸렸을 때는 버퍼에 저장
+            self._frame_buffer.append(content)
             
     def show_title(self):
         """타이틀 화면 표시 (글꼴 호환성 개선)"""

@@ -735,9 +735,16 @@ class RandomEncounterManager:
         return current_count < self.max_encounters_per_floor
     
     def should_force_encounter(self, floor: int, steps_taken: int) -> bool:
-        """강제 조우 발생 여부 (최소 조우 보장)"""
+        """강제 조우 발생 여부 (최소 조우 보장 + 최대 걸음수 시스템)"""
         current_count = self.get_floor_encounter_count(floor)
         
+        # === 최대 걸음수 도달 시 강제 인카운트 (100% 발생) ===
+        max_steps_without_encounter = 120  # 최대 120걸음
+        if steps_taken >= max_steps_without_encounter:
+            print(f"🚨 최대 걸음수 {max_steps_without_encounter} 도달! 강제 인카운트 발생!")
+            return True
+        
+        # === 기존 최소 조우 보장 시스템 ===
         # 최소 조우 횟수 미달이고 충분히 많이 걸었을 때 강제 발생
         if current_count < self.min_encounters_per_floor and steps_taken > 50:
             return True

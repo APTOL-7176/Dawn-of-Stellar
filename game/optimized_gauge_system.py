@@ -7,6 +7,43 @@
 from .color_text import Color  # color_text.Color로 통일
 import time
 
+
+# 안전한 색상 상수 정의
+COLORS = {
+    'RESET': '\033[0m',
+    'BOLD': '\033[1m',
+    'DIM': '\033[2m', 
+    'UNDERLINE': '\033[4m',
+    'BLACK': '\033[30m',
+    'RED': '\033[31m',
+    'GREEN': '\033[32m',
+    'YELLOW': '\033[33m',
+    'BLUE': '\033[34m',
+    'MAGENTA': '\033[35m',
+    'CYAN': '\033[36m',
+    'WHITE': '\033[37m',
+    'BRIGHT_BLACK': '\033[90m',
+    'BRIGHT_RED': '\033[91m',
+    'BRIGHT_GREEN': '\033[92m',
+    'BRIGHT_YELLOW': '\033[93m',
+    'BRIGHT_BLUE': '\033[94m',
+    'BRIGHT_MAGENTA': '\033[95m',
+    'BRIGHT_CYAN': '\033[96m',
+    'BRIGHT_WHITE': '\033[97m',
+    'BG_BLACK': '\033[40m',
+    'BG_RED': '\033[41m',
+    'BG_GREEN': '\033[42m',
+    'BG_YELLOW': '\033[43m',
+    'BG_BLUE': '\033[44m',
+    'BG_MAGENTA': '\033[45m',
+    'BG_CYAN': '\033[46m',
+    'BG_WHITE': '\033[47m'
+}
+
+def get_color(color_name):
+    """안전한 색상 코드 반환"""
+    return COLORS.get(color_name, '')
+
 class OptimizedGaugeSystem:
     """최적화된 게이지 시스템 클래스"""
     
@@ -54,16 +91,16 @@ class OptimizedGaugeSystem:
         
         # 색상 설정
         if new_brv == 0:
-            brv_color = Color.RED.value
+            brv_color = get_color('RED')
         elif new_brv <= 299:
-            brv_color = Color.YELLOW.value
+            brv_color = get_color('YELLOW')
         elif new_brv == max_brv:
-            brv_color = Color.BRIGHT_MAGENTA.value
+            brv_color = get_color('BRIGHT_MAGENTA')
         else:
-            brv_color = Color.BRIGHT_YELLOW.value
+            brv_color = get_color('BRIGHT_YELLOW')
         
         # 결과 문자열
-        result = f"💫 {character_name}: ⚡ {brv_gauge} {brv_color}{new_brv}/{max_brv}{Color.RESET.value}"
+        result = f"💫 {character_name}: ⚡ {brv_gauge} {brv_color}{new_brv}/{max_brv}{get_color('RESET')}"
         if change_text:
             result += f" {change_text} {change_symbol}"
         if change_reason:
@@ -475,53 +512,53 @@ class OptimizedGaugeSystem:
         if gauge_type.lower() == "hp":
             # HP 하트 색상에 따른 게이지 색상
             if hp_ratio > 0.8:
-                color = Color.BRIGHT_GREEN.value
+                color = get_color('BRIGHT_GREEN')
             elif hp_ratio > 0.6:
-                color = Color.GREEN.value  
+                color = get_color('GREEN')  
             elif hp_ratio > 0.4:
-                color = Color.YELLOW.value
+                color = get_color('YELLOW')
             elif hp_ratio > 0.2:
-                color = Color.BRIGHT_RED.value
+                color = get_color('BRIGHT_RED')
             else:
-                color = Color.RED.value
+                color = get_color('RED')
         elif gauge_type.lower() == "mp":
             # MP 하트 색상에 따른 게이지 색상
             if mp_ratio > 0.8:
-                color = Color.BRIGHT_CYAN.value
+                color = get_color('BRIGHT_CYAN')
             elif mp_ratio > 0.6:
-                color = Color.CYAN.value  
+                color = get_color('CYAN')  
             elif mp_ratio > 0.4:
-                color = Color.BLUE.value
+                color = get_color('BLUE')
             elif mp_ratio > 0.2:
-                color = Color.MAGENTA.value
+                color = get_color('MAGENTA')
             else:
-                color = Color.RED.value
+                color = get_color('RED')
         elif gauge_type.lower() == "brv":
             # BRV 게이지 색상 로직
             if current == 0:
-                color = Color.RED.value
+                color = get_color('RED')
             elif current <= 299:
-                color = Color.YELLOW.value
+                color = get_color('YELLOW')
             elif current == maximum:
-                color = Color.BRIGHT_MAGENTA.value
+                color = get_color('BRIGHT_MAGENTA')
             else:
-                color = Color.BRIGHT_YELLOW.value
+                color = get_color('BRIGHT_YELLOW')
         elif gauge_type.lower() == "atb":
             # ATB 게이지 색상 로직
             if is_casting:
-                color = Color.BRIGHT_MAGENTA.value
+                color = get_color('BRIGHT_MAGENTA')
             elif ratio >= 1.0:
-                color = Color.YELLOW.value  # 주황색 (꽉 참)
+                color = get_color('YELLOW')  # 주황색 (꽉 참)
             elif atb_speed_state == "fast":
-                color = Color.BRIGHT_CYAN.value  # 밝은 하늘색 (빠른 상태)
+                color = get_color('BRIGHT_CYAN')  # 밝은 하늘색 (빠른 상태)
             elif atb_speed_state == "slow":
-                color = Color.BLUE.value  # 파란색 (느린 상태)
+                color = get_color('BLUE')  # 파란색 (느린 상태)
             elif atb_speed_state == "stunned":
-                color = Color.WHITE.value  # 회색 (기절/정지)
+                color = get_color('WHITE')  # 회색 (기절/정지)
             else:
-                color = Color.CYAN.value  # 하늘색 (기본)
+                color = get_color('CYAN')  # 하늘색 (기본)
         else:
-            color = Color.WHITE.value
+            color = get_color('WHITE')
         
         # 완전히 새로운 게이지 생성 로직 - 길이 일관성 보장
         filled_length = ratio * length  # 실제 채워야 할 길이 (소수점 포함)
@@ -532,24 +569,24 @@ class OptimizedGaugeSystem:
         
         # 1. 완전히 채워진 블록들 추가
         if full_blocks > 0:
-            gauge_content += color + "█" * full_blocks + Color.RESET.value
+            gauge_content += color + "█" * full_blocks + get_color('RESET')
         
         # 2. 부분 블록 처리 (정확한 1개 블록 공간만 사용)
         if full_blocks < length and partial_amount > 0:
             if partial_amount >= 0.875:
-                gauge_content += color + "▉" + Color.RESET.value
+                gauge_content += color + "▉" + get_color('RESET')
             elif partial_amount >= 0.75:
-                gauge_content += color + "▊" + Color.RESET.value
+                gauge_content += color + "▊" + get_color('RESET')
             elif partial_amount >= 0.625:
-                gauge_content += color + "▋" + Color.RESET.value
+                gauge_content += color + "▋" + get_color('RESET')
             elif partial_amount >= 0.5:
-                gauge_content += color + "▌" + Color.RESET.value
+                gauge_content += color + "▌" + get_color('RESET')
             elif partial_amount >= 0.375:
-                gauge_content += color + "▍" + Color.RESET.value
+                gauge_content += color + "▍" + get_color('RESET')
             elif partial_amount >= 0.25:
-                gauge_content += color + "▎" + Color.RESET.value
+                gauge_content += color + "▎" + get_color('RESET')
             elif partial_amount >= 0.125:
-                gauge_content += color + "▏" + Color.RESET.value
+                gauge_content += color + "▏" + get_color('RESET')
             else:
                 # 부분 블록이 너무 작으면 빈 공간으로 처리
                 gauge_content += " "
@@ -648,59 +685,59 @@ class OptimizedGaugeSystem:
         
         # 색상 설정
         # 이름 색상 (턴이 온 캐릭터는 하늘색)
-        name_color = Color.BRIGHT_CYAN.value if character == current_char else Color.BRIGHT_WHITE.value
+        name_color = get_color('BRIGHT_CYAN') if character == current_char else get_color('BRIGHT_WHITE')
         
         # HP 하트 색상과 이모지
         if hp_ratio > 0.8:
-            hp_heart_color = Color.BRIGHT_GREEN.value
+            hp_heart_color = get_color('BRIGHT_GREEN')
             hp_heart = "💚"  # 녹색 하트
         elif hp_ratio > 0.6:
-            hp_heart_color = Color.GREEN.value
+            hp_heart_color = get_color('GREEN')
             hp_heart = "💚"  # 녹색 하트
         elif hp_ratio > 0.4:
-            hp_heart_color = Color.YELLOW.value
+            hp_heart_color = get_color('YELLOW')
             hp_heart = "💛"  # 노란 하트
         elif hp_ratio > 0.2:
-            hp_heart_color = Color.BRIGHT_RED.value
+            hp_heart_color = get_color('BRIGHT_RED')
             hp_heart = "🧡"  # 주황 하트
         else:
-            hp_heart_color = Color.RED.value
+            hp_heart_color = get_color('RED')
             hp_heart = "❤️"  # 빨간 하트
         
         # MP 하트 색상과 이모지
         if mp_ratio > 0.8:
-            mp_heart_color = Color.BRIGHT_CYAN.value
+            mp_heart_color = get_color('BRIGHT_CYAN')
             mp_heart = "💙"  # 파란 하트
         elif mp_ratio > 0.6:
-            mp_heart_color = Color.CYAN.value
+            mp_heart_color = get_color('CYAN')
             mp_heart = "💙"  # 파란 하트
         elif mp_ratio > 0.4:
-            mp_heart_color = Color.BLUE.value
+            mp_heart_color = get_color('BLUE')
             mp_heart = "💜"  # 보라 하트
         elif mp_ratio > 0.2:
-            mp_heart_color = Color.MAGENTA.value
+            mp_heart_color = get_color('MAGENTA')
             mp_heart = "💜"  # 보라 하트
         else:
-            mp_heart_color = Color.RED.value
+            mp_heart_color = get_color('RED')
             mp_heart = "❤️"  # 빨간 하트
         
         # BRV 색상
         if brv == 0:
-            brv_color = Color.RED.value
+            brv_color = get_color('RED')
         elif brv <= 299:
-            brv_color = Color.YELLOW.value  # 주황색
+            brv_color = get_color('YELLOW')  # 주황색
         elif brv == max_brv:
-            brv_color = Color.BRIGHT_MAGENTA.value
+            brv_color = get_color('BRIGHT_MAGENTA')
         else:
-            brv_color = Color.BRIGHT_YELLOW.value
+            brv_color = get_color('BRIGHT_YELLOW')
         
         # SPD 숫자 색상
         if speed >= avg_speed * 1.3:
-            spd_color = Color.GREEN.value
+            spd_color = get_color('GREEN')
         elif speed <= avg_speed * 0.7:
-            spd_color = Color.RED.value
+            spd_color = get_color('RED')
         else:
-            spd_color = Color.WHITE.value
+            spd_color = get_color('WHITE')
         
         # 게이지 생성
         hp_gauge = OptimizedGaugeSystem.create_clean_gauge(hp, max_hp, 10, "hp", hp_ratio, mp_ratio, is_casting, atb_speed_state)
@@ -716,14 +753,14 @@ class OptimizedGaugeSystem:
         
         # BREAK 상태 우선 확인
         if hasattr(character, 'is_broken') and character.is_broken:
-            status_effects.append(f"{Color.RED.value}BREAK{Color.RESET.value}")
+            status_effects.append(f"{get_color('RED')}BREAK{get_color('RESET')}")
             
         # 독 상태는 여러 방법으로 체크 - 강력한 방법
         poison_detected = False
         if hasattr(character, 'status_manager') and character.status_manager:
             if character.status_manager.has_status('독'):
                 poison_detected = True
-                status_effects.append(f"{Color.BRIGHT_GREEN.value}POISON{Color.RESET.value}")
+                status_effects.append(f"{get_color('BRIGHT_GREEN')}POISON{get_color('RESET')}")
         
         if not poison_detected and hasattr(character, 'is_poisoned') and character.is_poisoned:
             poison_detected = True
@@ -731,22 +768,22 @@ class OptimizedGaugeSystem:
             poison_turns = getattr(character, 'poison_turns', 0)
             poison_damage = getattr(character, 'poison_damage', 0)
             if poison_turns > 0 and poison_damage > 0:
-                status_effects.append(f"{Color.BRIGHT_GREEN.value}POISON: {poison_damage}{Color.RESET.value}")
+                status_effects.append(f"{get_color('BRIGHT_GREEN')}POISON: {poison_damage}{get_color('RESET')}")
             else:
-                status_effects.append(f"{Color.BRIGHT_GREEN.value}POISON{Color.RESET.value}")
+                status_effects.append(f"{get_color('BRIGHT_GREEN')}POISON{get_color('RESET')}")
         
         # 독 턴수 기반 체크 (추가 안전장치)
         if not poison_detected and hasattr(character, 'poison_turns') and getattr(character, 'poison_turns', 0) > 0:
             poison_turns = getattr(character, 'poison_turns', 0)
             poison_damage = getattr(character, 'poison_damage', 0)
-            status_effects.append(f"{Color.BRIGHT_GREEN.value}POISON: {poison_damage}{Color.RESET.value}")
+            status_effects.append(f"{get_color('BRIGHT_GREEN')}POISON: {poison_damage}{get_color('RESET')}")
             
         if hasattr(character, 'is_burning') and character.is_burning:
-            status_effects.append(f"{Color.BRIGHT_RED.value}BURN{Color.RESET.value}")
+            status_effects.append(f"{get_color('BRIGHT_RED')}BURN{get_color('RESET')}")
         if hasattr(character, 'is_frozen') and character.is_frozen:
-            status_effects.append(f"{Color.BRIGHT_CYAN.value}FREEZE{Color.RESET.value}")
+            status_effects.append(f"{get_color('BRIGHT_CYAN')}FREEZE{get_color('RESET')}")
         if hasattr(character, 'is_stunned') and character.is_stunned:
-            status_effects.append(f"{Color.BRIGHT_YELLOW.value}STUN{Color.RESET.value}")
+            status_effects.append(f"{get_color('BRIGHT_YELLOW')}STUN{get_color('RESET')}")
         
         # 캐스팅 정보 - 강력한 방법
         casting_info = ""
@@ -761,7 +798,7 @@ class OptimizedGaugeSystem:
                     skill_name = str(character.casting_skill)
             else:
                 skill_name = "알 수 없는 스킬"
-            casting_info = f" {Color.BRIGHT_MAGENTA.value}[CASTING: {skill_name}]{Color.RESET.value}"
+            casting_info = f" {get_color('BRIGHT_MAGENTA')}[CASTING: {skill_name}]{get_color('RESET')}"
         
         # 🎯 직업별 기믹 강제 표시 (모든 직업, 0도 표시) - create_compact_character_status와 통일
         mechanics_display = ""
@@ -770,25 +807,25 @@ class OptimizedGaugeSystem:
         if character_class == "궁수":
             aim_points = getattr(character, 'aim_points', 0)
             precision_points = getattr(character, 'precision_points', 0) 
-            mechanics_display += f" {Color.BRIGHT_GREEN.value}🎯AIM: {aim_points + precision_points}{Color.RESET.value}"
+            mechanics_display += f" {get_color('BRIGHT_GREEN')}🎯AIM: {aim_points + precision_points}{get_color('RESET')}"
         
         # 도적 독 스택 - 항상 표시
         elif character_class == "도적":
             poison_stacks = getattr(character, 'poison_stacks', 0)
             venom_power = getattr(character, 'venom_power', 0)
-            mechanics_display += f" {Color.BRIGHT_GREEN.value}☠️VENOM: {poison_stacks + venom_power}{Color.RESET.value}"
+            mechanics_display += f" {get_color('BRIGHT_GREEN')}☠️VENOM: {poison_stacks + venom_power}{get_color('RESET')}"
         
         # 암살자 그림자 - 항상 표시
         elif character_class == "암살자":
             shadow_count = getattr(character, 'shadow_count', 0)
             shadows = getattr(character, 'shadows', 0)
-            mechanics_display += f" {Color.BRIGHT_BLACK.value}👤SHADOW: {shadow_count + shadows}{Color.RESET.value}"
+            mechanics_display += f" {get_color('BRIGHT_BLACK')}👤SHADOW: {shadow_count + shadows}{get_color('RESET')}"
         
         # 검성 검기 - 항상 표시
         elif character_class == "검성":
             sword_aura = getattr(character, 'sword_aura', 0)
             sword_aura_stacks = getattr(character, 'sword_aura_stacks', 0)
-            mechanics_display += f" {Color.BRIGHT_YELLOW.value}⚔️AURA: {sword_aura + sword_aura_stacks}{Color.RESET.value}"
+            mechanics_display += f" {get_color('BRIGHT_YELLOW')}⚔️AURA: {sword_aura + sword_aura_stacks}{get_color('RESET')}"
         
         # 바드 멜로디 - 항상 표시 (DO, RE, MI 형태)
         elif character_class == "바드":
@@ -799,150 +836,150 @@ class OptimizedGaugeSystem:
             # DO, RE, MI, FA, SO, LA, TI 음계 표시 (7음계, 0~7)
             melody_notes = ["", "DO", "RE", "MI", "FA", "SO", "LA", "TI"]
             if total_melody > 0 and total_melody < len(melody_notes):
-                mechanics_display += f" {Color.BRIGHT_CYAN.value}🎵MELODY: {melody_notes[total_melody]}{Color.RESET.value}"
+                mechanics_display += f" {get_color('BRIGHT_CYAN')}🎵MELODY: {melody_notes[total_melody]}{get_color('RESET')}"
             elif total_melody >= len(melody_notes):
-                mechanics_display += f" {Color.BRIGHT_CYAN.value}🎵HARMONY: {total_melody}{Color.RESET.value}"  # 7을 넘으면 하모니
+                mechanics_display += f" {get_color('BRIGHT_CYAN')}🎵HARMONY: {total_melody}{get_color('RESET')}"  # 7을 넘으면 하모니
             else:
-                mechanics_display += f" {Color.BRIGHT_CYAN.value}🎵MELODY: {total_melody}{Color.RESET.value}"
+                mechanics_display += f" {get_color('BRIGHT_CYAN')}🎵MELODY: {total_melody}{get_color('RESET')}"
         
         # 광전사 분노 - 항상 표시 (0일 때도 표시)
         elif character_class == "광전사":
             rage_stacks = getattr(character, 'rage_stacks', 0)
             berserk_level = getattr(character, 'berserk_level', 0)
-            mechanics_display += f" {Color.BRIGHT_RED.value}💢RAGE: {rage_stacks + berserk_level}{Color.RESET.value}"
+            mechanics_display += f" {get_color('BRIGHT_RED')}💢RAGE: {rage_stacks + berserk_level}{get_color('RESET')}"
         
         # 아크메이지 원소 카운트 - 항상 표시
         elif character_class == "아크메이지":
             fire_count = getattr(character, 'fire_count', 0)
             ice_count = getattr(character, 'ice_count', 0)
             lightning_count = getattr(character, 'lightning_count', 0)
-            mechanics_display += f" {Color.BRIGHT_RED.value}🔥FIRE: {fire_count}{Color.RESET.value}"
-            mechanics_display += f" {Color.BRIGHT_CYAN.value}❄️ICE: {ice_count}{Color.RESET.value}"
-            mechanics_display += f" {Color.BRIGHT_YELLOW.value}⚡THUNDER: {lightning_count}{Color.RESET.value}"
+            mechanics_display += f" {get_color('BRIGHT_RED')}🔥FIRE: {fire_count}{get_color('RESET')}"
+            mechanics_display += f" {get_color('BRIGHT_CYAN')}❄️ICE: {ice_count}{get_color('RESET')}"
+            mechanics_display += f" {get_color('BRIGHT_YELLOW')}⚡THUNDER: {lightning_count}{get_color('RESET')}"
         
         # 몽크 기 에너지 - 항상 표시
         elif character_class == "몽크":
             chi_points = getattr(character, 'chi_points', 0)
             ki_energy = getattr(character, 'ki_energy', 0)
             strike_marks = getattr(character, 'strike_marks', 0)
-            mechanics_display += f" {Color.BRIGHT_YELLOW.value}🥋CHI: {chi_points + ki_energy + strike_marks}{Color.RESET.value}"
+            mechanics_display += f" {get_color('BRIGHT_YELLOW')}🥋CHI: {chi_points + ki_energy + strike_marks}{get_color('RESET')}"
         
         # 전사 자세/스탠스 - 항상 표시 (6가지 태세로 확장)
         elif character_class == "전사":
             warrior_stance = getattr(character, 'warrior_stance', None)
             warrior_focus = getattr(character, 'warrior_focus', 0)
             if warrior_stance == 'attack':
-                mechanics_display += f" {Color.BRIGHT_RED.value}⚔️STANCE: ATK{Color.RESET.value}"
+                mechanics_display += f" {get_color('BRIGHT_RED')}⚔️STANCE: ATK{get_color('RESET')}"
             elif warrior_stance == 'defense':
-                mechanics_display += f" {Color.BRIGHT_BLUE.value}🛡️STANCE: DEF{Color.RESET.value}"
+                mechanics_display += f" {get_color('BRIGHT_BLUE')}🛡️STANCE: DEF{get_color('RESET')}"
             elif warrior_stance == 'balanced':
-                mechanics_display += f" {Color.BRIGHT_YELLOW.value}⚖️STANCE: BAL{Color.RESET.value}"
+                mechanics_display += f" {get_color('BRIGHT_YELLOW')}⚖️STANCE: BAL{get_color('RESET')}"
             elif warrior_stance == 'berserker':
-                mechanics_display += f" {Color.BRIGHT_RED.value}💀STANCE: BERSERK{Color.RESET.value}"
+                mechanics_display += f" {get_color('BRIGHT_RED')}💀STANCE: BERSERK{get_color('RESET')}"
             elif warrior_stance == 'guardian':
-                mechanics_display += f" {Color.BRIGHT_CYAN.value}🛠️STANCE: GUARD{Color.RESET.value}"
+                mechanics_display += f" {get_color('BRIGHT_CYAN')}🛠️STANCE: GUARD{get_color('RESET')}"
             elif warrior_stance == 'speed':
-                mechanics_display += f" {Color.BRIGHT_GREEN.value}⚡STANCE: SPEED{Color.RESET.value}"
+                mechanics_display += f" {get_color('BRIGHT_GREEN')}⚡STANCE: SPEED{get_color('RESET')}"
             else:
-                mechanics_display += f" {Color.BRIGHT_WHITE.value}🔶STANCE: NONE{Color.RESET.value}"
+                mechanics_display += f" {get_color('BRIGHT_WHITE')}🔶STANCE: NONE{get_color('RESET')}"
             if warrior_focus > 0:
-                mechanics_display += f" {Color.BRIGHT_YELLOW.value}🎯FOCUS: {warrior_focus}{Color.RESET.value}"
+                mechanics_display += f" {get_color('BRIGHT_YELLOW')}🎯FOCUS: {warrior_focus}{get_color('RESET')}"
         
         # 용기사 드래곤 파워 - 항상 표시
         elif character_class == "용기사":
             dragon_marks = getattr(character, 'dragon_marks', 0)
             dragon_power = getattr(character, 'dragon_power', 0)
-            mechanics_display += f" {Color.BRIGHT_RED.value}🐉DRAGON: {dragon_marks + dragon_power}{Color.RESET.value}"
+            mechanics_display += f" {get_color('BRIGHT_RED')}🐉DRAGON: {dragon_marks + dragon_power}{get_color('RESET')}"
         
         # 검투사 투기장 포인트 - 항상 표시
         elif character_class == "검투사":
             arena_points = getattr(character, 'arena_points', 0)
             gladiator_experience = getattr(character, 'gladiator_experience', 0)
-            mechanics_display += f" {Color.BRIGHT_YELLOW.value}🏛️ARENA: {arena_points + gladiator_experience}{Color.RESET.value}"
+            mechanics_display += f" {get_color('BRIGHT_YELLOW')}🏛️ARENA: {arena_points + gladiator_experience}{get_color('RESET')}"
         
         # 네크로맨서 영혼/언데드 파워 - 항상 표시
         elif character_class == "네크로맨서":
             soul_count = getattr(character, 'soul_count', 0)
             undead_power = getattr(character, 'undead_power', 0)
             necromancy_stacks = getattr(character, 'necromancy_stacks', 0)
-            mechanics_display += f" {Color.BRIGHT_BLACK.value}💀SOUL: {soul_count + undead_power + necromancy_stacks}{Color.RESET.value}"
+            mechanics_display += f" {get_color('BRIGHT_BLACK')}💀SOUL: {soul_count + undead_power + necromancy_stacks}{get_color('RESET')}"
         
         # 정령술사 정령 동조 - 항상 표시
         elif character_class == "정령술사":
             spirit_attunement = getattr(character, 'spirit_attunement', 0)
             elemental_harmony = getattr(character, 'elemental_harmony', 0)
             spirit_bond = getattr(character, 'spirit_bond', 0)
-            mechanics_display += f" {Color.BRIGHT_CYAN.value}🌟SPIRIT: {spirit_attunement + elemental_harmony + spirit_bond}{Color.RESET.value}"
+            mechanics_display += f" {get_color('BRIGHT_CYAN')}🌟SPIRIT: {spirit_attunement + elemental_harmony + spirit_bond}{get_color('RESET')}"
         
         # 시간술사 시공 에너지 - 항상 표시
         elif character_class == "시간술사":
             time_energy = getattr(character, 'time_energy', 0)
             chrono_power = getattr(character, 'chrono_power', 0)
             temporal_stacks = getattr(character, 'temporal_stacks', 0)
-            mechanics_display += f" {Color.BRIGHT_MAGENTA.value}⏰TIME: {time_energy + chrono_power + temporal_stacks}{Color.RESET.value}"
+            mechanics_display += f" {get_color('BRIGHT_MAGENTA')}⏰TIME: {time_energy + chrono_power + temporal_stacks}{get_color('RESET')}"
         
         # 연금술사 화학 반응 - 항상 표시
         elif character_class == "연금술사":
             reaction_stacks = getattr(character, 'reaction_stacks', 0)
             alchemy_power = getattr(character, 'alchemy_power', 0)
             chemical_energy = getattr(character, 'chemical_energy', 0)
-            mechanics_display += f" {Color.BRIGHT_GREEN.value}⚗️REACTION: {reaction_stacks + alchemy_power + chemical_energy}{Color.RESET.value}"
+            mechanics_display += f" {get_color('BRIGHT_GREEN')}⚗️REACTION: {reaction_stacks + alchemy_power + chemical_energy}{get_color('RESET')}"
         
         # 차원술사 차원 균열 - 항상 표시
         elif character_class == "차원술사":
             dimension_rifts = getattr(character, 'dimension_rifts', 0)
             dimension_power = getattr(character, 'dimension_power', 0)
             dimensional_energy = getattr(character, 'dimensional_energy', 0)
-            mechanics_display += f" {Color.BRIGHT_MAGENTA.value}🌌RIFT: {dimension_rifts + dimension_power + dimensional_energy}{Color.RESET.value}"
+            mechanics_display += f" {get_color('BRIGHT_MAGENTA')}🌌RIFT: {dimension_rifts + dimension_power + dimensional_energy}{get_color('RESET')}"
         
         # 기계공학자 오버차지/기계 - 항상 표시
         elif character_class == "기계공학자":
             overcharge_stacks = getattr(character, 'overcharge_stacks', 0)
             mechanical_power = getattr(character, 'mechanical_power', 0)
             tech_energy = getattr(character, 'tech_energy', 0)
-            mechanics_display += f" {Color.BRIGHT_CYAN.value}🔧CHARGE: {overcharge_stacks + mechanical_power + tech_energy}{Color.RESET.value}"
+            mechanics_display += f" {get_color('BRIGHT_CYAN')}🔧CHARGE: {overcharge_stacks + mechanical_power + tech_energy}{get_color('RESET')}"
         
         # 무당 영력 - 항상 표시
         elif character_class == "무당":
             spiritual_power = getattr(character, 'spiritual_power', 0)
             shaman_energy = getattr(character, 'shaman_energy', 0)
             spirit_power = getattr(character, 'spirit_power', 0)
-            mechanics_display += f" {Color.BRIGHT_MAGENTA.value}🔯MYSTIC: {spiritual_power + shaman_energy + spirit_power}{Color.RESET.value}"
+            mechanics_display += f" {get_color('BRIGHT_MAGENTA')}🔯MYSTIC: {spiritual_power + shaman_energy + spirit_power}{get_color('RESET')}"
         
         # 해적 보물/전리품 - 항상 표시
         elif character_class == "해적":
             treasure_stacks = getattr(character, 'treasure_stacks', 0)
             pirate_loot = getattr(character, 'pirate_loot', 0)
             plunder_count = getattr(character, 'plunder_count', 0)
-            mechanics_display += f" {Color.BRIGHT_YELLOW.value}🏴‍☠️TREASURE: {treasure_stacks + pirate_loot + plunder_count}{Color.RESET.value}"
+            mechanics_display += f" {get_color('BRIGHT_YELLOW')}🏴‍☠️TREASURE: {treasure_stacks + pirate_loot + plunder_count}{get_color('RESET')}"
         
         # 사무라이 검의 도/기 - 항상 표시
         elif character_class == "사무라이":
             bushido_spirit = getattr(character, 'bushido_spirit', 0)
             sword_spirit = getattr(character, 'sword_spirit', 0)
             samurai_focus = getattr(character, 'samurai_focus', 0)
-            mechanics_display += f" {Color.BRIGHT_WHITE.value}🗾BUSHIDO: {bushido_spirit + sword_spirit + samurai_focus}{Color.RESET.value}"
+            mechanics_display += f" {get_color('BRIGHT_WHITE')}🗾BUSHIDO: {bushido_spirit + sword_spirit + samurai_focus}{get_color('RESET')}"
         
         # 드루이드 자연의 힘 - 항상 표시
         elif character_class == "드루이드":
             nature_power = getattr(character, 'nature_power', 0)
             druid_harmony = getattr(character, 'druid_harmony', 0)
             wild_energy = getattr(character, 'wild_energy', 0)
-            mechanics_display += f" {Color.BRIGHT_GREEN.value}🌿NATURE: {nature_power + druid_harmony + wild_energy}{Color.RESET.value}"
+            mechanics_display += f" {get_color('BRIGHT_GREEN')}🌿NATURE: {nature_power + druid_harmony + wild_energy}{get_color('RESET')}"
         
         # 철학자 깨달음/지혜 - 항상 표시
         elif character_class == "철학자":
             wisdom_stacks = getattr(character, 'wisdom_stacks', 0)
             enlightenment = getattr(character, 'enlightenment', 0)
             philosophy_power = getattr(character, 'philosophy_power', 0)
-            mechanics_display += f" {Color.BRIGHT_WHITE.value}📚WISDOM: {wisdom_stacks + enlightenment + philosophy_power}{Color.RESET.value}"
+            mechanics_display += f" {get_color('BRIGHT_WHITE')}📚WISDOM: {wisdom_stacks + enlightenment + philosophy_power}{get_color('RESET')}"
         
         # 기사 명예/기사도 - 항상 표시
         elif character_class == "기사":
             honor_points = getattr(character, 'honor_points', 0)
             chivalry_power = getattr(character, 'chivalry_power', 0)
             knight_spirit = getattr(character, 'knight_spirit', 0)
-            mechanics_display += f" {Color.BRIGHT_WHITE.value}🐎HONOR: {honor_points + chivalry_power + knight_spirit}{Color.RESET.value}"
+            mechanics_display += f" {get_color('BRIGHT_WHITE')}🐎HONOR: {honor_points + chivalry_power + knight_spirit}{get_color('RESET')}"
         
         # 신관 신앙심/성력 - 항상 표시
         elif character_class == "신관":
@@ -950,14 +987,14 @@ class OptimizedGaugeSystem:
             divine_energy = getattr(character, 'divine_energy', 0)
             holy_power = getattr(character, 'holy_power', 0)
             faith_points = getattr(character, 'faith_points', 0)
-            mechanics_display += f" {Color.BRIGHT_YELLOW.value}⛪FAITH: {faith_power + divine_energy + holy_power + faith_points}{Color.RESET.value}"
+            mechanics_display += f" {get_color('BRIGHT_YELLOW')}⛪FAITH: {faith_power + divine_energy + holy_power + faith_points}{get_color('RESET')}"
         
         # 마검사 마검 동조 - 항상 표시
         elif character_class == "마검사":
             magic_sword_sync = getattr(character, 'magic_sword_sync', 0)
             mystic_blade_power = getattr(character, 'mystic_blade_power', 0)
             sword_magic_fusion = getattr(character, 'sword_magic_fusion', 0)
-            mechanics_display += f" {Color.BRIGHT_MAGENTA.value}⚡SYNC: {magic_sword_sync + mystic_blade_power + sword_magic_fusion}{Color.RESET.value}"
+            mechanics_display += f" {get_color('BRIGHT_MAGENTA')}⚡SYNC: {magic_sword_sync + mystic_blade_power + sword_magic_fusion}{get_color('RESET')}"
         
         # 성기사 성스러운 힘 - 항상 표시
         elif character_class == "성기사":
@@ -965,24 +1002,24 @@ class OptimizedGaugeSystem:
             paladin_power = getattr(character, 'paladin_power', 0)
             sacred_energy = getattr(character, 'sacred_energy', 0)
             holy_power = getattr(character, 'holy_power', 0)
-            mechanics_display += f" {Color.BRIGHT_YELLOW.value}✨HOLY: {holy_blessing + paladin_power + sacred_energy + holy_power}{Color.RESET.value}"
+            mechanics_display += f" {get_color('BRIGHT_YELLOW')}✨HOLY: {holy_blessing + paladin_power + sacred_energy + holy_power}{get_color('RESET')}"
         
         # 암흑기사 어둠의 힘 - 항상 표시
         elif character_class == "암흑기사":
             dark_power = getattr(character, 'dark_power', 0)
             shadow_energy = getattr(character, 'shadow_energy', 0)
             darkness_stacks = getattr(character, 'darkness_stacks', 0)
-            mechanics_display += f" {Color.BRIGHT_BLACK.value}🌑DARK: {dark_power + shadow_energy + darkness_stacks}{Color.RESET.value}"
+            mechanics_display += f" {get_color('BRIGHT_BLACK')}🌑DARK: {dark_power + shadow_energy + darkness_stacks}{get_color('RESET')}"
         
         # 상처 시스템 - 0이 아닐 때만 표시, 심각도별 색상과 핏방울 이모지
         if hasattr(character, 'wounds') and character.wounds > 0:
             wound_ratio = character.wounds / character.max_hp if character.max_hp > 0 else 0
             if wound_ratio >= 0.5:  # 중태 (≥ 50%)
-                mechanics_display += f" {Color.RED.value}🩸WOUND: {character.wounds}{Color.RESET.value}"
+                mechanics_display += f" {get_color('RED')}🩸WOUND: {character.wounds}{get_color('RESET')}"
             elif wound_ratio >= 0.3:  # 중상 (30% ~ 50%)
-                mechanics_display += f" {Color.BRIGHT_RED.value}🩸WOUND: {character.wounds}{Color.RESET.value}"
+                mechanics_display += f" {get_color('BRIGHT_RED')}🩸WOUND: {character.wounds}{get_color('RESET')}"
             else:  # 경상 (< 30%)
-                mechanics_display += f" {Color.YELLOW.value}🩸WOUND: {character.wounds}{Color.RESET.value}"
+                mechanics_display += f" {get_color('YELLOW')}🩸WOUND: {character.wounds}{get_color('RESET')}"
         
         status_str = " ".join(status_effects) + casting_info
         
@@ -1000,7 +1037,7 @@ class OptimizedGaugeSystem:
                     casting_progress_ratio = character.combat_system_ref.calculate_casting_progress_method4(character)
                     cast_percent = int(casting_progress_ratio * 100)
                     cast_percent = max(0, min(100, cast_percent))
-                    atb_display = f"{Color.BRIGHT_MAGENTA.value}CAST {cast_percent}%{Color.RESET.value}"
+                    atb_display = f"{get_color('BRIGHT_MAGENTA')}CAST {cast_percent}%{get_color('RESET')}"
                     # Method 4 진행도로 게이지 표시
                     atb_bar = OptimizedGaugeSystem.create_clean_gauge(cast_percent, 100, 10, "atb", hp_ratio, mp_ratio, True, "casting")
                 elif hasattr(character, 'casting_progress') and hasattr(character, 'casting_duration'):
@@ -1009,21 +1046,21 @@ class OptimizedGaugeSystem:
                     casting_duration = getattr(character, 'casting_duration', 1000)
                     cast_percent = int((casting_progress / casting_duration) * 100) if casting_duration > 0 else 0
                     cast_percent = max(0, min(100, cast_percent))
-                    atb_display = f"{Color.BRIGHT_MAGENTA.value}CAST {cast_percent}%{Color.RESET.value}"
+                    atb_display = f"{get_color('BRIGHT_MAGENTA')}CAST {cast_percent}%{get_color('RESET')}"
                     # 캐스팅 게이지는 현재 진행도로 표시
                     atb_bar = OptimizedGaugeSystem.create_clean_gauge(casting_progress, casting_duration, 10, "atb", hp_ratio, mp_ratio, True, "casting")
                 else:
                     # 🎭 강력한 폴백: 캐스팅 중이지만 진행도가 없는 경우
-                    atb_display = f"{Color.BRIGHT_MAGENTA.value}CASTING...{Color.RESET.value}"
+                    atb_display = f"{get_color('BRIGHT_MAGENTA')}CASTING...{get_color('RESET')}"
                     # 기본 50% 진행도로 표시
                     atb_bar = OptimizedGaugeSystem.create_clean_gauge(500, 1000, 10, "atb", hp_ratio, mp_ratio, True, "casting")
             except Exception as e:
                 # 오류 시 폴백
-                atb_display = f"{Color.BRIGHT_MAGENTA.value}CASTING...{Color.RESET.value}"
+                atb_display = f"{get_color('BRIGHT_MAGENTA')}CASTING...{get_color('RESET')}"
                 atb_bar = OptimizedGaugeSystem.create_clean_gauge(500, 1000, 10, "atb", hp_ratio, mp_ratio, True, "casting")
         elif atb_gauge >= atb_ready_threshold:
             atb_percent = 100
-            atb_display = f"{Color.YELLOW.value}⚡ READY{Color.RESET.value}"
+            atb_display = f"{get_color('YELLOW')}⚡ READY{get_color('RESET')}"
             atb_bar = OptimizedGaugeSystem.create_clean_gauge(atb_gauge, atb_ready_threshold, 10, "atb", hp_ratio, mp_ratio, is_casting, atb_speed_state)
         else:
             # ATB 퍼센트 계산 - 부동소수점 오차 방지
@@ -1032,42 +1069,40 @@ class OptimizedGaugeSystem:
             
             # ATB 게이지 색상 결정
             if is_casting:
-                atb_color = Color.BRIGHT_MAGENTA.value
+                atb_color = get_color('BRIGHT_MAGENTA')
             elif atb_speed_state == "fast":
-                atb_color = Color.BRIGHT_CYAN.value
+                atb_color = get_color('BRIGHT_CYAN')
             elif atb_speed_state == "slow":
-                atb_color = Color.BLUE.value
+                atb_color = get_color('BLUE')
             elif atb_speed_state == "stunned":
-                atb_color = Color.WHITE.value
+                atb_color = get_color('WHITE')
             else:
-                atb_color = Color.CYAN.value
-            atb_display = f"{atb_color}{atb_percent}%{Color.RESET.value}"
+                atb_color = get_color('CYAN')
+            atb_display = f"{atb_color}{atb_percent}%{get_color('RESET')}"
             atb_bar = OptimizedGaugeSystem.create_clean_gauge(atb_gauge, atb_ready_threshold, 10, "atb", hp_ratio, mp_ratio, is_casting, atb_speed_state)
         
         if character == current_char:
             # 턴이 온 경우 - 화살표 표시
-            line = (f"{arrow} {class_icon} {Color.BRIGHT_WHITE.value}Lv.{level}{Color.RESET.value} {name_color}{name}{Color.RESET.value}{mechanics_display}\n"
-                    f"{hp_heart}{Color.RESET.value} {Color.BRIGHT_WHITE.value}HP: {Color.RESET.value} {hp_heart_color}{hp}{Color.RESET.value} {Color.BRIGHT_WHITE.value}/ {max_hp}{Color.RESET.value} {hp_gauge} | "
-                    f"{mp_heart}{Color.RESET.value} {Color.BRIGHT_WHITE.value}MP: {Color.RESET.value} {mp_heart_color}{mp}{Color.RESET.value} {Color.BRIGHT_WHITE.value}/ {max_mp}{Color.RESET.value} {mp_gauge} | "
-                    f"⚡ {Color.BRIGHT_WHITE.value}BRV: {Color.RESET.value} {brv_color}{brv}{Color.RESET.value} |\n"
-                    f"⌛ {Color.BRIGHT_WHITE.value}TIME: {Color.RESET.value} {atb_bar} {atb_display} | {Color.BRIGHT_WHITE.value}SPD: {Color.RESET.value} {spd_color}{speed}{Color.RESET.value} {status_str}")
+            line = (f"{arrow} {class_icon} {get_color('BRIGHT_WHITE')}Lv.{level}{get_color('RESET')} {name_color}{name}{get_color('RESET')}{mechanics_display}\n"
+                    f"{hp_heart}{get_color('RESET')} {get_color('BRIGHT_WHITE')}HP: {get_color('RESET')} {hp_heart_color}{hp}{get_color('RESET')} {get_color('BRIGHT_WHITE')}/ {max_hp}{get_color('RESET')} {hp_gauge} | "
+                    f"{mp_heart}{get_color('RESET')} {get_color('BRIGHT_WHITE')}MP: {get_color('RESET')} {mp_heart_color}{mp}{get_color('RESET')} {get_color('BRIGHT_WHITE')}/ {max_mp}{get_color('RESET')} {mp_gauge} | "
+                    f"⚡ {get_color('BRIGHT_WHITE')}BRV: {get_color('RESET')} {brv_color}{brv}{get_color('RESET')} |\n"
+                    f"⌛ {get_color('BRIGHT_WHITE')}TIME: {get_color('RESET')} {atb_bar} {atb_display} | {get_color('BRIGHT_WHITE')}SPD: {get_color('RESET')} {spd_color}{speed}{get_color('RESET')} {status_str}")
         else:
             # 대기 중인 경우
-            line = (f"{arrow} {class_icon} {Color.BRIGHT_WHITE.value}Lv.{level}{Color.RESET.value} {name_color}{name}{Color.RESET.value}{mechanics_display}\n"
-                    f"{hp_heart}{Color.RESET.value} {Color.BRIGHT_WHITE.value}HP: {Color.RESET.value} {hp_heart_color}{hp}{Color.RESET.value} {Color.BRIGHT_WHITE.value}/ {max_hp}{Color.RESET.value} {hp_gauge} | "
-                    f"{mp_heart}{Color.RESET.value} {Color.BRIGHT_WHITE.value}MP: {Color.RESET.value} {mp_heart_color}{mp}{Color.RESET.value} {Color.BRIGHT_WHITE.value}/ {max_mp}{Color.RESET.value} {mp_gauge} | "
-                    f"⚡ {Color.BRIGHT_WHITE.value}BRV: {Color.RESET.value} {brv_color}{brv}{Color.RESET.value} |\n"
-                    f"⏳ {Color.BRIGHT_WHITE.value}TIME: {Color.RESET.value} {atb_bar} {atb_display} | {Color.BRIGHT_WHITE.value}SPD: {Color.RESET.value} {spd_color}{speed}{Color.RESET.value} {status_str}")
+            line = (f"{arrow} {class_icon} {get_color('BRIGHT_WHITE')}Lv.{level}{get_color('RESET')} {name_color}{name}{get_color('RESET')}{mechanics_display}\n"
+                    f"{hp_heart}{get_color('RESET')} {get_color('BRIGHT_WHITE')}HP: {get_color('RESET')} {hp_heart_color}{hp}{get_color('RESET')} {get_color('BRIGHT_WHITE')}/ {max_hp}{get_color('RESET')} {hp_gauge} | "
+                    f"{mp_heart}{get_color('RESET')} {get_color('BRIGHT_WHITE')}MP: {get_color('RESET')} {mp_heart_color}{mp}{get_color('RESET')} {get_color('BRIGHT_WHITE')}/ {max_mp}{get_color('RESET')} {mp_gauge} | "
+                    f"⚡ {get_color('BRIGHT_WHITE')}BRV: {get_color('RESET')} {brv_color}{brv}{get_color('RESET')} |\n"
+                    f"⏳ {get_color('BRIGHT_WHITE')}TIME: {get_color('RESET')} {atb_bar} {atb_display} | {get_color('BRIGHT_WHITE')}SPD: {get_color('RESET')} {spd_color}{speed}{get_color('RESET')} {status_str}")
         
         return line
     
     @staticmethod
     def show_optimized_party_status(party, current_char=None) -> str:
-        """최적화된 파티 상태 표시"""
+        """최적화된 파티 상태 표시 - 헤더 없이 깔끔하게"""
         lines = []
-        lines.append(f"{Color.BRIGHT_BLUE.value}{'─'*70}{Color.RESET.value}")
-        lines.append(f"{Color.BRIGHT_WHITE.value}🛡️ 아군 파티 상태{Color.RESET.value}")
-        lines.append(f"{Color.BRIGHT_BLUE.value}{'─'*70}{Color.RESET.value}")
+        lines.append("🛡️ 아군")  # 간단한 구분만
         
         for member in party:
             if member.is_alive and hasattr(member, 'character_class') and member.character_class != 'Enemy':
@@ -1077,11 +1112,9 @@ class OptimizedGaugeSystem:
     
     @staticmethod 
     def show_optimized_enemy_status(enemies) -> str:
-        """최적화된 적군 상태 표시"""
+        """최적화된 적군 상태 표시 - 헤더 없이 깔끔하게"""
         lines = []
-        lines.append(f"{Color.BRIGHT_RED.value}{'─'*70}{Color.RESET.value}")
-        lines.append(f"{Color.BRIGHT_WHITE.value}⚔️ 적군 상태{Color.RESET.value}")
-        lines.append(f"{Color.BRIGHT_RED.value}{'─'*70}{Color.RESET.value}")
+        lines.append("⚔️ 적군")  # 간단한 구분만
         
         for enemy in enemies:
             if enemy.is_alive:
@@ -1119,72 +1152,72 @@ class OptimizedGaugeSystem:
                 # ATB 정확한 계산
                 atb_gauge = getattr(enemy, 'atb_gauge', 0)
                 if atb_gauge >= 1000:  # ATB_MAX 1000에 맞춤
-                    atb_status = f"{Color.YELLOW.value}⚡ READY{Color.RESET.value}"
+                    atb_status = f"{get_color('YELLOW')}⚡ READY{get_color('RESET')}"
                     atb_bar = OptimizedGaugeSystem.create_clean_gauge(1000, 1000, 10, "atb", hp_ratio, mp_ratio, is_casting, atb_speed_state)
                 else:
                     atb_percent = int((atb_gauge / 1000) * 100)  # 1000 기준으로 변경
                     # ATB 게이지 색상 결정
                     if is_casting:
-                        atb_color = Color.BRIGHT_MAGENTA.value
+                        atb_color = get_color('BRIGHT_MAGENTA')
                     elif atb_speed_state == "fast":
-                        atb_color = Color.BRIGHT_CYAN.value
+                        atb_color = get_color('BRIGHT_CYAN')
                     elif atb_speed_state == "slow":
-                        atb_color = Color.BLUE.value
+                        atb_color = get_color('BLUE')
                     elif atb_speed_state == "stunned":
-                        atb_color = Color.WHITE.value
+                        atb_color = get_color('WHITE')
                     else:
-                        atb_color = Color.CYAN.value
-                    atb_status = f"{atb_color}{atb_percent}%{Color.RESET.value}"
+                        atb_color = get_color('CYAN')
+                    atb_status = f"{atb_color}{atb_percent}%{get_color('RESET')}"
                     atb_bar = OptimizedGaugeSystem.create_clean_gauge(atb_gauge, 1000, 10, "atb", hp_ratio, mp_ratio, is_casting, atb_speed_state)
                 
                 # HP 하트 색상과 이모지
                 if hp_ratio > 0.8:
-                    hp_heart_color = Color.BRIGHT_GREEN.value
+                    hp_heart_color = get_color('BRIGHT_GREEN')
                     hp_heart = "💚"
                 elif hp_ratio > 0.6:
-                    hp_heart_color = Color.GREEN.value
+                    hp_heart_color = get_color('GREEN')
                     hp_heart = "💚"
                 elif hp_ratio > 0.4:
-                    hp_heart_color = Color.YELLOW.value
+                    hp_heart_color = get_color('YELLOW')
                     hp_heart = "💛"
                 elif hp_ratio > 0.2:
-                    hp_heart_color = Color.BRIGHT_RED.value
+                    hp_heart_color = get_color('BRIGHT_RED')
                     hp_heart = "🧡"
                 else:
-                    hp_heart_color = Color.RED.value
+                    hp_heart_color = get_color('RED')
                     hp_heart = "❤️"
                 
                 # BRV 색상 (같은 로직)
                 if brv == 0:
-                    brv_color = Color.RED.value
+                    brv_color = get_color('RED')
                 elif brv <= 299:
-                    brv_color = Color.YELLOW.value  # 주황색
+                    brv_color = get_color('YELLOW')  # 주황색
                 elif brv == max_brv:
-                    brv_color = Color.BRIGHT_MAGENTA.value
+                    brv_color = get_color('BRIGHT_MAGENTA')
                 else:
-                    brv_color = Color.BRIGHT_YELLOW.value
+                    brv_color = get_color('BRIGHT_YELLOW')
                 
                 # SPD 숫자 색상 (같은 로직)
                 if speed >= avg_speed * 1.3:
-                    spd_color = Color.GREEN.value
+                    spd_color = get_color('GREEN')
                 elif speed <= avg_speed * 0.7:
-                    spd_color = Color.RED.value
+                    spd_color = get_color('RED')
                 else:
-                    spd_color = Color.WHITE.value
+                    spd_color = get_color('WHITE')
                 
                 # 상태이상 체크 - 영어 대문자로 표시 
                 status_effects = []
                 
                 # BREAK 상태 우선 확인
                 if hasattr(enemy, 'is_broken') and enemy.is_broken:
-                    status_effects.append(f"{Color.RED.value}BREAK{Color.RESET.value}")
+                    status_effects.append(f"{get_color('RED')}BREAK{get_color('RESET')}")
                 
                 # 독 상태는 여러 방법으로 체크 - 강력한 방법
                 poison_detected = False
                 if hasattr(enemy, 'status_manager') and enemy.status_manager:
                     if enemy.status_manager.has_status('독'):
                         poison_detected = True
-                        status_effects.append(f"{Color.BRIGHT_GREEN.value}POISON{Color.RESET.value}")
+                        status_effects.append(f"{get_color('BRIGHT_GREEN')}POISON{get_color('RESET')}")
                 
                 if not poison_detected and hasattr(enemy, 'is_poisoned') and enemy.is_poisoned:
                     poison_detected = True
@@ -1192,22 +1225,22 @@ class OptimizedGaugeSystem:
                     poison_turns = getattr(enemy, 'poison_turns', 0)
                     poison_damage = getattr(enemy, 'poison_damage', 0)
                     if poison_turns > 0 and poison_damage > 0:
-                        status_effects.append(f"{Color.BRIGHT_GREEN.value}POISON: {poison_damage}{Color.RESET.value}")
+                        status_effects.append(f"{get_color('BRIGHT_GREEN')}POISON: {poison_damage}{get_color('RESET')}")
                     else:
-                        status_effects.append(f"{Color.BRIGHT_GREEN.value}POISON{Color.RESET.value}")
+                        status_effects.append(f"{get_color('BRIGHT_GREEN')}POISON{get_color('RESET')}")
                 
                 # 독 턴수 기반 체크 (추가 안전장치)
                 if not poison_detected and hasattr(enemy, 'poison_turns') and getattr(enemy, 'poison_turns', 0) > 0:
                     poison_turns = getattr(enemy, 'poison_turns', 0)
                     poison_damage = getattr(enemy, 'poison_damage', 0)
-                    status_effects.append(f"{Color.BRIGHT_GREEN.value}POISON: {poison_damage}{Color.RESET.value}")
+                    status_effects.append(f"{get_color('BRIGHT_GREEN')}POISON: {poison_damage}{get_color('RESET')}")
                     
                 if hasattr(enemy, 'is_burning') and enemy.is_burning:
-                    status_effects.append(f"{Color.BRIGHT_RED.value}BURN{Color.RESET.value}")
+                    status_effects.append(f"{get_color('BRIGHT_RED')}BURN{get_color('RESET')}")
                 if hasattr(enemy, 'is_frozen') and enemy.is_frozen:
-                    status_effects.append(f"{Color.BRIGHT_CYAN.value}FREEZE{Color.RESET.value}")
+                    status_effects.append(f"{get_color('BRIGHT_CYAN')}FREEZE{get_color('RESET')}")
                 if hasattr(enemy, 'is_stunned') and enemy.is_stunned:
-                    status_effects.append(f"{Color.BRIGHT_YELLOW.value}STUN{Color.RESET.value}")
+                    status_effects.append(f"{get_color('BRIGHT_YELLOW')}STUN{get_color('RESET')}")
                 
                 # 캐스팅 정보
                 casting_info = ""
@@ -1222,7 +1255,7 @@ class OptimizedGaugeSystem:
                         skill_name = str(casting_skill)
                     else:
                         skill_name = '스킬'
-                    casting_info = f" {Color.BRIGHT_MAGENTA.value}[CASTING: {skill_name}]{Color.RESET.value}"
+                    casting_info = f" {get_color('BRIGHT_MAGENTA')}[CASTING: {skill_name}]{get_color('RESET')}"
                 
                 status_str = " " + " ".join(status_effects) + casting_info if (status_effects or casting_info) else ""
                 
@@ -1262,9 +1295,9 @@ class OptimizedGaugeSystem:
                     # 오류 발생시 기본 아이콘 사용
                     enemy_icon = "⚔️"
                 
-                lines.append(f"▶ {enemy_icon} {Color.BRIGHT_WHITE.value}{enemy.name}{Color.RESET.value}{status_str}")
-                lines.append(f"   {hp_heart}{Color.RESET.value} {Color.BRIGHT_WHITE.value}HP: {Color.RESET.value} {hp_heart_color}{hp}{Color.RESET.value} {Color.BRIGHT_WHITE.value}/ {max_hp}{Color.RESET.value} {hp_gauge} | ⚡ {Color.BRIGHT_WHITE.value}BRV: {Color.RESET.value} {brv_color}{brv}{Color.RESET.value}")
-                lines.append(f"   ⏳ {atb_bar} {atb_status} | {Color.BRIGHT_WHITE.value}SPD: {Color.RESET.value} {spd_color}{speed}{Color.RESET.value}")
+                lines.append(f"▶ {enemy_icon} {get_color('BRIGHT_WHITE')}{enemy.name}{get_color('RESET')}{status_str}")
+                lines.append(f"   {hp_heart}{get_color('RESET')} {get_color('BRIGHT_WHITE')}HP: {get_color('RESET')} {hp_heart_color}{hp}{get_color('RESET')} {get_color('BRIGHT_WHITE')}/ {max_hp}{get_color('RESET')} {hp_gauge} | ⚡ {get_color('BRIGHT_WHITE')}BRV: {get_color('RESET')} {brv_color}{brv}{get_color('RESET')}")
+                lines.append(f"   ⏳ {atb_bar} {atb_status} | {get_color('BRIGHT_WHITE')}SPD: {get_color('RESET')} {spd_color}{speed}{get_color('RESET')}")
         
         return "\n".join(lines)
 

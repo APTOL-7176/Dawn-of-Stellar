@@ -8,6 +8,43 @@ import sys
 from typing import List, Optional
 from .color_text import Color  # color_text.Color로 통일
 
+
+# 안전한 색상 상수 정의
+COLORS = {
+    'RESET': '\033[0m',
+    'BOLD': '\033[1m',
+    'DIM': '\033[2m', 
+    'UNDERLINE': '\033[4m',
+    'BLACK': '\033[30m',
+    'RED': '\033[31m',
+    'GREEN': '\033[32m',
+    'YELLOW': '\033[33m',
+    'BLUE': '\033[34m',
+    'MAGENTA': '\033[35m',
+    'CYAN': '\033[36m',
+    'WHITE': '\033[37m',
+    'BRIGHT_BLACK': '\033[90m',
+    'BRIGHT_RED': '\033[91m',
+    'BRIGHT_GREEN': '\033[92m',
+    'BRIGHT_YELLOW': '\033[93m',
+    'BRIGHT_BLUE': '\033[94m',
+    'BRIGHT_MAGENTA': '\033[95m',
+    'BRIGHT_CYAN': '\033[96m',
+    'BRIGHT_WHITE': '\033[97m',
+    'BG_BLACK': '\033[40m',
+    'BG_RED': '\033[41m',
+    'BG_GREEN': '\033[42m',
+    'BG_YELLOW': '\033[43m',
+    'BG_BLUE': '\033[44m',
+    'BG_MAGENTA': '\033[45m',
+    'BG_CYAN': '\033[46m',
+    'BG_WHITE': '\033[47m'
+}
+
+def get_color(color_name):
+    """안전한 색상 코드 반환"""
+    return COLORS.get(color_name, '')
+
 class BufferedDisplay:
     """버퍼링 기반 화면 출력 시스템"""
     
@@ -193,7 +230,7 @@ class BufferedDisplay:
             length = self.width
         
         if color:
-            line = f"{color}{char * length}{Color.RESET}"
+            line = f"{color}{char * length}{get_color('RESET')}"
         else:
             line = char * length
         
@@ -203,7 +240,7 @@ class BufferedDisplay:
         """헤더 추가"""
         self.add_separator("=", color=color)
         centered_text = text.center(self.width)
-        self.add_line(f"{color}{centered_text}{Color.RESET}")
+        self.add_line(f"{color}{centered_text}{get_color('RESET')}")
         self.add_separator("=", color=color)
     
     def add_empty_line(self):
@@ -217,14 +254,14 @@ class BufferedDisplay:
         centered = " " * padding + text
         
         if color:
-            centered = f"{color}{centered}{Color.RESET}"
+            centered = f"{color}{centered}{get_color('RESET')}"
         
         self.add_line(centered)
     
     def cleanup(self):
         """정리 작업"""
         self.show_cursor()
-        print(Color.RESET, end='', flush=True)
+        print(get_color('RESET'), end='', flush=True)
     
     def __del__(self):
         """소멸자"""
