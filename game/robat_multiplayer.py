@@ -28,7 +28,7 @@ from .robat_gameplay_system import RobatGamePlayer, RobatGameplaySystem
 from .job_specialized_ai import JobSpecializedAI, JobClass, RobatPersonality
 
 # 버전 정보
-GAME_VERSION = "4.0.0"
+GAME_VERSION = "4.1.1"
 MULTIPLAYER_PROTOCOL_VERSION = "1.0"
 
 

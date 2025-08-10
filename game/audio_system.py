@@ -18,6 +18,7 @@ class BGMType(Enum):
     MENU = "메인메뉴"
     MAIN_MENU_OPENING = "메인메뉴_오프닝"  # 02-Opening ~ Bombing Mission.mp3 전용
     DIFFICULTY_SELECT = "난이도선택"  # 난이도 선택 화면용
+    AERITH_THEME = "에어리스테마"  # AI 멀티플레이어용 잔잔한 테마
     FLOOR_1_3 = "1-3층"
     FLOOR_4_6 = "4-6층"
     FLOOR_7_9 = "7-9층"
@@ -165,8 +166,7 @@ class AudioManager:
                 # 초기화 확인
                 if pygame.mixer.get_init():
                     self.mixer_available = True
-                    if debug_mode:
-                        print(f"✅ pygame mixer 초기화 성공: {pygame.mixer.get_init()}")
+                    # 초기화 성공 메시지 조용히 처리
                     
                     # 초기화 직후 즉시 정지
                     pygame.mixer.stop()
@@ -176,19 +176,16 @@ class AudioManager:
                     raise Exception("mixer 초기화 실패")
                     
             except Exception as init_error:
-                if debug_mode:
-                    print(f"⚠️ pygame mixer 초기화 실패: {init_error}")
+                # 초기화 실패 메시지 조용히 처리
                 self.mixer_available = False
                 
         except Exception as e:
-            if debug_mode:
-                print(f"⚠️ pygame 전체 초기화 실패: {e}")
+            # 전체 초기화 실패 메시지 조용히 처리
             self.mixer_available = False
         
         # mixer가 사용 불가능하면 여기서 종료
         if not self.mixer_available:
-            if debug_mode:
-                print("🔇 오디오 시스템 비활성화 모드로 실행")
+            # 오디오 비활성화 메시지 조용히 처리
             self._init_fallback_mode()
             return
         
@@ -485,7 +482,10 @@ class AudioManager:
                 "44-Cait Sith's Theme.mp3",          # 상인
                 "40-Costa del Sol.mp3",              # 코스타 델 솔
                 "19-Don of the Slums.mp3",            # 월 마켓
-                "65-Aeris' Theme.mp3"                 # 에어리스의 테마
+            ],
+            BGMType.AERITH_THEME: [
+                "47-Life Stream.mp3",                      # 라이프 스트림 (잔잔함)
+                "65-Aeris Theme.mp3"                       # 에어리스 테마
             ],
             BGMType.VICTORY: [
                 "12-Fanfare.mp3",                    # 승리의 팡파르 (우선 재생)
@@ -940,7 +940,8 @@ class AudioManager:
             # 제노바 컴플리트 추가 (보스급 전투 음악으로 매핑)
             "jenova_complete": BGMType.BOSS,
             "jenova_absolute": BGMType.BOSS,
-            "aerith_theme": BGMType.SHOP  # 트레이닝룸용 Aerith 테마
+            "aerith_theme": BGMType.AERITH_THEME,  # AI 멀티플레이어용 잔잔한 테마
+            "aerith": BGMType.AERITH_THEME
         }
         
         bgm_type = bgm_mapping.get(bgm_name.lower(), BGMType.FLOOR_1_3)
@@ -1044,9 +1045,7 @@ class AudioManager:
                     
                     self.current_bgm = selected_track
                     self.current_bgm_type = bgm_type
-                    # BGM 재생 시작 메시지는 승리 시에는 조용히
-                    if bgm_type != BGMType.VICTORY and (hasattr(self, 'debug_mode') and self.debug_mode):
-                        print(f"✅ BGM 재생 시작: {bgm_type.value}")
+                    # BGM 재생 시작 메시지 조용히 처리
                     
                 except Exception as e:
                     if hasattr(self, 'debug_mode') and self.debug_mode:
@@ -1263,7 +1262,7 @@ class DummyAudioManager:
         self.sfx_volume = 0.8
         self.current_bgm = None
         self.current_bgm_type = None
-        print("🔇 더미 오디오 매니저 사용 중 (사운드 없음)")
+        # 더미 오디오 매니저 메시지 조용히 처리
     
     def play_bgm(self, *args, **kwargs):
         """더미 BGM 재생"""

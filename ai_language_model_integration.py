@@ -6,6 +6,7 @@ OpenAI GPT, Claude, Ollama 등 실제 LLM과 연동
 """
 
 import os
+import sys
 import json
 import asyncio
 import aiohttp
@@ -14,6 +15,81 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
+
+# 한글 입력 지원을 위한 인코딩 설정
+if sys.platform.startswith('win'):
+    import codecs
+    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer)
+    sys.stdin = codecs.getreader('utf-8')(sys.stdin.buffer)
+
+def safe_korean_input(prompt: str = "") -> str:
+    """한글 입력을 안전하게 처리하는 함수"""
+    try:
+        if prompt:
+            print(prompt, end="", flush=True)
+        
+        # Windows에서 한글 입력 문제 해결
+        if sys.platform.startswith('win'):
+            import msvcrt
+            chars = []
+            while True:
+                try:
+                    char = msvcrt.getch()
+                    
+                    # Enter 키 (CR 또는 LF)
+                    if char == b'\r' or char == b'\n':
+                        print()  # 줄바꿈
+                        break
+                    
+                    # Backspace 키
+                    elif char == b'\x08':
+                        if chars:
+                            chars.pop()
+                            print('\b \b', end='', flush=True)
+                    
+                    # ESC 키
+                    elif char == b'\x1b':
+                        print("\n[ESC] 입력 취소")
+                        return ""
+                    
+                    # 일반 문자
+                    elif char != b'\x00' and char != b'\xe0':
+                        try:
+                            # UTF-8로 디코드 시도
+                            decoded_char = char.decode('utf-8')
+                            chars.append(decoded_char)
+                            print(decoded_char, end='', flush=True)
+                        except UnicodeDecodeError:
+                            try:
+                                # CP949로 디코드 시도 (한글)
+                                decoded_char = char.decode('cp949')
+                                chars.append(decoded_char)
+                                print(decoded_char, end='', flush=True)
+                            except UnicodeDecodeError:
+                                # 바이트를 문자열로 변환
+                                chars.append(str(char))
+                                print(str(char), end='', flush=True)
+                                
+                except Exception as e:
+                    # 에러 발생 시 일반 input 사용
+                    print(f"\n[입력 에러, 일반 모드로 전환: {e}]")
+                    try:
+                        return input().strip()
+                    except:
+                        return ""
+            
+            result = ''.join(chars).strip()
+            return result
+        else:
+            # 리눅스/맥에서는 일반 input 사용
+            return input().strip()
+            
+    except Exception as e:
+        print(f"\n[입력 오류: {e}]")
+        try:
+            return input("재입력: ").strip()
+        except:
+            return ""
 
 class LLMProvider(Enum):
     """지원하는 언어모델 제공자"""
@@ -445,7 +521,7 @@ class InteractiveRobatChat:
         
         while True:
             try:
-                user_input = input(f"\n💬 당신: ")
+                user_input = safe_korean_input(f"\n💬 당신: ")
                 
                 if user_input.lower() in ['quit', 'exit', '종료', 'q']:
                     print(f"\n👋 {self.active_character} 로바트: 안녕! 또 만나자!")

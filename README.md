@@ -1,4 +1,4 @@
-# ⭐ Dawn Of Stellar - 별빛의 여명 v4.0.0
+# ⭐ Dawn Of Stellar - 별빛의 여명 v4.2.0
 
 <div align="center">
 
@@ -6,17 +6,17 @@
 ![Platform](https://img.shields.io/badge/platform-windows%20%7C%20linux%20%7C%20macos%20%7C%20mobile-lightgrey.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Game](https://img.shields.io/badge/genre-roguelike%20%7C%20rpg%20%7C%20multiplayer-orange.svg)
-![Version](https://img.shields.io/badge/version-4.0.0-brightgreen.svg)
-![AI](https://img.shields.io/badge/AI-learning%20system-purple.svg)
-![Multiplayer](https://img.shields.io/badge/multiplayer-network%20ready-blue.svg)
+![Version](https://img.shields.io/badge/version-4.2.0-brightgreen.svg)
+![Korean](https://img.shields.io/badge/korean%20input-fully%20supported-red.svg)
+![Multiplayer](https://img.shields.io/badge/multiplayer-secure%20save%20system-blue.svg)
 
-**🎮 차세대 AI 학습 멀티플레이어 로그라이크 RPG**
+**🎮 한국어 완벽 지원 멀티플레이어 로그라이크 RPG**
 
-Final Fantasy 스타일 Brave 전투 + 영구 AI 학습 시스템 +  
-네트워크 멀티플레이어 + Flutter 모바일 클라이언트가 결합된  
-세계 최초의 완전체 로그라이크 게임
+Final Fantasy 스타일 Brave 전투 + 한국어 입력 완전 지원 +  
+보안 강화 멀티플레이어 세이브 시스템 + Flutter 모바일 클라이언트가 결합된  
+한국 최초의 완전체 한국어 로그라이크 게임
 
-[🚀 원클릭 설치](#-원클릭-자동-설치) • [🤖 AI 학습](#-ai-학습-시스템) • [🌐 멀티플레이어](#-멀티플레이어) • [📱 모바일](#-모바일-지원)
+[🚀 원클릭 설치](#-원클릭-자동-설치) • [🇰🇷 한국어 지원](#-한국어-입력-지원) • [🌐 멀티플레이어](#-멀티플레이어) • [📱 모바일](#-모바일-지원)
 
 </div>
 
@@ -24,9 +24,9 @@ Final Fantasy 스타일 Brave 전투 + 영구 AI 학습 시스템 +
 
 ## 🌟 게임 소개
 
-Dawn Of Stellar v4.0.0은 **세계 최초의 완전체 AI 학습 로그라이크 RPG**입니다! 
+Dawn Of Stellar v4.2.0은 **한국어 입력을 완벽하게 지원하는 로그라이크 RPG**입니다! 
 28개 직업군으로 구성된 파티와 함께 무작위 생성되는 차원 공간을 탐험하며, 
-**영구 학습하는 AI**와 **실시간 네트워크 멀티플레이어**를 경험해보세요!
+**한국어 캐릭터 이름 입력**과 **보안 강화된 멀티플레이어**를 경험해보세요!
 
 ## 🚀 v4.0.0 메이저 업데이트 (2025-08-10)
 

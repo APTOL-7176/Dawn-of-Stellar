@@ -43,7 +43,7 @@ class JobClass(Enum):
     ENGINEER = "기계공학자"
     SHAMAN = "무당"
     
-    # 특수 직업군 (10개)
+    # 특수 직업군 (9개)
     ASSASSIN = "암살자"
     PIRATE = "해적"
     SAMURAI = "사무라이"
@@ -293,6 +293,27 @@ class PermanentLearningDatabase:
                 "learned_jobs": 0
             }
     
+    def save_backup_data(self):
+        """학습 데이터 백업 저장"""
+        try:
+            # 데이터베이스 백업
+            backup_path = f"ai_permanent_learning_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+            import shutil
+            shutil.copy2(self.db_path, backup_path)
+            
+            # 통계 정보 저장
+            stats = self.get_learning_statistics()
+            self.connection.execute("""
+                INSERT OR REPLACE INTO global_statistics (stat_name, stat_value, updated_at)
+                VALUES ('last_backup', ?, ?)
+            """, (datetime.now().isoformat(), datetime.now().isoformat()))
+            
+            self.connection.commit()
+            print(f"💾 학습 데이터 백업 완료: {backup_path}")
+            
+        except Exception as e:
+            print(f"⚠️ 백업 저장 실패: {e}")
+    
     def cleanup_old_data(self, days_old: int = 30):
         """오래된 데이터 정리"""
         try:
@@ -333,6 +354,23 @@ class JobSpecificDatasetGenerator:
         
         print(f"✅ 27개 직업 데이터셋 생성 완료!")
         self._generate_summary_report()
+    
+    def generate_job_dataset(self, job_class: JobClass) -> JobSpecificKnowledge:
+        """외부에서 호출 가능한 단일 직업 데이터셋 생성"""
+        print(f"📊 {job_class.value} 데이터셋 생성 중...")
+        dataset = self._generate_job_dataset(job_class)
+        
+        # 영구 저장
+        self.db.save_knowledge(
+            f"{job_class.value}_AI", 
+            job_class.value, 
+            "job_specific_knowledge", 
+            asdict(dataset)
+        )
+        
+        self.job_datasets[job_class] = dataset
+        print(f"✅ {job_class.value} 데이터셋 생성 완료!")
+        return dataset
     
     def _generate_job_dataset(self, job_class: JobClass) -> JobSpecificKnowledge:
         """특정 직업 데이터셋 생성"""

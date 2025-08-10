@@ -145,6 +145,97 @@ class UltimateIntegratedAISystem:
             "analytics": self.learning_analytics
         }
     
+    async def run_night_learning(self, duration_hours: float = 8.0):
+        """밤새 자동 학습 (비동기)"""
+        print(f"🌙 === 밤새 자동 학습 시작! ===")
+        print(f"   ⏰ 학습 시간: {duration_hours}시간")
+        print(f"   💤 편히 주무세요! AI가 알아서 학습합니다!")
+        
+        start_time = time.time()
+        end_time = start_time + (duration_hours * 3600)
+        
+        # 영구 진화 시스템 시작
+        self.evolution_system.start_permanent_evolution()
+        
+        # 학습 루프
+        generation = 1
+        while time.time() < end_time:
+            print(f"🧬 제{generation}세대 학습 진행 중...")
+            
+            # ⚠️ 현재 구조의 문제점:
+            # 이 sleep은 단순히 시간 지연일 뿐, 실제 학습과 무관!
+            # AI가 실제 게임을 플레이하는 것이 아니라
+            # 미리 정의된 패턴으로 랜덤 데이터만 생성함
+            await asyncio.sleep(10)  # 10초로 줄여봤자 의미 없음
+            
+            # 실제로는 이런 더미 작업만 수행:
+            # 1. 랜덤 데이터 생성
+            # 2. 데이터베이스에 저장  
+            # 3. 세대 카운터 증가
+            self._simulate_learning_progress(generation)
+            
+            # 데이터 백업
+            self.permanent_db.save_backup_data()
+            
+            generation += 1
+            
+            # 5세대마다 상태 보고
+            if generation % 5 == 0:
+                print(f"📊 학습 진행 상황: {generation}세대 완료")
+                print(f"🎭 실제로는 랜덤 데이터만 생성 중...")
+        
+        # 학습 완료
+        self.evolution_system.evolution_active = False
+        print(f"✅ 밤새 학습 완료! 총 {generation}세대 진화")
+        print(f"💡 하지만 실제 게임 실력 향상은... 🤷‍♂️")
+        
+        return {
+            "generations_completed": generation,
+            "duration_hours": duration_hours,
+            "end_time": datetime.now(),
+            "reality_check": "시뮬레이션 데이터만 생성됨"
+        }
+    
+    async def evolve_ai_generation(self):
+        """AI 세대 진화"""
+        print("🧬 AI 세대 진화 중...")
+        await asyncio.sleep(1)  # 시뮬레이션
+        print("✅ AI 세대 진화 완료!")
+    
+    def _simulate_learning_progress(self, generation: int):
+        """학습 진행 시뮬레이션 (실제로는 랜덤 데이터 생성)"""
+        
+        # 🎭 현실: 이런 더미 작업들만 수행
+        fake_improvements = [
+            f"세대 {generation}: 전사 AI 공격력 +{random.randint(1, 5)}",
+            f"세대 {generation}: 아크메이지 AI 마법 효율 +{random.randint(2, 8)}%", 
+            f"세대 {generation}: 도적 AI 은신 성공률 +{random.randint(1, 3)}%"
+        ]
+        
+        # 랜덤하게 하나 선택해서 "개선됨" 메시지 출력
+        improvement = random.choice(fake_improvements)
+        
+        # 실제로는 그냥 숫자만 데이터베이스에 저장
+        fake_data = {
+            "generation": generation,
+            "timestamp": datetime.now().isoformat(),
+            "improvement": improvement,
+            "note": "실제 게임 플레이가 아닌 시뮬레이션 데이터"
+        }
+        
+        # 데이터베이스에 저장 (의미 있는 학습 데이터가 아님)
+        try:
+            self.permanent_db.save_knowledge(
+                f"generation_{generation}_AI",
+                "simulation", 
+                "fake_learning_data",
+                fake_data
+            )
+        except:
+            pass  # 실패해도 상관없음, 어차피 더미 데이터
+        
+        # 🎯 핵심: 실제 게임 실력과는 전혀 무관한 숫자 놀이!
+    
     def create_dream_team_session(self, human_players: List[str] = None):
         """드림팀 세션 생성 - 최고의 AI들과 인간의 협력"""
         print("⭐ === 드림팀 세션 생성! ===")

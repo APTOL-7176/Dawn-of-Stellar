@@ -22,7 +22,7 @@ class MultiplayerCharacterImport:
         self.preset_manager = CharacterPresets()
         self.save_system = SaveSystem()
         self.warehouse_file = "player_warehouse.json"
-        self.version = "4.0.0"  # 멀티플레이어 버전
+        self.version = "4.1.1"  # 멀티플레이어 버전
         
     def load_warehouse_data(self) -> Dict[str, Any]:
         """창고 데이터 로드"""

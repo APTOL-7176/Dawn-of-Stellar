@@ -16,6 +16,49 @@ from typing import List, Tuple
 import time
 import random
 
+def safe_korean_input(prompt: str = "", encoding: str = "utf-8") -> str:
+    """한국어 입력을 안전하게 처리하는 함수
+    
+    Windows에서 한국어 입력 시 인코딩 문제와 버퍼 문제를 해결합니다.
+    """
+    try:
+        sys.stdout.write(prompt)
+        sys.stdout.flush()
+        
+        # Windows에서 한국어 입력 처리
+        if os.name == 'nt':  # Windows
+            try:
+                # CP949로 입력받아 UTF-8로 변환
+                line = sys.stdin.readline()
+                if line:
+                    # 개행문자 제거
+                    line = line.rstrip('\r\n')
+                    # CP949 -> UTF-8 변환 시도
+                    try:
+                        if isinstance(line, bytes):
+                            line = line.decode('cp949', errors='ignore')
+                        elif isinstance(line, str):
+                            # 이미 문자열인 경우 그대로 사용
+                            pass
+                        return line
+                    except (UnicodeDecodeError, UnicodeEncodeError):
+                        # 변환 실패 시 원본 반환
+                        return line
+                return ""
+            except Exception:
+                # 실패 시 기본 input() 사용
+                return input().strip()
+        else:
+            # Unix/Linux에서는 기본 input() 사용
+            return input().strip()
+            
+    except (KeyboardInterrupt, EOFError):
+        return ""
+    except Exception as e:
+        # 모든 예외 상황에서 빈 문자열 반환
+        print(f"\n입력 오류: {e}")
+        return ""
+
 # 핫 리로드 매니저 import
 try:
     from state_preserving_hot_reload import handle_state_preserving_hot_reload
@@ -45,6 +88,15 @@ try:
 except ImportError as e:
     print(f"⚠️ 자동 저장 시스템을 불러올 수 없습니다: {e}")
     AUTO_SAVE_AVAILABLE = False
+
+# 안전 종료 시스템 import
+try:
+    from safe_exit_handler import SafeExitHandler
+    SAFE_EXIT_AVAILABLE = True
+    print("🛡️ 안전 종료 시스템 활성화됨! 강제 종료 시 자동 백업이 생성됩니다.")
+except ImportError as e:
+    print(f"⚠️ 안전 종료 시스템을 불러올 수 없습니다: {e}")
+    SAFE_EXIT_AVAILABLE = False
 
 # Windows용 curses 대안
 try:
@@ -86,7 +138,7 @@ try:
     from game.hybrid_input import DawnOfStellarInputManager, get_single_key_input
     from game.color_text import (ColorText, Color, bright_cyan, bright_yellow, bright_green, 
                                  bright_white, bright_red, red, green, blue, yellow, 
-                                 cyan, magenta, bright_magenta, colored, rarity_colored, RED, RESET)
+                                 cyan, magenta, bright_magenta, white, colored, rarity_colored, RED, RESET)
     from game.merchant import MerchantManager
     from game.permanent_progression import PermanentProgressionSystem
     from game.random_encounters import (RandomEncounterManager, FieldSkillManager, 
@@ -640,6 +692,72 @@ class DawnOfStellarGame:
         except:
             pass
     
+    def safe_cleanup(self):
+        """안전 종료를 위한 정리 메서드"""
+        try:
+            print("🛡️ 메인 게임 안전 정리 중...")
+            
+            # 현재 게임 상태 저장
+            if hasattr(self, 'save_current_game'):
+                try:
+                    self.save_current_game()
+                    print("📁 게임 상태 저장 완료")
+                except Exception as e:
+                    print(f"⚠️ 게임 상태 저장 실패: {e}")
+            
+            # 오디오 시스템 정리
+            if hasattr(self, 'audio_system') and self.audio_system:
+                try:
+                    self.audio_system.cleanup()
+                    print("🎵 오디오 시스템 정리 완료")
+                except Exception as e:
+                    print(f"⚠️ 오디오 시스템 정리 실패: {e}")
+            
+            # 기타 리소스 정리
+            self.cleanup()
+            print("✅ 메인 게임 안전 정리 완료")
+            
+        except Exception as e:
+            print(f"❌ 메인 게임 안전 정리 중 오류: {e}")
+    
+    def emergency_save_all(self):
+        """응급 상황 시 모든 데이터 저장"""
+        try:
+            print("🚨 응급 백업 생성 중...")
+            
+            # 메타 진행도 저장
+            if hasattr(self, 'meta_progression'):
+                try:
+                    self.meta_progression.save()
+                    print("📊 메타 진행도 응급 저장 완료")
+                except Exception as e:
+                    print(f"⚠️ 메타 진행도 저장 실패: {e}")
+            
+            # 파티 정보 저장
+            if hasattr(self, 'party_manager'):
+                try:
+                    # 파티 매니저 저장 로직 (있다면)
+                    if hasattr(self.party_manager, 'save_emergency'):
+                        self.party_manager.save_emergency()
+                        print("👥 파티 정보 응급 저장 완료")
+                except Exception as e:
+                    print(f"⚠️ 파티 정보 저장 실패: {e}")
+            
+            # 현재 게임 진행 상황 저장
+            if hasattr(self, 'save_current_game'):
+                try:
+                    self.save_current_game()
+                    print("🎮 게임 진행 상황 응급 저장 완료")
+                except Exception as e:
+                    print(f"⚠️ 게임 진행 상황 저장 실패: {e}")
+            
+            print("✅ 응급 백업 생성 완료")
+            return True
+            
+        except Exception as e:
+            print(f"❌ 응급 백업 생성 실패: {e}")
+            return False
+    
     def _show_party_combat_analysis(self):
         """파티 전투력 상세 분석 - 로바트 포함"""
         if not hasattr(self, 'party_manager') or not self.party_manager.members:
@@ -707,7 +825,13 @@ class DawnOfStellarGame:
                 print("-" * 70)
                 print(f"최강자: {bright_green(strongest['name'])} (전투력 {strongest['power']})")
                 print(f"최약자: {bright_red(weakest['name'])} (전투력 {weakest['power']})")
-                print(f"격차: {bright_yellow(str(gap))} ({gap/strongest['power']*100:.1f}% 차이)")
+                
+                # Division by zero 방지
+                if strongest['power'] > 0:
+                    percentage = gap/strongest['power']*100
+                    print(f"격차: {bright_yellow(str(gap))} ({percentage:.1f}% 차이)")
+                else:
+                    print(f"격차: {bright_yellow(str(gap))} (전투력 측정 불가)")
                 
                 if gap > 300:
                     print(f"{bright_red('📢 경고: 파티원 간 전투력 격차가 매우 큽니다!')}")
@@ -1393,12 +1517,12 @@ class DawnOfStellarGame:
                 if STORY_SYSTEM_AVAILABLE:
                     try:
                         print(f"\n{bright_yellow('📖 캐릭터들의 배경 이야기를 확인하세요...')}")
-                        input(f"{bright_green('[Enter 키를 눌러 계속]')}")
+                        safe_korean_input(f"{bright_green('[Enter 키를 눌러 계속]')}")
                         
                         # 캐릭터 소개 표시
                         for character in party:
                             show_character_intro(character.name, character.character_class)
-                            input(f"{bright_green('[Enter 키를 눌러 다음 캐릭터]')}")
+                            safe_korean_input(f"{bright_green('[Enter 키를 눌러 다음 캐릭터]')}")
                     except Exception as e:
                         print(f"⚠️ 캐릭터 소개 표시 중 오류: {e}")
                         pass
@@ -1582,7 +1706,13 @@ class DawnOfStellarGame:
                 self.ai_game_mode_enabled = True
                 
                 # 조작할 캐릭터 수 결정
-                controlled_count = 1 if choice == 1 else 2 if choice == 2 else 1
+                if hasattr(self, '_player_character_count') and self._player_character_count > 0:
+                    # 멀티플레이어 모드인 경우, 플레이어 수만큼 조작
+                    controlled_count = self._player_character_count
+                    print(f"\n🎮 멀티플레이어 모드: {controlled_count}명의 플레이어가 직접 조작")
+                else:
+                    # 일반 모드
+                    controlled_count = 1 if choice == 1 else 2 if choice == 2 else 1
                 
                 try:
                     from game.ai_game_mode import initialize_ai_game_mode
@@ -1629,7 +1759,7 @@ class DawnOfStellarGame:
             if hasattr(self, 'keyboard') and self.keyboard:
                 self.keyboard.wait_for_key("🔑 아무 키나 눌러 계속...")
             else:
-                input("🔑 아무 키나 눌러 계속...")
+                safe_korean_input("🔑 아무 키나 눌러 계속...")
             
         except ImportError:
             # 커서 메뉴를 사용할 수 없는 경우 기본 메뉴로 대체
@@ -1662,7 +1792,7 @@ class DawnOfStellarGame:
         
         while True:
             try:
-                choice = input(f"\n{bright_white('선택 (1-4): ')}")
+                choice = safe_korean_input(f"\n{bright_white('선택 (1-4): ')}")
                 
                 if choice == '1':
                     # 전체 수동 조작
@@ -1751,7 +1881,7 @@ class DawnOfStellarGame:
                 print("3. 🤔 사용 전 확인 (항상 허가 요청)")
                 print("4. 🚫 사용 금지")
                 
-                choice = input("선택 (1-4, 기본값: 1): ") or '1'
+                choice = safe_korean_input("선택 (1-4, 기본값: 1): ") or '1'
                 
                 permission_map = {
                     '1': ItemSharingPermission.LIMITED_ACCESS,
@@ -3524,7 +3654,7 @@ class DawnOfStellarGame:
             print("8. 치유의 기운 테스트")
             print("0. 돌아가기")
             
-            choice = input("\n선택: ").strip()
+            choice = safe_korean_input("\n선택: ").strip()
             
             if choice == "0":
                 break
@@ -4404,7 +4534,7 @@ class DawnOfStellarGame:
                 print("4. 🔄 AI 신뢰도 조정")
                 print("5. ⬅️ 돌아가기")
                 
-                choice = input("\n선택: ")
+                choice = safe_korean_input("\n선택: ")
                 
                 if choice == '1':
                     self._change_item_sharing_permission()
@@ -4514,7 +4644,7 @@ class DawnOfStellarGame:
             print("3. 🤔 사용 전 확인 (항상 허가 요청)")
             print("4. 🚫 사용 금지")
             
-            choice = input("선택: ")
+            choice = safe_korean_input("선택: ")
             permission_map = {
                 '1': ItemSharingPermission.FULL_ACCESS,
                 '2': ItemSharingPermission.LIMITED_ACCESS,  
@@ -4679,7 +4809,7 @@ class DawnOfStellarGame:
                 print(f"{i}. {ai_companion.character.name} (신뢰도: {ai_companion.trust_level}/100)")
             
             try:
-                choice = int(input("조정할 AI 선택: ")) - 1
+                choice = int(safe_korean_input("조정할 AI 선택: ")) - 1
                 if 0 <= choice < len(ai_game_mode_manager.ai_companions):
                     ai_companion = ai_game_mode_manager.ai_companions[choice]
                     
@@ -4689,7 +4819,7 @@ class DawnOfStellarGame:
                     print("3. -5 (주의)")
                     print("4. -10 (질책)")
                     
-                    adjust_choice = input("선택: ")
+                    adjust_choice = safe_korean_input("선택: ")
                     adjustments = {'1': 10, '2': 5, '3': -5, '4': -10}
                     
                     if adjust_choice in adjustments:
@@ -4813,7 +4943,7 @@ class DawnOfStellarGame:
             print("=" * 80)
             print("불러올 세이브 파일을 선택하세요...")
             
-            choice = input("\n불러올 저장 파일 번호: ").strip()
+            choice = safe_korean_input("\n불러올 저장 파일 번호: ").strip()
             
             try:
                 save_index = int(choice) - 1
@@ -5581,6 +5711,43 @@ class DawnOfStellarGame:
         self.multiplayer_integration = multiplayer_integration
         self.ai_multiplayer_mode = True
         
+        # AI 대화 시스템 초기화
+        if not hasattr(self, '_last_ai_conversation'):
+            self._last_ai_conversation = 0
+        
+        # 캐릭터 선택 시스템 (플레이어는 프리셋, AI는 자동 생성)
+        print(f"\n{bright_yellow('👥 AI 멀티플레이어 파티 구성')}")
+        print("🎭 플레이어: 저장된 캐릭터 프리셋 선택")
+        print("🤖 AI: 파티 조합에 맞는 캐릭터 자동 생성")
+        
+        # 플레이어 수 설정 (1~4명)
+        player_count = self.select_player_count()
+        if player_count == 0:
+            print(f"{bright_red('❌ 파티 구성이 취소되었습니다.')}")
+            return
+        
+        # 플레이어 캐릭터들 선택 (프리셋 기반)
+        player_characters = []
+        for i in range(player_count):
+            print(f"\n{bright_cyan(f'📋 플레이어 {i+1} 캐릭터 선택')}")
+            player_character = self.select_player_character_from_presets()
+            if not player_character:
+                print(f"{bright_red('❌ 캐릭터 선택이 취소되었습니다.')}")
+                return
+            player_characters.append(player_character)
+        
+        # AI 캐릭터들 자동 생성 (파티 조합 기반)
+        ai_characters = self.generate_ai_party_members_multi(player_characters, 4 - player_count)
+        
+        # 파티 구성
+        self.party_manager.members = player_characters + ai_characters
+        
+        # 플레이어 수 저장 (파티 표시용)
+        self._player_character_count = player_count
+        
+        print(f"\n{bright_green('✅ AI 멀티플레이어 파티 구성 완료!')}")
+        self.display_multiplayer_party()
+        
         # AI 시스템 초기화
         try:
             from game.ultimate_multiplayer_ai import initialize_ai_multiplayer
@@ -5595,33 +5762,43 @@ class DawnOfStellarGame:
         except ImportError as e:
             print(f"⚠️ 고급 AI 모드 로딩 실패, 기본 모드로 진행: {e}")
         
-        # 일반 모험 시작 (AI 모드 포함)
-        self.start_adventure(skip_passive_selection=False, skip_ai_mode_selection=False)
+        # 일반 모험 시작 (AI 멀티플레이어 모드로, AI 모드 선택 건너뛰기)
+        self.start_adventure(skip_passive_selection=False, skip_ai_mode_selection=True)
         
         print(f"\n{bright_green('🌟 AI-Enhanced 멀티플레이어 기능이 활성화되었습니다!')}")
         
-        # Ollama 연결 상태 확인 및 표시
-        ollama_status = self._check_ollama_status()
-        if ollama_status['connected']:
-            print(f"{bright_cyan('🦙 Ollama AI:')} {bright_green('연결됨')} - 모델: {ollama_status['model']}")
-            print(f"{cyan('🤖 자연스러운 AI 대화 시스템:')}")
-            print(f"  💬 자유롭게 말해보세요  - {ollama_status['model']}가 답변해드려요!")
-        else:
-            # Ollama 서버 실행 시도
-            if self._try_start_ollama_server():
-                ollama_status = self._check_ollama_status()  # 재확인
-                if ollama_status['connected']:
-                    print(f"{bright_cyan('🦙 AI:')} {bright_green('서버 시작됨')} - 모델: {ollama_status['model']}")
-                    print(f"{cyan('🤖 자연스러운 AI 대화 시스템:')}")
-                    print(f"  💬 자유롭게 말해보세요  - {ollama_status['model']}가 답변해드려요!")
-                else:
+        # Ollama 연결 상태 확인 및 표시 (안전한 호출)
+        try:
+            ollama_status = self._check_ollama_status()
+            if ollama_status['connected']:
+                print(f"{bright_cyan('🦙 Ollama AI:')} {bright_green('연결됨')} - 모델: {ollama_status['model']}")
+                print(f"{cyan('🤖 자연스러운 AI 대화 시스템:')}")
+                print(f"  💬 자유롭게 말해보세요  - {ollama_status['model']}가 답변해드려요!")
+            else:
+                # Ollama 서버 실행 시도
+                try:
+                    if self._try_start_ollama_server():
+                        ollama_status = self._check_ollama_status()  # 재확인
+                        if ollama_status['connected']:
+                            print(f"{bright_cyan('🦙 AI:')} {bright_green('서버 시작됨')} - 모델: {ollama_status['model']}")
+                            print(f"{cyan('🤖 자연스러운 AI 대화 시스템:')}")
+                            print(f"  💬 자유롭게 말해보세요  - {ollama_status['model']}가 답변해드려요!")
+                        else:
+                            print(f"{bright_cyan('🦙 AI:')} {bright_red('연결 안됨')} - 기본 패턴 매칭 사용")
+                            print(f"{cyan('🤖 기본 AI 대화 시스템:')}")
+                            print(f"  💬 자유롭게 말해보세요  - 로바트가 답변해드려요!")
+                    else:
+                        print(f"{bright_cyan('🦙 AI:')} {bright_red('연결 안됨')} - 기본 패턴 매칭 사용")
+                        print(f"{cyan('🤖 기본 AI 대화 시스템:')}")
+                        print(f"  💬 자유롭게 말해보세요  - 로바트가 답변해드려요!")
+                except Exception:
                     print(f"{bright_cyan('🦙 AI:')} {bright_red('연결 안됨')} - 기본 패턴 매칭 사용")
                     print(f"{cyan('🤖 기본 AI 대화 시스템:')}")
                     print(f"  💬 자유롭게 말해보세요  - 로바트가 답변해드려요!")
-            else:
-                print(f"{bright_cyan('🦙 AI:')} {bright_red('연결 안됨')} - 기본 패턴 매칭 사용")
-                print(f"{cyan('🤖 기본 AI 대화 시스템:')}")
-                print(f"  💬 자유롭게 말해보세요  - 로바트가 답변해드려요!")
+        except (AttributeError, Exception) as e:
+            # Ollama 기능이 없거나 오류 발생 시 무시하고 진행
+            print(f"{bright_cyan('🤖 AI 대화 시스템:')} {bright_green('기본 모드로 실행')}")
+            print(f"{cyan('💬 자유롭게 말해보세요 - 로바트가 답변해드려요!')}")
         
         print(f"  🎯 /ai_assist            - AI 전략 도움말")
         print(f"  📊 /robat_status         - 로바트 상태 확인")
@@ -5968,10 +6145,15 @@ class DawnOfStellarGame:
                         pass  # pygame 오류는 무시
                 
                 # 🤖 AI가 가끔 먼저 말을 걸기 (AI 모드일 때만)
-                if hasattr(self, 'ai_multiplayer_mode') and self.ai_multiplayer_mode:
-                    if self._should_ai_initiate_conversation(loop_count):
-                        self._ai_initiate_conversation()
-                        need_screen_refresh = True
+                try:
+                    if hasattr(self, 'ai_multiplayer_mode') and self.ai_multiplayer_mode:
+                        if hasattr(self, '_should_ai_initiate_conversation') and self._should_ai_initiate_conversation(loop_count):
+                            if hasattr(self, '_ai_initiate_conversation'):
+                                self._ai_initiate_conversation()
+                                need_screen_refresh = True
+                except (AttributeError, Exception):
+                    # AI 대화 기능이 없거나 오류 발생 시 무시
+                    pass
                 
                 # 화면 갱신이 필요한 경우에만 표시
                 if need_screen_refresh:
@@ -6028,6 +6210,27 @@ class DawnOfStellarGame:
                         print("화면 표시에 문제가 있습니다. 게임은 계속 진행됩니다.")
                     
                     need_screen_refresh = False  # 화면 갱신 완료
+                
+                # 🗣️ 채팅 시스템 상태 표시 (화면 갱신 후)
+                try:
+                    from game.toggle_chat_system import get_chat_system
+                    chat_system = get_chat_system()
+                    
+                    # 채팅 시스템 업데이트 (AI 아이템 요청 체크 포함)
+                    chat_system.update(self)
+                    
+                    # 채팅 상태 라인 표시
+                    status_line = chat_system.get_status_line()
+                    if status_line:
+                        print(f"\n{status_line}")
+                    
+                    # 채팅창이 열려있으면 채팅 내용 표시
+                    chat_lines = chat_system.render_chat_window()
+                    for line in chat_lines:
+                        print(line)
+                        
+                except ImportError:
+                    pass  # 채팅 시스템이 없으면 무시
                 
                 # 클래식 요청 확인 (클래식 게임모드인 경우)
                 if hasattr(self, 'ai_game_mode_enabled') and self.ai_game_mode_enabled:
@@ -7437,13 +7640,63 @@ class DawnOfStellarGame:
             print(f"⚠️ 입력 처리 오류: {e}")
             return 'q'  # 오류 시 종료
     
-    def process_action(self, action):
-        """액션 처리 - 클래식 게임모드 및 이동/층 전환 지원 + AI-Enhanced 멀티플레이어"""
+    def _handle_chat_input(self, chat_system):
+        """채팅 입력 처리"""
+        try:
+            print("💭 메시지를 입력하세요 (ESC로 취소): ", end="", flush=True)
+            
+            # 한 줄 입력 받기
+            message = input()
+            
+            if message.strip():
+                # 사용자 메시지 처리 및 AI 응답 생성
+                result = chat_system.process_user_message(message.strip(), self)
+                if result:
+                    print(f"✅ {result}")
+                else:
+                    print(f"✅ 메시지 전송: {message.strip()}")
+            else:
+                print("❌ 빈 메시지는 전송할 수 없습니다")
+            
+            # 입력 모드 종료
+            chat_system.exit_input_mode()
+            return True
+            
+        except KeyboardInterrupt:
+            print("\n❌ 메시지 입력 취소")
+            chat_system.exit_input_mode()
+            return True
+        except Exception as e:
+            print(f"❌ 채팅 입력 오류: {e}")
+            chat_system.exit_input_mode()
+            return True
+        """액션 처리 - 클래식 게임모드 및 이동/층 전환 지원 + AI-Enhanced 멀티플레이어 + 토글 채팅"""
+        
+        # 🗣️ 토글 채팅 시스템 처리 (최우선)
+        try:
+            from game.toggle_chat_system import get_chat_system
+            chat_system = get_chat_system()
+            
+            # 채팅 입력 처리
+            handled, result = chat_system.handle_input(action, self)
+            if handled:
+                if result == "input_mode":
+                    # 채팅 입력 모드 진입
+                    return self._handle_chat_input(chat_system)
+                elif result:
+                    print(result)
+                return True
+                
+        except ImportError:
+            pass  # 채팅 시스템이 없으면 무시
         
         # 🚀 AI-Enhanced 멀티플레이어 명령어 처리 (슬래시로 시작하는 명령어)
         if hasattr(self, 'multiplayer_integration') and self.multiplayer_integration:
             # 기본 멀티플레이어 처리
-            if self.multiplayer_integration.handle_multiplayer_input(action):
+            handled, message = self.multiplayer_integration.handle_multiplayer_input(action, self)
+            if handled:
+                if message:
+                    print(message)
                 return True  # 멀티플레이어 명령어가 처리됨
                 
             # AI 멀티플레이어 추가 처리
@@ -11555,7 +11808,7 @@ class DawnOfStellarGame:
             try:
                 # 간단한 입력 기반 메뉴 시스템 사용 (커서 메뉴 문제 해결)
                 # 최소 출력 모드: 옵션만 한 줄 요약 (배너 제거)
-                print("[1]시작 [2]불러오기 [T]트레이닝 [M]메타 [4]레시피 [B]가이드 [6]설정 [0]종료")
+                print("[1]시작 [2]불러오기 [3]AI멀티 [T]트레이닝 [M]메타 [4]레시피 [B]가이드 [6]설정 [0]종료")
                 
                 # 사용자 입력 받기
                 try:
@@ -11575,18 +11828,20 @@ class DawnOfStellarGame:
                     result = 0  # 게임 시작
                 elif choice.lower() == '2':
                     result = 1  # 게임 불러오기
+                elif choice.lower() == '3':
+                    result = 2  # AI 멀티플레이어
                 elif choice.lower() == 't':
-                    result = 2  # 트레이닝 룸
+                    result = 3  # 트레이닝 룸
                 elif choice.lower() == 'm':
-                    result = 3  # 메타 진행
+                    result = 4  # 메타 진행
                 elif choice.lower() == '4':
-                    result = 4  # 레시피 컬렉션
+                    result = 5  # 레시피 컬렉션
                 elif choice.lower() == 'b':
-                    result = 5  # 초보자 가이드
+                    result = 6  # 초보자 가이드
                 elif choice.lower() == '6':
-                    result = 6  # 설정
+                    result = 7  # 설정
                 elif choice.lower() == '0' or choice.lower() == 'q':
-                    result = 7  # 종료
+                    result = 8  # 종료
                 else:
                     print(f"❌ 잘못된 선택: {choice}")
                     time.sleep(0.5)
@@ -11599,17 +11854,19 @@ class DawnOfStellarGame:
                     choice = '1'
                 elif result == 1:  # 게임 불러오기
                     choice = '2'
-                elif result == 2:  # 트레이닝 룸
+                elif result == 2:  # AI 멀티플레이어
+                    choice = '3'
+                elif result == 3:  # 트레이닝 룸
                     choice = 'T'
-                elif result == 3:  # 메타 진행
+                elif result == 4:  # 메타 진행
                     choice = 'M'
-                elif result == 4:  # 레시피 컬렉션
+                elif result == 5:  # 레시피 컬렉션
                     choice = '4'
-                elif result == 5:  # 초보자 가이드
+                elif result == 6:  # 초보자 가이드
                     choice = 'B'
-                elif result == 6:  # 설정
+                elif result == 7:  # 설정
                     choice = '6'
-                elif result == 7:  # 종료
+                elif result == 8:  # 종료
                     if self.confirm_quit_main_menu():
                         choice = '0'
                     else:
@@ -11651,6 +11908,7 @@ class DawnOfStellarGame:
                 
                 print(f"{cyan('1️⃣')}  게임 시작")
                 print(f"{blue('2️⃣')}  게임 불러오기")
+                print(f"{bright_magenta('3️⃣')}  AI 멀티플레이어")
                 print(f"{bright_magenta('T️⃣')}  트레이닝 룸")
                 print(f"{yellow('M️⃣')}  메타 진행")
                 print(f"{green('4️⃣')}  레시피 컬렉션")
@@ -11709,6 +11967,7 @@ class DawnOfStellarGame:
                 print("="*50)
                 print("1. 게임 시작")
                 print("2. 게임 불러오기") 
+                print("3. AI 멀티플레이어")
                 print("T. 트레이닝 룸")
                 print("M. 메타 진행")
                 print("4. 레시피 컬렉션")
@@ -11779,6 +12038,7 @@ class DawnOfStellarGame:
                     "📖 레시피 컬렉션",
                     "👶 초보자 가이드",
                     "⚙️ 설정",
+                    "🛡️ 안전 종료",
                     "❌ 종료"
                 ]
                 
@@ -11790,6 +12050,7 @@ class DawnOfStellarGame:
                     "발견한 레시피들을 확인합니다",
                     "게임이 처음이신 분을 위한 친절한 가이드와 튜토리얼입니다",
                     "게임 옵션, 난이도, 설정을 변경합니다",
+                    "안전하게 모든 데이터를 저장하고 종료합니다",
                     "게임을 종료합니다"
                 ]
                 
@@ -12031,17 +12292,56 @@ class DawnOfStellarGame:
             return True
         
         elif choice == '3':
-            # AI 멀티플레이어
+            # AI 멀티플레이어 - EXAONE 3.5 기반 완전 신규 시스템
             self.safe_play_sfx("menu_select")
-            self._start_robat_multiplayer()
+            self._start_ai_multiplayer_mode()
             
             # 화면 클리어하고 아스키 아트 다시 표시
             print("\033[2J\033[H")  # 화면 클리어
             self._ascii_art_displayed = False  # 아스키 아트 다시 표시하도록 플래그 리셋
             return True
 
-    def _start_robat_multiplayer(self):
-        """로-바트 멀티플레이어 모드 시작"""
+    def _start_ai_multiplayer_mode(self):
+        """EXAONE 3.5 기반 AI 멀티플레이어 모드 - 클래식 모드 완전 대체"""
+        try:
+            # AI 멀티플레이어 런처 import
+            from ai_multiplayer_launcher import AIMultiplayerLauncher
+            
+            print(f"\n{bright_cyan('🌟 Dawn of Stellar - AI 멀티플레이어 모드')}")
+            print(f"{white('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')}")
+            print(f"{cyan('클래식 모드가 AI 멀티플레이로 완전 진화했습니다!')}")
+            print(f"{white('EXAONE 3.5 기반 지능형 AI 동료들과 함께 모험을 떠나세요.')}")
+            print()
+            
+            # AI 멀티플레이어 런처 실행
+            launcher = AIMultiplayerLauncher()
+            launcher.run()
+            
+        except ImportError as e:
+            print(f"⚠️ AI 멀티플레이어 런처를 불러올 수 없습니다: {e}")
+            print(f"{yellow('기본 게임 모드를 사용합니다.')}")
+            # 기본 게임 모드로 대체
+            self.run_classic_mode()
+        except Exception as e:
+            print(f"❌ AI 멀티플레이어 모드 오류: {e}")
+            print(f"{yellow('기본 게임 모드로 전환합니다.')}")
+            self.run_classic_mode()
+            
+            # AI 멀티플레이어 런처 시작
+            launcher = AIMultiplayerLauncher()
+            launcher.start_ai_multiplayer_mode()
+            
+        except ImportError as e:
+            print(f"{red('❌ AI 멀티플레이어 시스템을 불러올 수 없습니다: {e}')}")
+            print(f"{yellow('💡 폴백: 기존 로-바트 AI 시스템을 사용합니다.')}")
+            self._start_robat_multiplayer_fallback()
+        except Exception as e:
+            print(f"{red('❌ AI 멀티플레이어 시작 중 오류 발생: {e}')}")
+            print(f"{yellow('💡 폴백: 기존 시스템을 사용합니다.')}")
+            self._start_robat_multiplayer_fallback()
+
+    def _start_robat_multiplayer_fallback(self):
+        """기존 로-바트 멀티플레이어 모드 (폴백용)"""
         try:
             # 옵션과 설명을 분리
             option_titles = [
@@ -12066,33 +12366,70 @@ class DawnOfStellarGame:
                 cancellable=True
             )
             
-            choice_index = cursor_menu.show()
+            choice_index = cursor_menu.run()
             
             if choice_index == 0:
-                # 협력 모드
+                # 협력 모드 - 실제 게임에 AI 파트너 추가
                 print(f"\n{cyan('🤝 로-바트와 함께 던전을 탐험합니다!')}")
-                import asyncio
-                from game.robat_multiplayer import run_robat_multiplayer_test
-                asyncio.run(run_robat_multiplayer_test())
+                print("🎮 실제 게임에 AI 파트너를 추가합니다...")
+                
+                print(f"\n{bright_green('✅ AI 협력 모드로 게임을 시작합니다!')}")
+                print("🤖 AI 파트너들과 함께 던전을 탐험해보세요!")
+                input("\n게임을 시작하려면 Enter를 누르세요...")
+                
+                # 협력 멀티플레이어 객체 생성
+                from game.cooperative_multiplayer import CooperativeMultiplayer
+                multiplayer_integration = CooperativeMultiplayer()
+                self.start_multiplayer_adventure(multiplayer_integration)
+                return
                 
             elif choice_index == 1:
-                # 경쟁 모드 (AI vs AI 관전)
-                print(f"\n{cyan('🏆 AI들끼리 플레이하는 것을 관전합니다!')}")
-                import asyncio
-                from game.ultimate_multiplayer_ai import run_ultimate_multiplayer_ai_test
-                asyncio.run(run_ultimate_multiplayer_ai_test())
+                # 경쟁 모드 - 실제 게임에서 AI와 경쟁
+                print(f"\n{cyan('🏆 AI와 실력을 겨뤄봅시다!')}")
+                print("🎯 AI 경쟁 모드를 시작합니다...")
                 
+                # 경쟁 모드 설정
+                print(f"\n{bright_yellow('🏆 AI 경쟁 모드가 설정되었습니다!')}")
+                print("🤖 AI가 별도의 파티로 동시에 던전을 탐험합니다!")
+                print("📊 누가 더 빨리, 더 효율적으로 클리어하는지 경쟁해보세요!")
+                print("🏁 결과는 실시간으로 비교됩니다!")
+                
+                input("\n경쟁 게임을 시작하려면 Enter를 누르세요...")
+                
+                # 경쟁 멀티플레이어 객체 생성
+                from game.competitive_multiplayer import CompetitiveMultiplayer
+                multiplayer_integration = CompetitiveMultiplayer()
+                self.start_multiplayer_adventure(multiplayer_integration)
+                return            
             elif choice_index == 2:
-                # 학습 모드
+                # 학습 모드 - AI가 플레이어를 관찰하며 학습
                 print(f"\n{cyan('🎓 AI 학습 시스템을 시작합니다!')}")
-                from game.ultimate_ai_learning_system import demo_ultimate_ai_system
-                demo_ultimate_ai_system()
+                print("🧠 AI 학습 모드를 설정합니다...")
+                
+                print(f"\n{bright_cyan('🎓 AI 학습 모드로 게임을 시작합니다!')}")
+                print("📚 AI가 플레이 스타일을 분석합니다!")
+                input("\n학습 모드 게임을 시작하려면 Enter를 누르세요...")
+                
+                # 학습 멀티플레이어 객체 생성
+                from game.learning_multiplayer import LearningMultiplayer
+                multiplayer_integration = LearningMultiplayer()
+                self.start_multiplayer_adventure(multiplayer_integration)
+                return
                 
             elif choice_index == 3:
-                # 혼합 모드
+                # 혼합 모드 - 인간과 AI 혼합 파티
                 print(f"\n{cyan('🔥 인간과 AI가 함께 플레이합니다!')}")
-                from game.human_ai_hybrid_multiplayer import demo_hybrid_system
-                demo_hybrid_system()
+                print("🤝 혼합 모드를 설정합니다...")
+                
+                print(f"\n{bright_magenta('🔥 혼합 모드로 게임을 시작합니다!')}")
+                print("👨‍👩‍👧‍👦 인간과 AI가 함께 플레이합니다!")
+                input("\n혼합 모드 게임을 시작하려면 Enter를 누르세요...")
+                
+                # 혼합 멀티플레이어 객체 생성
+                from game.hybrid_multiplayer import HybridMultiplayer
+                multiplayer_integration = HybridMultiplayer()
+                self.start_multiplayer_adventure(multiplayer_integration)
+                return
                 
             elif choice_index is None:
                 print(f"\n{bright_cyan('메인 메뉴로 돌아갑니다.')}")
@@ -12101,6 +12438,10 @@ class DawnOfStellarGame:
             print(f"❌ AI 멀티플레이어 실행 중 오류: {e}")
             print(f"\n{bright_cyan('메인 메뉴로 돌아갑니다.')}")
             input("확인하려면 Enter를 누르세요...")
+        
+        # 화면 클리어하고 아스키 아트 다시 표시
+        print("\033[2J\033[H")  # 화면 클리어
+        self._ascii_art_displayed = False  # 아스키 아트 다시 표시하도록 플래그 리셋
         
         # 화면 클리어하고 아스키 아트 다시 표시
         print("\033[2J\033[H")  # 화면 클리어
@@ -12131,7 +12472,7 @@ class DawnOfStellarGame:
                 cancellable=True
             )
             
-            choice_index = cursor_menu.show()
+            choice_index = cursor_menu.run()
             
             if choice_index == 0:
                 # 서버 호스팅
@@ -12222,7 +12563,15 @@ class DawnOfStellarGame:
             self._ascii_art_displayed = False  # 아스키 아트 다시 표시하도록 플래그 리셋
             return True
         
-        elif choice == '0' or choice == '7':
+        elif choice == '7':
+            # 안전 종료
+            self.safe_play_sfx("menu_select")
+            if self._safe_exit_confirm():
+                self._perform_safe_exit()
+                return False  # 게임 종료
+            return True  # 확인 취소 시 메뉴 계속
+        
+        elif choice == '0' or choice == '8':
             # 게임 종료 확인
             if self.confirm_quit_main_menu():
                 self.safe_play_sfx("menu_cancel")
@@ -17311,6 +17660,16 @@ def handle_interaction(game):
 def main():
     """메인 함수 - 상태 보존 핫 리로드 지원"""
     
+    # 안전 종료 시스템 초기화
+    safe_exit_handler = None
+    if SAFE_EXIT_AVAILABLE:
+        try:
+            safe_exit_handler = SafeExitHandler()
+            print("🛡️ 안전 종료 시스템 활성화! 강제 종료 시 자동 백업됩니다.")
+        except Exception as e:
+            print(f"⚠️ 안전 종료 시스템 초기화 실패: {e}")
+            # SAFE_EXIT_AVAILABLE을 False로 변경하면 안되므로 handler만 None으로 설정
+    
     # 상태 보존 핫 리로드 안내
     if HOT_RELOAD_AVAILABLE:
         print("🔥 상태 보존 핫 리로드 v2.0 활성화!")
@@ -17327,6 +17686,14 @@ def main():
     # 종료 처리 함수 정의
     def cleanup_and_exit(signum=None, frame=None):
         """안전한 종료 처리"""
+        try:
+            # 안전 종료 핸들러 사용 (우선순위)
+            if safe_exit_handler:
+                safe_exit_handler.emergency_exit()
+                return
+        except Exception as e:
+            print(f"안전 종료 실패: {e}")
+        
         try:                
             import pygame
             if pygame.get_init():
@@ -17401,6 +17768,18 @@ def main():
         
         # 게임 인스턴스 생성
         game = DawnOfStellarGame()
+        
+        # 안전 종료 시스템에 게임 인스턴스 등록
+        if safe_exit_handler and hasattr(game, 'safe_cleanup'):
+            try:
+                safe_exit_handler.register_system(
+                    name="main_game",
+                    cleanup_func=game.safe_cleanup,
+                    emergency_save_func=getattr(game, 'emergency_save_all', None)
+                )
+                print("🔗 메인 게임이 안전 종료 시스템에 등록되었습니다.")
+            except Exception as e:
+                print(f"⚠️ 메인 게임 안전 종료 등록 실패: {e}")
         
         # 게임 데이터 초기화 시 채집 변수도 초기화
         if hasattr(game, 'meta_progression') and hasattr(game.meta_progression, 'data'):
@@ -18196,6 +18575,513 @@ def main():
             print(f"❌ AI 혼합 모드 실행 중 오류: {e}")
         
         input("메인 메뉴로 돌아가려면 Enter를 누르세요...")
+
+    def select_player_count(self):
+        """플레이어 수 선택 (1~4명)"""
+        print(f"\n{bright_cyan('👥 플레이어 수 선택')}")
+        print("파티는 최대 4명으로 구성됩니다.")
+        print("선택하지 않은 슬롯은 AI가 자동으로 채웁니다.")
+        
+        options = [
+            "👤 1명 (플레이어 1명 + AI 3명)",
+            "👥 2명 (플레이어 2명 + AI 2명)", 
+            "👫 3명 (플레이어 3명 + AI 1명)",
+            "👬 4명 (플레이어 4명만)"
+        ]
+        
+        descriptions = [
+            "혼자서 AI 파티와 함께 플레이",
+            "친구와 둘이서 AI와 함께 플레이", 
+            "3명이서 AI 1명과 함께 플레이",
+            "4명이서 모두 직접 플레이"
+        ]
+        
+        from game.cursor_menu_system import CursorMenu
+        cursor_menu = CursorMenu(
+            title="🎮 플레이어 수 선택",
+            extra_content="AI 멀티플레이어에서 직접 조작할 플레이어 수를 선택하세요",
+            options=options,
+            descriptions=descriptions,
+            cancellable=True
+        )
+        
+        choice_index = cursor_menu.run()
+        
+        if choice_index is None:
+            return 0
+        else:
+            return choice_index + 1  # 1~4명
+
+    def select_player_character_from_presets(self):
+        """플레이어 캐릭터를 프리셋에서 선택"""
+        try:
+            from game.character_presets import CharacterPresets
+            presets = CharacterPresets()
+            
+            # 저장된 프리셋 목록 가져오기
+            preset_list = presets.get_preset_list()
+            
+            if not preset_list:
+                print(f"{bright_yellow('💡 저장된 캐릭터 프리셋이 없습니다.')}")
+                print("🎯 새 캐릭터를 생성하거나 기본 캐릭터를 사용합니다.")
+                
+                # 기본 캐릭터 선택
+                return self.create_basic_character()
+            
+            print(f"\n{bright_cyan('📁 저장된 캐릭터 프리셋 목록')}")
+            options = []
+            descriptions = []
+            
+            for preset in preset_list:
+                name = preset.get('name', '이름없음')
+                job = preset.get('character_class', '직업불명')
+                level = preset.get('level', 1)
+                
+                options.append(f"🎭 {name} ({job} Lv.{level})")
+                descriptions.append(f"직업: {job} | 레벨: {level}")
+            
+            # 새 캐릭터 생성 옵션 추가
+            options.append("🆕 새 캐릭터 생성")
+            descriptions.append("새로운 캐릭터를 직접 생성합니다")
+            
+            from game.cursor_menu_system import CursorMenu
+            cursor_menu = CursorMenu(
+                title="🎭 플레이어 캐릭터 선택",
+                extra_content="AI 멀티플레이어에서 사용할 캐릭터를 선택하세요",
+                options=options,
+                descriptions=descriptions,
+                cancellable=True
+            )
+            
+            choice_index = cursor_menu.run()
+            
+            if choice_index is None:
+                return None
+            elif choice_index == len(preset_list):  # 새 캐릭터 생성
+                return self.create_basic_character()
+            else:
+                # 프리셋에서 캐릭터 로드
+                selected_preset = preset_list[choice_index]
+                character = presets.load_from_preset(selected_preset['name'])
+                print(f"\n{bright_green('✅')} {character.name} ({character.character_class}) 선택됨!")
+                return character
+                
+        except ImportError:
+            print(f"{bright_yellow('⚠️ 캐릭터 프리셋 시스템을 찾을 수 없습니다.')}")
+            return self.create_basic_character()
+        except Exception as e:
+            print(f"{bright_red('❌ 프리셋 로딩 오류:')} {e}")
+            return self.create_basic_character()
+    
+    def create_basic_character(self):
+        """기본 캐릭터 생성"""
+        from game.character import Character
+        available_classes = ["전사", "아크메이지", "궁수", "도적", "성기사"]
+        
+        print(f"\n{bright_cyan('🎯 기본 캐릭터 생성')}")
+        options = [f"⚔️ {cls}" for cls in available_classes]
+        descriptions = [f"{cls} 직업으로 게임 시작" for cls in available_classes]
+        
+        from game.cursor_menu_system import CursorMenu
+        cursor_menu = CursorMenu(
+            title="직업 선택",
+            options=options,
+            descriptions=descriptions,
+            cancellable=True
+        )
+        
+        choice_index = cursor_menu.run()
+        if choice_index is None:
+            return None
+        
+        selected_class = available_classes[choice_index]
+        character = Character(
+            name=f"플레이어",
+            character_class=selected_class,
+            max_hp=100,
+            physical_attack=50,
+            magic_attack=50,
+            physical_defense=30,
+            magic_defense=30,
+            speed=50
+        )
+        character.current_hp = character.max_hp
+        character.current_mp = character.max_mp
+        
+        print(f"\n{bright_green('✅')} {character.character_class} 생성 완료!")
+        return character
+    
+    def generate_ai_party_members(self, player_character):
+        """플레이어 캐릭터에 맞는 AI 파티원들 자동 생성"""
+        try:
+            from game.ai_chat_system import generate_dynamic_ai_character
+            
+            # 파티 조합 분석
+            player_job = player_character.character_class
+            
+            # 역할 분류
+            tank_jobs = ["전사", "성기사", "기사", "용기사", "암흑기사"]
+            dps_jobs = ["궁수", "도적", "암살자", "사무라이", "검투사", "광전사", "검성"]
+            mage_jobs = ["아크메이지", "네크로맨서", "정령술사", "시간술사", "연금술사", "차원술사", "마검사"]
+            support_jobs = ["신관", "바드", "드루이드", "무당"]
+            
+            player_role = "unknown"
+            if player_job in tank_jobs:
+                player_role = "tank"
+            elif player_job in dps_jobs:
+                player_role = "dps"
+            elif player_job in mage_jobs:
+                player_role = "mage"
+            elif player_job in support_jobs:
+                player_role = "support"
+            
+            # 플레이어 역할에 따른 AI 파티원 구성 결정
+            if player_role == "tank":
+                needed_roles = ["dps", "mage", "support"]
+            elif player_role == "dps":
+                needed_roles = ["tank", "mage", "support"]
+            elif player_role == "mage":
+                needed_roles = ["tank", "dps", "support"]
+            elif player_role == "support":
+                needed_roles = ["tank", "dps", "mage"]
+            else:
+                needed_roles = ["tank", "dps", "support"]  # 기본 구성
+            
+            # AI 캐릭터들 생성
+            ai_characters = []
+            for role in needed_roles:
+                if role == "tank":
+                    available_jobs = tank_jobs
+                elif role == "dps":
+                    available_jobs = dps_jobs
+                elif role == "mage":
+                    available_jobs = mage_jobs
+                elif role == "support":
+                    available_jobs = support_jobs
+                else:
+                    available_jobs = ["몽크", "해적"]  # 하이브리드
+                
+                # 기존 파티원 직업 제외
+                existing_jobs = [player_character.character_class] + [char.character_class for char in ai_characters]
+                available_jobs = [job for job in available_jobs if job not in existing_jobs]
+                
+                if available_jobs:
+                    ai_character = generate_dynamic_ai_character(available_jobs, existing_jobs)
+                    ai_characters.append(ai_character)
+            
+            print(f"\n{bright_green('🤖 AI 파티원 생성 완료!')}")
+            print(f"  플레이어: {player_character.character_class} ({player_role})")
+            for i, ai_char in enumerate(ai_characters, 1):
+                print(f"  AI {i}: {ai_char.name} ({ai_char.character_class})")
+            
+            return ai_characters
+            
+        except Exception as e:
+            print(f"{bright_red('❌ AI 캐릭터 생성 오류:')} {e}")
+            # 기본 AI 캐릭터들 생성
+            return self.create_basic_ai_party()
+    
+    def generate_ai_party_members_multi(self, player_characters, ai_count):
+        """다중 플레이어에 맞는 AI 파티원들 자동 생성"""
+        if ai_count <= 0:
+            return []
+        
+        try:
+            from game.ai_chat_system import generate_dynamic_ai_character
+            
+            # 기존 플레이어들의 직업 분석
+            existing_jobs = [char.character_class for char in player_characters]
+            
+            # 역할 분류
+            tank_jobs = ["전사", "성기사", "기사", "용기사", "암흑기사"]
+            dps_jobs = ["궁수", "도적", "암살자", "사무라이", "검투사", "광전사", "검성"]
+            mage_jobs = ["아크메이지", "네크로맨서", "정령술사", "시간술사", "연금술사", "차원술사", "마검사"]
+            support_jobs = ["신관", "바드", "드루이드", "무당"]
+            hybrid_jobs = ["몽크", "해적", "기계공학자", "철학자"]
+            
+            # 기존 플레이어들의 역할 분석
+            existing_roles = []
+            for job in existing_jobs:
+                if job in tank_jobs:
+                    existing_roles.append("tank")
+                elif job in dps_jobs:
+                    existing_roles.append("dps")
+                elif job in mage_jobs:
+                    existing_roles.append("mage")
+                elif job in support_jobs:
+                    existing_roles.append("support")
+                else:
+                    existing_roles.append("hybrid")
+            
+            # 필요한 역할 결정 (균형잡힌 파티 구성)
+            all_roles = ["tank", "dps", "mage", "support"]
+            needed_roles = []
+            
+            # 부족한 역할 우선 채우기
+            for role in all_roles:
+                if role not in existing_roles:
+                    needed_roles.append(role)
+            
+            # 남은 슬롯을 위해 역할 추가
+            while len(needed_roles) < ai_count:
+                # 가장 적은 역할부터 추가
+                role_count = {role: existing_roles.count(role) + needed_roles.count(role) for role in all_roles}
+                min_role = min(role_count, key=role_count.get)
+                needed_roles.append(min_role)
+            
+            # AI 캐릭터들 생성
+            ai_characters = []
+            for i in range(ai_count):
+                role = needed_roles[i] if i < len(needed_roles) else "hybrid"
+                
+                if role == "tank":
+                    available_jobs = tank_jobs
+                elif role == "dps":
+                    available_jobs = dps_jobs
+                elif role == "mage":
+                    available_jobs = mage_jobs
+                elif role == "support":
+                    available_jobs = support_jobs
+                else:
+                    available_jobs = hybrid_jobs
+                
+                # 이미 사용된 직업 제외
+                all_existing_jobs = existing_jobs + [char.character_class for char in ai_characters]
+                available_jobs = [job for job in available_jobs if job not in all_existing_jobs]
+                
+                if not available_jobs:
+                    # 모든 직업이 사용되었으면 하이브리드 직업 사용
+                    available_jobs = [job for job in hybrid_jobs if job not in all_existing_jobs]
+                
+                if available_jobs:
+                    ai_character = generate_dynamic_ai_character(available_jobs, all_existing_jobs)
+                    ai_characters.append(ai_character)
+                else:
+                    # 기본 캐릭터 생성
+                    ai_char = self.create_basic_character_with_class("몽크", f"AI_{i+1}")
+                    ai_characters.append(ai_char)
+            
+            print(f"\n{bright_green(f'🤖 AI 파티원 {ai_count}명 생성 완료!')}")
+            print(f"  플레이어: {len(player_characters)}명")
+            for i, player_char in enumerate(player_characters, 1):
+                print(f"    {i}. {player_char.character_class}")
+            print(f"  AI: {len(ai_characters)}명")
+            for i, ai_char in enumerate(ai_characters, 1):
+                print(f"    {i}. {ai_char.name} ({ai_char.character_class})")
+            
+            return ai_characters
+            
+        except Exception as e:
+            print(f"{bright_red('❌ AI 캐릭터 생성 오류:')} {e}")
+            # 기본 AI 캐릭터들 생성
+            return self.create_basic_ai_party_multi(ai_count)
+    
+    def create_basic_character_with_class(self, character_class, name):
+        """특정 직업으로 기본 캐릭터 생성"""
+        from game.character import Character
+        
+        character = Character(
+            name=name,
+            character_class=character_class,
+            max_hp=100,
+            physical_attack=50,
+            magic_attack=50,
+            physical_defense=30,
+            magic_defense=30,
+            speed=50
+        )
+        character.current_hp = character.max_hp
+        character.current_mp = character.max_mp
+        return character
+    
+    def create_basic_ai_party_multi(self, ai_count):
+        """다중 플레이어용 기본 AI 파티 생성"""
+        from game.character import Character
+        
+        ai_characters = []
+        basic_classes = ["아크메이지", "궁수", "신관", "전사", "도적", "네크로맨서", "몽크", "바드"]
+        basic_names = ["로바트", "아리아", "세라핌", "가디언", "쉐도우", "네크론", "젠마스터", "멜로디"]
+        
+        for i in range(min(ai_count, len(basic_classes))):
+            job = basic_classes[i]
+            name = basic_names[i]
+            
+            ai_char = Character(
+                name=name,
+                character_class=job,
+                max_hp=80 + i*10,
+                physical_attack=40 + i*5,
+                magic_attack=40 + i*5,
+                physical_defense=25 + i*3,
+                magic_defense=25 + i*3,
+                speed=45 + i*5
+            )
+            ai_char.current_hp = ai_char.max_hp
+            ai_char.current_mp = ai_char.max_mp
+            ai_characters.append(ai_char)
+        
+        return ai_characters
+    
+    def create_basic_ai_party(self):
+        """기본 AI 파티 생성 (오류 발생 시 대체)"""
+        from game.character import Character
+        
+        ai_characters = []
+        basic_classes = ["아크메이지", "궁수", "신관"]
+        basic_names = ["로바트", "아리아", "세라핌"]
+        
+        for i, (job, name) in enumerate(zip(basic_classes, basic_names)):
+            ai_char = Character(
+                name=name,
+                character_class=job,
+                max_hp=80 + i*10,
+                physical_attack=40 + i*5,
+                magic_attack=40 + i*5,
+                physical_defense=25 + i*3,
+                magic_defense=25 + i*3,
+                speed=45 + i*5
+            )
+            ai_char.current_hp = ai_char.max_hp
+            ai_char.current_mp = ai_char.max_mp
+            ai_characters.append(ai_char)
+        
+        return ai_characters
+    
+    def display_multiplayer_party(self):
+        """멀티플레이어 파티 구성 표시"""
+        print(f"\n{bright_cyan('═══ 🎮 AI 멀티플레이어 파티 ═══')}")
+        
+        # 플레이어와 AI 구분
+        player_count = 0
+        ai_count = 0
+        
+        for i, member in enumerate(self.party_manager.members):
+            # 첫 번째부터 순서대로 플레이어로 간주 (선택된 순서대로)
+            if hasattr(self, '_player_character_count'):
+                is_player = i < self._player_character_count
+            else:
+                # 기본적으로 첫 번째만 플레이어
+                is_player = i == 0
+            
+            if is_player:
+                player_count += 1
+                role_indicator = "👤"
+                player_type = f"플레이어 {player_count}"
+            else:
+                ai_count += 1
+                role_indicator = "🤖"
+                player_type = f"AI {ai_count}"
+            
+            if hasattr(member, 'name') and member.name:
+                display_name = f"{member.name} ({member.character_class})"
+            else:
+                display_name = member.character_class
+            
+            print(f"  {role_indicator} {player_type}: {bright_cyan(display_name)}")
+        
+        print(f"{bright_cyan('═══════════════════════════')}")
+        print(f"  💫 총 {len(self.party_manager.members)}명 파티")
+        print(f"  👤 플레이어: {player_count}명 | 🤖 AI: {ai_count}명")
+        print()
+
+    def _safe_exit_confirm(self):
+        """안전 종료 확인"""
+        try:
+            from game.cursor_menu_system import CursorMenu
+            from game.color_text import bright_yellow, bright_green, red
+            
+            options = [
+                f"🛡️ {bright_green('안전 종료')}",
+                f"❌ {red('취소')}"
+            ]
+            
+            descriptions = [
+                "모든 데이터를 안전하게 저장하고 게임을 종료합니다",
+                "메인 메뉴로 돌아갑니다"
+            ]
+            
+            menu = CursorMenu("🛡️ 안전 종료", options, descriptions, cancellable=True)
+            choice = menu.run()
+            
+            if choice == 0:
+                return True  # 안전 종료 확인
+            else:
+                return False  # 취소
+                
+        except Exception as e:
+            print(f"❌ 안전 종료 확인 창 오류: {e}")
+            # 폴백: 간단한 확인
+            confirm = input("🛡️ 안전하게 종료하시겠습니까? (y/N): ").strip().lower()
+            return confirm in ['y', 'yes', 'Y', 'YES']
+    
+    def _perform_safe_exit(self):
+        """안전 종료 실행"""
+        try:
+            from game.color_text import bright_cyan, bright_green, bright_yellow
+            
+            print(f"\n{bright_cyan('🛡️ 안전 종료를 시작합니다...')}")
+            
+            # 안전 종료 핸들러 사용
+            if SAFE_EXIT_AVAILABLE:
+                try:
+                    safe_exit_handler = SafeExitHandler()
+                    print(f"{bright_yellow('🔄 시스템 정리 중...')}")
+                    safe_exit_handler.safe_shutdown()
+                    print(f"{bright_green('✅ 안전 정리 완료!')}")
+                except Exception as e:
+                    print(f"⚠️ 안전 종료 핸들러 실행 실패: {e}")
+                    # 폴백으로 일반 정리 진행
+                    self._fallback_safe_exit()
+            else:
+                self._fallback_safe_exit()
+            
+            print(f"\n{bright_green('🌟 게임이 안전하게 종료되었습니다!')}")
+            print(f"{bright_cyan('💾 모든 데이터가 보존되었습니다.')}")
+            print(f"{bright_yellow('🎮 다음에 또 만나요!')}")
+            
+            self.running = False
+            
+        except Exception as e:
+            print(f"❌ 안전 종료 중 오류: {e}")
+            print("일반 종료를 시도합니다...")
+            self.running = False
+    
+    def _fallback_safe_exit(self):
+        """폴백 안전 종료 (안전 종료 핸들러가 없을 때)"""
+        try:
+            from game.color_text import bright_yellow
+            
+            print(f"{bright_yellow('💾 수동 데이터 저장 중...')}")
+            
+            # 영구 진행상황 저장
+            if hasattr(self, 'permanent_progression'):
+                try:
+                    self.permanent_progression.save_to_file()
+                    print("✅ 영구 진행상황 저장 완료")
+                except Exception as e:
+                    print(f"⚠️ 영구 진행상황 저장 실패: {e}")
+            
+            # 메타 진행도 저장
+            if hasattr(self, 'meta_progression'):
+                try:
+                    self.meta_progression.save()
+                    print("✅ 메타 진행도 저장 완료")
+                except Exception as e:
+                    print(f"⚠️ 메타 진행도 저장 실패: {e}")
+            
+            # 오디오 시스템 정리
+            if hasattr(self, 'audio_system') and self.audio_system:
+                try:
+                    self.audio_system.cleanup()
+                    print("✅ 오디오 시스템 정리 완료")
+                except Exception as e:
+                    print(f"⚠️ 오디오 시스템 정리 실패: {e}")
+            
+            # 일반 정리
+            self.cleanup()
+            
+        except Exception as e:
+            print(f"❌ 폴백 안전 종료 실패: {e}")
 
 
 if __name__ == "__main__":

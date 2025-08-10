@@ -1,18 +1,18 @@
 # Dawn Of Stellar - Version Information
 
-__version__ = "3.1.1"
+__version__ = "4.2.0"
 __title__ = "Dawn Of Stellar - 별빛의 여명"
-__description__ = "차세대 ASCII 기반 전략 로그라이크 RPG"
+__description__ = "차세대 ASCII 기반 전략 로그라이크 RPG - 한국어 입력 지원 + 멀티플레이어 완성"
 __author__ = "APTOL-7176"
 __author_email__ = "iamckck49@gmail.com"
 __license__ = "MIT"
 __url__ = "https://github.com/APTOL-7176/Dawn-of-Stellar"
 
 # Release Information
-RELEASE_DATE = "2025-08-10"
-MAJOR_VERSION = 3
-MINOR_VERSION = 1
-PATCH_VERSION = 1
+RELEASE_DATE = "2025-08-11"
+MAJOR_VERSION = 4
+MINOR_VERSION = 2
+PATCH_VERSION = 0
 
 # Game Information
 GAME_TITLE = "Dawn Of Stellar"

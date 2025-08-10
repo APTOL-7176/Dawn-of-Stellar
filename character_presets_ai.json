@@ -1,0 +1,246 @@
+{
+  "네페르티티": {
+    "name": "네페르티티",
+    "class": "철학자",
+    "level": 1,
+    "gender": "남성",
+    "age": 34,
+    "quirk": "토론 좋아함",
+    "created_at": "2025-08-10T20:28:01.794949",
+    "ai_enabled": true,
+    "stats": {
+      "level": 1,
+      "hp": 80,
+      "max_hp": 80,
+      "physical_attack": 38,
+      "magic_attack": 76,
+      "physical_defense": 54,
+      "magic_defense": 86,
+      "speed": 49,
+      "luck": 5
+    },
+    "ai_personality": {
+      "basic_info": {
+        "gender": "남성",
+        "age": 34,
+        "personality_type": "논리적하며 지혜추구",
+        "speech_style": "따뜻한"
+      },
+      "personal_traits": {
+        "hobby": "명상",
+        "fear": "높은 곳",
+        "dream": "진리 발견",
+        "quirk": "토론 좋아함"
+      },
+      "game_preferences": {
+        "combat_preference": "전략적",
+        "risk_tolerance": "신중함",
+        "teamwork_style": "협력적",
+        "learning_style": "빠른학습"
+      },
+      "interests_and_memory": {
+        "interests": [
+          "진리",
+          "논리",
+          "분석",
+          "사고",
+          "무용",
+          "종교",
+          "게임"
+        ],
+        "memory_weight": 0.8728225288585707,
+        "creativity_level": 5,
+        "social_level": 4
+      }
+    },
+    "ai_database_path": "ai_memory_네페르티티.db",
+    "learning_stats": {
+      "conversations": 0,
+      "events": 0,
+      "satisfaction": 0.5,
+      "relationships": 0
+    }
+  },
+  "레굴루스": {
+    "name": "레굴루스",
+    "class": "기사",
+    "level": 1,
+    "gender": "남성",
+    "age": 41,
+    "quirk": "귀족적 취향",
+    "created_at": "2025-08-10T20:28:01.818669",
+    "ai_enabled": true,
+    "stats": {
+      "level": 1,
+      "hp": 259,
+      "max_hp": 259,
+      "physical_attack": 79,
+      "magic_attack": 46,
+      "physical_defense": 72,
+      "magic_defense": 54,
+      "speed": 48,
+      "luck": 5
+    },
+    "ai_personality": {
+      "basic_info": {
+        "gender": "남성",
+        "age": 41,
+        "personality_type": "명예하며 규율적",
+        "speech_style": "귀여운"
+      },
+      "personal_traits": {
+        "hobby": "운동",
+        "fear": "힘의 부족",
+        "dream": "치유",
+        "quirk": "귀족적 취향"
+      },
+      "game_preferences": {
+        "combat_preference": "방어적",
+        "risk_tolerance": "무모함",
+        "teamwork_style": "리더십",
+        "learning_style": "보수적"
+      },
+      "interests_and_memory": {
+        "interests": [
+          "충성",
+          "보호",
+          "의무",
+          "명예"
+        ],
+        "memory_weight": 0.7990266577764165,
+        "creativity_level": 4,
+        "social_level": 8
+      }
+    },
+    "ai_database_path": "ai_memory_레굴루스.db",
+    "learning_stats": {
+      "conversations": 0,
+      "events": 0,
+      "satisfaction": 0.5,
+      "relationships": 0
+    }
+  },
+  "엠마": {
+    "name": "엠마",
+    "class": "검성",
+    "level": 1,
+    "gender": "중성",
+    "age": 35,
+    "quirk": "차 마시기",
+    "created_at": "2025-08-10T20:28:01.844620",
+    "ai_enabled": true,
+    "stats": {
+      "level": 1,
+      "hp": 180,
+      "max_hp": 180,
+      "physical_attack": 83,
+      "magic_attack": 31,
+      "physical_defense": 51,
+      "magic_defense": 47,
+      "speed": 71,
+      "luck": 5
+    },
+    "ai_personality": {
+      "basic_info": {
+        "gender": "중성",
+        "age": 35,
+        "personality_type": "절제하며 인내",
+        "speech_style": "귀여운"
+      },
+      "personal_traits": {
+        "hobby": "게임",
+        "fear": "책임",
+        "dream": "스승 되기",
+        "quirk": "차 마시기"
+      },
+      "game_preferences": {
+        "combat_preference": "공격적",
+        "risk_tolerance": "무모함",
+        "teamwork_style": "추종적",
+        "learning_style": "꾸준함"
+      },
+      "interests_and_memory": {
+        "interests": [
+          "검술",
+          "수련",
+          "완성",
+          "극한",
+          "심리학",
+          "시",
+          "정치"
+        ],
+        "memory_weight": 0.8718271209901414,
+        "creativity_level": 8,
+        "social_level": 3
+      }
+    },
+    "ai_database_path": "ai_memory_엠마.db",
+    "learning_stats": {
+      "conversations": 0,
+      "events": 0,
+      "satisfaction": 0.5,
+      "relationships": 0
+    }
+  },
+  "호세": {
+    "name": "호세",
+    "class": "연금술사",
+    "level": 1,
+    "gender": "여성",
+    "age": 31,
+    "quirk": "조합 시도",
+    "created_at": "2025-08-10T20:28:01.874163",
+    "ai_enabled": true,
+    "stats": {
+      "level": 1,
+      "hp": 114,
+      "max_hp": 114,
+      "physical_attack": 59,
+      "magic_attack": 72,
+      "physical_defense": 44,
+      "magic_defense": 58,
+      "speed": 54,
+      "luck": 5
+    },
+    "ai_personality": {
+      "basic_info": {
+        "gender": "여성",
+        "age": 31,
+        "personality_type": "창조욕하며 끈기있음",
+        "speech_style": "친근한"
+      },
+      "personal_traits": {
+        "hobby": "약초 재배",
+        "fear": "과거",
+        "dream": "평온한 삶",
+        "quirk": "조합 시도"
+      },
+      "game_preferences": {
+        "combat_preference": "전략적",
+        "risk_tolerance": "보통",
+        "teamwork_style": "협력적",
+        "learning_style": "실험적"
+      },
+      "interests_and_memory": {
+        "interests": [
+          "실험",
+          "변화",
+          "발견",
+          "창조",
+          "식물",
+          "수련"
+        ],
+        "memory_weight": 0.7390442805643588,
+        "creativity_level": 6,
+        "social_level": 6
+      }
+    },
+    "ai_database_path": "ai_memory_호세.db",
+    "learning_stats": {
+      "conversations": 0,
+      "events": 0,
+      "satisfaction": 0.5,
+      "relationships": 0
+    }
+  }
+}

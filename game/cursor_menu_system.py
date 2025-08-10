@@ -96,7 +96,14 @@ class CursorMenu:
         # 런처에서 PowerShell로 실행되었는지 확인
         launcher_powershell = os.getenv('LAUNCHER_POWERSHELL') == '1'
         
-        if powershell_env or launcher_powershell:
+        # CMD 전용 모드 감지 (배치 파일에서 설정)
+        cmd_only_mode = os.getenv('USE_CMD_ONLY') == '1'
+        terminal_type = os.getenv('TERMINAL_TYPE')
+        
+        if cmd_only_mode or terminal_type == 'CMD':
+            self._ansi_inplace_supported = False
+            print("[INFO] CMD 전용 모드 감지 - 기본 메뉴 시스템 사용")
+        elif powershell_env or launcher_powershell:
             self._ansi_inplace_supported = True
             print("[INFO] PowerShell 환경 감지 - 고급 메뉴 시스템 활성화")
         else:
