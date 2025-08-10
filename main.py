@@ -93,6 +93,7 @@ try:
                                         get_encounter_manager, get_field_skill_manager)
     from game.tutorial import show_help
     from game.error_logger import get_comprehensive_logger, log_error, log_debug, log_player_action, log_player_movement  # 완전체 로그 시스템
+    from game.cursor_menu_system import CursorMenu  # 커서 메뉴 시스템
     from config import game_config
 except ImportError as e:
     print(f"핵심 모듈 임포트 오류: {e}")
@@ -11553,8 +11554,8 @@ class DawnOfStellarGame:
             
             try:
                 # 간단한 입력 기반 메뉴 시스템 사용 (커서 메뉴 문제 해결)
-                # 최소 출력 모드: 옵션만 한 줄 요약 (배너 제거) - 핫시트 멀티플레이어 추가
-                print("[1]시작 [2]불러오기 [3]핫시트멀티 [T]트레이닝 [M]메타 [4]레시피 [B]가이드 [6]설정 [0]종료")
+                # 최소 출력 모드: 옵션만 한 줄 요약 (배너 제거)
+                print("[1]시작 [2]불러오기 [T]트레이닝 [M]메타 [4]레시피 [B]가이드 [6]설정 [0]종료")
                 
                 # 사용자 입력 받기
                 try:
@@ -11574,8 +11575,6 @@ class DawnOfStellarGame:
                     result = 0  # 게임 시작
                 elif choice.lower() == '2':
                     result = 1  # 게임 불러오기
-                elif choice.lower() == '3':
-                    result = 8  # 핫시트 멀티플레이어 (수정됨)
                 elif choice.lower() == 't':
                     result = 2  # 트레이닝 룸
                 elif choice.lower() == 'm':
@@ -11600,8 +11599,6 @@ class DawnOfStellarGame:
                     choice = '1'
                 elif result == 1:  # 게임 불러오기
                     choice = '2'
-                elif result == 8:  # 핫시트 멀티플레이어 (수정됨)
-                    choice = '3'
                 elif result == 2:  # 트레이닝 룸
                     choice = 'T'
                 elif result == 3:  # 메타 진행
@@ -11654,7 +11651,6 @@ class DawnOfStellarGame:
                 
                 print(f"{cyan('1️⃣')}  게임 시작")
                 print(f"{blue('2️⃣')}  게임 불러오기")
-                print(f"{bright_green('3️⃣')}  핫시트 멀티플레이어") 
                 print(f"{bright_magenta('T️⃣')}  트레이닝 룸")
                 print(f"{yellow('M️⃣')}  메타 진행")
                 print(f"{green('4️⃣')}  레시피 컬렉션")
@@ -11775,11 +11771,10 @@ class DawnOfStellarGame:
             try:
                 from game.cursor_menu_system import create_simple_menu
                 
-                # 메뉴 옵션 설정 - 핫시트 멀티플레이어 추가
                 options = [
                     "🚀 게임 시작",
                     "📁 게임 불러오기",
-                    "� 핫시트 멀티플레이어",
+                    "🤖 AI 멀티플레이어",
                     "⭐ 메타 진행",
                     "📖 레시피 컬렉션",
                     "👶 초보자 가이드",
@@ -11790,7 +11785,7 @@ class DawnOfStellarGame:
                 descriptions = [
                     "새로운 모험을 시작합니다",
                     "이전에 저장된 게임을 불러옵니다",
-                    "한 컴퓨터에서 여러 명이 함께 플레이합니다",
+                    "AI와 함께 협력하거나 경쟁하며 플레이합니다",
                     "캐릭터 해금, 특성 해금, 영구 강화 등 메타 시스템을 관리합니다",
                     "발견한 레시피들을 확인합니다",
                     "게임이 처음이신 분을 위한 친절한 가이드와 튜토리얼입니다",
@@ -12036,114 +12031,153 @@ class DawnOfStellarGame:
             return True
         
         elif choice == '3':
-            # 핫시트 멀티플레이어 (수정됨)
+            # AI 멀티플레이어
+            self.safe_play_sfx("menu_select")
+            self._start_robat_multiplayer()
+            
+            # 화면 클리어하고 아스키 아트 다시 표시
+            print("\033[2J\033[H")  # 화면 클리어
+            self._ascii_art_displayed = False  # 아스키 아트 다시 표시하도록 플래그 리셋
+            return True
+
+    def _start_robat_multiplayer(self):
+        """로-바트 멀티플레이어 모드 시작"""
+        try:
+            # 옵션과 설명을 분리
+            option_titles = [
+                "🤝 협력 모드",
+                "🏆 경쟁 모드", 
+                "🎓 학습 모드",
+                "🔥 혼합 모드"
+            ]
+            
+            option_descriptions = [
+                "AI와 함께 던전 탐험",
+                "AI와 실력 경쟁",
+                "AI가 플레이를 관찰하고 학습",
+                "인간+AI 혼합 파티"
+            ]
+            
+            cursor_menu = CursorMenu(
+                title="🤖 AI 멀티플레이어",
+                extra_content="AI 멀티플레이어란?\n• AI와 함께 협력하거나 경쟁하며 플레이\n• 로-바트들이 지능적으로 함께 모험\n• 실시간 채팅과 전략적 의사소통\n• 다양한 AI 개성과 특화 전술",
+                options=option_titles,
+                descriptions=option_descriptions,
+                cancellable=True
+            )
+            
+            choice_index = cursor_menu.show()
+            
+            if choice_index == 0:
+                # 협력 모드
+                print(f"\n{cyan('🤝 로-바트와 함께 던전을 탐험합니다!')}")
+                import asyncio
+                from game.robat_multiplayer import run_robat_multiplayer_test
+                asyncio.run(run_robat_multiplayer_test())
+                
+            elif choice_index == 1:
+                # 경쟁 모드 (AI vs AI 관전)
+                print(f"\n{cyan('🏆 AI들끼리 플레이하는 것을 관전합니다!')}")
+                import asyncio
+                from game.ultimate_multiplayer_ai import run_ultimate_multiplayer_ai_test
+                asyncio.run(run_ultimate_multiplayer_ai_test())
+                
+            elif choice_index == 2:
+                # 학습 모드
+                print(f"\n{cyan('🎓 AI 학습 시스템을 시작합니다!')}")
+                from game.ultimate_ai_learning_system import demo_ultimate_ai_system
+                demo_ultimate_ai_system()
+                
+            elif choice_index == 3:
+                # 혼합 모드
+                print(f"\n{cyan('🔥 인간과 AI가 함께 플레이합니다!')}")
+                from game.human_ai_hybrid_multiplayer import demo_hybrid_system
+                demo_hybrid_system()
+                
+            elif choice_index is None:
+                print(f"\n{bright_cyan('메인 메뉴로 돌아갑니다.')}")
+                
+        except Exception as e:
+            print(f"❌ AI 멀티플레이어 실행 중 오류: {e}")
+            print(f"\n{bright_cyan('메인 메뉴로 돌아갑니다.')}")
+            input("확인하려면 Enter를 누르세요...")
+        
+        # 화면 클리어하고 아스키 아트 다시 표시
+        print("\033[2J\033[H")  # 화면 클리어
+        self._ascii_art_displayed = False  # 아스키 아트 다시 표시하도록 플래그 리셋
+        return True
+
+    def _start_integrated_multiplayer(self):
+        """통합 멀티플레이어 모드 시작"""
+        try:
+            # 옵션과 설명을 분리
+            option_titles = [
+                "🌐 서버 호스팅",
+                "🔗 클라이언트 접속",
+                "🏠 LAN 게임"
+            ]
+            
+            option_descriptions = [
+                "멀티플레이어 서버를 시작하여 다른 플레이어 초대",
+                "다른 플레이어의 서버에 접속",
+                "같은 네트워크의 플레이어와 게임"
+            ]
+            
+            cursor_menu = CursorMenu(
+                title="🌐 통합 멀티플레이어",
+                extra_content="실시간 온라인 멀티플레이어\n• 최대 4명까지 함께 플레이\n• 실시간 채팅과 협력\n• 동기화된 게임 진행\n• 안정적인 네트워크 연결",
+                options=option_titles,
+                descriptions=option_descriptions,
+                cancellable=True
+            )
+            
+            choice_index = cursor_menu.show()
+            
+            if choice_index == 0:
+                # 서버 호스팅
+                print(f"\n{cyan('🌐 멀티플레이어 서버를 시작합니다!')}")
+                from game.integrated_multiplayer import start_multiplayer_server
+                start_multiplayer_server()
+                
+            elif choice_index == 1:
+                # 클라이언트 접속
+                print(f"\n{cyan('🔗 서버에 접속합니다!')}")
+                server_ip = input("서버 IP 주소를 입력하세요 (기본값: localhost): ").strip()
+                if not server_ip:
+                    server_ip = "localhost"
+                print(f"서버 {server_ip}에 접속을 시도합니다...")
+                # 클라이언트 접속 로직 (추후 구현)
+                
+            elif choice_index == 2:
+                # LAN 게임
+                print(f"\n{cyan('🏠 LAN 게임을 시작합니다!')}")
+                print("로컬 네트워크에서 게임을 찾고 있습니다...")
+                # LAN 게임 로직 (추후 구현)
+                
+            elif choice_index is None:
+                print(f"\n{bright_cyan('메인 메뉴로 돌아갑니다.')}")
+                
+        except Exception as e:
+            print(f"❌ 멀티플레이어 실행 중 오류: {e}")
+            print(f"\n{bright_cyan('메인 메뉴로 돌아갑니다.')}")
+            input("확인하려면 Enter를 누르세요...")
+        
+        # 화면 클리어하고 아스키 아트 다시 표시
+        print("\033[2J\033[H")  # 화면 클리어
+        self._ascii_art_displayed = False  # 아스키 아트 다시 표시하도록 플래그 리셋
+        return True
+        
+    def handle_menu_choice(self, choice):
+        """메뉴 선택 처리"""
+        if choice == '4':
+            # 레시피 컬렉션
             self.safe_play_sfx("menu_select")
             try:
-                from game.hotseat_multiplayer import setup_hotseat_multiplayer, get_hotseat_manager
-                
-                print(f"\n{bright_cyan('🎮 핫시트 멀티플레이어')}")
-                print("=" * 30)
-                print()
-                print(f"{bright_yellow('핫시트 멀티플레이어란?')}")
-                print("• 한 컴퓨터에서 여러 명이 번갈아가며 플레이")
-                print("• 각자 파티 멤버를 배정받아 조종")
-                print("• 탐험은 한 명이 담당, 전투는 각자 조종")
-                print("• 기존 세이브파일과 완전 호환")
-                print()
-                
-                # 새 게임 vs 불러오기 선택
-                print("1. 새 게임으로 핫시트 시작")
-                print("2. 기존 세이브를 핫시트로 변환")
-                print("0. 메인 메뉴로 돌아가기")
-                print()
-                
-                hotseat_choice = input(f"{bright_yellow('선택하세요: ')}")
-                
-                if hotseat_choice == '1':
-                    # 새 게임으로 핫시트 시작
-                    print(f"\n{cyan('새 게임으로 핫시트 멀티플레이어를 시작합니다.')}")
-                    
-                    # 핫시트 설정
-                    if setup_hotseat_multiplayer(self):
-                        # 난이도 선택
-                        game = DawnOfStellarGame()
-                        if hasattr(self, 'sound_manager') and self.sound_manager:
-                            game.audio_system = self.sound_manager
-                            game.sound_manager = self.sound_manager
-                        game.permanent_progression = self.permanent_progression
-                        
-                        selected_difficulty = game.select_difficulty()
-                        if selected_difficulty is None:
-                            print(f"\n{bright_cyan('메인 메뉴로 돌아갑니다.')}")
-                            self._smart_play_main_menu_bgm()
-                            del game
-                            return True
-                        
-                        # 캐릭터 선택
-                        if game.show_character_selection():
-                            # 핫시트 매니저 연결
-                            hotseat_manager = get_hotseat_manager()
-                            game.hotseat_manager = hotseat_manager
-                            
-                            # 캐릭터 배정
-                            if hotseat_manager.assign_characters(game.party_manager.members):
-                                game.selected_difficulty = selected_difficulty
-                                print(f"\n{bright_green('🎮 핫시트 멀티플레이어 게임을 시작합니다!')}")
-                                game.start_adventure()
-                            else:
-                                print(f"\n{bright_red('캐릭터 배정 실패. 메인 메뉴로 돌아갑니다.')}")
-                        else:
-                            print(f"\n{bright_cyan('메인 메뉴로 돌아갑니다.')}")
-                        
-                        self._play_main_menu_bgm()
-                        del game
-                    
-                elif hotseat_choice == '2':
-                    # 기존 세이브를 핫시트로 변환
-                    print(f"\n{cyan('기존 세이브파일을 핫시트 모드로 불러옵니다.')}")
-                    
-                    load_game = DawnOfStellarGame()
-                    if hasattr(self, 'sound_manager') and self.sound_manager:
-                        load_game.audio_system = self.sound_manager
-                        load_game.sound_manager = self.sound_manager
-                    load_game.permanent_progression = self.permanent_progression
-                    
-                    if load_game.load_game():
-                        party_count = len(load_game.party_manager.members)
-                        if party_count > 0:
-                            # 핫시트 설정
-                            if setup_hotseat_multiplayer(load_game):
-                                hotseat_manager = get_hotseat_manager()
-                                load_game.hotseat_manager = hotseat_manager
-                                
-                                # 기존 캐릭터에 플레이어 배정
-                                if hotseat_manager.assign_characters(load_game.party_manager.members):
-                                    print(f"\n{bright_green('🎮 핫시트 모드로 게임을 재개합니다!')}")
-                                    load_game.start_adventure(skip_passive_selection=True, skip_ai_mode_selection=True)
-                                else:
-                                    print(f"\n{bright_red('캐릭터 배정 실패.')}")
-                            else:
-                                print(f"\n{bright_red('핫시트 설정 실패.')}")
-                        else:
-                            print(f"\n{bright_red('파티 정보가 없습니다.')}")
-                    else:
-                        print(f"\n{bright_red('세이브파일 로드 실패.')}")
-                    
-                    self._play_main_menu_bgm()
-                    del load_game
-                
-                elif hotseat_choice == '0':
-                    print(f"\n{bright_cyan('메인 메뉴로 돌아갑니다.')}")
-                else:
-                    print(f"{bright_red('잘못된 선택입니다.')}")
-                    
+                from game.cooking_system import show_recipe_collection
+                show_recipe_collection()
             except Exception as e:
-                print(f"{bright_red(f'핫시트 멀티플레이어 오류: {e}')}")
-                print("📋 가능한 원인:")
-                print("   - 핫시트 모듈 로딩 실패")
-                print("   - 설정 과정에서 오류")
-                input("메인 메뉴로 돌아가려면 Enter를 누르세요...")
-                
+                print(f"❌ 레시피 컬렉션 오류: {e}")
+                input("아무 키나 눌러 계속...")
             # 화면 클리어하고 아스키 아트 다시 표시
             print("\033[2J\033[H")  # 화면 클리어
             self._ascii_art_displayed = False  # 아스키 아트 다시 표시하도록 플래그 리셋
@@ -12156,20 +12190,6 @@ class DawnOfStellarGame:
                 self.show_meta_progression_menu()
             else:
                 print("메타 진행 시스템이 초기화되지 않았습니다.")
-                input("아무 키나 눌러 계속...")
-            # 화면 클리어하고 아스키 아트 다시 표시
-            print("\033[2J\033[H")  # 화면 클리어
-            self._ascii_art_displayed = False  # 아스키 아트 다시 표시하도록 플래그 리셋
-            return True
-            
-        elif choice == '4':
-            # 레시피 컬렉션
-            self.safe_play_sfx("menu_select")
-            try:
-                from game.cooking_system import show_recipe_collection
-                show_recipe_collection()
-            except Exception as e:
-                print(f"❌ 레시피 컬렉션 오류: {e}")
                 input("아무 키나 눌러 계속...")
             # 화면 클리어하고 아스키 아트 다시 표시
             print("\033[2J\033[H")  # 화면 클리어
@@ -12214,7 +12234,7 @@ class DawnOfStellarGame:
                 return False  # 게임 종료
             # 확인 취소 시 메뉴 계속
             return True
-            
+        
         else:
             error_msg = f"잘못된 선택입니다: '{choice}'"
             self.safe_play_sfx("error")
@@ -18097,6 +18117,85 @@ def main():
         except Exception as e:
             print(f"{bright_red('❌ Ollama 서버 시작 중 오류:')} {e}")
             return False
+
+
+    def _start_ai_cooperative_mode(self):
+        """AI 협력 모드 시작"""
+        try:
+            print(f"\n{bright_green('🤝 AI 협력 모드를 시작합니다!')}")
+            print("AI 파트너들과 함께 던전을 탐험하세요!")
+            print()
+            
+            # AI 협력 멀티플레이어 실행
+            from game.robat_multiplayer import run_robat_multiplayer_test
+            import asyncio
+            asyncio.run(run_robat_multiplayer_test())
+            
+        except ImportError as e:
+            print(f"❌ AI 협력 시스템을 불러올 수 없습니다: {e}")
+            print("💡 robat_multiplayer 모듈이 필요합니다.")
+        except Exception as e:
+            print(f"❌ AI 협력 모드 실행 중 오류: {e}")
+        
+        input("메인 메뉴로 돌아가려면 Enter를 누르세요...")
+
+    def _start_ai_competitive_mode(self):
+        """AI 경쟁 모드 시작"""
+        try:
+            print(f"\n{bright_red('🏆 AI 경쟁 모드를 시작합니다!')}")
+            print("AI들과 실력을 겨뤄보세요!")
+            print()
+            
+            # 궁극 AI 시스템 실행  
+            from game.ultimate_multiplayer_ai import run_ultimate_multiplayer_ai_test
+            import asyncio
+            asyncio.run(run_ultimate_multiplayer_ai_test())
+            
+        except ImportError as e:
+            print(f"❌ AI 경쟁 시스템을 불러올 수 없습니다: {e}")
+            print("💡 ultimate_multiplayer_ai 모듈이 필요합니다.")
+        except Exception as e:
+            print(f"❌ AI 경쟁 모드 실행 중 오류: {e}")
+        
+        input("메인 메뉴로 돌아가려면 Enter를 누르세요...")
+
+    def _start_ai_learning_mode(self):
+        """AI 학습 모드 시작"""
+        try:
+            print(f"\n{bright_cyan('🎓 AI 학습 모드를 시작합니다!')}")
+            print("AI가 당신의 플레이를 관찰하고 학습합니다!")
+            print()
+            
+            # AI 학습 시스템 실행
+            from game.ultimate_ai_learning_system import demo_ultimate_ai_system
+            demo_ultimate_ai_system()
+            
+        except ImportError as e:
+            print(f"❌ AI 학습 시스템을 불러올 수 없습니다: {e}")
+            print("💡 ultimate_ai_learning_system 모듈이 필요합니다.")
+        except Exception as e:
+            print(f"❌ AI 학습 모드 실행 중 오류: {e}")
+        
+        input("메인 메뉴로 돌아가려면 Enter를 누르세요...")
+
+    def _start_ai_hybrid_mode(self):
+        """AI 혼합 모드 시작"""
+        try:
+            print(f"\n{bright_magenta('🔥 AI 혼합 모드를 시작합니다!')}")
+            print("인간과 AI가 완벽하게 협력하는 혼합 파티!")
+            print()
+            
+            # 인간-AI 혼합 시스템 실행
+            from game.human_ai_hybrid_multiplayer import demo_hybrid_system
+            demo_hybrid_system()
+            
+        except ImportError as e:
+            print(f"❌ AI 혼합 시스템을 불러올 수 없습니다: {e}")
+            print("💡 human_ai_hybrid_multiplayer 모듈이 필요합니다.")
+        except Exception as e:
+            print(f"❌ AI 혼합 모드 실행 중 오류: {e}")
+        
+        input("메인 메뉴로 돌아가려면 Enter를 누르세요...")
 
 
 if __name__ == "__main__":
