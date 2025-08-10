@@ -1,4 +1,4 @@
-# ⭐ Dawn Of Stellar - 별빛의 여명 v3.1.0
+# ⭐ Dawn Of Stellar - 별빛의 여명 v3.1.1
 
 <div align="center">
 
@@ -6,7 +6,7 @@
 ![Platform](https://img.shields.io/badge/platform-windows%20%7C%20linux%20%7C%20macos-lightgrey.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Game](https://img.shields.io/badge/genre-roguelike%20%7C%20rpg-orange.svg)
-![Version](https://img.shields.io/badge/version-3.1.0-brightgreen.svg)
+![Version](https://img.shields.io/badge/version-3.1.1-brightgreen.svg)
 
 **차세대 ASCII 기반 콘솔 로그라이크 RPG**
 
@@ -21,8 +21,21 @@ Final Fantasy 스타일의 혁신적인 Brave 전투 시스템과
 
 ## 🌟 게임 소개
 
-Dawn Of Stellar v3.1.0은 클래식한 로그라이크의 재미와 현대적인 전투 시스템, 그리고 **메타 진행 시스템**을 결합한 혁신적인 ASCII 콘솔 RPG입니다. 
+Dawn Of Stellar v3.1.1은 클래식한 로그라이크의 재미와 현대적인 전투 시스템, 그리고 **메타 진행 시스템**을 결합한 혁신적인 ASCII 콘솔 RPG입니다. 
 28개의 개성 넘치는 직업군으로 구성된 파티와 함께 무작위 생성되는 차원 공간을 탐험하며, 전략적인 BRV/HP 전투 시스템으로 강력한 적들을 물리쳐보세요!
+
+## 🚀 v3.1.1 주요 업데이트 (2025-08-10)
+
+### 🔧 완전 자동화된 전투 시스템
+- **Enter 입력 대기 완전 제거**: 승리/패배 시 자동 진행
+- **전투 속도 대폭 향상**: 모든 대기 시간 단축 (2초 → 0.5초)
+- **915개 Color.value 오류 완전 해결**: 안정적인 색상 시스템
+- **log_debug 메서드 인수 오류 수정**: 완벽한 로깅 시스템
+
+### 🎮 사용자 경험 개선
+- **전투 화면 최적화**: 상단 여백 3줄로 깔끔한 UI
+- **자동 진행 시스템**: 공격/스킬 사용 후 즉시 다음 단계
+- **AI 턴 처리 최적화**: 빠른 AI 행동 처리
 
 ## 📊 v3.1.0 주요 업데이트
 

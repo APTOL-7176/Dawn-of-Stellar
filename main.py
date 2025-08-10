@@ -82,7 +82,8 @@ try:
     from game.world import GameWorld
     from game.meta_progression import MetaProgression, get_meta_progression
     from game.items import ItemDatabase
-    from game.input_utils import UnifiedInputManager, get_single_key_input
+    # 새로운 하이브리드 입력 시스템 사용
+    from game.hybrid_input import DawnOfStellarInputManager, get_single_key_input
     from game.color_text import (ColorText, Color, bright_cyan, bright_yellow, bright_green, 
                                  bright_white, bright_red, red, green, blue, yellow, 
                                  cyan, magenta, bright_magenta, colored, rarity_colored, RED, RESET)
@@ -587,11 +588,22 @@ class DawnOfStellarGame:
         # 클래식 게임모드 기본값 설정 (기본적으로 비활성화)
         self.ai_game_mode_enabled = False
         
-        # 키보드 입력 초기화 (게임패드 지원)
-        self.keyboard = UnifiedInputManager()
+        # 🎮 게임패드 환경 활성화 (런처의 안전 모드 해제)
+        try:
+            from game.gamepad_input import enable_gamepad_for_game
+            enable_gamepad_for_game()
+        except Exception as e:
+            print(f"⚠️ 게임패드 환경 활성화 실패: {e}")
         
-        # 게임패드 상태 표시
-        self._show_gamepad_status()
+        # 하이브리드 입력 시스템 초기화 (키보드 + 게임패드)
+        try:
+            self.keyboard = DawnOfStellarInputManager(sound_manager=getattr(self, 'audio_manager', None))
+            print("✅ Dawn of Stellar 하이브리드 입력 시스템 초기화 완료")
+        except Exception as e:
+            print(f"⚠️ 하이브리드 입력 시스템 초기화 실패: {e}")
+            # 기본 키보드 입력으로 폴백
+            from game.input_utils import KeyboardInput
+            self.keyboard = KeyboardInput()
         
         # 게임 통계
         self.score = 0
@@ -7297,11 +7309,21 @@ class DawnOfStellarGame:
             print(f"{bright_cyan('═══════════════════════════════════════')}")
             print(f"{bright_yellow('📍 이동 조작:')}")
             print(f"   {bright_white('W/A/S/D')} 또는 {bright_white('방향키')} - 캐릭터 이동")
+            
+            # 게임패드 연결 상태 확인 및 추가 가이드 표시
+            if hasattr(self.keyboard, 'is_gamepad_connected') and self.keyboard.is_gamepad_connected():
+                print(f"   {bright_green('🎮 게임패드:')} 왼쪽 스틱 또는 D-Pad")
+            
             print()
             print(f"{cyan('📋 메뉴 조작:')}")
             print(f"   {bright_white('I')} - 🎒 인벤토리 (소모품과 장비)")
             print(f"   {bright_white('P')} - 👥 파티 상태 (캐릭터 정보)")  
             print(f"   {bright_white('F')} - 🗺️  필드 활동 (스킬 & 요리 & 상인)")
+            
+            # 게임패드 메뉴 조작법
+            if hasattr(self.keyboard, 'is_gamepad_connected') and self.keyboard.is_gamepad_connected():
+                print(f"   {bright_green('🎮 게임패드:')} X(인벤토리), LB(파티), Y(필드)")
+            
             print()
             print(f"{magenta('⚙️  시스템 조작:')}")
             print(f"   {bright_white('H')} - ❓ 도움말 (이 화면)")
@@ -7310,6 +7332,12 @@ class DawnOfStellarGame:
             print(f"   {bright_white('B')} - 💾 게임 저장")
             print(f"   {bright_white('T')} - ⚔️ 자동전투 토글")
             print(f"   {bright_white('Z')} - 🌀 긴급 텔레포트 (갇혔을 때 사용)")
+            print(f"   {bright_white('Enter')} - ✅ 확인/상호작용")
+            
+            # 게임패드 시스템 조작법
+            if hasattr(self.keyboard, 'is_gamepad_connected') and self.keyboard.is_gamepad_connected():
+                print(f"   {bright_green('🎮 게임패드:')} A(확인), B(취소), RB(도움말), LT(저장)")
+                print(f"   {bright_green('            ')} RT(자동전투), L스틱클릭(텔레포트)")
             
             # 클래식 게임모드인 경우 추가 조작법
             if hasattr(self, 'ai_game_mode_enabled') and self.ai_game_mode_enabled:
@@ -7318,6 +7346,15 @@ class DawnOfStellarGame:
                 print(f"   {bright_white('M')} - 🎛️ 클래식 모드 설정")
                 print(f"   {bright_white('R')} - 💬 AI 요청 처리")
                 print(f"   {bright_white('Y')} - 📊 AI 상태 확인")
+                
+                if hasattr(self.keyboard, 'is_gamepad_connected') and self.keyboard.is_gamepad_connected():
+                    print(f"   {bright_green('🎮:')} Start(설정), R스틱클릭(AI요청)")
+            
+            # 상세한 게임패드 가이드 옵션
+            if hasattr(self.keyboard, 'is_gamepad_connected') and self.keyboard.is_gamepad_connected():
+                print()
+                print(f"{bright_magenta('🎮 상세한 게임패드 조작법을 보시겠습니까?')}")
+                print(f"   {bright_white('G')} - 게임패드 상세 가이드 보기")
             
             print(f"{bright_cyan('═══════════════════════════════════════')}")
             print(f"{bright_green('💡 팁: 차원 공간을 탐험하며 차원 생명체와 전투하고 보물을 찾아보세요!')}")
@@ -7325,7 +7362,15 @@ class DawnOfStellarGame:
             
             # 조작법을 다시 표시하도록 플래그 리셋
             self._controls_shown = False
-            self.keyboard.wait_for_key("🔑 아무 키나 눌러 계속...")
+            
+            # 게임패드 상세 가이드 옵션 처리
+            if hasattr(self.keyboard, 'is_gamepad_connected') and self.keyboard.is_gamepad_connected():
+                key = self.keyboard.wait_for_key("🔑 아무 키나 누르세요 (G: 게임패드 상세 가이드)...")
+                if key.lower() == 'g':
+                    self.keyboard.show_gamepad_guide()
+                    self.keyboard.wait_for_key("🔑 아무 키나 눌러 계속...")
+            else:
+                self.keyboard.wait_for_key("🔑 아무 키나 눌러 계속...")
             
         elif action.lower() == 't':  # T키로 자동전투 토글
             self.toggle_auto_battle()
@@ -7804,7 +7849,7 @@ class DawnOfStellarGame:
                         # 장착된 장비 정보
                         print(f"\n{bright_cyan('🎒 장착된 장비:')}")
                         try:
-                            if selected_member:  # locals() 체크 제거
+                            if 'selected_member' in locals() and selected_member:  # 안전한 체크
                                 equipped_items = selected_member.get_equipped_items()
                                 equipment_found = False
                                 
@@ -8265,6 +8310,40 @@ class DawnOfStellarGame:
                             traceback.print_exc()
                         
                         return  # handle_player_movement 종료하여 main_game_loop로 돌아감
+                    
+                    elif result_type == "tile_interaction":
+                        # 특수 타일 상호작용 성공
+                        interaction_result = result.get("result", {})
+                        position = result.get("position")
+                        tile_type = result.get("tile_type")
+                        
+                        print(f"\n🔮 {bright_cyan('특수 타일 상호작용 성공!')}")
+                        print(f"📍 위치: {position}")
+                        if interaction_result.get('message'):
+                            print(f"✨ {interaction_result['message']}")
+                        
+                        # 일시정지가 필요한 경우
+                        if interaction_result.get('pause'):
+                            input(f"\n{bright_yellow('엔터를 눌러 계속...')}")
+                        
+                        return
+                    
+                    elif result_type == "tile_interaction_failed":
+                        # 특수 타일 상호작용 실패
+                        interaction_result = result.get("result", {})
+                        position = result.get("position")
+                        tile_type = result.get("tile_type")
+                        
+                        print(f"\n❌ {bright_red('특수 타일 상호작용 실패!')}")
+                        print(f"📍 위치: {position}")
+                        if interaction_result.get('message'):
+                            print(f"💬 {interaction_result['message']}")
+                        
+                        # 일시정지가 필요한 경우
+                        if interaction_result.get('pause'):
+                            input(f"\n{bright_yellow('엔터를 눌러 계속...')}")
+                        
+                        return
                     
                     elif result_type == "item":
                         # 아이템 획득
@@ -11249,9 +11328,6 @@ class DawnOfStellarGame:
         # 메인 메뉴 표시 및 선택 처리 루프
         while self.running:
             choice = None  # choice 변수 초기화
-            print("🔄 메뉴 루프 시작!")  # 디버그 출력
-            sys.stdout.flush()
-            time.sleep(0.5)  # 디버그 메시지 표시 시간
             
             try:
                 # 간단한 입력 기반 메뉴 시스템 사용 (커서 메뉴 문제 해결)
@@ -11293,9 +11369,7 @@ class DawnOfStellarGame:
                     time.sleep(0.5)
                     continue  # 다시 메뉴로
                 
-                print(f"🎯 메뉴 결과: {result}")  # 디버그 출력
-                sys.stdout.flush()
-                time.sleep(0.5)  # 결과 표시 시간
+                # 메뉴 결과 처리
                 
                 # 선택 결과 처리
                 if result == 0:  # 게임 시작
@@ -11323,14 +11397,11 @@ class DawnOfStellarGame:
                     else:
                         continue  # 확인 취소 시 메뉴 계속
                 else:
-                    print(f"디버그: 알 수 없는 결과 = {result}")
-                    sys.stdout.flush()
+                    # 알 수 없는 결과 처리
                     continue
                 
                 # 실제 메뉴 선택 처리
                 if choice is not None:
-                    print(f"🎮 메뉴 선택 처리: {choice}")  # 디버그 출력
-                    sys.stdout.flush()
                     processed = self._process_menu_choice(choice)
                     if not processed:  # 게임 종료가 선택된 경우
                         break
@@ -11399,8 +11470,6 @@ class DawnOfStellarGame:
                 time.sleep(0.5)
                 
                 # 폴백 메뉴 선택 처리
-                print(f"🎮 폴백 메뉴 선택 처리: {choice}")  # 디버그 출력
-                sys.stdout.flush()
                 processed = self._process_menu_choice(choice)
                 if not processed:  # 게임 종료가 선택된 경우
                     break
@@ -14191,111 +14260,123 @@ class DawnOfStellarGame:
             print(f"\n{item.name}을(를) 장착하시겠습니까?")
             print(f"소유자: {owner.name}")
             
-            # 파티원 선택 메뉴 (상세 정보 포함)
-            from game.cursor_menu_system import create_character_detail_menu
-            member_menu = create_character_detail_menu("장착할 파티원 선택", self.party_manager.members)
-            member_choice = member_menu.run()
+            # 소유자 본인만 장착 가능하도록 수정
+            from game.cursor_menu_system import create_simple_menu
             
-            if member_choice is not None and member_choice < len(self.party_manager.members):
-                target_member = self.party_manager.members[member_choice]
-                
-                # 장비 슬롯 결정
-                from game.items import ItemType
-                slot_map = {
-                    ItemType.WEAPON: "weapon",
-                    ItemType.ARMOR: "armor",
-                    ItemType.ACCESSORY: "accessory"
-                }
-                
-                slot_name = slot_map.get(item.item_type)
-                if not slot_name:
-                    print(f"❌ {item.name}은(는) 장착할 수 없는 아이템입니다.")
-                    self.keyboard.wait_for_key("아무 키나 눌러 계속...")
-                    return
-                
-                # 현재 장착된 아이템 확인
-                current_item = getattr(target_member, f"equipped_{slot_name}", None)
-                
-                if current_item:
-                    try:
-                        from game.cursor_menu_system import create_simple_menu
-                        
-                        options = [
-                            f"✅ 교체하기 ({current_item.name} → {item.name})",
-                            "❌ 취소하기"
-                        ]
-                        descriptions = [
-                            f"현재 장착된 {current_item.name}을(를) 해제하고 {item.name}을(를) 장착합니다.",
-                            "장착을 취소하고 이전 메뉴로 돌아갑니다."
-                        ]
-                        
-                        menu = create_simple_menu(
-                            f"⚠️ {target_member.name} 장비 교체 확인",
-                            options,
-                            descriptions
-                        )
-                        choice = menu.run()
-                        
-                        if choice != 0:  # 교체하기가 아님
-                            return
-                            
-                    except ImportError:
-                        # 폴백: 기존 Y/N 방식
-                        print(f"⚠️ {target_member.name}이(가) 이미 {current_item.name}을(를) 장착하고 있습니다.")
-                        print("교체하시겠습니까? (Y/N)")
-                        
-                        choice = input().strip().upper()
-                        if choice != 'Y':
-                            print("장착을 취소했습니다.")
-                            self.keyboard.wait_for_key("아무 키나 눌러 계속...")
-                            return
+            # 확인 메뉴만 표시 (본인에게 장착)
+            confirm_menu = create_simple_menu(
+                f"{owner.name}에게 {item.name} 장착", 
+                ["✅ 장착", "❌ 취소"],
+                [
+                    f"{owner.name}에게 {item.name}을(를) 장착합니다",
+                    "장착을 취소하고 이전 메뉴로 돌아갑니다"
+                ]
+            )
+            
+            choice = confirm_menu.run()
+            if choice != 0:  # 취소
+                return
+            
+            # 소유자에게 직접 장착
+            target_member = owner
+            
+            # 장비 슬롯 결정
+            from game.items import ItemType
+            slot_map = {
+                ItemType.WEAPON: "weapon",
+                ItemType.ARMOR: "armor",
+                ItemType.ACCESSORY: "accessory"
+            }
+            
+            slot_name = slot_map.get(item.item_type)
+            if not slot_name:
+                print(f"❌ {item.name}은(는) 장착할 수 없는 아이템입니다.")
+                self.keyboard.wait_for_key("아무 키나 눌러 계속...")
+                return
+            
+            # 현재 장착된 아이템 확인
+            current_item = getattr(target_member, f"equipped_{slot_name}", None)
+            
+            if current_item:
+                try:
+                    from game.cursor_menu_system import create_simple_menu
                     
-                    # 기존 아이템 해제하고 인벤토리에 추가
-                    unequipped = target_member.unequip_item(slot_name)
-                    if unequipped and hasattr(owner, 'inventory'):
-                        # Inventory.add_item은 Item 객체를 요구하므로 안전하게 처리
-                        if hasattr(owner.inventory, 'add_item'):
-                            try:
-                                owner.inventory.add_item(unequipped, 1)
-                            except Exception:
-                                # 폴백: 이름 기반 추가 시도
-                                if hasattr(owner.inventory, 'add_item_by_name'):
-                                    owner.inventory.add_item_by_name(unequipped.name, 1)
-                        print(f"🔄 {unequipped.name}을(를) 해제하고 {owner.name}의 인벤토리에 추가했습니다.")
+                    options = [
+                        f"✅ 교체하기 ({current_item.name} → {item.name})",
+                        "❌ 취소하기"
+                    ]
+                    descriptions = [
+                        f"현재 장착된 {current_item.name}을(를) 해제하고 {item.name}을(를) 장착합니다.",
+                        "장착을 취소하고 이전 메뉴로 돌아갑니다."
+                    ]
+                    
+                    menu = create_simple_menu(
+                        f"⚠️ {target_member.name} 장비 교체 확인",
+                        options,
+                        descriptions
+                    )
+                    choice = menu.run()
+                    
+                    if choice != 0:  # 교체하기가 아님
+                        return
+                        
+                except ImportError:
+                    # 폴백: 기존 Y/N 방식
+                    print(f"⚠️ {target_member.name}이(가) 이미 {current_item.name}을(를) 장착하고 있습니다.")
+                    print("교체하시겠습니까? (Y/N)")
+                    
+                    choice = input().strip().upper()
+                    if choice != 'Y':
+                        print("장착을 취소했습니다.")
+                        self.keyboard.wait_for_key("아무 키나 눌러 계속...")
+                        return
                 
-                # 새 아이템 장착
-                if target_member.equip_item(item):
-                    # 인벤토리에서 아이템 제거
-                    if hasattr(owner, 'inventory') and hasattr(owner.inventory, 'remove_item'):
-                        owner.inventory.remove_item(item.name, 1)
-                    
-                    print(f"✅ {target_member.name}에게 {item.name}을(를) 장착했습니다!")
-                    
-                    # 장비 효과 표시
-                    if hasattr(item, 'get_effective_stats'):
-                        effective_stats = item.get_effective_stats()
-                        if effective_stats:
-                            print("📊 장비 효과:")
-                            for stat, value in effective_stats.items():
-                                if value > 0:
-                                    stat_name = {
-                                        "physical_attack": "물리공격력",
-                                        "physical_defense": "물리방어력",
-                                        "magic_attack": "마법공격력", 
-                                        "magic_defense": "마법방어력",
-                                        "speed": "속도",
-                                        "vision_range": "시야범위"
-                                    }.get(stat, stat)
-                                    print(f"   {stat_name}: +{value}")
-                    
-                    # 내구도 정보 표시
-                    if hasattr(item, 'get_durability_status'):
-                        durability_status = item.get_durability_status()
-                        if durability_status:
-                            print(f"🔧 내구도: {durability_status}")
-                            
-                else:
-                    print(f"❌ {item.name} 장착에 실패했습니다.")
+                # 기존 아이템 해제하고 인벤토리에 추가
+                unequipped = target_member.unequip_item(slot_name)
+                if unequipped and hasattr(owner, 'inventory'):
+                    # Inventory.add_item은 Item 객체를 요구하므로 안전하게 처리
+                    if hasattr(owner.inventory, 'add_item'):
+                        try:
+                            owner.inventory.add_item(unequipped, 1)
+                        except Exception:
+                            # 폴백: 이름 기반 추가 시도
+                            if hasattr(owner.inventory, 'add_item_by_name'):
+                                owner.inventory.add_item_by_name(unequipped.name, 1)
+                    print(f"🔄 {unequipped.name}을(를) 해제하고 {owner.name}의 인벤토리에 추가했습니다.")
+            
+            # 새 아이템 장착
+            if target_member.equip_item(item):
+                # 인벤토리에서 아이템 제거
+                if hasattr(owner, 'inventory') and hasattr(owner.inventory, 'remove_item'):
+                    owner.inventory.remove_item(item.name, 1)
+                
+                print(f"✅ {target_member.name}에게 {item.name}을(를) 장착했습니다!")
+                
+                # 장비 효과 표시
+                if hasattr(item, 'get_effective_stats'):
+                    effective_stats = item.get_effective_stats()
+                    if effective_stats:
+                        print("📊 장비 효과:")
+                        for stat, value in effective_stats.items():
+                            if value > 0:
+                                stat_name = {
+                                    "physical_attack": "물리공격력",
+                                    "physical_defense": "물리방어력",
+                                    "magic_attack": "마법공격력", 
+                                    "magic_defense": "마법방어력",
+                                    "speed": "속도",
+                                    "vision_range": "시야범위"
+                                }.get(stat, stat)
+                                print(f"   {stat_name}: +{value}")
+                
+                # 내구도 정보 표시
+                if hasattr(item, 'get_durability_status'):
+                    durability_status = item.get_durability_status()
+                    if durability_status:
+                        print(f"🔧 내구도: {durability_status}")
+                        
+            else:
+                print(f"❌ {item.name} 장착에 실패했습니다.")
                 
                 self.keyboard.wait_for_key("아무 키나 눌러 계속...")
             
@@ -15769,25 +15850,25 @@ class DawnOfStellarGame:
                     
                     # 장비가 있다면 최적화 실행, 없다면 기본 처리
                     if all_equipment_items:
-                        try:
-                            print(f"   🔧 장비 최적화 시스템 실행 중... ({len(all_equipment_items)}개 장비)")
-                            from game.equipment_helpers import optimize_all_equipment
-                            results = optimize_all_equipment(
-                                self.party_manager.members, 
-                                all_equipment_items, 
-                                show_results=True  # 디버깅을 위해 활성화
-                            )
+                        print(f"   🔧 기본 장비 최적화 시스템 실행 중... ({len(all_equipment_items)}개 장비)")
+                        
+                        # 간단하고 확실한 기본 최적화 사용
+                        optimization_results = []
+                        for member in self.party_manager.members:
+                            if not member.is_alive:
+                                continue
                             
-                            optimization_results = []
-                            for member_name, result in results.items():
-                                equipped_count = result.get('equipped', 0)
-                                if equipped_count > 0:
-                                    optimization_results.append(f"   ✅ {member_name}: {equipped_count}개 공평 분배 완료")
-                                else:
-                                    optimization_results.append(f"   ⚪ {member_name}: 분배 가능한 장비 없음")
-                        except ImportError:
-                            print("   ⚠️ 고급 최적화 시스템 사용 불가, 기본 최적화 사용")
-                            optimization_results = self._fallback_equipment_optimization(all_equipment_items)
+                            print(f"   🔧 {member.name} 기본 최적화 시작...")
+                            equipped_items = self._auto_equip_best_items(member)
+                            print(f"   📊 {member.name} 최적화 결과: {equipped_items}")
+                            
+                            if equipped_items:
+                                optimization_results.append(f"   ✅ {member.name}: {len(equipped_items)}개 아이템 자동 장착")
+                                # 실제 장착된 아이템 목록 출력
+                                for item_info in equipped_items:
+                                    print(f"      🔹 {item_info}")
+                            else:
+                                optimization_results.append(f"   ⚠️ {member.name}: 장착 가능한 장비 없음")
                     else:
                         print("   📭 인벤토리에 장비 아이템이 없습니다.")
                         optimization_results = []
@@ -15802,12 +15883,18 @@ class DawnOfStellarGame:
                 optimization_results = []
                 for member in self.party_manager.members:
                     if not member.is_alive:
+                        print(f"   💀 {member.name} 생존하지 않음, 건너뜀")
                         continue
                     
-                    print(f"   🔧 {member.name} 기본 최적화 중...")
+                    print(f"   🔧 {member.name} 폴백 기본 최적화 시작...")
                     equipped_items = self._auto_equip_best_items(member)
+                    print(f"   📊 {member.name} 폴백 최적화 결과: {equipped_items}")
+                    
                     if equipped_items:
                         optimization_results.append(f"   ✅ {member.name}: {len(equipped_items)}개 아이템 자동 장착")
+                        # 실제 장착된 아이템 목록 출력
+                        for item_info in equipped_items:
+                            print(f"      🔹 {item_info}")
                     else:
                         optimization_results.append(f"   ⚠️ {member.name}: 장착 가능한 장비 없음")
             
@@ -15990,6 +16077,8 @@ class DawnOfStellarGame:
         """캐릭터에게 최적의 장비를 자동 장착 (폴백 함수)"""
         equipped_items = []
         
+        print(f"      🔍 {character.name} 자동 장착 시작...")
+        
         try:
             from game.items import ItemDatabase, ItemType
             item_db = ItemDatabase()
@@ -15997,9 +16086,15 @@ class DawnOfStellarGame:
             # 캐릭터의 인벤토리에서 장비 아이템 찾기
             available_equipment = {}  # slot -> [items]
             
+            print(f"      📦 {character.name} 인벤토리 확인 중...")
+            
             if hasattr(character, 'inventory') and character.inventory:
+                print(f"      📂 인벤토리 존재 확인됨")
                 if hasattr(character.inventory, 'items'):
-                    for item_name, quantity in character.inventory.items.items():
+                    inventory_items = character.inventory.items.items()
+                    print(f"      📋 인벤토리 아이템 수: {len(inventory_items)}")
+                    
+                    for item_name, quantity in inventory_items:
                         if quantity > 0:
                             item = item_db.get_item(item_name)
                             if item and item.item_type in [ItemType.WEAPON, ItemType.ARMOR, ItemType.ACCESSORY]:
@@ -16009,13 +16104,21 @@ class DawnOfStellarGame:
                                     if slot not in available_equipment:
                                         available_equipment[slot] = []
                                     available_equipment[slot].append(item)
+                                    print(f"        🎒 {item_name} ({item.item_type.value}) → {slot} 슬롯")
+            else:
+                print(f"      ⚠️ {character.name} 인벤토리 없음")
+            
+            print(f"      📊 발견된 장비 슬롯: {list(available_equipment.keys())}")
             
             # 각 슬롯별로 최적 장비 선택 및 장착
             character_class = getattr(character, 'character_class', '전사')
+            print(f"      👤 {character.name} 직업: {character_class}")
             
             for slot, items in available_equipment.items():
                 if not items:
                     continue
+                
+                print(f"        🔧 {slot} 슬롯 최적화 중... ({len(items)}개 후보)")
                 
                 # 최적 아이템 선택 (직업 적합성 + 능력치 고려)
                 best_item = None
@@ -16023,25 +16126,51 @@ class DawnOfStellarGame:
                 
                 for item in items:
                     score = self._calculate_equipment_score(item, character_class, slot)
+                    print(f"          📈 {item.name}: 점수 {score}")
                     if score > best_score:
                         best_score = score
                         best_item = item
                 
+                print(f"        🏆 최선 선택: {best_item.name if best_item else '없음'}")
+                
                 # 최적 아이템 장착
                 if best_item:
                     try:
-                        success = character.equip_item(best_item)  # slot 파라미터 제거
+                        print(f"        🔧 {best_item.name} 장착 시도 중...")
+                        
+                        # 먼저 해당 슬롯에 기존 장비가 있으면 해제
+                        if hasattr(character, 'get_equipped_items'):
+                            current_equipped = character.get_equipped_items()
+                            # 슬롯 이름을 한글로 변환
+                            slot_korean = {"weapon": "무기", "armor": "방어구", "accessory": "장신구"}.get(slot, slot)
+                            if slot_korean in current_equipped and current_equipped[slot_korean]:
+                                print(f"        📤 기존 장비 {current_equipped[slot_korean].name} 해제 중...")
+                                character.unequip_item(slot_korean)
+                        
+                        # 새 장비 장착
+                        print(f"        🎯 {best_item.name} 장착 실행...")
+                        success = character.equip_item(best_item)
+                        
                         if success:
                             equipped_items.append(f"{best_item.name} ({slot})")
-                            # 인벤토리에서 제거
-                            if hasattr(character.inventory, 'remove_item'):
-                                character.inventory.remove_item(best_item.name, 1)
+                            print(f"        ✅ {best_item.name} ({slot}) 장착 성공!")
+                            # equip_item 메서드가 이미 인벤토리에서 제거하므로 별도 제거 불필요
+                        else:
+                            print(f"        ❌ {best_item.name} ({slot}) 장착 실패 - equip_item이 False 반환")
+                            
                     except Exception as e:
-                        print(f"   ⚠️ {best_item.name} 장착 실패: {e}")
+                        print(f"        ⚠️ {best_item.name} 장착 중 예외 발생: {e}")
+                        import traceback
+                        traceback.print_exc()
+                else:
+                    print(f"        ⚪ {slot} 슬롯에 적합한 아이템 없음")
         
         except Exception as e:
-            print(f"   ❌ 자동 장착 오류: {e}")
+            print(f"      ❌ {character.name} 자동 장착 전체 오류: {e}")
+            import traceback
+            traceback.print_exc()
         
+        print(f"      🎉 {character.name} 자동 장착 완료: {len(equipped_items)}개 장착됨")
         return equipped_items
 
     def _get_equipment_slot(self, item):
@@ -16352,50 +16481,96 @@ def increment_steps(game_data):
 
 def handle_interaction(game):
     """플레이어 주변 상호작용 처리 (커서 메뉴 사용)"""
+    
+    # 안전한 로깅 함수 정의
+    def safe_log_debug(category, message, data=None):
+        try:
+            from game.error_logger import log_debug
+            log_debug(category, message, data)
+        except:
+            print(f"[DEBUG] {category}: {message}")
+    
+    def safe_log_error(category, message, data=None):
+        try:
+            from game.error_logger import log_error
+            log_error(category, message, data)
+        except:
+            print(f"[ERROR] {category}: {message}")
+    
+    def safe_log_player_action(action, data=None):
+        try:
+            from game.error_logger import log_player_action
+            log_player_action(action, data)
+        except:
+            print(f"[PLAYER] {action}")
+    
     try:
         print("🔍 Enter키 상호작용 시작!")
-        log_debug("상호작용", f"상호작용 시도", {"플레이어위치": game.world.player_pos})
+        
+        safe_log_debug("상호작용", f"상호작용 시도", {"플레이어위치": game.world.player_pos})
         
         if not hasattr(game, 'world') or not game.world:
             print("❌ 월드 정보가 없습니다.")
-            log_error("상호작용", f"월드 정보 없음", data={"게임객체": hasattr(game, 'world')})
+            safe_log_error("상호작용", f"월드 정보 없음", data={"게임객체": hasattr(game, 'world')})
             return
         
         # 먼저 현재 위치에서 밟아서 상호작용하는 것들 확인
         px, py = game.world.player_pos
         current_tile = game.world.tiles[py][px]
         
-        log_debug("상호작용", f"현재 타일 확인", {
+        print(f"[DEBUG] 현재 위치: ({px}, {py}), 타일: {current_tile.type.name if hasattr(current_tile.type, 'name') else current_tile.type}")
+        
+        safe_log_debug("상호작용", f"현재 타일 확인", {
             "위치": (px, py),
-            "타일타입": current_tile.type.name,
-            "타일기호": current_tile.symbol
+            "타일타입": current_tile.type.name if hasattr(current_tile.type, 'name') else str(current_tile.type),
+            "타일기호": getattr(current_tile, 'symbol', '?')
         })
         
+        # TileType 접근 개선
+        try:
+            from game.world import TileType
+        except:
+            TileType = game.world.TileType
+        
         # 현재 위치에서 상호작용 가능한 것들 (밟아서 작동)
-        if current_tile.type in [game.world.TileType.FOUNTAIN, game.world.TileType.ALTAR, 
-                                game.world.TileType.CRYSTAL, game.world.TileType.GARDEN,
-                                game.world.TileType.CURSED_ALTAR, game.world.TileType.POISON_CLOUD,
-                                game.world.TileType.DARK_PORTAL, game.world.TileType.UNSTABLE_FLOOR]:
-            print(f"🦶 {current_tile.type.name}을(를) 밟았습니다!")
-            log_debug("상호작용", f"밟아서 상호작용", {"타일타입": current_tile.type.name})
+        step_on_tiles = [TileType.FOUNTAIN, TileType.ALTAR, TileType.CRYSTAL, TileType.GARDEN,
+                        TileType.CURSED_ALTAR, TileType.POISON_CLOUD, TileType.DARK_PORTAL, 
+                        TileType.UNSTABLE_FLOOR]
+        
+        if current_tile.type in step_on_tiles:
+            print(f"🦶 {current_tile.type.name if hasattr(current_tile.type, 'name') else current_tile.type}을(를) 밟았습니다!")
+            safe_log_debug("상호작용", f"밟아서 상호작용", {"타일타입": current_tile.type.name if hasattr(current_tile.type, 'name') else str(current_tile.type)})
+            
             result = game.world.interact_with_tile((px, py))
             
             if result.get('success'):
                 print(f"✅ {result.get('message', '상호작용 성공!')}")
-                log_player_action(f"밟기 상호작용 성공: {current_tile.type.name}", {"결과": result})
+                safe_log_player_action(f"밟기 상호작용 성공: {current_tile.type.name if hasattr(current_tile.type, 'name') else current_tile.type}", {"결과": result})
                 if result.get('pause', False):
                     game.keyboard.wait_for_key("계속하려면 아무 키나 누르세요...")
             else:
                 print(f"❌ {result.get('message', '상호작용 실패!')}")
-                log_error("상호작용", f"밟기 상호작용 실패", data={"결과": result})
+                safe_log_error("상호작용", f"밟기 상호작용 실패", data={"결과": result})
             game.keyboard.wait_for_key("계속하려면 아무 키나 누르세요...")
             return
         
         # 플레이어 주변의 상호작용 가능한 객체들 확인
+        print("🔍 주변 상호작용 객체 검색 중...")
         interactables = game.world.get_interactable_nearby(game.world.player_pos)
+        print(f"[DEBUG] 기본 상호작용 객체 {len(interactables)}개 발견")
         
         # 스킬이 없어도 모든 특수 타일들을 상호작용 목록에 포함
         nearby_special_tiles = []
+        special_tile_types = [TileType.ALTAR, TileType.LEVER, TileType.BOOKSHELF, 
+                             TileType.FORGE, TileType.GARDEN, TileType.CRYSTAL,
+                             TileType.CURSED_ALTAR, TileType.POISON_CLOUD, 
+                             TileType.DARK_PORTAL, TileType.CURSED_CHEST, 
+                             TileType.UNSTABLE_FLOOR, TileType.CHEST,
+                             TileType.LOCKED_DOOR, TileType.SECRET_DOOR, TileType.TRAP]
+        
+        print("🔍 주변 특수 타일 검색 중...")
+        tiles_found = 0
+        
         for dx in range(-1, 2):
             for dy in range(-1, 2):
                 if dx == 0 and dy == 0:
@@ -16405,53 +16580,53 @@ def handle_interaction(game):
                     continue
                 
                 tile = game.world.tiles[y][x]
+                print(f"[DEBUG] 검사 중: ({x}, {y}) - {tile.type.name if hasattr(tile.type, 'name') else tile.type}, visible: {tile.visible}, explored: {tile.explored}")
+                
                 if not tile.visible and not tile.explored:
                     continue
                 
                 # 모든 특수 타일 타입에 대해 상호작용 정보 생성
-                if tile.type in [game.world.TileType.ALTAR, game.world.TileType.LEVER, 
-                               game.world.TileType.BOOKSHELF, game.world.TileType.FORGE, 
-                               game.world.TileType.GARDEN, game.world.TileType.CRYSTAL,
-                               game.world.TileType.CURSED_ALTAR, game.world.TileType.POISON_CLOUD, 
-                               game.world.TileType.DARK_PORTAL, game.world.TileType.CURSED_CHEST, 
-                               game.world.TileType.UNSTABLE_FLOOR, game.world.TileType.CHEST,
-                               game.world.TileType.LOCKED_DOOR, game.world.TileType.SECRET_DOOR,
-                               game.world.TileType.TRAP]:
+                if tile.type in special_tile_types:
+                    tiles_found += 1
+                    print(f"[DEBUG] 특수 타일 발견: {tile.type.name if hasattr(tile.type, 'name') else tile.type} at ({x}, {y})")
+                if tile.type in special_tile_types:
+                    tiles_found += 1
+                    print(f"[DEBUG] 특수 타일 발견: {tile.type.name if hasattr(tile.type, 'name') else tile.type} at ({x}, {y})")
                     
                     skill_map = {
-                        game.world.TileType.ALTAR: ('신성마법', ['성기사', '신관']),
-                        game.world.TileType.LEVER: ('기계조작', ['기계공학자', '도적']),
-                        game.world.TileType.BOOKSHELF: ('지식탐구', ['철학자', '아크메이지']),
-                        game.world.TileType.FORGE: ('기계공학', ['기계공학자']),
-                        game.world.TileType.GARDEN: ('자연친화', ['드루이드']),
-                        game.world.TileType.CRYSTAL: ('정령술', ['정령술사', '아크메이지']),
-                        game.world.TileType.CURSED_ALTAR: ('신성마법', ['성기사', '신관']),
-                        game.world.TileType.POISON_CLOUD: ('자연친화', ['드루이드']),
-                        game.world.TileType.DARK_PORTAL: ('정령술', ['정령술사', '아크메이지']),
-                        game.world.TileType.CURSED_CHEST: ('자물쇠해제', ['도적', '궁수']),
-                        game.world.TileType.UNSTABLE_FLOOR: ('기계조작', ['기계공학자', '도적']),
-                        game.world.TileType.CHEST: ('자물쇠해제' if getattr(tile, 'is_locked', False) else None, ['도적', '궁수'] if getattr(tile, 'is_locked', False) else []),
-                        game.world.TileType.LOCKED_DOOR: ('자물쇠해제', ['도적', '궁수']),
-                        game.world.TileType.SECRET_DOOR: ('비밀탐지', ['도적', '궁수', '철학자']),
-                        game.world.TileType.TRAP: ('함정해제', ['도적', '궁수'])
+                        TileType.ALTAR: ('신성마법', ['성기사', '신관']),
+                        TileType.LEVER: ('기계조작', ['기계공학자', '도적']),
+                        TileType.BOOKSHELF: ('지식탐구', ['철학자', '아크메이지']),
+                        TileType.FORGE: ('기계공학', ['기계공학자']),
+                        TileType.GARDEN: ('자연친화', ['드루이드']),
+                        TileType.CRYSTAL: ('정령술', ['정령술사', '아크메이지']),
+                        TileType.CURSED_ALTAR: ('신성마법', ['성기사', '신관']),
+                        TileType.POISON_CLOUD: ('자연친화', ['드루이드']),
+                        TileType.DARK_PORTAL: ('정령술', ['정령술사', '아크메이지']),
+                        TileType.CURSED_CHEST: ('자물쇠해제', ['도적', '궁수']),
+                        TileType.UNSTABLE_FLOOR: ('기계조작', ['기계공학자', '도적']),
+                        TileType.CHEST: ('자물쇠해제' if getattr(tile, 'is_locked', False) else None, ['도적', '궁수'] if getattr(tile, 'is_locked', False) else []),
+                        TileType.LOCKED_DOOR: ('자물쇠해제', ['도적', '궁수']),
+                        TileType.SECRET_DOOR: ('비밀탐지', ['도적', '궁수', '철학자']),
+                        TileType.TRAP: ('함정해제', ['도적', '궁수'])
                     }
                     
                     tile_names = {
-                        game.world.TileType.ALTAR: '신성한 제단',
-                        game.world.TileType.LEVER: '고대 레버',
-                        game.world.TileType.BOOKSHELF: '고대 서적',
-                        game.world.TileType.FORGE: '마법 대장간',
-                        game.world.TileType.GARDEN: '신비한 정원',
-                        game.world.TileType.CRYSTAL: '마법 수정',
-                        game.world.TileType.CURSED_ALTAR: '저주받은 제단 ⚠️',
-                        game.world.TileType.POISON_CLOUD: '독성 구름 ⚠️',
-                        game.world.TileType.DARK_PORTAL: '어둠의 포털 ⚠️',
-                        game.world.TileType.CURSED_CHEST: '저주받은 상자 ⚠️',
-                        game.world.TileType.UNSTABLE_FLOOR: '불안정한 바닥 ⚠️',
-                        game.world.TileType.CHEST: f"{'잠긴 ' if getattr(tile, 'is_locked', False) else ''}보물상자",
-                        game.world.TileType.LOCKED_DOOR: '잠긴 문',
-                        game.world.TileType.SECRET_DOOR: '비밀 문',
-                        game.world.TileType.TRAP: '함정'
+                        TileType.ALTAR: '신성한 제단',
+                        TileType.LEVER: '고대 레버',
+                        TileType.BOOKSHELF: '고대 서적',
+                        TileType.FORGE: '마법 대장간',
+                        TileType.GARDEN: '신비한 정원',
+                        TileType.CRYSTAL: '마법 수정',
+                        TileType.CURSED_ALTAR: '저주받은 제단 ⚠️',
+                        TileType.POISON_CLOUD: '독성 구름 ⚠️',
+                        TileType.DARK_PORTAL: '어둠의 포털 ⚠️',
+                        TileType.CURSED_CHEST: '저주받은 상자 ⚠️',
+                        TileType.UNSTABLE_FLOOR: '불안정한 바닥 ⚠️',
+                        TileType.CHEST: f"{'잠긴 ' if getattr(tile, 'is_locked', False) else ''}보물상자",
+                        TileType.LOCKED_DOOR: '잠긴 문',
+                        TileType.SECRET_DOOR: '비밀 문',
+                        TileType.TRAP: '함정'
                     }
                     
                     skill, classes = skill_map.get(tile.type, ('알 수 없음', []))
@@ -16469,16 +16644,20 @@ def handle_interaction(game):
                         'classes': classes,
                         'has_skill': has_skill,
                         'used': is_used,
-                        'dangerous': tile.type in [game.world.TileType.CURSED_ALTAR, game.world.TileType.POISON_CLOUD, 
-                                                  game.world.TileType.DARK_PORTAL, game.world.TileType.CURSED_CHEST, 
-                                                  game.world.TileType.UNSTABLE_FLOOR]
+                        'dangerous': tile.type in [TileType.CURSED_ALTAR, TileType.POISON_CLOUD, 
+                                                  TileType.DARK_PORTAL, TileType.CURSED_CHEST, 
+                                                  TileType.UNSTABLE_FLOOR]
                     })
+        
+        print(f"[DEBUG] 특수 타일 총 {tiles_found}개 발견됨") 
         
         # 상호작용 가능한 객체들과 특수 타일들 합치기
         all_interactables = interactables + nearby_special_tiles
+        print(f"[DEBUG] 총 상호작용 객체: {len(all_interactables)}개 (기본 {len(interactables)}개 + 특수 {len(nearby_special_tiles)}개)")
         
         if not all_interactables:
             print("💬 주변에 상호작용할 수 있는 것이 없습니다.")
+            print("[DEBUG] 상호작용 객체가 하나도 없습니다. 특수 타일이 맵에 없거나 인식되지 않을 수 있습니다.")
             game.keyboard.wait_for_key("계속하려면 아무 키나 누르세요...")
             return
         
@@ -16512,6 +16691,7 @@ def handle_interaction(game):
             index = int(choice) - 1
             if 0 <= index < len(all_interactables):
                 target = all_interactables[index]
+                print(f"[DEBUG] 선택된 객체: {target}")
                 
                 # 특수 타일인 경우
                 if 'name' in target:
@@ -16534,7 +16714,9 @@ def handle_interaction(game):
                             return
                 
                 # 상호작용 실행
+                print(f"[DEBUG] 상호작용 실행 중: {target['pos']}")
                 result = game.world.interact_with_tile(target['pos'])
+                print(f"[DEBUG] 상호작용 결과: {result}")
                 
                 if result.get('success'):
                     print(f"✅ {result.get('message', '상호작용 성공!')}")
@@ -16549,6 +16731,20 @@ def handle_interaction(game):
                 
         except (ValueError, IndexError):
             print("❌ 잘못된 입력입니다.")
+            game.keyboard.wait_for_key("계속하려면 아무 키나 누르세요...")
+        except Exception as e:
+            print(f"❌ 상호작용 중 오류 발생: {e}")
+            print("[DEBUG] 상호작용 시스템에 예상치 못한 오류가 발생했습니다.")
+            import traceback
+            traceback.print_exc()
+            game.keyboard.wait_for_key("계속하려면 아무 키나 누르세요...")
+        
+    except Exception as e:
+        print(f"❌ 상호작용 시스템 오류: {e}")
+        print("[DEBUG] 전체 상호작용 시스템에 오류가 발생했습니다.")
+        import traceback
+        traceback.print_exc()
+        if hasattr(game, 'keyboard'):
             game.keyboard.wait_for_key("계속하려면 아무 키나 누르세요...")
             
     except Exception as e:
@@ -16754,6 +16950,14 @@ def main():
     if HOT_RELOAD_AVAILABLE:
         print("🔥 상태 보존 핫 리로드 v2.0 활성화!")
         print("💡 게임 중 'r' 키로 상태를 유지하며 모듈을 업데이트할 수 있습니다.")
+    
+    # 🎮 고성능 프레임레이트 설정
+    try:
+        from game.clear_screen_utils import set_game_fps
+        set_game_fps(30)  # 기본 30 FPS (20-60 범위)
+        print("🎯 게임 FPS: 30 (최소 20, 최대 60)")
+    except ImportError:
+        print("⚠️ 프레임레이트 제어 시스템을 불러올 수 없습니다.")
     
     # 종료 처리 함수 정의
     def cleanup_and_exit(signum=None, frame=None):

@@ -1,0 +1,11 @@
+{
+  "gamepad_enabled": true,
+  "detected_gamepads": [
+    {
+      "name": "Xbox 360 Controller",
+      "index": 0,
+      "axes": 6,
+      "buttons": 11
+    }
+  ]
+}

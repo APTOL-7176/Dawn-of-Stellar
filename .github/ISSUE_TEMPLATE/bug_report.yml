@@ -1,0 +1,161 @@
+name: Bug Report
+description: 게임에서 발생한 버그를 신고해주세요
+title: "[BUG] "
+labels: ["bug", "needs-investigation"]
+assignees:
+  - APTOL-7176
+body:
+  - type: markdown
+    attributes:
+      value: |
+        🐛 **버그 리포트를 작성해주셔서 감사합니다!**
+        
+        상세한 정보를 제공해주시면 더 빠르게 문제를 해결할 수 있습니다.
+
+  - type: textarea
+    id: bug-description
+    attributes:
+      label: 🐛 버그 설명
+      description: 발생한 버그에 대해 명확하고 간결하게 설명해주세요.
+      placeholder: 예) 전투 중 ATB 게이지가 갑자기 멈추는 문제가 발생합니다.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction-steps
+    attributes:
+      label: 🔄 재현 단계
+      description: 버그를 재현할 수 있는 단계별 과정을 작성해주세요.
+      placeholder: |
+        1. 게임을 시작한다
+        2. 던전 3층으로 이동한다
+        3. 적과 전투를 시작한다
+        4. 스킬 "검기 베기"를 사용한다
+        5. 오류 발생
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: ✅ 예상 동작
+      description: 정상적으로 작동할 때 어떤 일이 일어나야 하는지 설명해주세요.
+      placeholder: ATB 게이지가 정상적으로 차오르고 턴이 진행되어야 합니다.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: ❌ 실제 동작
+      description: 실제로 어떤 일이 일어나는지 설명해주세요.
+      placeholder: ATB 게이지가 90%에서 멈추고 더 이상 진행되지 않습니다.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: game-version
+    attributes:
+      label: 🎮 게임 버전
+      description: 사용 중인 게임 버전을 선택해주세요.
+      options:
+        - v3.1.1 (최신)
+        - v3.1.0
+        - v3.0.x
+        - 기타 (아래에 명시)
+        - 모르겠음
+    validations:
+      required: true
+
+  - type: dropdown
+    id: operating-system
+    attributes:
+      label: 🖥️ 운영체제
+      description: 사용 중인 운영체제를 선택해주세요.
+      options:
+        - Windows 11
+        - Windows 10
+        - Windows (기타 버전)
+        - macOS (Intel)
+        - macOS (Apple Silicon)
+        - Ubuntu/Debian
+        - Linux (기타 배포판)
+        - 기타
+    validations:
+      required: true
+
+  - type: input
+    id: python-version
+    attributes:
+      label: 🐍 Python 버전
+      description: 사용 중인 Python 버전을 입력해주세요.
+      placeholder: 예) 3.11.5
+    validations:
+      required: true
+
+  - type: dropdown
+    id: bug-frequency
+    attributes:
+      label: 🔢 발생 빈도
+      description: 이 버그가 얼마나 자주 발생하나요?
+      options:
+        - 항상 발생 (100%)
+        - 자주 발생 (80% 이상)
+        - 가끔 발생 (50% 정도)
+        - 드물게 발생 (20% 이하)
+        - 한 번만 발생
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: affected-systems
+    attributes:
+      label: 🎯 영향받는 시스템
+      description: 어떤 게임 시스템에서 문제가 발생하나요? (복수 선택 가능)
+      options:
+        - label: 전투 시스템
+        - label: 캐릭터/직업 시스템
+        - label: 인벤토리/아이템
+        - label: 던전 탐험
+        - label: 저장/로드
+        - label: UI/인터페이스
+        - label: 오디오
+        - label: 모바일 연동
+        - label: 기타
+
+  - type: textarea
+    id: error-logs
+    attributes:
+      label: 📋 오류 로그/스크린샷
+      description: |
+        관련된 오류 로그나 스크린샷이 있다면 첨부해주세요.
+        게임로그 폴더의 로그 파일들을 확인해보세요.
+      placeholder: |
+        latest_errors.log 내용이나 스크린샷을 여기에 붙여넣어주세요.
+        또는 파일을 드래그 앤 드롭으로 첨부해주세요.
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: 📝 추가 정보
+      description: 버그와 관련된 기타 정보나 컨텍스트가 있다면 작성해주세요.
+      placeholder: |
+        - 특정 직업에서만 발생하는지
+        - 특정 장비 착용 시에만 발생하는지
+        - 게임 설정과 관련이 있는지
+        - 기타 관련 정보
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: ✅ 확인사항
+      description: 버그 리포트 전에 다음 사항들을 확인해주세요.
+      options:
+        - label: 최신 버전의 게임을 사용하고 있습니다
+          required: true
+        - label: 기존 이슈에서 동일한 문제가 보고되지 않았는지 확인했습니다
+          required: true
+        - label: 게임을 재시작해봤지만 문제가 지속됩니다
+          required: true
+        - label: 가능한 한 상세한 정보를 제공했습니다
+          required: true

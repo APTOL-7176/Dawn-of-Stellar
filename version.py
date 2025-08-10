@@ -1,6 +1,6 @@
 # Dawn Of Stellar - Version Information
 
-__version__ = "3.1.0"
+__version__ = "3.1.1"
 __title__ = "Dawn Of Stellar - 별빛의 여명"
 __description__ = "차세대 ASCII 기반 전략 로그라이크 RPG"
 __author__ = "APTOL-7176"
@@ -12,7 +12,7 @@ __url__ = "https://github.com/APTOL-7176/Dawn-of-Stellar"
 RELEASE_DATE = "2025-08-10"
 MAJOR_VERSION = 3
 MINOR_VERSION = 1
-PATCH_VERSION = 0
+PATCH_VERSION = 1
 
 # Game Information
 GAME_TITLE = "Dawn Of Stellar"
@@ -36,6 +36,20 @@ def get_version_info():
         "python_min": PYTHON_MIN_VERSION,
         "python_recommended": PYTHON_RECOMMENDED
     }
+
+# v3.1.1 업데이트 내역 (2025-08-10)
+VERSION_NOTES_311 = [
+    "🔧 모든 Color.value 오류 완전 해결 (915+ 패턴 수정)",
+    "🎮 전투 자동화 개선 - Enter 입력 대기 제거",
+    "⚡ 전투 로그 확인 시간 단축 (0.5초 → 0.2초)",
+    "🏆 승리/패배 시 자동 진행 (1-2초 대기 후 자동 계속)",
+    "📊 상세 정보 표시 시 자동 계속 (0.5초)",
+    "🎯 공격/스킬 사용 후 대기 시간 단축 (2초 → 0.5초)",
+    "🤖 AI 턴 처리 속도 향상 (모든 대기 시간 단축)",
+    "🛠️ log_debug 메서드 인수 오류 완전 수정",
+    "🎪 전투 화면 상단 빈 줄 3줄 추가 (깔끔한 UI)",
+    "🚀 전반적인 게임 진행 속도 대폭 향상"
+]
 
 # v3.1.0 업데이트 내역
 VERSION_NOTES_310 = [
@@ -61,7 +75,11 @@ def print_version_info():
     print(f"Author: {__author__}")
     print(f"License: {__license__}")
     
-    if __version__ == "3.1.0":
+    if __version__ == "3.1.1":
+        print(f"\n📋 v{__version__} 업데이트 내역:")
+        for note in VERSION_NOTES_311:
+            print(f"   {note}")
+    elif __version__ == "3.1.0":
         print(f"\n📋 v{__version__} 업데이트 내역:")
         for note in VERSION_NOTES_310:
             print(f"   {note}")

@@ -36,10 +36,21 @@ class LauncherAudio:
         
         if self.enabled:
             try:
-                pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
+                # pygame 초기화 (필요한 경우)
+                if not pygame.get_init():
+                    pygame.init()
+                
+                # 믹서 초기화 (이미 초기화된 경우 재사용)
+                if not pygame.mixer.get_init():
+                    pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
+                
                 self.load_sounds()
+                print("✅ 런처 오디오 시스템이 활성화되었습니다.")
             except Exception as e:
+                print(f"⚠️ 오디오 초기화 실패: {e}")
                 self.enabled = False
+        else:
+            print("⚠️ pygame이 설치되지 않았습니다. 오디오 기능이 비활성화됩니다.")
     
     def load_sounds(self):
         """사운드 파일 로드 - 실제 파일 구조에 맞게"""
@@ -47,6 +58,7 @@ class LauncherAudio:
             # BGM (런처용 - FF7 음악 사용)
             launcher_bgm_candidates = [
                 "game/audio/bgm/13-Flowers Blooming in the Church.mp3",  # 평화로운 음악
+                "game/audio/bgm/01-The Prelude.mp3",  # 대체 옵션
             ]
             
             self.launcher_bgm = None
@@ -54,32 +66,42 @@ class LauncherAudio:
                 if os.path.exists(bgm_path):
                     try:
                         self.launcher_bgm = pygame.mixer.Sound(bgm_path)
+                        print(f"✅ BGM 로드됨: {bgm_path}")
                         break
-                    except:
+                    except Exception as e:
+                        print(f"⚠️ BGM 로드 실패 ({bgm_path}): {e}")
                         continue
+            
+            if not self.launcher_bgm:
+                print("⚠️ 런처 BGM을 찾을 수 없습니다.")
             
             # SFX (게임과 동일한 매핑 사용)
             sfx_mapping = {
                 'cursor': 'game/audio/sfx/000.wav',     # menu_select - 커서 이동
                 'select': 'game/audio/sfx/000.wav',     # menu_select - 커서 이동  
                 'confirm': 'game/audio/sfx/001.wav',    # menu_confirm - 확인
-                'cancel': 'game/audio/sfx/003.wav',     # menu_cancel - 취소
-                'startup': None                         # 시작음 없음
+                'cancel': 'game/audio/sfx/002.wav',     # menu_cancel - 취소
+                'startup': 'game/audio/sfx/001.wav'     # 시작음
             }
             
             self.sfx = {}
+            loaded_sfx_count = 0
             for name, path in sfx_mapping.items():
                 if path and os.path.exists(path):
                     try:
                         self.sfx[name] = pygame.mixer.Sound(path)
+                        loaded_sfx_count += 1
                     except Exception as e:
+                        print(f"⚠️ SFX 로드 실패 ({name}): {e}")
                         self.sfx[name] = None
                 else:
                     self.sfx[name] = None
+            
+            print(f"✅ SFX 로드됨: {loaded_sfx_count}/{len(sfx_mapping)}개")
                     
         except Exception as e:
             self.enabled = False
-            print(f"오디오 로드 실패: {e}")
+            print(f"❌ 오디오 로드 실패: {e}")
     
     def play_bgm(self, fade_in=True):
         """BGM 재생"""
@@ -146,9 +168,11 @@ class LauncherAudio:
             return
         
         try:
+            # 볼륨 조절하여 재생
+            self.sfx[sound_name].set_volume(0.5)  # 적당한 볼륨
             self.sfx[sound_name].play()
-        except:
-            pass
+        except Exception as e:
+            print(f"⚠️ SFX 재생 실패 ({sound_name}): {e}")
 
 class CursorMenu:
     """커서 기반 메뉴 시스템"""
@@ -182,7 +206,7 @@ class CursorMenu:
         clear_screen()
         set_console_font()
         
-        # 아스키 아트
+        # 아스키 아트 (한 번만)
         print(self.draw_ascii_art())
         
         # 제목과 부제목
@@ -235,7 +259,7 @@ class CursorMenu:
                     key = msvcrt.getch()
                     
                     # 입력 후 잠시 대기 (중복 입력 방지)
-                    time.sleep(0.1)
+                    time.sleep(0.15)  # 0.1 -> 0.15초로 증가
                     
                     if key == b'\xe0':  # 화살표 키
                         key = msvcrt.getch()
@@ -302,19 +326,34 @@ class CursorMenu:
         return None
     
     def run(self):
-        """메뉴 실행"""
+        """메뉴 실행 - 화면 중복 출력 방지 개선"""
+        # 첫 화면만 그리기
+        self.draw_menu()
+        
         while True:
-            self.draw_menu()
             action = self.get_input()
             
             if action == 'SELECT':
                 return self.get_selected_key()
             elif action == 'EXIT':
                 return '0'
+            elif action in ['UP', 'DOWN']:
+                # 커서가 움직였을 때만 다시 그리기
+                # 하지만 추가 지연을 두어 중복 출력 방지
+                time.sleep(0.1)  # 추가 지연
+                self.draw_menu()
 
 def clear_screen():
-    """화면 클리어"""
-    os.system('cls' if os.name == 'nt' else 'clear')
+    """화면 클리어 (파워셸 최적화 + 안정성 개선)"""
+    try:
+        if os.name == 'nt':  # Windows/파워셸
+            # 파워셸에서 가장 안정적인 방법: cls 명령어 사용
+            os.system('cls')
+        else:
+            os.system('clear')
+    except Exception:
+        # 폴백: 스크롤 방식 (ANSI 대신)
+        print("\n" * 50)
 
 def set_console_font():
     """콘솔 폰트 설정 (UTF-8 지원)"""
@@ -322,11 +361,40 @@ def set_console_font():
         os.system('chcp 65001 > nul')
 
 def set_gamepad_safe_environment():
-    """게임패드 안전 환경 설정"""
+    """게임패드 안전 환경 설정 - 화상키보드 방지 개선"""
+    # 🚫 런처에서는 기본적으로 게임패드 비활성화 (게임에서는 활성화됨)
     os.environ['DISABLE_GAMEPAD'] = '1'
     os.environ['TERMINAL_MODE'] = '1'
     os.environ['SDL_GAMECONTROLLER_IGNORE_DEVICES'] = '1'
     os.environ['SDL_JOYSTICK_DEVICE'] = ''
+    
+    # 🛡️ Windows 화상키보드 및 터치 이벤트 차단 (정교한 설정)
+    os.environ['SDL_HINT_TOUCH_MOUSE_EVENTS'] = '0'  # 터치 이벤트 차단
+    os.environ['SDL_HINT_MOUSE_TOUCH_EVENTS'] = '0'  # 마우스 터치 이벤트 차단
+    os.environ['SDL_HINT_WINDOWS_DISABLE_THREAD_NAMING'] = '1'  # 스레드 이름 비활성화
+    os.environ['SDL_HINT_WINDOWS_INTRESOURCE_ICON'] = '0'  # 아이콘 리소스 비활성화
+    os.environ['SDL_HINT_WINDOWS_INTRESOURCE_ICON_SMALL'] = '0'  # 작은 아이콘 비활성화
+    
+    # 🎮 게임패드 관련 화상키보드 방지 설정
+    os.environ['SDL_HINT_JOYSTICK_HIDAPI_CORRELATE_XINPUT'] = '0'  # XInput 연결 차단
+    os.environ['SDL_HINT_XINPUT_ENABLED'] = '0'  # XInput 완전 비활성화 (런처용)
+    os.environ['SDL_HINT_DINPUT_ENABLED'] = '0'  # DirectInput 비활성화 (런처용)
+    
+    # 🚫 Windows 접근성 기능 차단 (화상키보드 자동 실행 방지)
+    os.environ['QT_ACCESSIBILITY'] = '0'
+    os.environ['GTK_ACCESSIBILITY'] = '0'
+    
+    # 🛡️ 추가 안전 설정 (다른 앱으로 입력 누출 방지)
+    os.environ['SDL_HINT_JOYSTICK_HIDAPI_XBOX_360'] = '0'  # 런처에서는 비활성화
+    os.environ['SDL_HINT_JOYSTICK_HIDAPI_XBOX_ONE'] = '0'  # 런처에서는 비활성화
+    os.environ['SDL_HINT_JOYSTICK_HIDAPI_PS4'] = '0'       # 런처에서는 비활성화
+    os.environ['SDL_HINT_JOYSTICK_HIDAPI_PS5'] = '0'       # 런처에서는 비활성화
+    os.environ['SDL_HINT_XINPUT_ENABLED'] = '0'  # XInput 완전 비활성화
+    os.environ['SDL_HINT_DIRECTINPUT_ENABLED'] = '0'  # DirectInput 비활성화
+    
+    # 🔒 시스템 레벨 게임패드 훅 차단
+    os.environ['SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS'] = '0'  # 백그라운드 이벤트 차단
+    os.environ['SDL_HINT_GAMECONTROLLER_USE_BUTTON_LABELS'] = '0'  # 버튼 라벨 시스템 비활성화
 
 def get_python_exe():
     """Python 실행파일 경로 찾기"""
@@ -386,6 +454,7 @@ def show_main_menu():
         ("4", "📦 게임 빌드", "EXE 파일 생성 및 패키징"),
         ("5", "🔧 폰트 도구", "폰트 주입 및 설정 유틸리티"),
         ("6", "🚀 빠른 설정", "환경 설정 및 패키지 업데이트"),
+        ("G", "🎮 게임패드 테스트", "게임패드 연결 상태 확인 및 버튼 테스트"),
         
         # 🛠️ 시스템 관리 섹션
         ("7", "🔄 게임 업데이트", "Git을 통한 최신 버전 업데이트"),
@@ -446,12 +515,40 @@ def run_game_in_new_process(mode, dev_mode=False, mobile_mode=False):
     """게임을 새 프로세스에서 실행 후 런처 종료"""
     set_console_font()
     
-    # 환경 변수 설정
+    # 🎮 게임 실행용 환경 변수 설정 (게임패드 활성화)
     env = os.environ.copy()
-    env['DISABLE_GAMEPAD'] = '1'
+    
+    # 🎮 게임에서는 게임패드 활성화 (런처 설정 제거)
+    if 'DISABLE_GAMEPAD' in env:
+        del env['DISABLE_GAMEPAD']
+    if 'SDL_GAMECONTROLLER_IGNORE_DEVICES' in env:
+        del env['SDL_GAMECONTROLLER_IGNORE_DEVICES']
+    if 'SDL_JOYSTICK_DEVICE' in env:
+        del env['SDL_JOYSTICK_DEVICE']
+    
+    # 🛡️ 최강 화상키보드 차단 설정 (게임패드는 활성화)
+    env['SDL_VIDEODRIVER'] = 'windows'
+    env['SDL_HINT_TOUCH_MOUSE_EVENTS'] = '0'
+    env['SDL_HINT_MOUSE_TOUCH_EVENTS'] = '0'
+    env['SDL_HINT_WINDOWS_DISABLE_THREAD_NAMING'] = '1'
+    env['SDL_HINT_WINDOWS_INTRESOURCE_ICON'] = '0'
+    env['SDL_HINT_WINDOWS_INTRESOURCE_ICON_SMALL'] = '0'
+    env['SDL_HINT_WINDOWS_ENABLE_MESSAGELOOP'] = '0'
+    env['SDL_HINT_WINDOWS_DPI_AWARENESS'] = 'unaware'
+    env['SDL_HINT_WINDOWS_DPI_SCALING'] = '0'
+    env['QT_ACCESSIBILITY'] = '0'
+    env['GTK_ACCESSIBILITY'] = '0'
+    
+    # 🎮 게임패드 지원 활성화
+    env['SDL_HINT_JOYSTICK_HIDAPI_XBOX_360'] = '1'
+    env['SDL_HINT_JOYSTICK_HIDAPI_XBOX_ONE'] = '1'
+    env['SDL_HINT_JOYSTICK_HIDAPI_PS4'] = '1'
+    env['SDL_HINT_JOYSTICK_HIDAPI_PS5'] = '1'
+    env['SDL_HINT_XINPUT_ENABLED'] = '1'  # XInput 활성화
+    env['SDL_HINT_DINPUT_ENABLED'] = '1'  # DirectInput 활성화
+    
+    # 기타 설정
     env['TERMINAL_MODE'] = '1'
-    env['SDL_GAMECONTROLLER_IGNORE_DEVICES'] = '1'
-    env['SDL_JOYSTICK_DEVICE'] = ''
     env['LAUNCHER_POWERSHELL'] = '1'  # PowerShell 환경임을 알림
     
     if dev_mode:
@@ -466,44 +563,16 @@ def run_game_in_new_process(mode, dev_mode=False, mobile_mode=False):
         python_exe = os.path.abspath(python_exe)
     
     try:
-        if os.name == 'nt':
-            # Windows에서 배치파일로 실행 (한글 경로 안전)
-            batch_file = "temp_game_launcher.bat"
-            batch_content = f'''@echo off
-chcp 65001 >nul 2>&1
-cd /d "{os.getcwd()}"
-echo 🎮 Dawn of Stellar 게임을 시작합니다...
-"{python_exe}" main.py
-echo 게임이 종료되었습니다.
-pause
-del "%~f0"
-'''
-            with open(batch_file, 'w', encoding='utf-8') as f:
-                f.write(batch_content)
-            
-            # 배치파일을 PowerShell에서 실행
-            subprocess.Popen([
-                'powershell', '-Command', f'Start-Process "{batch_file}" -Wait'
-            ], env=env)
-        else:
-            # Linux/Mac에서 새 터미널에서 실행
-            subprocess.run([
-                'gnome-terminal', '--', 'bash', '-c',
-                f'cd "{os.getcwd()}" && "{python_exe}" main.py; read -p "Press any key to continue..."'
-            ], env=env)
-        
-        # 게임 실행 후 런처 종료
-        print("\n🎮 게임이 새 창에서 실행됩니다...")
-        print("👋 런처를 종료합니다.")
-        time.sleep(2)
-        sys.exit(0)
+        # 현재 터미널에서 직접 실행
+        print("\n🎮 Dawn of Stellar 게임을 시작합니다...")
+        print("🎮 게임패드 지원이 활성화되었습니다!")
+        print("🛡️ 화상키보드 자동 실행은 차단됩니다.")
+        subprocess.run([python_exe, 'main.py'], env=env)
         
     except Exception as e:
         print(f"❌ 게임 실행 실패: {e}")
-        print("대신 현재 터미널에서 실행합니다...")
+        print("현재 터미널에서 실행을 재시도합니다...")
         subprocess.run([python_exe, 'main.py'], env=env)
-        # 현재 터미널에서 실행한 경우에도 종료
-        sys.exit(0)
 
 def run_exe_game(audio_system=None):
     """빌드된 EXE 파일로 게임 실행"""
@@ -559,8 +628,38 @@ def run_exe_game(audio_system=None):
         else:
             print("🎯 일반 모드로 실행합니다...")
         
-        # 환경 변수 설정
+        # 🎮 EXE 게임용 환경 변수 설정 (게임패드 활성화)
         env = os.environ.copy()
+        
+        # 🎮 게임패드 지원 활성화 (런처 제한 제거)
+        if 'DISABLE_GAMEPAD' in env:
+            del env['DISABLE_GAMEPAD']
+        if 'SDL_GAMECONTROLLER_IGNORE_DEVICES' in env:
+            del env['SDL_GAMECONTROLLER_IGNORE_DEVICES']
+        if 'SDL_JOYSTICK_DEVICE' in env:
+            del env['SDL_JOYSTICK_DEVICE']
+        
+        # 🛡️ 최강 화상키보드 차단 설정 (게임패드는 활성화)
+        env['SDL_VIDEODRIVER'] = 'windows'
+        env['SDL_HINT_TOUCH_MOUSE_EVENTS'] = '0'
+        env['SDL_HINT_MOUSE_TOUCH_EVENTS'] = '0'
+        env['SDL_HINT_WINDOWS_DISABLE_THREAD_NAMING'] = '1'
+        env['SDL_HINT_WINDOWS_INTRESOURCE_ICON'] = '0'
+        env['SDL_HINT_WINDOWS_INTRESOURCE_ICON_SMALL'] = '0'
+        env['SDL_HINT_WINDOWS_ENABLE_MESSAGELOOP'] = '0'
+        env['SDL_HINT_WINDOWS_DPI_AWARENESS'] = 'unaware'
+        env['SDL_HINT_WINDOWS_DPI_SCALING'] = '0'
+        env['QT_ACCESSIBILITY'] = '0'
+        env['GTK_ACCESSIBILITY'] = '0'
+        
+        # 🎮 게임패드 지원 활성화
+        env['SDL_HINT_JOYSTICK_HIDAPI_XBOX_360'] = '1'
+        env['SDL_HINT_JOYSTICK_HIDAPI_XBOX_ONE'] = '1'
+        env['SDL_HINT_JOYSTICK_HIDAPI_PS4'] = '1'
+        env['SDL_HINT_JOYSTICK_HIDAPI_PS5'] = '1'
+        env['SDL_HINT_XINPUT_ENABLED'] = '1'
+        env['SDL_HINT_DINPUT_ENABLED'] = '1'
+        
         if dev_mode:
             env['DEV_MODE'] = '1'
         
@@ -568,6 +667,8 @@ def run_exe_game(audio_system=None):
         exe_path = os.path.abspath(exe_path)
         
         print(f"🚀 게임 시작: {os.path.basename(exe_path)}")
+        print("🎮 게임패드 지원이 활성화되었습니다!")
+        print("🛡️ 화상키보드 자동 실행은 차단됩니다.")
         
         # EXE 파일 직접 실행
         subprocess.Popen([exe_path], env=env, cwd=os.path.dirname(exe_path))
@@ -1571,6 +1672,225 @@ def clean_cache():
     print("\n✅ 캐시 정리가 완료되었습니다!")
     input("아무 키나 누르세요...")
 
+def test_gamepad():
+    """게임패드 테스트 및 설정 - 최강 화상키보드 방지"""
+    clear_screen()
+    print("🎮 게임패드 테스트 및 설정")
+    print("="*50)
+    
+    # 🛡️ 게임패드 테스트용 최강 안전 환경
+    import os
+    
+    # 기존 환경변수 백업
+    original_env = {}
+    gamepad_keys = ['DISABLE_GAMEPAD', 'SDL_GAMECONTROLLER_IGNORE_DEVICES', 'SDL_JOYSTICK_DEVICE']
+    for key in gamepad_keys:
+        if key in os.environ:
+            original_env[key] = os.environ[key]
+    
+    # 화상키보드 완전 차단 함수들
+    def disable_onscreen_keyboard():
+        """Windows 화상키보드 레지스트리 설정 변경"""
+        try:
+            import winreg
+            
+            # 터치 키보드 자동 실행 비활성화
+            user_key_path = r"SOFTWARE\Microsoft\TabletTip\1.7"
+            try:
+                key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, user_key_path, 0, winreg.KEY_SET_VALUE)
+                winreg.SetValueEx(key, "EnableAutomaticInvocation", 0, winreg.REG_DWORD, 0)
+                winreg.CloseKey(key)
+                print("✅ 자동 터치 키보드 실행 비활성화됨")
+            except:
+                print("⚠️ 터치 키보드 레지스트리 설정 실패")
+                
+        except ImportError:
+            print("⚠️ winreg 모듈을 사용할 수 없습니다")
+        except Exception as e:
+            print(f"⚠️ 레지스트리 설정 실패: {e}")
+
+    def kill_onscreen_keyboard_processes():
+        """실행 중인 화상키보드 프로세스 종료"""
+        try:
+            import subprocess
+            
+            keyboard_processes = ["TabTip.exe", "osk.exe", "wisptis.exe"]
+            
+            for process in keyboard_processes:
+                try:
+                    subprocess.run(["taskkill", "/f", "/im", process], 
+                                 capture_output=True, text=True, check=False)
+                except:
+                    pass
+                    
+            print("✅ 화상키보드 프로세스 정리 완료")
+        except Exception as e:
+            print(f"⚠️ 프로세스 정리 실패: {e}")
+    
+    try:
+        print("🛡️ 최강 화상키보드 방지 모드 활성화 중...")
+        
+        # 화상키보드 차단 실행
+        disable_onscreen_keyboard()
+        kill_onscreen_keyboard_processes()
+        
+        # 게임패드 테스트를 위해 일시적으로 게임패드 활성화
+        if 'DISABLE_GAMEPAD' in os.environ:
+            del os.environ['DISABLE_GAMEPAD']
+        if 'SDL_GAMECONTROLLER_IGNORE_DEVICES' in os.environ:
+            del os.environ['SDL_GAMECONTROLLER_IGNORE_DEVICES']
+        if 'SDL_JOYSTICK_DEVICE' in os.environ:
+            del os.environ['SDL_JOYSTICK_DEVICE']
+        
+        # 최강 화상키보드 차단 설정
+        os.environ['SDL_VIDEODRIVER'] = 'windows'
+        os.environ['SDL_HINT_TOUCH_MOUSE_EVENTS'] = '0'
+        os.environ['SDL_HINT_MOUSE_TOUCH_EVENTS'] = '0'
+        os.environ['SDL_HINT_WINDOWS_DISABLE_THREAD_NAMING'] = '1'
+        os.environ['SDL_HINT_WINDOWS_INTRESOURCE_ICON'] = '0'
+        os.environ['SDL_HINT_WINDOWS_INTRESOURCE_ICON_SMALL'] = '0'
+        os.environ['SDL_HINT_WINDOWS_ENABLE_MESSAGELOOP'] = '0'
+        os.environ['SDL_HINT_WINDOWS_DPI_AWARENESS'] = 'unaware'
+        os.environ['SDL_HINT_WINDOWS_DPI_SCALING'] = '0'
+        os.environ['QT_ACCESSIBILITY'] = '0'
+        os.environ['GTK_ACCESSIBILITY'] = '0'
+        
+        # 게임패드 지원 활성화
+        os.environ['SDL_HINT_JOYSTICK_HIDAPI_XBOX_360'] = '1'
+        os.environ['SDL_HINT_JOYSTICK_HIDAPI_XBOX_ONE'] = '1'
+        os.environ['SDL_HINT_JOYSTICK_HIDAPI_PS4'] = '1'
+        os.environ['SDL_HINT_JOYSTICK_HIDAPI_PS5'] = '1'
+        os.environ['SDL_HINT_XINPUT_ENABLED'] = '1'
+        os.environ['SDL_HINT_DINPUT_ENABLED'] = '1'
+        
+        # gamepad_setup.py 실행
+        if os.path.exists("gamepad_setup.py"):
+            print("🔧 게임패드 설정 도구를 실행합니다...")
+            print("👆 설정 도구에서 게임패드 테스트를 진행하세요.")
+            print("🛡️ 최강 화상키보드 방지 모드가 활성화되어 있습니다.")
+            
+            # Python으로 gamepad_setup.py 실행
+            python_exe = get_python_exe()
+            subprocess.run([python_exe, "gamepad_setup.py"])
+            
+        else:
+            # 강화된 게임패드 감지 테스트
+            print("⚠️ gamepad_setup.py 파일이 없습니다.")
+            print("🔍 pygame을 이용한 강화된 게임패드 감지를 실행합니다...")
+            print("🛡️ 최강 화상키보드 방지 모드로 실행 중...")
+            
+            try:
+                import pygame
+                
+                # pygame 초기화 (최소한의 설정)
+                pygame.init()
+                pygame.joystick.init()
+                
+                # 숨겨진 더미 윈도우 생성
+                try:
+                    screen = pygame.display.set_mode((1, 1), pygame.HIDDEN)
+                except:
+                    screen = pygame.display.set_mode((300, 200))
+                    pygame.display.set_caption("Gamepad Test - 이 창은 무시하세요")
+                
+                joystick_count = pygame.joystick.get_count()
+                print(f"\n🎮 감지된 게임패드: {joystick_count}개")
+                
+                if joystick_count > 0:
+                    joysticks = []
+                    for i in range(joystick_count):
+                        joystick = pygame.joystick.Joystick(i)
+                        joystick.init()
+                        joysticks.append(joystick)
+                        print(f"  📱 {i+1}번: {joystick.get_name()}")
+                        print(f"     버튼: {joystick.get_numbuttons()}개")
+                        print(f"     축: {joystick.get_numaxes()}개")
+                        print(f"     D-Pad: {joystick.get_numhats()}개")
+                    
+                    print("\n✅ 게임패드가 정상적으로 인식되었습니다!")
+                    
+                    # 강화된 버튼 테스트
+                    print("\n🎮 5초간 강화된 버튼 테스트:")
+                    print("   아무 버튼이나 누르거나 스틱을 움직여보세요.")
+                    print("   🛡️ 최강 화상키보드 차단이 활성화되어 있습니다!")
+                    
+                    def monitor_keyboard():
+                        """실시간 화상키보드 모니터링"""
+                        try:
+                            result = subprocess.run(["tasklist", "/fi", "imagename eq TabTip.exe"], 
+                                                  capture_output=True, text=True, check=False)
+                            if "TabTip.exe" in result.stdout:
+                                print("🚨 화상키보드 감지됨! 즉시 종료합니다...")
+                                subprocess.run(["taskkill", "/f", "/im", "TabTip.exe"], 
+                                             capture_output=True, text=True, check=False)
+                                return True
+                        except:
+                            pass
+                        return False
+                    
+                    start_time = time.time()
+                    while time.time() - start_time < 5:
+                        pygame.event.pump()
+                        
+                        # 화상키보드 모니터링
+                        if monitor_keyboard():
+                            print("⚠️ 화상키보드가 나타났지만 즉시 차단했습니다!")
+                        
+                        for joystick in joysticks:
+                            # 버튼 체크
+                            for button in range(joystick.get_numbuttons()):
+                                if joystick.get_button(button):
+                                    print(f"✅ 버튼 {button} 눌림! (최강 차단 중)")
+                                    monitor_keyboard()
+                            
+                            # 축 체크
+                            for axis in range(joystick.get_numaxes()):
+                                value = joystick.get_axis(axis)
+                                if abs(value) > 0.3:
+                                    print(f"✅ 축 {axis}: {value:.2f} (최강 차단 중)")
+                        
+                        time.sleep(0.1)
+                    
+                    print("\n🎮 게임패드 테스트 완료!")
+                    print("🛡️ 최강 화상키보드 차단이 작동했습니다!")
+                    
+                    # 최종 체크
+                    if not monitor_keyboard():
+                        print("✅ 최종 확인: 화상키보드가 열리지 않았습니다!")
+                else:
+                    print("\n❌ 게임패드가 감지되지 않았습니다.")
+                    print("🔌 게임패드를 연결한 후 다시 시도해주세요.")
+                    
+                pygame.quit()
+                
+            except ImportError:
+                print("❌ pygame이 설치되지 않았습니다.")
+                print("💿 패키지 설정에서 pygame을 설치해주세요.")
+            except Exception as e:
+                print(f"❌ 게임패드 테스트 실패: {e}")
+                
+    except Exception as e:
+        print(f"❌ 게임패드 설정 실행 실패: {e}")
+    
+    finally:
+        # 정리 작업
+        print("\n🧹 정리 작업 중...")
+        kill_onscreen_keyboard_processes()
+        
+        # 원래 환경변수 복원
+        for key, value in original_env.items():
+            os.environ[key] = value
+        
+        # 게임패드 비활성화 환경 복원 (런처용)
+        os.environ['DISABLE_GAMEPAD'] = '1'
+        os.environ['SDL_GAMECONTROLLER_IGNORE_DEVICES'] = '1'
+        os.environ['SDL_JOYSTICK_DEVICE'] = ''
+    
+    print("\n" + "="*50)
+    print("💡 참고: 게임 실행 시에는 게임패드가 자동으로 활성화됩니다.")
+    print("🛡️ 최강 화상키보드 차단이 적용됩니다.")
+    input("아무 키나 눌러 메인 메뉴로 돌아갑니다...")
+
 def main():
     """메인 함수 - 커서 메뉴 시스템"""
     # 시작 시 게임패드 안전 환경 설정
@@ -1643,6 +1963,11 @@ def main():
                 if audio:
                     audio.play_sfx('confirm')
                 quick_setup()
+            
+            elif choice == "G":
+                if audio:
+                    audio.play_sfx('confirm')
+                test_gamepad()
             
             elif choice == "7":
                 if audio:

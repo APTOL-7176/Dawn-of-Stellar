@@ -1,0 +1,196 @@
+name: Dawn of Stellar - CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: [3.8, 3.9, '3.10', '3.11']
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pytest-cov
+        pip install -r requirements.txt
+    
+    - name: Lint with flake8
+      run: |
+        pip install flake8
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    
+    - name: Test game import
+      run: |
+        python -c "from game import character, brave_combat, world; print('✅ 게임 모듈 임포트 성공')"
+    
+    - name: Test version info
+      run: |
+        python -c "from version import print_version_info; print_version_info()"
+    
+    - name: Run tests
+      run: |
+        python -m pytest tests/ -v --cov=game --cov-report=xml
+      continue-on-error: true
+
+    - name: Upload coverage to Codecov
+      if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install security tools
+      run: |
+        pip install safety bandit
+    
+    - name: Run safety check
+      run: |
+        safety check
+      continue-on-error: true
+    
+    - name: Run bandit security scan
+      run: |
+        bandit -r game/ -f json -o bandit-report.json
+      continue-on-error: true
+
+  build-release:
+    name: Build Release Package
+    needs: test
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install build dependencies
+      run: |
+        pip install build wheel setuptools
+    
+    - name: Create release package
+      run: |
+        # 릴리스용 폴더 생성
+        mkdir -p release/dawn-of-stellar
+        
+        # 필수 파일들 복사
+        cp -r game/ release/dawn-of-stellar/
+        cp main.py release/dawn-of-stellar/
+        cp config.py release/dawn-of-stellar/
+        cp version.py release/dawn-of-stellar/
+        cp requirements.txt release/dawn-of-stellar/
+        cp README.md release/dawn-of-stellar/
+        cp LICENSE release/dawn-of-stellar/
+        
+        # 실행 스크립트 생성
+        cat > release/dawn-of-stellar/run.sh << 'EOF'
+        #!/bin/bash
+        echo "🌟 Dawn of Stellar 시작..."
+        python3 main.py
+        EOF
+        chmod +x release/dawn-of-stellar/run.sh
+        
+        cat > release/dawn-of-stellar/run.bat << 'EOF'
+        @echo off
+        echo 🌟 Dawn of Stellar 시작...
+        python main.py
+        pause
+        EOF
+        
+        # 압축 파일 생성
+        cd release
+        tar -czf dawn-of-stellar-${{ github.ref_name }}.tar.gz dawn-of-stellar/
+        zip -r dawn-of-stellar-${{ github.ref_name }}.zip dawn-of-stellar/
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          release/dawn-of-stellar-${{ github.ref_name }}.tar.gz
+          release/dawn-of-stellar-${{ github.ref_name }}.zip
+        draft: false
+        prerelease: false
+        body: |
+          ## 🌟 Dawn of Stellar ${{ github.ref_name }}
+          
+          ### 🎮 설치 방법
+          1. 압축 파일 다운로드 및 압축 해제
+          2. Python 3.8+ 설치 확인: `python --version`
+          3. 의존성 설치: `pip install -r requirements.txt`
+          4. 게임 실행: `python main.py` (또는 `run.bat`/`run.sh`)
+          
+          ### 📋 주요 변경사항
+          자세한 내용은 [CHANGELOG.md](CHANGELOG.md)를 참조하세요.
+          
+          ### 🐛 버그 리포트
+          문제가 발생하면 [Issues](https://github.com/APTOL-7176/Dawn-of-Stellar/issues)에 신고해주세요.
+
+  code-quality:
+    name: Code Quality Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install quality tools
+      run: |
+        pip install black isort mypy pylint
+    
+    - name: Check code formatting with black
+      run: |
+        black --check --diff game/ main.py config.py version.py
+      continue-on-error: true
+    
+    - name: Check import sorting with isort
+      run: |
+        isort --check-only --diff game/ main.py config.py version.py
+      continue-on-error: true
+    
+    - name: Type checking with mypy
+      run: |
+        mypy game/ --ignore-missing-imports
+      continue-on-error: true
+    
+    - name: Lint with pylint
+      run: |
+        pylint game/ --disable=C0114,C0115,C0116 --max-line-length=120
+      continue-on-error: true

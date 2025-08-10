@@ -1,33 +1,16 @@
 @echo off
-:: Dawn of Stellar - PowerShell 강제 실행 런처
+:: Dawn of Stellar - 터미널 기반 런처 (현재 터미널에서 실행)
 :: UTF-8 encoding for Korean support
 chcp 65001 > nul
 
-title Dawn of Stellar - PowerShell Launcher
-
-:: 현재 실행 환경 확인
-echo [INFO] Checking execution environment...
-
-:: PowerShell에서 실행 중인지 확인
-if "%PSModulePath%"=="" (
-    echo [DETECT] Running in Command Prompt - Switching to PowerShell...
-    echo [SWITCH] Launching game in PowerShell for better compatibility...
-    
-    :: PowerShell에서 런처 재실행
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "& { cd '%~dp0'; .\파이썬런처실행.bat /powershell }"
-    exit /b 0
-)
-
-:: PowerShell 환경 표시
-echo [SUCCESS] Running in PowerShell environment!
-echo [INFO] ANSI colors and advanced features enabled.
+title Dawn of Stellar - Terminal Launcher
 
 echo.
 echo ================================================================
 echo.
 echo                Dawn of Stellar - Python Launcher
 echo.
-echo                     Development Tools Integration
+echo                     터미널 기반 실행 모드
 echo.
 echo ================================================================
 echo.
@@ -43,6 +26,11 @@ if not exist "python_launcher.py" (
 
 :: Python environment check and execution
 echo [INFO] Checking Python environment...
+
+:: 🎨 Windows Terminal 색상 강제 활성화
+set FORCE_COLOR=1
+set WT_SESSION=1
+echo [COLOR] Enabling Windows Terminal color support...
 
 :: Check virtual environment and execute
 if exist ".venv\Scripts\python.exe" (
@@ -113,14 +101,16 @@ echo [COMPLETE] Hope this helped with game development!
 echo.
 
 :: Prevent auto-close (for debugging)
+echo.
+echo [COMPLETE] Dawn of Stellar launcher finished.
+echo.
+
 if "%1"=="/auto" (
     echo [AUTO] Auto mode - closing automatically
     timeout /t 1 > nul
 ) else (
-    echo [SUCCESS] Python launcher exited normally.
-    echo [COMPLETE] Hope this helped with game development!
-    echo [AUTO] Closing window automatically...
-    timeout /t 2 > nul
+    echo [MANUAL] Press any key to close...
+    pause > nul
 )
 
 exit /b %exit_code%

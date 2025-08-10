@@ -1,0 +1,161 @@
+name: Feature Request
+description: 새로운 기능이나 개선사항을 제안해주세요
+title: "[FEATURE] "
+labels: ["enhancement", "feature-request"]
+assignees:
+  - APTOL-7176
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ✨ **기능 요청을 해주셔서 감사합니다!**
+        
+        좋은 아이디어가 Dawn of Stellar을 더욱 멋진 게임으로 만듭니다.
+
+  - type: textarea
+    id: feature-summary
+    attributes:
+      label: 🚀 요청 기능 요약
+      description: 원하는 기능을 한 문장으로 요약해주세요.
+      placeholder: 예) 파티원들이 자동으로 전투하는 AI 모드를 추가해주세요.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: feature-category
+    attributes:
+      label: 📁 기능 카테고리
+      description: 어떤 분야의 기능인가요?
+      options:
+        - 🗡️ 전투 시스템
+        - 👥 캐릭터/직업
+        - 🎒 인벤토리/아이템
+        - 🏰 던전/월드
+        - 🎨 UI/UX
+        - 🎵 오디오/비주얼
+        - 📱 모바일 기능
+        - 🤖 AI 시스템
+        - 🛠️ 개발자 도구
+        - 🎮 게임플레이 전반
+        - 기타
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority-level
+    attributes:
+      label: 📊 우선순위
+      description: 이 기능의 중요도는 어느 정도인가요?
+      options:
+        - 🔥 높음 - 게임의 핵심 기능
+        - 📈 보통 - 있으면 좋은 기능
+        - 💡 낮음 - 나중에 구현해도 되는 기능
+        - 🎁 보너스 - 재미있는 추가 기능
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: 💡 동기/배경
+      description: 왜 이 기능이 필요한가요? 어떤 문제를 해결하거나 경험을 개선할까요?
+      placeholder: |
+        현재 매번 파티원의 행동을 직접 선택해야 해서 전투가 번거롭습니다.
+        자동 전투 모드가 있다면 더 편리하게 게임을 즐길 수 있을 것 같습니다.
+    validations:
+      required: true
+
+  - type: textarea
+    id: detailed-description
+    attributes:
+      label: 📝 상세 설명
+      description: 원하는 기능에 대해 자세히 설명해주세요.
+      placeholder: |
+        - 메뉴에서 AI 모드를 활성화/비활성화할 수 있어야 함
+        - AI는 각 캐릭터의 직업과 상황에 맞는 최적의 행동을 선택
+        - 플레이어는 언제든지 수동으로 개입할 수 있어야 함
+        - AI 전략을 설정할 수 있는 옵션 (공격적, 방어적, 균형)
+    validations:
+      required: true
+
+  - type: textarea
+    id: user-story
+    attributes:
+      label: 🎯 사용자 스토리
+      description: "~로서, 나는 ~을 원한다. 왜냐하면 ~이기 때문이다" 형식으로 작성해주세요.
+      placeholder: |
+        "바쁜 플레이어로서, 나는 파티가 자동으로 전투하는 기능을 원한다. 
+        왜냐하면 매번 모든 파티원의 행동을 선택하는 것이 시간이 오래 걸리기 때문이다."
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: implementation-scope
+    attributes:
+      label: 🔧 구현 범위
+      description: 이 기능과 관련하여 어떤 부분들이 영향을 받을까요? (복수 선택 가능)
+      options:
+        - label: 새로운 UI 메뉴/화면
+        - label: 기존 UI 수정
+        - label: 새로운 설정 옵션
+        - label: 새로운 게임 로직
+        - label: 데이터 저장/로드 수정
+        - label: 성능 최적화 필요
+        - label: 모바일 클라이언트 수정
+        - label: 문서 업데이트 필요
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 💭 대안 고려사항
+      description: 고려해봤던 다른 해결책이나 접근 방법이 있나요?
+      placeholder: |
+        - 간단한 자동 전투 vs 복잡한 AI 전략
+        - 전체 자동화 vs 부분 자동화
+        - 기존 게임에서 본 유사한 시스템
+
+  - type: textarea
+    id: examples
+    attributes:
+      label: 🎮 참조 예시
+      description: 다른 게임이나 소프트웨어에서 본 유사한 기능이 있다면 설명해주세요.
+      placeholder: |
+        - Final Fantasy의 자동 전투 시스템
+        - RPG Maker 게임의 AI 파티원
+        - 기타 로그라이크 게임의 유사 기능
+
+  - type: dropdown
+    id: implementation-difficulty
+    attributes:
+      label: 🔨 예상 구현 난이도
+      description: 개발자 관점에서 이 기능의 구현 난이도는 어느 정도일 것 같나요?
+      options:
+        - 🟢 쉬움 - 간단한 UI 변경이나 설정 추가
+        - 🟡 보통 - 새로운 로직 추가나 기존 시스템 확장
+        - 🟠 어려움 - 핵심 시스템 수정이나 복잡한 로직
+        - 🔴 매우 어려움 - 게임 구조 대폭 변경 필요
+        - 🤷 모르겠음 - 개발자가 판단해주세요
+
+  - type: textarea
+    id: additional-notes
+    attributes:
+      label: 📋 추가 의견
+      description: 기타 관련 의견이나 제안사항이 있다면 자유롭게 작성해주세요.
+      placeholder: |
+        - 관련된 다른 기능 아이디어
+        - 구현 시 주의사항
+        - 플레이어 피드백
+        - 기타 의견
+
+  - type: checkboxes
+    id: agreement
+    attributes:
+      label: ✅ 동의사항
+      description: 기능 요청 전에 다음 사항들을 확인해주세요.
+      options:
+        - label: 기존 이슈에서 동일한 기능이 요청되지 않았는지 확인했습니다
+          required: true
+        - label: 이 기능이 게임의 방향성에 맞다고 생각합니다
+          required: true
+        - label: 개발 시간과 우선순위를 고려하여 요청합니다
+          required: true
