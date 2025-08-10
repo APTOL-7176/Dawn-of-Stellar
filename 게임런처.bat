@@ -144,12 +144,7 @@ echo     Setting up server for friends to join...
 echo     [INFO] Server will be hosted on your local network
 echo     [INFO] Friends can connect using your IP address
 echo.
-D:\로그라이크_2\.venv\Scripts\python.exe -c "
-import sys
-sys.path.append('.')
-from game.multiplayer_server import start_server
-start_server()
-"
+D:\로그라이크_2\.venv\Scripts\python.exe -c "import sys; sys.path.append('.'); from game.multiplayer_server import start_server; start_server()"
 pause
 goto HOST_MULTIPLAYER
 
@@ -164,12 +159,7 @@ echo       • AI fills empty slots automatically
 echo       • Dynamic difficulty adjustment
 echo       • Intelligent matchmaking
 echo.
-D:\로그라이크_2\.venv\Scripts\python.exe -c "
-import sys
-sys.path.append('.')
-from game.integrated_multiplayer import start_ai_enhanced_server
-start_ai_enhanced_server()
-"
+D:\로그라이크_2\.venv\Scripts\python.exe -c "import sys; sys.path.append('.'); from game.integrated_multiplayer import start_ai_enhanced_server; start_ai_enhanced_server()"
 pause
 goto HOST_MULTIPLAYER
 
@@ -184,12 +174,7 @@ echo       • Observe AI vs AI gameplay
 echo       • Train and evaluate AI models
 echo       • Research and development mode
 echo.
-D:\로그라이크_2\.venv\Scripts\python.exe -c "
-import sys
-sys.path.append('.')
-from game.robat_multiplayer import start_robat_playground_server
-start_robat_playground_server()
-"
+D:\로그라이크_2\.venv\Scripts\python.exe -c "import sys; sys.path.append('.'); from game.robat_multiplayer import start_robat_playground_server; start_robat_playground_server()"
 pause
 goto HOST_MULTIPLAYER
 
@@ -232,12 +217,7 @@ if "%server_ip%"=="" set server_ip=localhost
 echo.
 echo     Connecting to server: %server_ip%
 echo     Starting multiplayer client...
-D:\로그라이크_2\.venv\Scripts\python.exe -c "
-import sys
-sys.path.append('.')
-from game.multiplayer_client import connect_to_server
-connect_to_server('%server_ip%')
-"
+D:\로그라이크_2\.venv\Scripts\python.exe -c "import sys; sys.path.append('.'); from game.multiplayer_client import connect_to_server; connect_to_server('%server_ip%')"
 pause
 goto JOIN_MULTIPLAYER
 
@@ -250,12 +230,7 @@ echo     🔍 Scanning for available servers...
 echo     [INFO] Checking local network and internet
 echo     [INFO] Analyzing server quality and latency
 echo.
-D:\로그라이크_2\.venv\Scripts\python.exe -c "
-import sys
-sys.path.append('.')
-from game.multiplayer_network import smart_auto_connect
-smart_auto_connect()
-"
+D:\로그라이크_2\.venv\Scripts\python.exe -c "import sys; sys.path.append('.'); from game.multiplayer_network import smart_auto_connect; smart_auto_connect()"
 pause
 goto JOIN_MULTIPLAYER
 
@@ -270,12 +245,7 @@ echo       • Real-time strategy analysis
 echo       • Learning algorithm visualization
 echo       • Performance metrics display
 echo.
-D:\로그라이크_2\.venv\Scripts\python.exe -c "
-import sys
-sys.path.append('.')
-from game.ultimate_multiplayer_ai import start_ai_spectator_mode
-start_ai_spectator_mode()
-"
+D:\로그라이크_2\.venv\Scripts\python.exe -c "import sys; sys.path.append('.'); from game.ultimate_multiplayer_ai import start_ai_spectator_mode; start_ai_spectator_mode()"
 pause
 goto JOIN_MULTIPLAYER
 
@@ -323,12 +293,7 @@ echo       • Natural communication with robats
 echo       • Adaptive AI that learns your style
 echo       • 5 different cooperation modes
 echo.
-D:\로그라이크_2\.venv\Scripts\python.exe -c "
-import sys
-sys.path.append('.')
-from game.human_ai_hybrid_multiplayer import start_hybrid_session
-start_hybrid_session()
-"
+D:\로그라이크_2\.venv\Scripts\python.exe -c "import sys; sys.path.append('.'); from game.human_ai_hybrid_multiplayer import start_hybrid_session; start_hybrid_session()"
 pause
 goto AI_COOP
 
@@ -343,11 +308,7 @@ echo       • Real-time strategy adaptation
 echo       • Human-level decision making
 echo       • Advanced teamwork algorithms
 echo.
-D:\로그라이크_2\.venv\Scripts\python.exe -c "
-import sys
-sys.path.append('.')
-from game.ultimate_multiplayer_ai import start_ultimate_ai_session
-start_ultimate_ai_session()
+D:\로그라이크_2\.venv\Scripts\python.exe -c "import sys; sys.path.append('.'); from game.ultimate_multiplayer_ai import start_ultimate_ai_session; start_ultimate_ai_session()"
 "
 pause
 goto AI_COOP
@@ -363,12 +324,7 @@ echo       • Real-time AI communication
 echo       • Leadership system (host/leader roles)
 echo       • Cooperative and competitive modes
 echo.
-D:\로그라이크_2\.venv\Scripts\python.exe -c "
-import sys
-sys.path.append('.')
-from game.robat_multiplayer import start_robat_session
-start_robat_session()
-"
+D:\로그라이크_2\.venv\Scripts\python.exe -c "import sys; sys.path.append('.'); from game.robat_multiplayer import start_robat_session; start_robat_session()"
 pause
 goto AI_COOP
 
@@ -383,12 +339,7 @@ echo       • Adapts to your playstyle preferences
 echo       • Provides personalized suggestions
 echo       • Grows smarter over time
 echo.
-D:\로그라이크_2\.venv\Scripts\python.exe -c "
-import sys
-sys.path.append('.')
-from game.ultimate_ai_learning_system import start_learning_session
-start_learning_session()
-"
+D:\로그라이크_2\.venv\Scripts\python.exe -c "import sys; sys.path.append('.'); from game.ultimate_ai_learning_system import start_learning_session; start_learning_session()"
 pause
 goto AI_COOP
 
