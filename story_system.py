@@ -1777,7 +1777,9 @@ class StorySystem:
         ]
     
     def display_story_with_typing_effect(self, segments: List[StorySegment]):
-        """타이핑 효과 + Enter 전체 스킵 (콘솔/파이프 모두)"""
+        """타이핑 효과 + Enter 전체 스킵 (콘솔/파이프 모두)
+        반환값: True이면 중간 스킵 발생(또는 키보드 인터럽트), False이면 정상 종료
+        """
         import sys, time, os
         
         # 글리치 모드에서 추가 화면 클리어
@@ -1846,7 +1848,7 @@ class StorySystem:
                     else:
                         # 개입 실패 시 정상 스킵
                         print("\n[스토리를 건너뜁니다...]")
-                        return
+                        return True
                 windows = sys.platform == 'win32'
                 pipe_mode = windows and (not sys.stdin.isatty()) and os.getenv('SUBPROCESS_MODE') == '1'
                 if windows and not pipe_mode:
@@ -1886,7 +1888,7 @@ class StorySystem:
                             else:
                                 print(codes['reset'])
                                 print("\n[스토리를 건너뜁니다...]")
-                                return
+                                return True
                         if msvcrt.kbhit():
                             b = msvcrt.getch()
                             if b in (b'\r', b'\n'):
@@ -1902,10 +1904,10 @@ class StorySystem:
                     while time.time() < end_time:
                         if self._skip_requested:
                             print("\n[스토리를 건너뜁니다...]")
-                            return
+                            return True
                         if msvcrt.kbhit() and msvcrt.getch() in (b'\r', b'\n'):
                             print("\n[스토리를 건너뜁니다...]")
-                            return
+                            return True
                         time.sleep(0.01)
                 else:
                     # 파이프 / Unix 경로: _skip_requested 플래그만 감시
@@ -1918,10 +1920,12 @@ class StorySystem:
                         time.sleep(0.01)
         except KeyboardInterrupt:
             print("\n[스토리를 건너뜁니다...]")
+            return True
         finally:
             self.running_story = False
             self._skip_requested = False
             # 스토리 종료되면 watcher 자연 종료 대기 (플래그 false로 루프 탈출)
+        return False
     
     def _check_enter_key(self):
         """Enter 키 입력 확인 (크로스 플랫폼)"""
@@ -2074,6 +2078,40 @@ class StorySystem:
             time.sleep(delay)
         print(color_codes["reset"], end="")
         print()  # 줄바꿈
+
+    def _flush_input_buffer(self):
+        """입력 버퍼 플러시 (오프닝 시작 직전 잔여 입력 제거)
+        - Windows 콘솔: msvcrt로 안전하게 비우기
+        - Unix: select로 논블로킹 읽기
+        - 파이프/서브프로세스 모드에서는 입력을 건드리지 않음
+        """
+        try:
+            import os, sys
+            # 서브프로세스/파이프 모드에서는 건드리지 않음 (입력 공유 이슈 회피)
+            if os.getenv('SUBPROCESS_MODE') == '1':
+                return
+            if os.name == 'nt':
+                import msvcrt
+                # 가능한 모든 키를 즉시 소모
+                while msvcrt.kbhit():
+                    try:
+                        msvcrt.getch()
+                    except Exception:
+                        break
+            else:
+                import select
+                # 입력이 없을 때까지 1바이트씩 소모
+                while True:
+                    r, _, _ = select.select([sys.stdin], [], [], 0)
+                    if not r:
+                        break
+                    try:
+                        sys.stdin.read(1)
+                    except Exception:
+                        break
+        except Exception:
+            # 실패해도 게임 진행에 영향 주지 않음
+            pass
     
     def show_opening_story(self):
         """오프닝 스토리 표시"""
@@ -2127,18 +2165,24 @@ class StorySystem:
             self._force_stop_all_bgm()
             time.sleep(0.5)
             self.play_story_bgm("BOMBING_MISSION")
+
+        # 🎯 오프닝 시작 직전 입력 버퍼 플러시 (이전 화면에서 눌린 Enter 제거)
+        self._flush_input_buffer()
+        time.sleep(0.02)  # 아주 짧은 안정화 대기
         
         segments = self.get_opening_story()
         if not segments:
             return
-        self.display_story_with_typing_effect(segments)
+        skipped = self.display_story_with_typing_effect(segments)
         
         # 스토리 완료 후 Enter 키 입력 대기
-        try:
-            # 이미 스토리에 메시지가 포함되어 있으므로 빈 입력 대기만 수행
-            input()
-        except KeyboardInterrupt:
-            pass
+        # 스킵 시에는 추가 입력 대기를 생략하여 Enter를 한 번만 눌러도 바로 건너뛰도록 함
+        if not skipped:
+            try:
+                # 이미 스토리에 메시지가 포함되어 있으므로 빈 입력 대기만 수행
+                input()
+            except KeyboardInterrupt:
+                pass
         
         # 스토리 완료 후 BGM 복구
         self._restore_normal_bgm()
@@ -2302,7 +2346,7 @@ class StorySystem:
             print(f"💀 최후의 BGM 정지 시도: {e}")
         
     def _restore_normal_bgm(self):
-        """글리치 모드 종료 후 정상 BGM 복구"""
+        """글리치 모드 종료 후 정상 BGM 복구 - 메인 메뉴로 돌아갈 때 메뉴 BGM으로 전환"""
         if not self.audio_manager:
             return
         try:
@@ -2311,12 +2355,22 @@ class StorySystem:
                 print("🔇 [CORRUPTION] BGM REMAINS TERMINATED")
                 return
             
-            # 정상 모드일 때만 BGM 복구
-            print("🎵 [SYSTEM] BGM 복구 중...")
+            # 정상 모드일 때는 스토리 완료 후 메인 메뉴 BGM으로 전환
+            print("🎵 [SYSTEM] 메인 메뉴 BGM 복구 중...")
             time.sleep(1.0)  # 잠시 대기
-            self.play_story_bgm("BOMBING_MISSION")  # 기본 BGM 재시작
             
-        except Exception:
+            # MENU BGM으로 전환 (BOMBING_MISSION 대신)
+            try:
+                from game.audio_system import BGMType
+                if hasattr(self.audio_manager, 'play_bgm'):
+                    self.audio_manager.play_bgm(BGMType.MENU, loop=True)
+                print("🎶 메인 메뉴 BGM이 재생됩니다.")
+            except:
+                # 폴백: 기존 방식
+                self.play_story_bgm("BOMBING_MISSION")
+            
+        except Exception as e:
+            print(f"⚠️ BGM 복구 실패: {e}")
             pass
         
     def _play_horror_ambience(self):

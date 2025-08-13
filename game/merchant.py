@@ -6,6 +6,7 @@
 import random
 from typing import List, Optional, Dict, Tuple
 from .items import Item, ItemDatabase, ItemType, ItemRarity
+from .ui_formatters import format_item_brief
 from .character import Character
 
 
@@ -19,19 +20,9 @@ class ShopItem:
         
     def get_display_name(self) -> str:
         """표시용 이름 (재고 및 내구도 포함)"""
-        # 내구도 정보 추가
-        durability_info = ""
-        if hasattr(self.item, 'get_durability_percentage'):
-            durability_pct = self.item.get_durability_percentage()
-            if durability_pct < 100:
-                durability_color = "🟢" if durability_pct > 80 else "🟡" if durability_pct > 50 else "🟠" if durability_pct > 20 else "🔴"
-                durability_info = f" {durability_color}{durability_pct:.0f}%"
-        elif hasattr(self.item, 'current_durability') and hasattr(self.item, 'max_durability'):
-            durability_pct = (self.item.current_durability / self.item.max_durability * 100) if self.item.max_durability > 0 else 0
-            durability_color = "🟢" if durability_pct > 80 else "🟡" if durability_pct > 50 else "🟠" if durability_pct > 20 else "🔴"
-            durability_info = f" {durability_color}{durability_pct:.0f}%"
-        
-        return f"{self.item.name} (x{self.stock}){durability_info} - {self.price}G"
+        # 공용 포맷터로 일관 표기 (희귀도/내구도/옵션)
+        brief = format_item_brief(self.item)
+        return f"{brief} (x{self.stock}) - {self.price}G"
 
 
 class Merchant:
@@ -335,6 +326,8 @@ class Merchant:
                 options = [
                     "🛒 아이템 구매",
                     "💰 아이템 판매",
+                    "⚒️ 장비 강화",
+                    "🎲 추가 옵션 리롤",
                     "📋 상점 목록 보기",
                     "❌ 나가기"
                 ]
@@ -342,6 +335,8 @@ class Merchant:
                 descriptions = [
                     "상인에게서 아이템을 구매합니다",
                     "상인에게 아이템을 판매합니다",
+                    "골드를 지불하여 장비를 강화합니다",
+                    "골드를 지불하여 장비의 추가 옵션을 리롤합니다",
                     "상점에서 판매하는 모든 아이템을 확인합니다",
                     "상점을 나갑니다"
                 ]
@@ -353,7 +348,11 @@ class Merchant:
                     self._show_buy_menu(party_manager)
                 elif result == 1:  # 판매
                     self._show_sell_menu(party_manager)
-                elif result == 2:  # 목록 보기
+                elif result == 2:  # 장비 강화
+                    self._show_enhancement_menu(party_manager)
+                elif result == 3:  # 추가 옵션 리롤
+                    self._show_reroll_menu(party_manager)
+                elif result == 4:  # 목록 보기
                     self._show_shop_items()
                 else:  # 나가기
                     print(f"{bright_cyan('상점을 나갑니다. 또 오세요!')}")
@@ -362,6 +361,13 @@ class Merchant:
         except ImportError:
             # 폴백: 기존 텍스트 메뉴
             self._show_shop_menu_fallback(party_manager)
+
+    def interact(self, party_manager=None):
+        """메인 시스템과의 호환을 위한 상호작용 진입점.
+        기존 코드에서 merchant.interact(party_manager)를 호출하므로,
+        실제 구현인 show_shop_menu로 위임한다.
+        """
+        return self.show_shop_menu(party_manager)
     
     def _show_buy_menu(self, party_manager=None):
         """구매 메뉴"""
@@ -380,7 +386,8 @@ class Merchant:
             
             for i, shop_item in enumerate(self.shop_items):
                 price_color = bright_green if (party_manager and party_manager.get_total_gold() >= shop_item.price) else bright_red
-                options.append(f"{shop_item.item.name} - {price_color(f'{shop_item.price}G')} (x{shop_item.stock})")
+                brief = format_item_brief(shop_item.item)
+                options.append(f"{brief} - {price_color(f'{shop_item.price}G')} (x{shop_item.stock})")
                 descriptions.append(f"{shop_item.item.description}")
             
             options.append("❌ 취소")
@@ -426,16 +433,49 @@ class Merchant:
                 input("Enter를 눌러 계속...")
                 return
             
-            # 파티 멤버들의 아이템 수집
+            # 파티 멤버들의 아이템 수집 (딕트/리스트 구조 모두 지원)
             sellable_items = []
             item_owners = []
             
             for member in party_manager.get_alive_members():
                 if hasattr(member, 'inventory') and hasattr(member.inventory, 'items'):
-                    for item in member.inventory.items:
-                        if hasattr(item, 'name'):
-                            sellable_items.append(f"{item.name} ({member.name})")
-                            item_owners.append((member, item.name))
+                    inventory_items = member.inventory.items
+                    
+                    # 딕트 구조 (아이템명: 개수)인 경우
+                    if isinstance(inventory_items, dict):
+                        from .items import ItemDatabase
+                        db = ItemDatabase()
+                        
+                        for item_name, quantity in inventory_items.items():
+                            if quantity > 0:  # 수량이 있는 아이템만
+                                # 실제 아이템 객체로 변환
+                                item = db.get_item(item_name)
+                                if item:
+                                    brief = format_item_brief(item)
+                                    if quantity > 1:
+                                        sellable_items.append(f"{brief} x{quantity} ({member.name})")
+                                    else:
+                                        sellable_items.append(f"{brief} ({member.name})")
+                                    item_owners.append((member, item_name))
+                                else:
+                                    # DB에 없는 아이템도 기본 이름으로 표시
+                                    if quantity > 1:
+                                        sellable_items.append(f"{item_name} x{quantity} ({member.name})")
+                                    else:
+                                        sellable_items.append(f"{item_name} ({member.name})")
+                                    item_owners.append((member, item_name))
+                    
+                    # 리스트 구조 (Item 객체들)인 경우
+                    elif isinstance(inventory_items, list):
+                        for item in inventory_items:
+                            if item:  # None이 아닌 아이템만
+                                brief = format_item_brief(item)
+                                sellable_items.append(f"{brief} ({member.name})")
+                                item_owners.append((member, item.name if hasattr(item, 'name') else str(item)))
+                    
+                    else:
+                        print(f"⚠️ {member.name}의 인벤토리 구조를 인식할 수 없습니다: {type(inventory_items)}")
+                        continue
             
             if not sellable_items:
                 print(f"{bright_red('판매할 아이템이 없습니다.')}")
@@ -462,8 +502,8 @@ class Merchant:
             print("판매 메뉴를 표시할 수 없습니다.")
     
     def _show_shop_items(self):
-        """상점 아이템 목록 표시"""
-        from .color_text import bright_cyan, bright_white, bright_yellow
+        """상점 아이템 목록 표시 (상세 정보 포함)"""
+        from .color_text import bright_cyan, bright_white, bright_yellow, bright_green, bright_red, cyan, green
         
         print(f"\n{bright_cyan('='*60)}")
         print(f"{bright_white(f'📋 {self.name}의 상품 목록')}")
@@ -473,13 +513,270 @@ class Merchant:
             print("판매할 아이템이 없습니다.")
         else:
             for i, shop_item in enumerate(self.shop_items, 1):
-                print(f"{i}. {shop_item.item.name}")
+                brief = format_item_brief(shop_item.item)
+                print(f"{i}. {brief}")
                 print(f"   💰 가격: {bright_yellow(f'{shop_item.price}G')}")
                 print(f"   📦 재고: {shop_item.stock}개")
                 print(f"   📝 설명: {shop_item.item.description}")
+                
+                # 추가 상세 정보
+                item = shop_item.item
+                
+                # 아이템 타입별 상세 정보
+                if hasattr(item, 'item_type'):
+                    item_type = getattr(item.item_type, 'name', str(item.item_type))
+                    print(f"   🏷️ 타입: {cyan(item_type)}")
+                
+                # 희귀도 정보 (색상 포함)
+                if hasattr(item, 'rarity'):
+                    rarity = getattr(item.rarity, 'name', str(item.rarity)) if hasattr(item.rarity, 'name') else str(item.rarity)
+                    rarity_colors = {
+                        'COMMON': bright_white, 'UNCOMMON': green, 'RARE': bright_cyan,
+                        'EPIC': bright_yellow, 'LEGENDARY': bright_red, 'MYTHIC': bright_red
+                    }
+                    color_func = rarity_colors.get(rarity, bright_white)
+                    print(f"   ⭐ 희귀도: {color_func(rarity)}")
+                
+                # 스탯 정보
+                if hasattr(item, 'stats') and item.stats:
+                    stat_strs = []
+                    for stat, value in item.stats.items():
+                        if value > 0:
+                            stat_strs.append(f"{stat}+{value}")
+                    if stat_strs:
+                        print(f"   📊 스탯: {green(', '.join(stat_strs))}")
+                
+                # 내구도 정보
+                if hasattr(item, 'current_durability') and hasattr(item, 'max_durability'):
+                    durability_pct = (item.current_durability / item.max_durability * 100) if item.max_durability > 0 else 0
+                    durability_color = bright_green if durability_pct > 80 else bright_yellow if durability_pct > 50 else bright_red
+                    print(f"   🔧 내구도: {durability_color(f'{item.current_durability}/{item.max_durability} ({durability_pct:.0f}%)')}")
+                
+                # 강화 레벨
+                if hasattr(item, 'enhancement_level') and item.enhancement_level > 0:
+                    print(f"   ⚡ 강화: {bright_yellow(f'+{item.enhancement_level}')}")
+                
+                # 추가 옵션
+                if hasattr(item, 'additional_options') and item.additional_options:
+                    options_count = len(item.additional_options)
+                    print(f"   ✨ 추가 옵션: {bright_cyan(f'{options_count}개')}")
+                
+                # 소모품 효과
+                if hasattr(item, 'effects') and item.effects:
+                    effect_strs = []
+                    for effect, value in item.effects.items():
+                        effect_strs.append(f"{effect}: {value}")
+                    if effect_strs:
+                        print(f"   💊 효과: {green(', '.join(effect_strs[:2]))}")  # 최대 2개만 표시
+                
                 print()
         
         input("Enter를 눌러 계속...")
+    
+    def _show_enhancement_menu(self, party_manager=None):
+        """장비 강화 메뉴"""
+        try:
+            from .cursor_menu_system import create_simple_menu
+            from .color_text import bright_cyan, bright_white, bright_yellow, bright_green, bright_red
+            from .unified_equipment_system import UnifiedEquipmentGenerator
+            
+            if not party_manager:
+                print(f"{bright_red('파티 정보가 없어 강화할 수 없습니다.')}") 
+                input("Enter를 눌러 계속...")
+                return
+            
+            # 강화 가능한 장비 수집
+            enhanceable_items = []
+            item_owners = []
+            
+            for member in party_manager.get_alive_members():
+                if hasattr(member, 'inventory') and hasattr(member.inventory, 'items'):
+                    for item in member.inventory.items:
+                        if (hasattr(item, 'enhancement_level') and 
+                            hasattr(item, 'item_type') and 
+                            item.item_type.name in ['WEAPON', 'ARMOR']):
+                            # 강화 비용 계산
+                            enhancement_cost = self._calculate_enhancement_cost(item)
+                            cost_color = bright_green if party_manager.get_total_gold() >= enhancement_cost else bright_red
+                            brief = format_item_brief(item)
+                            level = getattr(item, 'enhancement_level', 0)
+                            enhanceable_items.append(f"{brief} +{level} ({member.name}) - {cost_color(f'{enhancement_cost}G')}")
+                            item_owners.append((member, item, enhancement_cost))
+            
+            if not enhanceable_items:
+                print(f"{bright_red('강화할 수 있는 장비가 없습니다.')}") 
+                input("Enter를 눌러 계속...")
+                return
+            
+            enhanceable_items.append("❌ 취소")
+            descriptions = ["선택한 장비를 강화합니다"] * len(item_owners)
+            descriptions.append("강화를 취소합니다")
+            
+            menu = create_simple_menu("⚒️ 장비 강화", enhanceable_items, descriptions)
+            result = menu.run()
+            
+            if result != -1 and result < len(item_owners):
+                owner, item, cost = item_owners[result]
+                
+                if not party_manager.has_enough_gold(cost):
+                    print(f"{bright_red(f'골드가 부족합니다 ({party_manager.get_total_gold()}G/{cost}G)')}") 
+                    input("Enter를 눌러 계속...")
+                    return
+                
+                # 강화 실행
+                success, message = self._enhance_equipment(party_manager, owner, item, cost)
+                if success:
+                    print(f"{bright_green(message)}")
+                else:
+                    print(f"{bright_red(message)}")
+                input("Enter를 눌러 계속...")
+                
+        except ImportError:
+            print("장비 강화 메뉴를 표시할 수 없습니다.")
+    
+    def _show_reroll_menu(self, party_manager=None):
+        """추가 옵션 리롤 메뉴"""
+        try:
+            from .cursor_menu_system import create_simple_menu
+            from .color_text import bright_cyan, bright_white, bright_yellow, bright_green, bright_red
+            from .unified_equipment_system import UnifiedEquipmentGenerator
+            
+            if not party_manager:
+                print(f"{bright_red('파티 정보가 없어 리롤할 수 없습니다.')}") 
+                input("Enter를 눌러 계속...")
+                return
+            
+            # 리롤 가능한 장비 수집
+            rerollable_items = []
+            item_owners = []
+            
+            for member in party_manager.get_alive_members():
+                if hasattr(member, 'inventory') and hasattr(member.inventory, 'items'):
+                    for item in member.inventory.items:
+                        if (hasattr(item, 'additional_options') and 
+                            hasattr(item, 'item_type') and 
+                            item.item_type.name in ['WEAPON', 'ARMOR'] and
+                            item.additional_options):
+                            # 리롤 비용 계산
+                            reroll_cost = self._calculate_reroll_cost(item)
+                            cost_color = bright_green if party_manager.get_total_gold() >= reroll_cost else bright_red
+                            brief = format_item_brief(item)
+                            rerollable_items.append(f"{brief} ({member.name}) - {cost_color(f'{reroll_cost}G')}")
+                            item_owners.append((member, item, reroll_cost))
+            
+            if not rerollable_items:
+                print(f"{bright_red('리롤할 수 있는 장비가 없습니다.')}") 
+                input("Enter를 눌러 계속...")
+                return
+            
+            rerollable_items.append("❌ 취소")
+            descriptions = ["선택한 장비의 추가 옵션을 리롤합니다"] * len(item_owners)
+            descriptions.append("리롤을 취소합니다")
+            
+            menu = create_simple_menu("🎲 추가 옵션 리롤", rerollable_items, descriptions)
+            result = menu.run()
+            
+            if result != -1 and result < len(item_owners):
+                owner, item, cost = item_owners[result]
+                
+                if not party_manager.has_enough_gold(cost):
+                    print(f"{bright_red(f'골드가 부족합니다 ({party_manager.get_total_gold()}G/{cost}G)')}") 
+                    input("Enter를 눌러 계속...")
+                    return
+                
+                # 리롤 실행
+                success, message = self._reroll_additional_options(party_manager, owner, item, cost)
+                if success:
+                    print(f"{bright_green(message)}")
+                else:
+                    print(f"{bright_red(message)}")
+                input("Enter를 눌러 계속...")
+                
+        except ImportError:
+            print("추가 옵션 리롤 메뉴를 표시할 수 없습니다.")
+    
+    def _calculate_enhancement_cost(self, item):
+        """강화 비용 계산"""
+        base_cost = 100
+        level_multiplier = (item.enhancement_level + 1) ** 2
+        rarity_multiplier = {
+            'COMMON': 1.0,
+            'UNCOMMON': 1.5,
+            'RARE': 2.0,
+            'EPIC': 3.0,
+            'LEGENDARY': 5.0
+        }.get(item.rarity.name if hasattr(item, 'rarity') else 'COMMON', 1.0)
+        
+        return int(base_cost * level_multiplier * rarity_multiplier)
+    
+    def _calculate_reroll_cost(self, item):
+        """리롤 비용 계산"""
+        base_cost = 200
+        enhancement_multiplier = 1.0 + (item.enhancement_level * 0.5) if hasattr(item, 'enhancement_level') else 1.0
+        rarity_multiplier = {
+            'COMMON': 1.0,
+            'UNCOMMON': 1.5,
+            'RARE': 2.5,
+            'EPIC': 4.0,
+            'LEGENDARY': 7.0
+        }.get(item.rarity.name if hasattr(item, 'rarity') else 'COMMON', 1.0)
+        
+        return int(base_cost * enhancement_multiplier * rarity_multiplier)
+    
+    def _enhance_equipment(self, party_manager, owner, item, cost):
+        """장비 강화 실행"""
+        try:
+            from .unified_equipment_system import UnifiedEquipmentGenerator
+            
+            # 골드 차감
+            party_manager.spend_gold(cost)
+            
+            # 강화 시도
+            generator = UnifiedEquipmentGenerator()
+            success = generator.enhance_equipment(item)
+            
+            if success:
+                return True, f"{item.name}이(가) +{item.enhancement_level}로 강화되었습니다!"
+            else:
+                # 강화 실패 시 등급 감소 및 내구도 감소
+                if hasattr(item, 'enhancement_level') and item.enhancement_level > 0:
+                    item.enhancement_level -= 1
+                    message = f"{item.name}의 강화가 실패하여 +{item.enhancement_level}로 감소했습니다."
+                    
+                    # +5강 이상에서는 내구도도 감소
+                    if item.enhancement_level >= 5:
+                        if hasattr(item, 'current_durability') and hasattr(item, 'max_durability'):
+                            durability_loss = max(1, item.max_durability // 10)  # 최대 내구도의 10%
+                            item.current_durability = max(0, item.current_durability - durability_loss)
+                            message += f" 내구도도 {durability_loss} 감소했습니다."
+                    
+                    return False, message
+                else:
+                    return False, f"{item.name}의 강화가 실패했습니다."
+                
+        except Exception as e:
+            return False, f"강화 중 오류가 발생했습니다: {e}"
+    
+    def _reroll_additional_options(self, party_manager, owner, item, cost):
+        """추가 옵션 리롤 실행"""
+        try:
+            from .unified_equipment_system import UnifiedEquipmentGenerator
+            
+            # 골드 차감
+            party_manager.spend_gold(cost)
+            
+            # 리롤 실행
+            generator = UnifiedEquipmentGenerator()
+            old_options = item.additional_options.copy() if item.additional_options else []
+            
+            # 새로운 추가 옵션 생성
+            new_options = generator.generate_additional_options(item.rarity, item.item_type)
+            item.additional_options = new_options
+            
+            return True, f"{item.name}의 추가 옵션이 리롤되었습니다!"
+                
+        except Exception as e:
+            return False, f"리롤 중 오류가 발생했습니다: {e}"
     
     def _show_shop_menu_fallback(self, party_manager=None):
         """상점 메뉴 폴백 (기존 방식)"""

@@ -300,10 +300,13 @@ class MultiplayerAICharacterCreator:
         }
         return decision_styles.get(personality_type, "균형적_판단")
     
-    def create_multiplayer_party(self, party_size: int = 4) -> List[Dict]:
-        """멀티플레이용 AI 파티 생성 (역할 균형 고려)"""
+    def create_multiplayer_party(self, party_size: int = 4, exclude_jobs: List[str] = None) -> List[Dict]:
+        """멀티플레이용 AI 파티 생성 (역할 균형 고려 + 직업 중복 방지)"""
         print(f"\n{BRIGHT_CYAN}🎮 AI 멀티플레이 파티 생성 ({party_size}명){RESET}")
         print(f"{WHITE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{RESET}")
+        
+        if exclude_jobs is None:
+            exclude_jobs = []
         
         # 역할별 직업 분류 (밸런스 잡힌 파티 구성)
         role_distribution = {
@@ -314,8 +317,13 @@ class MultiplayerAICharacterCreator:
             "하이브리드": ["몽크", "용기사", "마검사", "기계공학자", "해적"]
         }
         
+        # 제외할 직업 필터링
+        for role, jobs in role_distribution.items():
+            role_distribution[role] = [job for job in jobs if job not in exclude_jobs]
+        
         party_members = []
         used_names = set()
+        used_jobs = set(exclude_jobs)  # 이미 제외할 직업들 추가
         
         # 파티 구성 전략 (4명 기준)
         if party_size >= 4:
@@ -328,26 +336,40 @@ class MultiplayerAICharacterCreator:
             if i >= party_size:
                 break
             
-            class_name = random.choice(role_distribution[role])
+            # 사용 가능한 직업들 중에서 선택 (중복 방지)
+            available_jobs = [job for job in role_distribution[role] if job not in used_jobs]
+            if not available_jobs:
+                # 해당 역할에 사용 가능한 직업이 없으면 다른 역할에서 선택
+                all_available = []
+                for other_role, jobs in role_distribution.items():
+                    all_available.extend([job for job in jobs if job not in used_jobs])
+                if all_available:
+                    class_name = random.choice(all_available)
+                else:
+                    continue  # 정말 선택할 직업이 없으면 스킵
+            else:
+                class_name = random.choice(available_jobs)
+            
+            used_jobs.add(class_name)  # 사용된 직업 추가
             gender = random.choice(self.genders)
             
-            # 직업에 맞는 성격 선택
-            if class_name in self.class_specialties:
-                suitable_personalities = self.class_specialties[class_name]["personality_fit"]
-                personality_type = random.choice(suitable_personalities)
-            else:
-                personality_type = random.choice(self.personality_types)
+            # 직업에 맞는 성격 선택 (개선된 매칭)
+            personality_type = self._get_suitable_personality(class_name)
+            
+            # 직업과 성격에 맞는 이름과 성별 선택
+            name, gender = self._get_suitable_name(class_name, personality_type)
             
             # 이름 중복 방지
             attempts = 0
-            while attempts < 30:
-                name = random.choice(self.name_pools[gender])
-                if name not in used_names:
-                    used_names.add(name)
-                    break
+            while name in used_names and attempts < 10:
+                name, gender = self._get_suitable_name(class_name, personality_type)
                 attempts += 1
-            else:
-                name = f"{random.choice(self.name_pools[gender])}_{i+1}"
+            
+            # 여전히 중복이면 숫자 추가
+            if name in used_names:
+                name = f"{name}_{i+1}"
+            
+            used_names.add(name)
             
             character = self.create_ai_character_for_multiplayer(
                 name, class_name, gender, personality_type
@@ -424,6 +446,74 @@ class MultiplayerAICharacterCreator:
         
         print(f"  {WHITE}└─ 파티 등급: {rating}{RESET}")
     
+    def _get_suitable_personality(self, class_name: str) -> str:
+        """직업에 맞는 성격 유형 반환"""
+        # 직업별 어울리는 성격 매핑
+        class_personality_map = {
+            # 전투 직업군 - 강인하고 용감한 성격
+            "전사": ["용감한_전사", "충성스런_기사", "단호한_지휘관", "수호하는_방패", "불굴의_투사"],
+            "성기사": ["신실한_성자", "정의로운_기사", "수호하는_방패", "자비로운_치유자", "빛의_수호자"],
+            "암흑기사": ["냉정한_전술가", "고독한_기사", "어둠의_수호자", "복수의_검", "침묵하는_전사"],
+            "몽크": ["평온한_수도승", "단련하는_구도자", "깨달은_현자", "수행하는_무도가", "조화로운_영혼"],
+            "아크메이지": ["지혜로운_현자", "탐구하는_학자", "신비로운_술사", "마법의_지배자", "원소의_주인"],
+            "궁수": ["냉정한_저격수", "자유로운_유랑자", "정확한_명사수", "숲의_수호자", "바람의_사자"],
+            "도적": ["교활한_도둑", "그림자_무용수", "침묵하는_암살자", "민첩한_탐험가", "은밀한_정탐꾼"],
+            "바드": ["낭만적_음유시인", "매혹적_예술가", "유쾌한_엔터테이너", "감성적_시인", "카리스마_리더"],
+            
+            # 마법 직업군 - 지적이고 신비로운 성격
+            "네크로맨서": ["어둠의_학자", "죽음의_현자", "고독한_연구자", "금기의_탐구자", "영혼의_지배자"],
+            "용기사": ["용맹한_기사", "불의_전사", "드래곤_동반자", "화염의_수호자", "고귀한_전사"],
+            "검성": ["초월한_검사", "검의_구도자", "무예의_달인", "고독한_검호", "완벽한_검사"],
+            "정령술사": ["자연의_친구", "원소의_현자", "조화로운_술사", "신비로운_드루이드", "정령의_대화자"],
+            "시간술사": ["신비로운_예언자", "시간의_수호자", "운명의_조율자", "차원의_여행자", "미래의_관찰자"],
+            "연금술사": ["탐구하는_학자", "실험적_발명가", "지적인_연구자", "창조적_과학자", "변화의_대가"],
+            "차원술사": ["초월적_현자", "차원의_탐험가", "공간의_지배자", "무한의_탐구자", "현실의_조율자"],
+            "마검사": ["균형의_전사", "마법_검사", "이중의_수행자", "조화로운_전사", "완성된_검사"],
+            "기계공학자": ["창의적_발명가", "기계의_대가", "논리적_엔지니어", "혁신적_창조자", "완벽주의_기술자"],
+            "무당": ["영적인_치유자", "신비로운_무당", "자연의_대변자", "영혼의_안내자", "조상의_대리인"],
+            
+            # 특수 직업군 - 독특하고 특별한 성격
+            "암살자": ["침묵하는_그림자", "냉혹한_암살자", "완벽한_킬러", "그림자_무용수", "죽음의_사자"],
+            "해적": ["자유로운_모험가", "바다의_늑대", "모험적_선장", "용감한_해적", "바다의_지배자"],
+            "사무라이": ["명예로운_무사", "완벽한_검사", "충의의_전사", "고귀한_사무라이", "무도의_달인"],
+            "드루이드": ["자연의_수호자", "야생의_친구", "대지의_현자", "생명의_보호자", "자연의_대변자"],
+            "철학자": ["깊이_사색하는_현자", "지혜로운_철학자", "진리의_탐구자", "사색적_학자", "깨달은_현자"],
+            "검투사": ["투기의_전사", "불굴의_투사", "경기장_영웅", "전투의_예술가", "승리의_추구자"],
+            "기사": ["고귀한_기사", "명예로운_전사", "충성스런_기사", "정의의_수호자", "완벽한_기사"],
+            "신관": ["신실한_성직자", "자비로운_치유자", "빛의_사도", "희망의_전령", "평화의_수호자"],
+            "광전사": ["광기의_전사", "파괴적_투사", "분노의_화신", "전투광_바이킹", "폭풍의_전사"]
+        }
+        
+        # 직업에 맞는 성격 목록 가져오기
+        suitable_personalities = class_personality_map.get(class_name, ["균형잡힌_모험가"])
+        return random.choice(suitable_personalities)
+    
+    def _get_suitable_name(self, class_name: str, personality_type: str) -> tuple[str, str]:
+        """직업과 성격에 맞는 이름과 성별 생성 (성별별 이름 풀 사용)"""
+        
+        # 성별 랜덤 선택 후 해당 성별 이름 풀에서 선택
+        gender = random.choice(["male", "female"])
+        name_pool = self.name_pools[gender]
+        base_name = random.choice(name_pool)
+        
+        # 성격에 따른 수식어 추가 (선택적)
+        if "리더" in personality_type:
+            modifiers = ["대장", "캡틴", "리더"]
+        elif "현자" in personality_type or "학자" in personality_type:
+            modifiers = ["현자", "박사", "마스터"]
+        elif "전사" in personality_type or "기사" in personality_type:
+            modifiers = ["기사", "전사", "가디언"]
+        else:
+            modifiers = []
+        
+        # 20% 확률로 수식어 추가
+        if modifiers and random.random() < 0.2:
+            final_name = f"{random.choice(modifiers)} {base_name}"
+        else:
+            final_name = base_name
+            
+        return final_name, gender
+
     def display_ai_character_profile(self, character: Dict):
         """AI 캐릭터 상세 프로필 표시"""
         data = character['character_data']

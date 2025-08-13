@@ -320,7 +320,7 @@ class PlayerCentricAISystem:
                         "original_character": player_char  # 원본 객체 저장
                     }
                     
-                    print(f"\\n🎉 {self.player_character['name']} ({self.player_character['job']}) 캐릭터가 생성되었습니다!")
+                    print(f"\n🎉 {self.player_character['name']} ({self.player_character['job']}) 캐릭터가 생성되었습니다!")
                     self._display_character_info(self.player_character)
                     return self.player_character
                 else:
@@ -338,7 +338,7 @@ class PlayerCentricAISystem:
     
     def _create_simple_character(self):
         """간단한 캐릭터 생성 (백업용)"""
-        print("\\n📋 간단한 캐릭터 생성")
+        print("\n📋 간단한 캐릭터 생성")
         print("-" * 40)
         
         # 플레이어 이름 입력
@@ -349,7 +349,7 @@ class PlayerCentricAISystem:
         # 간단한 6개 직업 선택
         simple_jobs = ["전사", "아크메이지", "궁수", "도적", "성기사", "암흑기사"]
         
-        print(f"\\n직업을 선택하세요:")
+        print(f"\n직업을 선택하세요:")
         for i, job in enumerate(simple_jobs, 1):
             desc = self.job_descriptions.get(job, "특별한 능력을 가진 직업")
             print(f"{i}. {job} - {desc}")
@@ -357,7 +357,7 @@ class PlayerCentricAISystem:
         
         while True:
             try:
-                choice = input(f"\\n직업 선택 (0-{len(simple_jobs)}): ").strip()
+                choice = input(f"\n직업 선택 (0-{len(simple_jobs)}): ").strip()
                 
                 if choice == "0":
                     print("🔙 메인 메뉴로 돌아갑니다.")
@@ -399,14 +399,14 @@ class PlayerCentricAISystem:
             "is_player": True
         }
         
-        print(f"\\n✅ {name} ({selected_job}) 캐릭터가 생성되었습니다!")
+        print(f"\n✅ {name} ({selected_job}) 캐릭터가 생성되었습니다!")
         self._display_character_info(self.player_character)
         
         return self.player_character
     
     def _create_simple_character(self):
         """간단한 캐릭터 생성 (폴백)"""
-        print("\\n📝 간단한 캐릭터 생성 모드")
+        print("\n📝 간단한 캐릭터 생성 모드")
         
         # 플레이어 이름 입력
         name = get_korean_safe_input("캐릭터 이름을 입력하세요", 20)
@@ -416,13 +416,13 @@ class PlayerCentricAISystem:
         # 6개 기본 직업
         simple_jobs = ["전사", "아크메이지", "궁수", "도적", "성기사", "암흑기사"]
         
-        print(f"\\n직업을 선택하세요:")
+        print(f"\n직업을 선택하세요:")
         for i, job in enumerate(simple_jobs, 1):
             print(f"{i}. {job}")
         
         while True:
             try:
-                choice = int(input(f"\\n직업 선택 (1-{len(simple_jobs)}): ")) - 1
+                choice = int(input(f"\n직업 선택 (1-{len(simple_jobs)}): ")) - 1
                 if 0 <= choice < len(simple_jobs):
                     selected_job = simple_jobs[choice]
                     break
@@ -453,7 +453,7 @@ class PlayerCentricAISystem:
             "is_player": True
         }
         
-        print(f"\\n✅ {name} ({selected_job}) 캐릭터가 생성되었습니다!")
+        print(f"\n✅ {name} ({selected_job}) 캐릭터가 생성되었습니다!")
         self._display_character_info(self.player_character)
         
         return self.player_character
@@ -502,7 +502,7 @@ class PlayerCentricAISystem:
     
     def create_ai_companions(self):
         """AI 동료들 자동 생성 - 기존 시스템 활용"""
-        print(f"\\n🤖 AI 동료 {self.party_size - 1}명을 자동 생성합니다...")
+        print(f"\n🤖 AI 동료 {self.party_size - 1}명을 자동 생성합니다...")
         
         if CHARACTER_CREATOR_AVAILABLE:
             try:
@@ -515,7 +515,7 @@ class PlayerCentricAISystem:
                 self.ai_companions = []
                 
                 for i in range(self.party_size - 1):
-                    print(f"\\n🤖 AI 동료 {i+1}번 생성 중...")
+                    print(f"\n🤖 AI 동료 {i+1}번 생성 중...")
                     
                     # AI 자동 생성 모드로 캐릭터 생성
                     ai_characters = character_creator.create_ai_characters(1, exclude_jobs=[player_job] if player_job else [])
@@ -553,7 +553,7 @@ class PlayerCentricAISystem:
                         # 폴백: 간단한 AI 생성
                         self._create_simple_ai_companion(i)
                 
-                print(f"\\n🎉 고급 파티 구성 완료! 총 {len(self.ai_companions) + 1}명")
+                print(f"\n🎉 고급 파티 구성 완료! 총 {len(self.ai_companions) + 1}명")
                 if self.ai_companions:
                     jobs = [comp['job'] for comp in self.ai_companions]
                     print(f"   파티 구성: {player_job} (플레이어) + {', '.join(jobs)}")
@@ -566,7 +566,7 @@ class PlayerCentricAISystem:
     
     def _create_simple_ai_companions(self):
         """간단한 AI 동료 생성 (폴백)"""
-        print("\\n📝 간단한 AI 생성 모드")
+        print("\n📝 간단한 AI 생성 모드")
         
         player_job = self.player_character["job"] if self.player_character else None
         available_for_ai = [job for job in self.available_jobs if job != player_job]
@@ -576,7 +576,7 @@ class PlayerCentricAISystem:
         for i in range(self.party_size - 1):
             self._create_simple_ai_companion(i, available_for_ai)
         
-        print(f"\\n🎉 간단한 파티 구성 완료! 총 {len(self.ai_companions) + 1}명")
+        print(f"\n🎉 간단한 파티 구성 완료! 총 {len(self.ai_companions) + 1}명")
     
     def _create_simple_ai_companion(self, index: int, available_jobs: List[str] = None):
         """단일 간단 AI 동료 생성"""
@@ -661,7 +661,7 @@ class PlayerCentricAISystem:
     
     def _display_character_info(self, character: Dict[str, Any]):
         """캐릭터 정보 표시"""
-        print(f"\\n📋 {character['name']} 정보:")
+        print(f"\n📋 {character['name']} 정보:")
         print(f"   직업: {character['job']}")
         print(f"   레벨: {character['level']}")
         print(f"   HP: {character['hp']}/{character.get('max_hp', character['hp'])}")
@@ -690,7 +690,7 @@ class PlayerCentricAISystem:
     
     def show_party_status(self):
         """파티 상태 표시"""
-        print(f"\\n👥 현재 파티 상태:")
+        print(f"\n👥 현재 파티 상태:")
         print("-" * 50)
         
         if self.player_character:
@@ -698,7 +698,7 @@ class PlayerCentricAISystem:
             self._display_character_info(self.player_character)
         
         if self.ai_companions:
-            print(f"\\n🤖 AI 동료들:")
+            print(f"\n🤖 AI 동료들:")
             for companion in self.ai_companions:
                 self._display_character_info(companion)
     
@@ -708,7 +708,7 @@ class PlayerCentricAISystem:
             print("❌ 먼저 플레이어 캐릭터를 생성해주세요.")
             return
         
-        print(f"\\n🎯 {self.player_character['name']}의 훈련 모드")
+        print(f"\n🎯 {self.player_character['name']}의 훈련 모드")
         print("="*50)
         
         training_options = [
@@ -724,7 +724,7 @@ class PlayerCentricAISystem:
         
         while True:
             try:
-                choice = safe_input("\\n훈련 모드 선택 (0-4): ", 2).strip()
+                choice = safe_input("\n훈련 모드 선택 (0-4): ", 2).strip()
                 
                 if choice == "0":
                     print("🔙 메인 메뉴로 돌아갑니다.")
@@ -742,7 +742,7 @@ class PlayerCentricAISystem:
     
     def _execute_training(self, training_type: str):
         """훈련 실행"""
-        print(f"\\n🏃‍♂️ {training_type} 시작!")
+        print(f"\n🏃‍♂️ {training_type} 시작!")
         
         if training_type == "개인 스킬 훈련":
             print("💪 개인 스킬을 연마하고 있습니다...")
@@ -770,7 +770,7 @@ class PlayerCentricAISystem:
                 print(f"   {companion['name']}: 더 잘 이해하게 되었어요!")
             print("✅ AI 동료들과의 친밀도가 증가했습니다!")
         
-        print(f"\\n🎉 {training_type} 완료!")
+        print(f"\n🎉 {training_type} 완료!")
     
     def start_simple_adventure(self):
         """간단한 모험 시작"""
@@ -778,7 +778,7 @@ class PlayerCentricAISystem:
             print("❌ 먼저 파티를 구성해주세요.")
             return
         
-        print(f"\\n🗺️ {self.player_character['name']}의 모험 시작!")
+        print(f"\n🗺️ {self.player_character['name']}의 모험 시작!")
         print("="*50)
         
         adventure_scenarios = [
@@ -815,7 +815,7 @@ class PlayerCentricAISystem:
         
         while True:
             try:
-                choice = safe_input("\\n모험지 선택 (0-3): ", 2).strip()
+                choice = safe_input("\n모험지 선택 (0-3): ", 2).strip()
                 
                 if choice == "0":
                     print("🔙 메인 메뉴로 돌아갑니다.")
@@ -833,7 +833,7 @@ class PlayerCentricAISystem:
     
     def _execute_adventure(self, scenario: Dict[str, Any]):
         """모험 실행"""
-        print(f"\\n🗺️ {scenario['name']} 진입!")
+        print(f"\n🗺️ {scenario['name']} 진입!")
         print(f"📖 {scenario['description']}")
         print("-" * 50)
         
@@ -847,7 +847,7 @@ class PlayerCentricAISystem:
             ]
             print(random.choice(reactions))
         
-        print("\\n⚔️ 전투 시뮬레이션 중...")
+        print("\n⚔️ 전투 시뮬레이션 중...")
         
         # 간단한 전투 결과 시뮬레이션
         success_rate = {
@@ -927,7 +927,7 @@ class PlayerCentricAISystem:
         self.load_party_data()
         
         while True:
-            print("\\n" + "="*60)
+            print("\n" + "="*60)
             print("🎮 Dawn of Stellar - 플레이어 중심 AI 멀티플레이어")
             print("="*60)
             
@@ -937,7 +937,7 @@ class PlayerCentricAISystem:
             else:
                 print("👤 플레이어: 미생성")
             
-            print("\\n🎮 메인 메뉴:")
+            print("\n🎮 메인 메뉴:")
             print("1. 👤 플레이어 캐릭터 생성 (27개 직업)")
             print("2. 🤖 AI 동료 자동 생성")
             print("3. 👥 파티 상태 보기")
@@ -951,9 +951,9 @@ class PlayerCentricAISystem:
             if SAFE_EXIT_AVAILABLE:
                 print("99. 🛡️ 안전 종료")
             print("0. 🚪 종료")
-            print("\\n💡 팁: 대부분의 메뉴에서 0을 누르면 뒤로가기가 됩니다!")
+            print("\n💡 팁: 대부분의 메뉴에서 0을 누르면 뒤로가기가 됩니다!")
             
-            choice = safe_input("\\n선택하세요: ", 3).strip()
+            choice = safe_input("\n선택하세요: ", 3).strip()
             
             if choice == "1":
                 result = self.create_player_character()
@@ -1011,7 +1011,7 @@ class PlayerCentricAISystem:
                 print("❌ 잘못된 선택입니다.")
             
             if choice != "0":
-                input("\\nEnter를 눌러 계속...")
+                input("\nEnter를 눌러 계속...")
 
 def main():
     """메인 실행 함수"""

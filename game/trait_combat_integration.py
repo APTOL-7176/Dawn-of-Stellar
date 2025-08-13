@@ -4,8 +4,8 @@ character.py의 temp_* 속성들을 실제 전투에서 활용하도록 구현
 """
 
 import random
-from typing import Dict, Any, List
-from .character import Character
+from typing import Dict, Any, List, Optional
+from .character import Character, CharacterTrait, CharacterClassManager
 
 class TraitCombatIntegrator:
     """특성 효과를 전투 시스템에 연동하는 클래스"""
@@ -53,14 +53,30 @@ class TraitCombatIntegrator:
                 modified_damage += holy_bonus
                 print(f"✨ 신성한 힘으로 {holy_bonus} 추가 피해!")
         
-        # 4. 관통 피해 (temp_penetration)
-        penetration = getattr(attacker, 'temp_penetration', 0)
-        if penetration > 0:
-            # 적의 방어력 일부 무시
-            ignored_defense = int(target.physical_defense * penetration)
-            penetration_bonus = int(ignored_defense * 0.5)  # 무시한 방어력의 50%만큼 추가 피해
+        # 4. 관통 피해 (물리/마법 관통력 시스템)
+        # 물리 관통력 적용
+        physical_pen = getattr(attacker, 'physical_penetration', 0)
+        physical_pen_percent = getattr(attacker, 'temp_penetration', 0)  # 기존 호환성
+        
+        if physical_pen > 0 or physical_pen_percent > 0:
+            original_defense = target.physical_defense
+            # 관통력 공식: 방어력을 X% 깎고 -Y한 값 (최소 10 보장)
+            reduced_defense = original_defense * (1 - physical_pen_percent) - physical_pen
+            effective_defense = max(10, reduced_defense)
+            
+            # 방어력 감소로 인한 추가 피해 계산
+            defense_difference = original_defense - effective_defense
+            penetration_bonus = int(defense_difference * 0.3)  # 감소된 방어력의 30%만큼 추가 피해
             modified_damage += penetration_bonus
-            print(f"🎯 {attacker.name}의 약점 감지로 방어력 일부 무시! {penetration_bonus} 추가 피해!")
+            
+            if penetration_bonus > 0:
+                print(f"🎯 {attacker.name}의 물리 관통력으로 방어력 {defense_difference:.1f} 관통! {penetration_bonus} 추가 피해!")
+        
+        # 마법 관통력은 마법 공격 시에만 적용 (추후 확장 가능)
+        magic_pen = getattr(attacker, 'magic_penetration', 0)
+        if magic_pen > 0 and hasattr(target, 'magic_defense'):
+            # 마법 관통력 로직은 마법 데미지 계산 시 별도 처리
+            pass
         
         # 5. 폭발 강화 (temp_explosion_boost)
         explosion_boost = getattr(attacker, 'temp_explosion_boost', 0)
@@ -394,3 +410,54 @@ class TraitCombatIntegrator:
 
 # 전역 연동 인스턴스 생성
 trait_integrator = TraitCombatIntegrator()
+
+def get_trait_by_name(trait_name: str) -> Optional[CharacterTrait]:
+    """
+    특성 이름으로 특성 객체를 가져옵니다.
+    기존 CharacterClassManager의 get_class_traits와 연동하여 특성을 찾습니다.
+    
+    Args:
+        trait_name (str): 찾을 특성의 이름
+        
+    Returns:
+        Optional[CharacterTrait]: 해당 특성 객체, 없으면 None
+    """
+    # 모든 직업의 특성을 검색
+    all_classes = ["전사", "아크메이지", "궁수", "도적", "성기사", "암흑기사", "몽크", "바드", 
+                   "네크로맨서", "용기사", "검성", "정령술사", "시간술사", "연금술사", 
+                   "차원술사", "마검사", "기계공학자", "무당", "암살자", "해적", "사무라이", 
+                   "드루이드", "철학자", "검투사", "기사", "신관", "광전사"]
+    
+    for job_class in all_classes:
+        try:
+            traits = CharacterClassManager.get_class_traits(job_class)
+            for trait in traits:
+                if trait.name == trait_name:
+                    return trait
+        except:
+            continue
+    
+    return None
+
+def get_all_trait_names() -> List[str]:
+    """모든 특성 이름 목록을 반환합니다."""
+    trait_names = []
+    all_classes = ["전사", "아크메이지", "궁수", "도적", "성기사", "암흑기사", "몽크", "바드", 
+                   "네크로맨서", "용기사", "검성", "정령술사", "시간술사", "연금술사", 
+                   "차원술사", "마검사", "기계공학자", "무당", "암살자", "해적", "사무라이", 
+                   "드루이드", "철학자", "검투사", "기사", "신관", "광전사"]
+    
+    for job_class in all_classes:
+        try:
+            traits = CharacterClassManager.get_class_traits(job_class)
+            for trait in traits:
+                if trait.name not in trait_names:
+                    trait_names.append(trait.name)
+        except:
+            continue
+    
+    return trait_names
+
+def trait_exists(trait_name: str) -> bool:
+    """특성이 존재하는지 확인합니다."""
+    return get_trait_by_name(trait_name) is not None

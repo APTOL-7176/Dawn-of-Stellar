@@ -1,0 +1,62 @@
+{
+  "basic_info": {
+    "name": "에이바",
+    "class": "드루이드",
+    "gender": "male",
+    "age": 31,
+    "personality_type": "따뜻한_치유자",
+    "speech_style": "부드러운_말투"
+  },
+  "ai_profile": {
+    "core_personality": {
+      "traits": [
+        "공감",
+        "따뜻함",
+        "치유"
+      ],
+      "interests": [
+        "아군_돌봄",
+        "치유술",
+        "평화"
+      ],
+      "fears": [
+        "아군_고통",
+        "치유_실패",
+        "갈등"
+      ],
+      "motivations": [
+        "모두의_행복",
+        "평화로운_여행"
+      ]
+    },
+    "professional_knowledge": {
+      "expertise": [
+        "드루이드_전술",
+        "드루이드_기술"
+      ],
+      "preferred_skills": [],
+      "combat_style": "드루이드_스타일",
+      "weakness_analysis": []
+    },
+    "relationship_data": {
+      "trust_level": 0.5,
+      "friendship_points": 0,
+      "memorable_events": [],
+      "communication_history": []
+    },
+    "database_file": "ai_memory_에이바.db"
+  },
+  "learning_data": {
+    "learning_sessions": 0,
+    "experience_points": 0,
+    "skill_development": {},
+    "behavioral_patterns": {}
+  },
+  "multiplayer_settings": {
+    "ai_controlled": true,
+    "cooperation_level": 0.8,
+    "independence_level": 0.6,
+    "communication_frequency": 0.7,
+    "decision_making_style": "공감적_배려"
+  }
+}

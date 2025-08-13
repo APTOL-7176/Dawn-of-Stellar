@@ -753,11 +753,14 @@ class UnifiedInputManager:
         if not hasattr(self, '_last_key_time'):
             self._last_key_time = {}
         if not hasattr(self, '_key_hold_delay'):
-            self._key_hold_delay = 0.08  # 80ms로 단축 (초당 12회 허용)
+            self._key_hold_delay = 0.15  # 150ms로 증가 (Enter 키 인식 개선)
         if not hasattr(self, '_key_burst_count'):
             self._key_burst_count = {}  # 키 버스트 카운터
         if not hasattr(self, '_key_burst_threshold'):
-            self._key_burst_threshold = 8  # 연속 8회 이상은 홀드로 판정
+            self._key_burst_threshold = 12  # 연속 12회 이상은 홀드로 판정 (증가)
+        
+        # 홀드 방지에서 제외할 중요한 키들
+        important_keys = ['\r', '\n', 'w', 's', 'a', 'd', 'q', ' ', 'i', 'b']
         
         # 게임패드 입력 우선 체크 (활성화된 경우에만)
         if self.enable_gamepad and self.gamepad and self.gamepad.is_available():
@@ -774,10 +777,24 @@ class UnifiedInputManager:
                     if isinstance(key, bytes):
                         key = key.decode('utf-8', errors='ignore')
                     
+                    # Enter 키 처리 개선
+                    if key == '\r':
+                        key = '\r'  # 캐리지 리턴을 그대로 유지
+                    
                     key_lower = key.lower()
                     current_time = time.time()
                     
-                    # 키 홀드 방지: 같은 키가 너무 빨리 반복되면 무시
+                    # 중요한 키들은 홀드 방지 로직을 완화
+                    if key in important_keys or key_lower in important_keys:
+                        # 중요한 키는 짧은 지연만 적용
+                        short_delay = 0.05  # 50ms
+                        if key_lower in self._last_key_time:
+                            if current_time - self._last_key_time[key_lower] < short_delay:
+                                return ''  # 너무 빠른 반복만 차단
+                        self._last_key_time[key_lower] = current_time
+                        return key
+                    
+                    # 일반 키에 대한 기존 홀드 방지 로직
                     if key_lower in self._last_key_time:
                         if current_time - self._last_key_time[key_lower] < self._key_hold_delay:
                             # 버퍼에 남은 키 모두 제거 (키 홀드 방지)

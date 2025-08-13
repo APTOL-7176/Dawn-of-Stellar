@@ -340,6 +340,14 @@ class GameConfig:
         self.ONLINE_FEATURES = False
         self.AUTO_UPLOAD_SAVES = False
         self.CLOUD_SYNC = False
+
+        # 모바일 서버 모드 설정
+        # off | web_ui | flutter_backend
+        self.MOBILE_SERVER_MODE = os.getenv('MOBILE_SERVER_MODE', 'off')
+        try:
+            self.MOBILE_SERVER_PORT = int(os.getenv('MOBILE_SERVER_PORT', '5000'))
+        except Exception:
+            self.MOBILE_SERVER_PORT = 5000
         
         # 디버그 설정
         self.DEBUG_MODE = self.DEVELOPMENT_MODE
@@ -1020,6 +1028,12 @@ class GameConfig:
                 'auto_upload_saves': self.AUTO_UPLOAD_SAVES,
                 'cloud_sync': self.CLOUD_SYNC
             })
+
+            # 모바일 서버 설정 추가 저장
+            settings['mobile'] = {
+                'server_mode': self.MOBILE_SERVER_MODE,
+                'server_port': self.MOBILE_SERVER_PORT
+            }
             
             # ATB 설정 업데이트 (새로 추가)
             settings['atb'] = {

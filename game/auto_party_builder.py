@@ -7,6 +7,7 @@ import random
 from typing import List, Dict, Any, Optional
 from .character import Character, CharacterClassManager
 from .input_utils import KeyboardInput
+from . import enhanced_items
 from config import game_config
 
 # 색상 정의
@@ -96,7 +97,7 @@ class AutoPartyBuilder:
         "마검사": {"type": "속성", "display": "원소 부여", "max": 4, "description": "무기에 속성 부여, 원소 조합으로 연쇄 반응"}
     }
     
-    # 질문 기반 파티 추천을 위한 질문 풀 (대폭 확장형 - 20개 질문)
+    # 질문 기반 파티 추천을 위한 질문 풀 (30개 질문)
     PARTY_QUESTIONS = [
         {
             "question": "어떤 전투 스타일을 선호하시나요?",
@@ -270,12 +271,93 @@ class AutoPartyBuilder:
             ]
         },
         {
-            "question": "마지막 질문: 당신의 플레이 철학은?",
+            "question": "당신의 플레이 철학은?",
             "answers": [
                 {"text": "강한 자가 살아남는다", "tags": ["강함", "생존", "경쟁", "실력", "우승"]},
                 {"text": "모두가 함께 성장한다", "tags": ["성장", "함께", "공동체", "협력", "발전"]},
                 {"text": "재미있으면 그것으로 충분하다", "tags": ["재미", "즐거움", "엔터테인", "행복", "만족"]},
                 {"text": "완벽을 추구한다", "tags": ["완벽", "정밀", "완성", "품질", "최고"]}
+            ]
+        },
+        {
+            "question": "보스전에서 가장 중요한 전략은?",
+            "answers": [
+                {"text": "강력한 일격으로 빠르게 끝내기", "tags": ["일격", "빠름", "폭딜", "공격적", "결정적"]},
+                {"text": "안전하게 패턴을 파악하며 공략", "tags": ["패턴", "안전", "분석", "신중", "학습"]},
+                {"text": "팀원들과 역할 분담해서 협력", "tags": ["협력", "역할분담", "팀워크", "조직", "시너지"]},
+                {"text": "창의적인 방법으로 약점 공략", "tags": ["창의", "약점", "기발", "전략", "독특"]}
+            ]
+        },
+        {
+            "question": "던전 탐험에서 가장 흥미로운 요소는?",
+            "answers": [
+                {"text": "숨겨진 보물과 비밀 방", "tags": ["보물", "비밀", "탐험", "발견", "수집"]},
+                {"text": "다양한 몬스터와의 전투", "tags": ["몬스터", "전투", "다양함", "도전", "액션"]},
+                {"text": "퍼즐과 함정 해결", "tags": ["퍼즐", "함정", "지능", "해결", "사고"]},
+                {"text": "동료들과의 모험 이야기", "tags": ["모험", "이야기", "동료", "추억", "여정"]}
+            ]
+        },
+        {
+            "question": "적의 약점을 발견했을 때 어떻게 하나요?",
+            "answers": [
+                {"text": "즉시 약점을 집중 공격", "tags": ["집중공격", "약점", "즉시", "효율", "타겟팅"]},
+                {"text": "팀원들에게 알려서 함께 공략", "tags": ["정보공유", "팀워크", "소통", "협력", "조직"]},
+                {"text": "약점 공격용 스킬을 준비", "tags": ["준비", "스킬", "계획", "전략", "특화"]},
+                {"text": "약점보다는 정면승부", "tags": ["정면승부", "직접", "당당함", "강함", "정직"]}
+            ]
+        },
+        {
+            "question": "새로운 장비를 얻었을 때 우선순위는?",
+            "answers": [
+                {"text": "공격력이 높은 무기", "tags": ["공격력", "무기", "딜러", "강함", "데미지"]},
+                {"text": "방어력이 높은 방어구", "tags": ["방어력", "방어구", "탱커", "생존", "안전"]},
+                {"text": "특수 효과가 있는 장비", "tags": ["특수효과", "유니크", "기능", "다양함", "특별"]},
+                {"text": "세트 효과를 맞출 수 있는 장비", "tags": ["세트효과", "조합", "시너지", "완성", "체계"]}
+            ]
+        },
+        {
+            "question": "파티 구성에서 가장 신경쓰는 부분은?",
+            "answers": [
+                {"text": "각 역할의 균형", "tags": ["균형", "역할", "안정", "체계", "완성"]},
+                {"text": "강력한 시너지 효과", "tags": ["시너지", "조합", "상승효과", "협력", "강화"]},
+                {"text": "개성 있는 캐릭터들", "tags": ["개성", "다양함", "특색", "유니크", "재미"]},
+                {"text": "상황 대응 능력", "tags": ["대응능력", "유연", "적응", "변화", "범용"]}
+            ]
+        },
+        {
+            "question": "전투에서 가장 만족스러운 순간은?",
+            "answers": [
+                {"text": "완벽한 타이밍의 스킬 사용", "tags": ["타이밍", "완벽", "스킬", "정밀", "기술"]},
+                {"text": "예상보다 높은 데미지가 나올 때", "tags": ["높은데미지", "예상초과", "놀라움", "강력", "성과"]},
+                {"text": "위기를 모면했을 때", "tags": ["위기모면", "생존", "안도", "극복", "회복"]},
+                {"text": "팀원을 구해냈을 때", "tags": ["구조", "도움", "희생", "보호", "영웅"]}
+            ]
+        },
+        {
+            "question": "마법과 물리 공격 중 선호하는 것은?",
+            "answers": [
+                {"text": "화려하고 강력한 마법", "tags": ["마법", "화려", "강력", "신비", "원소"]},
+                {"text": "확실하고 직접적인 물리 공격", "tags": ["물리", "직접", "확실", "근접", "단순"]},
+                {"text": "마법과 물리를 조합", "tags": ["조합", "하이브리드", "다양", "복합", "균형"]},
+                {"text": "상황에 따라 선택", "tags": ["상황대응", "선택", "유연", "적응", "전략"]}
+            ]
+        },
+        {
+            "question": "게임에서 가장 중요한 재미 요소는?",
+            "answers": [
+                {"text": "강해지는 성장의 재미", "tags": ["성장", "강화", "발전", "진보", "향상"]},
+                {"text": "새로운 것을 발견하는 재미", "tags": ["발견", "새로움", "탐험", "호기심", "모험"]},
+                {"text": "친구들과 함께하는 재미", "tags": ["친구", "함께", "소셜", "공유", "유대"]},
+                {"text": "도전과 극복의 재미", "tags": ["도전", "극복", "성취", "승리", "만족"]}
+            ]
+        },
+        {
+            "question": "이상적인 캐릭터 빌드는?",
+            "answers": [
+                {"text": "한 분야에 특화된 전문가", "tags": ["전문가", "특화", "집중", "마스터", "깊이"]},
+                {"text": "여러 분야를 아우르는 만능형", "tags": ["만능", "다재다능", "균형", "범용", "유연"]},
+                {"text": "독특한 컨셉의 개성파", "tags": ["개성", "독특", "컨셉", "특별", "유니크"]},
+                {"text": "팀에 꼭 필요한 핵심 역할", "tags": ["핵심", "필수", "중요", "역할", "책임"]}
             ]
         }
     ]
@@ -537,6 +619,9 @@ class AutoPartyBuilder:
         for member in party_members:
             if not hasattr(member, 'party_passives'):
                 member.party_passives = selected_passives
+        
+        # 🎁 모든 캐릭터에게 스타팅 아이템 지급
+        self._give_starting_items_to_party(party_members)
         
         return party_members
     
@@ -1007,7 +1092,7 @@ class AutoPartyBuilder:
         print(f"  설명: {WHITE}{mechanic['description']}{RESET}")
 
     def create_balanced_party(self, user_selected: List[str] = None, party_size: int = 4, auto_select_traits: bool = True) -> List[Character]:
-        """밸런스 잡힌 파티 생성"""
+        """밸런스 잡힌 파티 생성 (개선된 다양성 알고리즘)"""
         if user_selected is None:
             user_selected = []
         
@@ -1029,8 +1114,27 @@ class AutoPartyBuilder:
         if validated_selected:
             print(f"{GREEN}사용자 선택: {', '.join(validated_selected)}{RESET}")
         
-        # 파티 구성
-        party_classes = self._select_party_classes(validated_selected, party_size)
+        # 다양성 보장을 위한 다중 시도 시스템
+        best_party_classes = None
+        max_diversity_score = -1
+        
+        # 최대 5번 시도하여 가장 다양한 조합 선택
+        for attempt in range(5):
+            try_party_classes = self._select_party_classes(validated_selected, party_size)
+            diversity_score = self._calculate_diversity_score(try_party_classes)
+            
+            if diversity_score > max_diversity_score:
+                max_diversity_score = diversity_score
+                best_party_classes = try_party_classes
+            
+            # 완벽한 다양성(모두 다른 직업)이면 즉시 선택
+            if len(set(try_party_classes)) == len(try_party_classes):
+                best_party_classes = try_party_classes
+                break
+        
+        party_classes = best_party_classes
+        print(f"{BLUE}다양성 점수: {max_diversity_score}/100{RESET}")
+        
         party_members = []
         
         for i, class_name in enumerate(party_classes):
@@ -1082,12 +1186,17 @@ class AutoPartyBuilder:
                 return None
     
     def _select_party_classes(self, user_selected: List[str], party_size: int) -> List[str]:
-        """파티 직업 선택 (밸런스 고려)"""
+        """파티 직업 선택 (밸런스 고려 + 다양성 강화)"""
         remaining_slots = party_size - len(user_selected)
         available_classes = [c for c in self.ALL_CLASSES if c not in user_selected]
         
         if remaining_slots <= 0:
             return user_selected[:party_size]
+        
+        # 🎲 다양성 강화: 자주 선택되는 직업들을 피하기 위한 가중치 조정
+        # 고정되는 직업들 (궁수, 암살자, 사무라이, 도적)의 가중치를 줄임
+        overused_classes = ["궁수", "암살자", "사무라이", "도적"]
+        underused_classes = ["기계공학자", "무당", "철학자", "연금술사", "차원술사", "바드", "몽크", "마검사"]
         
         # 현재 파티 역할 분석
         current_roles = self._analyze_roles(user_selected)
@@ -1095,7 +1204,7 @@ class AutoPartyBuilder:
         
         selected_classes = user_selected.copy()
         
-        # 필요한 역할에 따라 캐릭터 선택
+        # 필요한 역할에 따라 캐릭터 선택 (다양성 가중치 적용)
         for role in needed_roles:
             if remaining_slots <= 0:
                 break
@@ -1103,20 +1212,70 @@ class AutoPartyBuilder:
             role_candidates = [c for c in self.ROLE_CLASSES.get(role, []) if c in available_classes]
             
             if role_candidates:
-                # 시너지를 고려한 선택
-                best_candidate = self._select_best_candidate(role_candidates, selected_classes)
+                # 🎯 다양성 기반 선택: 덜 사용되는 직업에 높은 가중치
+                weighted_candidates = []
+                for candidate in role_candidates:
+                    weight = 1.0  # 기본 가중치
+                    
+                    if candidate in underused_classes:
+                        weight *= 3.0  # 덜 사용되는 직업은 3배 가중치
+                    elif candidate in overused_classes:
+                        weight *= 0.3  # 자주 사용되는 직업은 30% 가중치
+                    
+                    # 시너지도 고려하되 다양성이 우선
+                    synergy_score = self._calculate_synergy_score(candidate, selected_classes)
+                    weight *= (1.0 + synergy_score * 0.2)  # 시너지는 20% 보너스만
+                    
+                    weighted_candidates.extend([candidate] * int(weight * 10))
+                
+                # 가중치 기반 랜덤 선택
+                if weighted_candidates:
+                    best_candidate = random.choice(weighted_candidates)
+                else:
+                    best_candidate = random.choice(role_candidates)
+                    
                 selected_classes.append(best_candidate)
                 available_classes.remove(best_candidate)
                 remaining_slots -= 1
         
-        # 남은 슬롯은 랜덤 선택
+        # 남은 슬롯은 다양성 우선 랜덤 선택
         while remaining_slots > 0 and available_classes:
-            random_choice = random.choice(available_classes)
+            # 다양성 가중치 적용
+            weighted_available = []
+            for candidate in available_classes:
+                weight = 1.0
+                if candidate in underused_classes:
+                    weight *= 2.5  # 덜 사용되는 직업 우선
+                elif candidate in overused_classes:
+                    weight *= 0.4  # 자주 사용되는 직업 회피
+                weighted_available.extend([candidate] * int(weight * 10))
+            
+            if weighted_available:
+                random_choice = random.choice(weighted_available)
+            else:
+                random_choice = random.choice(available_classes)
+                
             selected_classes.append(random_choice)
             available_classes.remove(random_choice)
             remaining_slots -= 1
         
         return selected_classes
+    
+    def _calculate_synergy_score(self, candidate: str, current_party: List[str]) -> float:
+        """후보 직업과 현재 파티 간의 시너지 점수 계산"""
+        synergy_score = 0.0
+        
+        for member in current_party:
+            # 시너지 조합 확인
+            synergy_key1 = f"{member} + {candidate}"
+            synergy_key2 = f"{candidate} + {member}"
+            
+            if synergy_key1 in self.SYNERGY_COMBINATIONS:
+                synergy_score += 0.5
+            elif synergy_key2 in self.SYNERGY_COMBINATIONS:
+                synergy_score += 0.5
+        
+        return synergy_score
     
     def _analyze_roles(self, classes: List[str]) -> Dict[str, int]:
         """현재 파티의 역할 분석"""
@@ -1131,60 +1290,140 @@ class AutoPartyBuilder:
         return role_count
     
     def _determine_needed_roles(self, current_roles: Dict[str, int], remaining_slots: int) -> List[str]:
-        """필요한 역할 결정 (서포터 비중 높임)"""
+        """필요한 역할 결정 (다양한 조합을 위한 개선된 로직)"""
         needed_roles = []
         
-        # 서포터 우선 구성: 서포터를 우선적으로 배치
-        if current_roles["서포터"] == 0:
-            needed_roles.append("서포터")
+        # 파티 구성 패턴들 정의 (4인 파티 기준)
+        composition_patterns = [
+            # 밸런스형 (클래식)
+            ["탱커", "딜러", "마법사", "서포터"],
+            ["탱커", "딜러", "서포터", "서포터"],
+            
+            # 공격형 (딜러 중심)
+            ["딜러", "딜러", "마법사", "서포터"],
+            ["딜러", "딜러", "딜러", "서포터"],
+            ["딜러", "마법사", "마법사", "서포터"],
+            
+            # 마법형 (마법사 중심)
+            ["마법사", "마법사", "마법사", "서포터"],
+            ["마법사", "마법사", "딜러", "서포터"],
+            ["탱커", "마법사", "마법사", "서포터"],
+            
+            # 서포터형 (지원 중심)
+            ["탱커", "딜러", "서포터", "서포터"],
+            ["마법사", "서포터", "서포터", "서포터"],
+            
+            # 하이브리드형 (특수 조합)
+            ["하이브리드", "딜러", "마법사", "서포터"],
+            ["탱커", "하이브리드", "마법사", "서포터"],
+            ["딜러", "딜러", "하이브리드", "서포터"],
+            
+            # 극한형 (도전적)
+            ["탱커", "탱커", "딜러", "서포터"],
+            ["딜러", "딜러", "딜러", "딜러"],  # 극딜파티
+            ["마법사", "마법사", "마법사", "마법사"],  # 극마파티
+        ]
         
-        # 탱커 추가
-        if current_roles["탱커"] == 0:
-            needed_roles.append("탱커")
+        # 현재 파티 크기에 따라 패턴 선택
+        total_party_size = sum(current_roles.values()) + remaining_slots
         
-        # 딜러 추가 (최소 1명)
-        if current_roles["딜러"] == 0:
-            needed_roles.append("딜러")
+        # 랜덤하게 구성 패턴 선택
+        selected_pattern = random.choice(composition_patterns)
         
-        # 마법사 추가 (서포터가 없을 때만)
-        if current_roles["마법사"] == 0 and current_roles["서포터"] == 0 and len(needed_roles) < remaining_slots:
-            needed_roles.append("마법사")
+        # 현재 파티에서 부족한 역할들 계산
+        for role in selected_pattern:
+            if len(needed_roles) >= remaining_slots:
+                break
+                
+            current_count = current_roles.get(role, 0)
+            needed_count = selected_pattern.count(role)
+            already_added = needed_roles.count(role)
+            
+            if current_count + already_added < needed_count:
+                needed_roles.append(role)
         
-        # 남은 슬롯을 서포터나 딜러로 채우기 (서포터 우선)
+        # 남은 슬롯이 있으면 완전 랜덤 선택 (20% 확률로 예측 불가능한 조합)
         while len(needed_roles) < remaining_slots:
-            if current_roles["서포터"] + needed_roles.count("서포터") < 2:
-                needed_roles.append("서포터")
+            if random.random() < 0.2:  # 20% 확률로 완전 랜덤
+                all_roles = ["탱커", "딜러", "마법사", "서포터", "하이브리드"]
+                needed_roles.append(random.choice(all_roles))
             else:
-                needed_roles.append("딜러")
+                # 부족한 핵심 역할 우선 추가
+                missing_core_roles = []
+                if current_roles["탱커"] == 0 and "탱커" not in needed_roles:
+                    missing_core_roles.append("탱커")
+                if current_roles["서포터"] == 0 and "서포터" not in needed_roles:
+                    missing_core_roles.append("서포터")
+                if current_roles["딜러"] == 0 and "딜러" not in needed_roles:
+                    missing_core_roles.append("딜러")
+                
+                if missing_core_roles:
+                    needed_roles.append(random.choice(missing_core_roles))
+                else:
+                    # 모든 핵심 역할이 있으면 랜덤 추가
+                    preferred_roles = ["딜러", "마법사", "서포터"]  # 하이브리드는 희소성 유지
+                    needed_roles.append(random.choice(preferred_roles))
         
         return needed_roles[:remaining_slots]
     
     def _select_best_candidate(self, candidates: List[str], current_party: List[str]) -> str:
-        """시너지를 고려한 최적 후보 선택"""
+        """시너지와 다양성을 고려한 최적 후보 선택 (개선된 알고리즘)"""
+        if not candidates:
+            return None
+            
+        # 30% 확률로 완전 랜덤 선택 (예측 불가능성 증가)
+        if random.random() < 0.3:
+            return random.choice(candidates)
+        
         synergy_scores = {}
         
         for candidate in candidates:
             score = 0
             
-            # 시너지 확인
+            # 시너지 확인 (가중치 감소)
             for party_member in current_party:
                 synergy_key1 = f"{party_member} + {candidate}"
                 synergy_key2 = f"{candidate} + {party_member}"
                 
                 if synergy_key1 in self.SYNERGY_COMBINATIONS or synergy_key2 in self.SYNERGY_COMBINATIONS:
-                    score += 10
+                    score += 5  # 10에서 5로 감소
             
-            # 다양성 보너스 (같은 직업이 없으면 보너스)
+            # 다양성 보너스 강화 (같은 직업이 없으면 큰 보너스)
             if candidate not in current_party:
-                score += 5
+                score += 15  # 5에서 15로 증가
+            
+            # 희소 직업 보너스 (하이브리드 직업들)
+            rare_classes = ["암살자", "해적", "사무라이", "드루이드", "철학자", 
+                           "검투사", "기사", "신관", "광전사"]
+            if candidate in rare_classes:
+                score += 10
+            
+            # 균형 보너스 - 특정 역할이 너무 많으면 페널티
+            candidate_role = None
+            for role, classes in self.ROLE_CLASSES.items():
+                if candidate in classes:
+                    candidate_role = role
+                    break
+            
+            if candidate_role:
+                role_count = sum(1 for member in current_party 
+                               for role, classes in self.ROLE_CLASSES.items()
+                               if member in classes and role == candidate_role)
+                
+                # 같은 역할이 2명 이상이면 페널티
+                if role_count >= 2:
+                    score -= 8
+                elif role_count >= 1:
+                    score -= 3
             
             synergy_scores[candidate] = score
         
-        # 가장 높은 점수의 후보 선택 (동점이면 랜덤)
-        max_score = max(synergy_scores.values())
-        best_candidates = [c for c, s in synergy_scores.items() if s == max_score]
+        # 상위 50% 후보군에서 랜덤 선택 (다양성 증가)
+        sorted_candidates = sorted(synergy_scores.items(), key=lambda x: x[1], reverse=True)
+        top_half_count = max(1, len(sorted_candidates) // 2)
+        top_candidates = [candidate for candidate, score in sorted_candidates[:top_half_count]]
         
-        return random.choice(best_candidates)
+        return random.choice(top_candidates)
     
     def _create_character(self, class_name: str, index: int) -> Character:
         """캐릭터 생성"""
@@ -1295,7 +1534,7 @@ class AutoPartyBuilder:
             "시간술사": {"hp": 121, "physical_attack": 54, "magic_attack": 77, "physical_defense": 49, "magic_defense": 64, "speed": 57},
             "연금술사": {"hp": 135, "physical_attack": 59, "magic_attack": 72, "physical_defense": 44, "magic_defense": 58, "speed": 54},
             "검투사": {"hp": 172, "physical_attack": 79, "magic_attack": 41, "physical_defense": 56, "magic_defense": 48, "speed": 64},
-            "기사": {"hp": 216, "physical_attack": 79, "magic_attack": 46, "physical_defense": 72, "magic_defense": 54, "speed": 48},
+            "기사": {"hp": 235, "physical_attack": 79, "magic_attack": 46, "physical_defense": 72, "magic_defense": 54, "speed": 48},
             "신관": {"hp": 143, "physical_attack": 42, "magic_attack": 79, "physical_defense": 57, "magic_defense": 89, "speed": 52},
             "마검사": {"hp": 164, "physical_attack": 67, "magic_attack": 70, "physical_defense": 54, "magic_defense": 61, "speed": 58},
             "차원술사": {"hp": 84, "physical_attack": 33, "magic_attack": 88, "physical_defense": 28, "magic_defense": 72, "speed": 47},
@@ -2182,6 +2421,190 @@ class AutoPartyBuilder:
         except Exception as e:
             print(f"{RED}저장된 캐릭터 로드 중 오류 발생: {e}{RESET}")
             return None
+    
+    def _give_starting_items_to_party(self, party_members: List[Character]):
+        """파티 전체에게 스타팅 아이템 지급"""
+        print(f"\n{CYAN}🎁 스타팅 아이템 지급 중...{RESET}")
+        
+        for character in party_members:
+            try:
+                # 각 캐릭터에게 스타팅 아이템 생성
+                starting_items = enhanced_items.generate_starting_items(
+                    character.character_class, character.level
+                )
+                
+                # 인벤토리가 없으면 생성
+                if not hasattr(character, 'inventory'):
+                    character.inventory = []
+                
+                # 장비 아이템 추가 (2개)
+                for equipment in starting_items["equipment"]:
+                    item = enhanced_items.create_item_for_inventory(equipment)
+                    # 인벤토리 타입에 따른 처리
+                    if hasattr(character.inventory, 'add_item_by_name'):
+                        # Inventory 객체인 경우 - 이름으로 추가
+                        success = character.inventory.add_item_by_name(item['name'])
+                        if not success:
+                            print(f"      ⚠️ {item['name']} 추가 실패 (add_item_by_name)")
+                    elif hasattr(character.inventory, 'add_item'):
+                        # Inventory 객체인 경우 - 직접 추가 (fallback)
+                        try:
+                            from .items import Item, ItemType, ItemRarity
+                            inventory_item = Item(item['name'], ItemType.EQUIPMENT, ItemRarity.COMMON, 
+                                                item.get('description', '장비 아이템'))
+                            character.inventory.add_item(inventory_item)
+                        except Exception as e:
+                            print(f"      ⚠️ {item['name']} 추가 실패 (add_item): {e}")
+                    elif hasattr(character.inventory, 'items'):
+                        # Dict 형태 인벤토리인 경우
+                        if item['name'] in character.inventory.items:
+                            character.inventory.items[item['name']] += item.get('quantity', 1)
+                        else:
+                            character.inventory.items[item['name']] = item.get('quantity', 1)
+                    else:
+                        # 리스트인 경우 - 직접 추가
+                        character.inventory.append(item)
+                
+                # 소비 아이템 추가 (2개)
+                for consumable in starting_items["consumables"]:
+                    item = enhanced_items.create_item_for_inventory(consumable)
+                    # 인벤토리 타입에 따른 처리
+                    if hasattr(character.inventory, 'add_item_by_name'):
+                        # Inventory 객체인 경우 - 이름으로 추가
+                        success = character.inventory.add_item_by_name(item['name'])
+                        if not success:
+                            print(f"      ⚠️ {item['name']} 추가 실패 (add_item_by_name)")
+                    elif hasattr(character.inventory, 'add_item'):
+                        # Inventory 객체인 경우 - 직접 추가 (fallback)
+                        try:
+                            from .items import Item, ItemType, ItemRarity
+                            inventory_item = Item(item['name'], ItemType.CONSUMABLE, ItemRarity.COMMON, 
+                                                item.get('description', '소비 아이템'))
+                            character.inventory.add_item(inventory_item)
+                        except Exception as e:
+                            print(f"      ⚠️ {item['name']} 추가 실패 (add_item): {e}")
+                    elif hasattr(character.inventory, 'items'):
+                        # Dict 형태 인벤토리인 경우
+                        if item['name'] in character.inventory.items:
+                            character.inventory.items[item['name']] += item.get('quantity', 1)
+                        else:
+                            character.inventory.items[item['name']] = item.get('quantity', 1)
+                    else:
+                        # 리스트인 경우 - 직접 추가
+                        character.inventory.append(item)
+                
+                # 자동 장착 시도 (장비 아이템만)
+                self._auto_equip_starting_items(character, starting_items["equipment"])
+                
+                print(f"{GREEN}  ✅ {character.name} - 스타팅 아이템 지급 완료{RESET}")
+                
+            except Exception as e:
+                print(f"{RED}  ✗ {character.name} - 아이템 지급 실패: {e}{RESET}")
+
+    def _calculate_diversity_score(self, party_classes: List[str]) -> int:
+        """파티 구성의 다양성 점수 계산 (0-100점)"""
+        if not party_classes:
+            return 0
+        
+        score = 0
+        
+        # 1. 중복 없는 직업 비율 (40점)
+        unique_classes = len(set(party_classes))
+        total_classes = len(party_classes)
+        uniqueness_ratio = unique_classes / total_classes
+        score += int(uniqueness_ratio * 40)
+        
+        # 2. 역할 다양성 (30점)
+        role_count = {"탱커": 0, "딜러": 0, "마법사": 0, "서포터": 0, "하이브리드": 0}
+        for class_name in party_classes:
+            for role, classes in self.ROLE_CLASSES.items():
+                if class_name in classes:
+                    role_count[role] += 1
+                    break
+        
+        # 서로 다른 역할의 수
+        different_roles = sum(1 for count in role_count.values() if count > 0)
+        role_diversity = (different_roles / 5) * 30  # 최대 5개 역할
+        score += int(role_diversity)
+        
+        # 3. 희소 직업 보너스 (20점)
+        rare_classes = ["암살자", "해적", "사무라이", "드루이드", "철학자", 
+                       "검투사", "기사", "신관", "광전사"]
+        rare_count = sum(1 for class_name in party_classes if class_name in rare_classes)
+        rare_bonus = min(20, rare_count * 7)  # 희소 직업 1개당 7점, 최대 20점
+        score += rare_bonus
+        
+        # 4. 밸런스 페널티 (한 역할이 너무 많으면 감점)
+        balance_penalty = 0
+        for role, count in role_count.items():
+            if count > 2:  # 같은 역할이 3명 이상이면 페널티
+                balance_penalty += (count - 2) * 5
+        
+        # 5. 하이브리드 직업 특별 보너스 (10점)
+        hybrid_bonus = min(10, role_count["하이브리드"] * 10)
+        score += hybrid_bonus
+        
+        final_score = max(0, min(100, score - balance_penalty))
+        
+        return final_score
+    
+    def _auto_equip_starting_items(self, character: Character, equipment_items: List[Dict]):
+        """스타팅 장비 자동 장착"""
+        for equipment in equipment_items:
+            try:
+                # 장비 타입 확인
+                item_type = self._determine_equipment_type(equipment)
+                item_name = equipment.get('name', '알 수 없는 아이템')
+                
+                # 캐릭터에 장비 속성이 없으면 생성
+                if not hasattr(character, 'weapon'):
+                    character.weapon = None
+                if not hasattr(character, 'armor'):
+                    character.armor = None
+                if not hasattr(character, 'accessory'):
+                    character.accessory = None
+                
+                # 해당 슬롯이 비어있으면 자동 장착
+                if item_type == "무기" and character.weapon is None:
+                    character.weapon = equipment
+                    print(f"{GREEN}      ✅ {item_name} 무기 슬롯에 자동 장착{RESET}")
+                elif item_type == "방어구" and character.armor is None:
+                    character.armor = equipment
+                    print(f"{GREEN}      ✅ {item_name} 방어구 슬롯에 자동 장착{RESET}")
+                elif item_type == "장신구" and character.accessory is None:
+                    character.accessory = equipment
+                    print(f"{GREEN}      ✅ {item_name} 장신구 슬롯에 자동 장착{RESET}")
+                else:
+                    print(f"{YELLOW}      ⚠️ {item_name} ({item_type}) - 해당 슬롯이 이미 사용 중{RESET}")
+                    
+            except Exception as e:
+                print(f"{YELLOW}    ⚠️ {equipment.get('name', '알 수 없는 아이템')} 자동 장착 실패: {e}{RESET}")
+    
+    def _determine_equipment_type(self, equipment: Dict) -> str:
+        """장비 타입 판별"""
+        name = equipment.get('name', '').lower()
+        
+        # 무기 키워드
+        weapon_keywords = ['검', '도', '활', '지팡이', '창', '도끼', '망치', '단검', '총', '권총', '소총']
+        # 방어구 키워드  
+        armor_keywords = ['갑옷', '로브', '가죽', '천', '판금', '사슬', '투구', '모자', '방패']
+        # 장신구 키워드
+        accessory_keywords = ['반지', '목걸이', '팔찌', '부적', '장신구']
+        
+        for keyword in weapon_keywords:
+            if keyword in name:
+                return "무기"
+        
+        for keyword in armor_keywords:
+            if keyword in name:
+                return "방어구"
+                
+        for keyword in accessory_keywords:
+            if keyword in name:
+                return "장신구"
+        
+        # 기본값은 무기로 처리
+        return "무기"
 
 # 전역 자동 파티 빌더 인스턴스
 auto_party_builder = AutoPartyBuilder()

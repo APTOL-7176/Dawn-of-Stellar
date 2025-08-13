@@ -1419,7 +1419,11 @@ class GameWorld:
         # 로깅 시스템 사용
         from .error_logger import log_enemy
         
+        # 강제 디버그 출력 (로깅 문제 우회)
+        print(f"🔍 [DEBUG] move_enemies 호출됨 - 적 수: {len(getattr(self, 'enemies_positions', []))}")
+        
         if not self.enemies_positions:
+            print(f"🔍 [DEBUG] 적이 없어서 이동 처리하지 않음")
             log_enemy("적이동", "적이 없어서 이동 처리하지 않음", {
                 "적개수": 0,
                 "플레이어위치": self.player_pos
@@ -1429,6 +1433,9 @@ class GameWorld:
         player_x, player_y = self.player_pos
         new_positions = []
         moved_count = 0
+        
+        print(f"🔍 [DEBUG] 적 이동 처리 시작 - 플레이어 위치: ({player_x}, {player_y})")
+        print(f"🔍 [DEBUG] 적 위치 목록: {list(self.enemies_positions)}")
         
         log_enemy("적이동", f"적 이동 처리 시작", {
             "총적수": len(self.enemies_positions),
@@ -1461,34 +1468,23 @@ class GameWorld:
                     "적있음": getattr(tile, 'has_enemy', False)
                 })
             
-            # 시야 범위 안에 있는 적만 이동 (5 타일 이내)
-            if distance <= 5:  # 추적 범위를 5칸으로 설정
+            # 시야 범위 안에 있는 적만 이동 (5 타일 이내로 증가)
+            if distance <= 8:  # 추적 범위를 8칸으로 확대하여 더 활발한 적 이동
                 log_enemy("적이동", f"적 추적 범위 내", {
                     "거리": distance, 
                     "적타입": enemy_type,
                     "적위치": (enemy_x, enemy_y),
                     "플레이어위치": (player_x, player_y)
                 })
-                # 플레이어를 향해 이동
-                new_x, new_y = enemy_x, enemy_y
+                
+                # 🧠 지능적 이동 계산 - 집단 지성 추가
+                new_x, new_y = self._calculate_intelligent_move(enemy_x, enemy_y, player_x, player_y, enemy_type)
                 original_pos = (enemy_x, enemy_y)
                 
-                # 이동 방향 결정 로직
-                move_reason = ""
-                if enemy_x < player_x and self._can_move_to(enemy_x + 1, enemy_y):
-                    new_x = enemy_x + 1
-                    move_reason = "동쪽으로 추적"
-                elif enemy_x > player_x and self._can_move_to(enemy_x - 1, enemy_y):
-                    new_x = enemy_x - 1
-                    move_reason = "서쪽으로 추적"
-                elif enemy_y < player_y and self._can_move_to(enemy_x, enemy_y + 1):
-                    new_y = enemy_y + 1
-                    move_reason = "남쪽으로 추적"
-                elif enemy_y > player_y and self._can_move_to(enemy_x, enemy_y - 1):
-                    new_y = enemy_y - 1
-                    move_reason = "북쪽으로 추적"
-                else:
-                    move_reason = "이동불가-막힘"
+                # 이동 성공 여부 확인
+                move_reason = "지능적이동"
+                if (new_x, new_y) == (enemy_x, enemy_y):
+                    move_reason = "이동불가-최적위치없음"
                 
                 # 적 정보 업데이트
                 if (new_x, new_y) != (enemy_x, enemy_y):
@@ -1522,7 +1518,7 @@ class GameWorld:
                 log_enemy("적이동", f"적이 추적 범위 밖", {"거리": distance, "적타입": enemy_type})
                 random_chance = random.random()
                 
-                if random_chance < 0.95:  # 95% 확률
+                if random_chance < 0.80:  # 80% 확률로 감소하여 더 많은 이동
                     log_enemy("적이동", f"랜덤 이동 시도", {"적위치": (enemy_x, enemy_y), "확률": random_chance})
                     directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
                     random.shuffle(directions)
@@ -1535,7 +1531,7 @@ class GameWorld:
                             "시작": (enemy_x, enemy_y),
                             "목표": (new_x, new_y)
                         })
-                        if self._can_move_to(new_x, new_y):
+                        if self._can_move_to(new_x, new_y, (enemy_x, enemy_y)):
                             moved_count += 1
                             moved_this_turn = True
                             log_enemy("적이동", f"랜덤 이동 성공", {
@@ -1574,33 +1570,161 @@ class GameWorld:
             "이동한적수": moved_count,
             "이동비율": f"{moved_count}/{len(new_positions)}"
         })
+        
+        # 강제 디버그 출력 (실제 위치 변화 확인)
+        print(f"🔍 [DEBUG] 이동 완료 - 이동한 적: {moved_count}개")
+        print(f"🔍 [DEBUG] 이전 위치: {list(self.enemies_positions)}")
+        
         self.enemies_positions = new_positions
+        # 즉시 화면 갱신으로 적 위치 동기화
+        if moved_count > 0:
+            self.update_display()
+        
+        print(f"🔍 [DEBUG] 새 위치: {list(self.enemies_positions)}")
         
         # 적이 이동했으면 화면 갱신 필요함을 반환
         enemies_moved = moved_count > 0
         
+        print(f"🔍 [DEBUG] 화면 갱신 필요: {enemies_moved}")
+        
         return enemies_moved  # 적이 이동했으면 True, 안했으면 False
     
-    def _can_move_to(self, x: int, y: int) -> bool:
-        """해당 위치로 이동 가능한지 확인 - 간소화"""
+    def _calculate_intelligent_move(self, enemy_x: int, enemy_y: int, player_x: int, player_y: int, enemy_type: str) -> Tuple[int, int]:
+        """🧠 지능적 적 이동 계산 - 집단 지성 및 전술적 판단"""
+        from .error_logger import log_enemy
+        
+        # 가능한 모든 이동 방향 (8방향)
+        all_directions = [
+            (-1, -1), (-1, 0), (-1, 1),  # 왼쪽 위, 위, 오른쪽 위
+            (0, -1),           (0, 1),   # 왼쪽,     오른쪽
+            (1, -1),  (1, 0),  (1, 1)    # 왼쪽 아래, 아래, 오른쪽 아래
+        ]
+        
+        best_moves = []
+        
+        for dx, dy in all_directions:
+            new_x, new_y = enemy_x + dx, enemy_y + dy
+            
+            # 이동 가능한지 확인
+            if not self._can_move_to(new_x, new_y, (enemy_x, enemy_y)):
+                continue
+                
+            # 🎯 이동 후 플레이어와의 거리 계산
+            new_distance = abs(new_x - player_x) + abs(new_y - player_y)
+            current_distance = abs(enemy_x - player_x) + abs(enemy_y - player_y)
+            
+            # 🤝 집단 지성 평가: 다른 적들과의 협력도
+            cooperation_score = self._evaluate_cooperation(new_x, new_y, player_x, player_y)
+            
+            # 🧭 전술적 점수 계산
+            tactical_score = 0
+            
+            # 1. 플레이어에게 가까워지면 좋음
+            if new_distance < current_distance:
+                tactical_score += 10
+            elif new_distance == current_distance:
+                tactical_score += 3  # 최소한 거리 유지
+            
+            # 2. 플레이어를 에워싸기 좋은 위치면 보너스
+            if self._is_flanking_position(new_x, new_y, player_x, player_y):
+                tactical_score += 8
+                
+            # 3. 다른 적과 협력하기 좋은 위치면 보너스
+            tactical_score += cooperation_score
+            
+            # 4. 플레이어 바로 인접한 위치면 최고 점수
+            if new_distance == 1:
+                tactical_score += 15
+                
+            # 5. 대각선 이동보다 직선 이동 선호 (AI 행동 자연스럽게)
+            if dx == 0 or dy == 0:  # 직선 이동
+                tactical_score += 2
+                
+            best_moves.append({
+                'pos': (new_x, new_y),
+                'distance': new_distance,
+                'tactical_score': tactical_score,
+                'cooperation': cooperation_score
+            })
+        
+        if not best_moves:
+            log_enemy("적AI", f"이동 불가", {"적위치": (enemy_x, enemy_y)})
+            return (enemy_x, enemy_y)
+        
+        # 🏆 최고 점수 이동 선택
+        best_move = max(best_moves, key=lambda m: m['tactical_score'])
+        
+        log_enemy("적AI", f"지능적 이동 선택", {
+            "적위치": (enemy_x, enemy_y),
+            "목표위치": best_move['pos'],
+            "전술점수": best_move['tactical_score'],
+            "협력점수": best_move['cooperation'],
+            "거리변화": f"{abs(enemy_x - player_x) + abs(enemy_y - player_y)} → {best_move['distance']}"
+        })
+        
+        return best_move['pos']
+    
+    def _evaluate_cooperation(self, x: int, y: int, player_x: int, player_y: int) -> int:
+        """🤝 집단 지성: 다른 적들과의 협력 평가"""
+        cooperation_score = 0
+        
+        # 주변 2칸 내에 다른 적이 있으면 협력 보너스
+        for other_pos in self.enemies_positions:
+            if other_pos == (x, y):  # 자기 자신 제외
+                continue
+                
+            other_x, other_y = other_pos
+            distance_to_ally = abs(x - other_x) + abs(y - other_y)
+            
+            # 적끼리 너무 가까우면 -점수 (겹치기 방지)
+            if distance_to_ally == 1:
+                cooperation_score -= 2
+            # 적당한 거리면 +점수 (팀워크)
+            elif distance_to_ally == 2:
+                cooperation_score += 3
+            elif distance_to_ally == 3:
+                cooperation_score += 1
+        
+        return cooperation_score
+    
+    def _is_flanking_position(self, x: int, y: int, player_x: int, player_y: int) -> bool:
+        """🧭 플레이어를 에워싸기 좋은 위치인지 판단"""
+        # 플레이어의 4방향 중 하나에 위치하면 에워싸기 좋음
+        flanking_positions = [
+            (player_x + 1, player_y),     # 동쪽
+            (player_x - 1, player_y),     # 서쪽
+            (player_x, player_y + 1),     # 남쪽
+            (player_x, player_y - 1),     # 북쪽
+        ]
+        
+        return (x, y) in flanking_positions
+    
+    def _can_move_to(self, x: int, y: int, current_enemy_pos: Tuple[int, int] = None) -> bool:
+        """해당 위치로 이동 가능한지 확인 - 현재 적 위치 제외"""
         from .error_logger import log_enemy
         
         # 경계 체크
         if not self.is_valid_pos(x, y):
+            log_enemy("이동체크", f"경계 벗어남", {"목표위치": (x, y)})
             return False
             
         # 벽 체크
         if not self.tiles[y][x].is_walkable():
+            log_enemy("이동체크", f"이동불가 타일", {"목표위치": (x, y), "타일타입": str(self.tiles[y][x].type)})
             return False
             
         # 플레이어 위치 체크
         if (x, y) == self.player_pos:
+            log_enemy("이동체크", f"플레이어 위치", {"목표위치": (x, y), "플레이어위치": self.player_pos})
             return False
             
-        # 다른 적 위치 체크 (이 부분을 좀 더 관대하게)
-        if (x, y) in self.enemies_positions:
+        # 다른 적 위치 체크 (현재 이동하려는 적의 위치는 제외)
+        other_enemies = [pos for pos in self.enemies_positions if pos != current_enemy_pos]
+        if (x, y) in other_enemies:
+            log_enemy("이동체크", f"다른 적 위치", {"목표위치": (x, y), "현재적위치": current_enemy_pos})
             return False
         
+        log_enemy("이동체크", f"이동 가능", {"목표위치": (x, y), "현재적위치": current_enemy_pos})
         return True
         
     def track_enemy_defeat(self, enemy_pos: Tuple[int, int]):
@@ -2666,3 +2790,10 @@ class GameWorld:
         except Exception as e:
             print(f"경로 탐색 오류: {e}")
             return True  # 오류 시 안전하다고 가정
+    
+    def update_display(self):
+        """화면 업데이트 메서드 - 적 이동 후 화면 갱신용"""
+        # 이 메서드는 move_enemies에서 호출되지만
+        # 실제 화면 갱신은 메인 게임 루프에서 담당하므로
+        # 여기서는 플래그만 설정하거나 간단한 처리만 함
+        pass

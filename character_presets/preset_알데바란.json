@@ -1,0 +1,77 @@
+{
+  "basic_info": {
+    "name": "알데바란",
+    "class": "성기사",
+    "gender": "female",
+    "age": 28,
+    "personality_type": "신실한_성자",
+    "speech_style": "보통_말투"
+  },
+  "ai_profile": {
+    "core_personality": {
+      "traits": [
+        "용감함",
+        "책임감",
+        "정의감"
+      ],
+      "interests": [
+        "전술",
+        "무기_연구",
+        "파티_보호",
+        "신성_마법",
+        "치유술",
+        "정의_실현",
+        "악의_척결"
+      ],
+      "fears": [
+        "동료_손실",
+        "책임_회피",
+        "불의"
+      ],
+      "motivations": [
+        "모두를_지키고_싶음",
+        "강해지고_싶음"
+      ]
+    },
+    "professional_knowledge": {
+      "expertise": [
+        "성기사_전술",
+        "성기사_기술"
+      ],
+      "preferred_skills": [],
+      "combat_style": "탱커_힐러_하이브리드",
+      "weakness_analysis": [],
+      "preferred_actions": [
+        "성스러운_타격",
+        "치유",
+        "정화"
+      ],
+      "specialty_knowledge": [
+        "신성_마법",
+        "치유술",
+        "정의_실현",
+        "악의_척결"
+      ]
+    },
+    "relationship_data": {
+      "trust_level": 0.5,
+      "friendship_points": 0,
+      "memorable_events": [],
+      "communication_history": []
+    },
+    "database_file": "ai_memory_알데바란.db"
+  },
+  "learning_data": {
+    "learning_sessions": 0,
+    "experience_points": 0,
+    "skill_development": {},
+    "behavioral_patterns": {}
+  },
+  "multiplayer_settings": {
+    "ai_controlled": true,
+    "cooperation_level": 0.8,
+    "independence_level": 0.6,
+    "communication_frequency": 0.7,
+    "decision_making_style": "균형적_판단"
+  }
+}

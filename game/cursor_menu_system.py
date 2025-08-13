@@ -7,8 +7,26 @@ Dawn of Stellar의 모든 메뉴에 적용되는 통합 메뉴 시스템
 import os
 import sys
 import time
+import platform
+import time as _t
+try:
+    import msvcrt  # Windows에서만 존재
+except Exception:
+    msvcrt = None
+
+# 메뉴 디버그 토글 (환경변수로 제어)
+MENU_DEBUG = os.getenv('MENU_DEBUG') == '1'
 from typing import List, Optional, Callable, Any
 from enum import Enum
+
+# 안전 로깅(선택): 메뉴 표시/선택 시 시스템 로그 남기기
+try:
+    from game.error_logger import log_system as _menu_log_system
+except Exception:
+    _menu_log_system = None
+
+# 전역 메뉴 락: 동시에 두 개 이상의 메뉴 루프가 돌지 않도록 방지
+_ACTIVE_MENU = False
 class MenuAction(Enum):
     """메뉴 액션 타입"""
     SELECT = "select"
@@ -36,7 +54,8 @@ class CursorMenu:
     def __init__(self, title: str = "", options: List[str] = None, descriptions: List[str] = None, 
                  audio_manager=None, keyboard=None, cancellable: bool = True, extra_content: str = "",
                  clear_screen: bool = True,
-                 buffered: bool = False, multi_select: bool = False, max_selections: int = 4):
+                 buffered: bool = False, multi_select: bool = False, max_selections: int = 4,
+                 ignore_initial_enter_ms: float = 0.2):
         """메뉴 초기화"""
         try:
             if not audio_manager:
@@ -79,6 +98,15 @@ class CursorMenu:
         self.clear_screen = clear_screen
         self.buffered = buffered or self.compact_mode
         self._last_render_line_count = 0
+        self._last_key = None
+        try:
+            import time as _t
+            self._ignore_enter_until = _t.time() + (ignore_initial_enter_ms if ignore_initial_enter_ms else 0)
+        except Exception:
+            self._ignore_enter_until = 0
+        # 초기 Enter/Q 억제를 한 번만 적용하기 위한 플래그
+        self._grace_suppressed_once = False
+        self._grace_cancel_suppressed_once = False
         
         # 멀티 선택 관련 설정
         self.multi_select = multi_select
@@ -435,22 +463,47 @@ class CursorMenu:
         
     def display_menu(self):
         """메뉴 화면 표시 - 명령 프롬프트 최적화"""
-        # 빈 줄로 이전 내용 밀어내기 (확실한 방법)
-        for _ in range(100):
-            print()
-        
-        # cls 시도
+        # 안전 가드: 잘못된 인덱스 보정(클램프)
         try:
-            import os
-            os.system('cls')
-        except:
+            if self.items:
+                if self.selected_index < 0:
+                    self.selected_index = 0
+                elif self.selected_index >= len(self.items):
+                    self.selected_index = len(self.items) - 1
+        except Exception:
             pass
-        
-        # 추가로 빈 줄 몇 개 더
-        for _ in range(5):
-            print()
+        # 최초 표시 시 시스템 로그 남기기 (가능할 때만)
+        try:
+            if _menu_log_system and not getattr(self, "_menu_displayed", False):
+                _menu_log_system("메뉴표시", "메뉴 표시", {
+                    "제목": getattr(self, 'title', ''),
+                    "항목수": len(self.items) if self.items else 0,
+                    "취소가능": getattr(self, 'cancellable', True)
+                })
+        except Exception:
+            pass
+        if self.clear_screen:
+            # 빈 줄로 이전 내용 밀어내기 (확실한 방법)
+            for _ in range(100):
+                print()
+            
+            # cls 시도
+            try:
+                import os
+                os.system('cls')
+            except:
+                pass
+            
+            # 추가로 빈 줄 몇 개 더
+            for _ in range(5):
+                print()
             
         lines = self._compose_menu_lines()
+        if MENU_DEBUG:
+            try:
+                print(f"[MENU_DEBUG] display_menu() lines={len(lines)} sel={self.selected_index} items={len(self.items)}", flush=True)
+            except Exception:
+                pass
         self._print_lines(lines)
         self._last_render_line_count = len(lines)
         self._menu_displayed = True
@@ -618,8 +671,48 @@ class CursorMenu:
             
     def handle_input(self) -> MenuAction:
         """키 입력 처리 (키보드 + 게임패드 지원)"""
+        # 키보드 장치가 없을 때 즉시 취소로 빠지지 않도록 안전한 폴백 제공
         if not self.keyboard:
-            return MenuAction.CANCEL
+            try:
+                # 표준 입력 폴백: 한 줄 입력을 받아 간단히 매핑
+                raw = input().strip()
+            except Exception:
+                # 입력 불가 환경에서는 잠시 대기 후 화면 유지
+                import time as _t
+                _t.sleep(0.1)
+                return MenuAction.SPECIAL
+            # 최근 키 저장 (초기 Enter 무시 보조)
+            try:
+                self._last_key = raw if raw else '\n'
+            except Exception:
+                self._last_key = None
+            key = raw.lower() if raw else '\n'
+            # 매핑
+            if key == 'w':
+                self.move_cursor(-1)
+                return MenuAction.UP
+            if key == 's':
+                self.move_cursor(1)
+                return MenuAction.DOWN
+            if key == 'a':
+                self.move_cursor(-1)
+                return MenuAction.LEFT
+            if key == 'd':
+                self.move_cursor(1)
+                return MenuAction.RIGHT
+            if key == 'i':
+                return MenuAction.INFO
+            if key == 'q':
+                # 메뉴가 취소 불가면 취소로 처리하지 않음
+                return MenuAction.CANCEL if getattr(self, 'cancellable', True) else MenuAction.SPECIAL
+            if key.isdigit():
+                num = int(key) - 1
+                if 0 <= num < len(self.items):
+                    self.selected_index = num
+                    return MenuAction.SELECT
+                return MenuAction.SPECIAL
+            # 빈 입력 또는 기타 입력은 Enter로 간주
+            return MenuAction.SELECT
         
         # 통합 입력 관리자에서 입력 받기
         if hasattr(self.keyboard, 'wait_for_input_with_repeat'):
@@ -629,13 +722,32 @@ class CursorMenu:
             # 논블로킹 모드 - 입력이 있을 때까지 대기
             import time
             key = ""
-            while not key:
-                key = self.keyboard.get_input().lower()
+            attempts = 0
+            while not key and attempts < 100:  # 최대 2초 대기
+                key = self.keyboard.get_input()
                 if not key:
-                    time.sleep(0.02)  # 20ms 대기 (더 빠른 반응)
+                    time.sleep(0.02)  # 20ms 대기
+                    attempts += 1
+                # Enter 키 특별 처리
+                if key == '\r':
+                    key = '\r'  # 유지
+                    break
+            key = key.lower() if key and key != '\r' else key
         else:
             # 폴백: 기존 키보드 입력
             key = self.keyboard.get_key().lower()
+        
+        # 최근 키 저장 (초기 Enter 무시 보조)
+        try:
+            self._last_key = key
+        except Exception:
+            self._last_key = None
+        # 디버그: 입력된 키 출력
+        if MENU_DEBUG:
+            try:
+                print(f"[MENU_DEBUG] key={repr(key)}", flush=True)
+            except Exception:
+                pass
         
         if key == 'w':  # 위로 (키보드/게임패드)
             self.move_cursor(-1)
@@ -649,7 +761,7 @@ class CursorMenu:
         elif key == 'd':  # 오른쪽 (게임패드 D-패드)
             self.move_cursor(1)
             return MenuAction.RIGHT
-        elif key == '\r' or key == '\n':  # 엔터 
+        elif key in ['\r', '\n'] or (key and ord(key) == 13):  # Enter 키 (선택)
             if self.multi_select:
                 # 멀티 선택 모드: 엔터로 체크/언체크 토글
                 if self.items and self.selected_index < len(self.items):
@@ -732,7 +844,7 @@ class CursorMenu:
                 else:
                     self.play_error_sound()
                     return MenuAction.SPECIAL
-                return MenuAction.SELECT
+            return MenuAction.SPECIAL
         
         return MenuAction.SPECIAL  # 기타 키
     
@@ -761,51 +873,230 @@ class CursorMenu:
         """메뉴 실행"""
         if not self.items:
             return None
-        
-        # 화면 클리어 후 첫 번째 표시
-        if self.clear_screen:
-            self._clear_screen()
-        self.display_menu()
-        
-        while True:
-            action = self.handle_input()
+        # 전역 메뉴 락: 중첩 메뉴 즉시 전환 지원 (대기 없이 선점)
+        global _ACTIVE_MENU
+        _lock_acquired = False
+        try:
+            if MENU_DEBUG:
+                try:
+                    print(f"[MENU_DEBUG] run() start: items={len(self.items)}, cancellable={self.cancellable}, clear_screen={self.clear_screen}", flush=True)
+                except Exception:
+                    pass
+            # 진입 시 인덱스 정규화
+            try:
+                if not self.items or self.selected_index < 0 or self.selected_index >= len(self.items):
+                    self.selected_index = 0
+            except Exception:
+                self.selected_index = 0
+            try:
+                # 다른 메뉴가 활성화되어 있으면 즉시 해제하고 선점
+                if _ACTIVE_MENU:
+                    _ACTIVE_MENU = False
+                _ACTIVE_MENU = True
+                _lock_acquired = True
+            except Exception:
+                pass
+            # 키보드가 없으면 안전 초기화 시도 (런타임 복구)
+            if not self.keyboard:
+                try:
+                    from game.input_utils import UnifiedInputManager
+                    self.keyboard = UnifiedInputManager()
+                except Exception:
+                    try:
+                        from game.input_utils import KeyboardInput
+                        self.keyboard = KeyboardInput()
+                    except Exception:
+                        self.keyboard = None
             
-            if action in [MenuAction.UP, MenuAction.DOWN]:
-                # 커서 이동 -> 간단한 상태 표시만 (메뉴 다시 그리지 않음)
-                self._update_selection_inline()
+            # 키보드 버퍼 정리 (한글 입력 후 문제 해결)
+            try:
+                if sys.platform.startswith('win') and msvcrt is not None:
+                    while msvcrt.kbhit():
+                        msvcrt.getch()
+            except:
+                pass
+            
+            # 화면 클리어 후 첫 번째 표시
+            if self.clear_screen:
+                self._clear_screen()
+            self.display_menu()
+            # 그레이스 억제 플래그 리셋 (실행마다 초기화)
+            self._grace_suppressed_once = False
+            self._grace_cancel_suppressed_once = False
+            
+            while True:
+                action = self.handle_input()
+                if MENU_DEBUG:
+                    try:
+                        print(f"[MENU_DEBUG] action={action}", flush=True)
+                    except Exception:
+                        pass
+                # 메뉴 진입 직후 잔상 입력으로 인한 즉시 선택/취소 방지
+                try:
+                    now = _t.time()
+                    if now < self._ignore_enter_until:
+                        # 초기 Enter만 무시, 숫자 선택은 허용
+                        if action == MenuAction.SELECT and (self._last_key in ['\r', '\n']):
+                            if not self._grace_suppressed_once:
+                                if MENU_DEBUG:
+                                    try:
+                                        print(f"[MENU_DEBUG] suppressed SELECT due to grace: last_key={repr(self._last_key)} now={now:.3f} until={self._ignore_enter_until:.3f}", flush=True)
+                                    except Exception:
+                                        pass
+                                # 키보드 버퍼 플러시로 자동 반복 입력 제거
+                                try:
+                                    if sys.platform.startswith('win') and msvcrt is not None:
+                                        while msvcrt.kbhit():
+                                            msvcrt.getch()
+                                except Exception:
+                                    pass
+                                # 너무 바쁘게 루프 도는 것을 방지하기 위해 짧게 대기
+                                try:
+                                    remaining = max(0.0, self._ignore_enter_until - now)
+                                    _t.sleep(min(0.05, remaining))
+                                except Exception:
+                                    pass
+                                # 억제 직후 메뉴를 다시 그려 시각적 확실성 보장
+                                try:
+                                    self._menu_displayed = False
+                                    self.display_menu()
+                                except Exception:
+                                    pass
+                                self._grace_suppressed_once = True
+                                continue
+                            # 이미 한 번 억제한 경우에는 허용
+                        if action == MenuAction.CANCEL and (self._last_key == 'q'):
+                            if not self._grace_cancel_suppressed_once:
+                                if MENU_DEBUG:
+                                    try:
+                                        print(f"[MENU_DEBUG] suppressed CANCEL due to grace: last_key={repr(self._last_key)} now={now:.3f} until={self._ignore_enter_until:.3f}", flush=True)
+                                    except Exception:
+                                        pass
+                                try:
+                                    if sys.platform.startswith('win') and msvcrt is not None:
+                                        while msvcrt.kbhit():
+                                            msvcrt.getch()
+                                except Exception:
+                                    pass
+                                try:
+                                    remaining = max(0.0, self._ignore_enter_until - now)
+                                    _t.sleep(min(0.05, remaining))
+                                except Exception:
+                                    pass
+                                try:
+                                    self._menu_displayed = False
+                                    self.display_menu()
+                                except Exception:
+                                    pass
+                                self._grace_cancel_suppressed_once = True
+                                continue
+                except Exception:
+                    pass
                 
-            elif action == MenuAction.SPECIAL:
-                # 특별 액션 (체크박스 토글 등) -> 전체 메뉴 다시 그리기
-                self._menu_displayed = False
-                self.display_menu()
-                
-            elif action == MenuAction.SELECT:
-                if self.multi_select:
-                    # 멀티 선택 모드: 선택된 인덱스들의 리스트 반환
-                    return list(self.selected_items)
-                else:
-                    # 단일 선택 모드: 현재 인덱스 반환
-                    current_item = self.items[self.selected_index]
-                    if current_item.enabled:
-                        # 액션이 있으면 실행
-                        if current_item.action:
-                            try:
-                                result = current_item.action()
-                                if result is not None:
-                                    return result
-                            except Exception as e:
-                                print(f"⚠️ 액션 실행 오류: {e}")
-                                self.keyboard.get_key() if self.keyboard else None
-                        return self.selected_index
+                if action in [MenuAction.UP, MenuAction.DOWN]:
+                    # 커서 이동 -> 간단한 상태 표시만 (메뉴 다시 그리지 않음)
+                    self._update_selection_inline()
                     
-            elif action == MenuAction.CANCEL:
-                return None  # Q 키로 취소할 때 None 반환
-                
-            elif action == MenuAction.INFO:
-                self.show_item_info()
-                # 정보 화면에서 돌아온 후 메뉴 다시 표시
-                self._menu_displayed = False
-                self.display_menu()
+                elif action == MenuAction.SPECIAL:
+                    # 특별 액션 (체크박스 토글 등) -> 전체 메뉴 다시 그리기
+                    self._menu_displayed = False
+                    self.display_menu()
+                    
+                elif action == MenuAction.INFO:
+                    # 정보 보기 후 메뉴 다시 표시
+                    try:
+                        self.show_item_info()
+                    except Exception:
+                        pass
+                    self._menu_displayed = False
+                    self.display_menu()
+                    
+                elif action == MenuAction.SELECT:
+                    if self.multi_select:
+                        # 멀티 선택 모드: 선택된 인덱스들의 리스트 반환
+                        if MENU_DEBUG:
+                            try:
+                                print(f"[MENU_DEBUG] return SELECT multi={list(self.selected_items)}", flush=True)
+                            except Exception:
+                                pass
+                        # 시스템 로그: 멀티 선택 결과
+                        try:
+                            if _menu_log_system:
+                                _menu_log_system("메뉴선택", "멀티 선택 완료", {
+                                    "제목": getattr(self, 'title', ''),
+                                    "선택목록": list(self.selected_items)
+                                })
+                        except Exception:
+                            pass
+                        return list(self.selected_items)
+                    else:
+                        # 단일 선택 모드: 현재 인덱스 반환
+                        current_item = self.items[self.selected_index]
+                        if current_item.enabled:
+                            # 액션이 있으면 실행
+                            if current_item.action:
+                                try:
+                                    result = current_item.action()
+                                    if result is not None:
+                                        if MENU_DEBUG:
+                                            try:
+                                                print(f"[MENU_DEBUG] return action-result={result}", flush=True)
+                                            except Exception:
+                                                pass
+                                        # 시스템 로그: 액션 반환값
+                                        try:
+                                            if _menu_log_system:
+                                                _menu_log_system("메뉴선택", "액션 결과 반환", {
+                                                    "제목": getattr(self, 'title', ''),
+                                                    "반환값": result
+                                                })
+                                        except Exception:
+                                            pass
+                                        return result
+                                except Exception as e:
+                                    print(f"⚠️ 액션 실행 오류: {e}")
+                                    self.keyboard.get_key() if self.keyboard else None
+                            # 시스템 로그: 일반 선택
+                            try:
+                                if _menu_log_system:
+                                    _menu_log_system("메뉴선택", "항목 선택", {
+                                        "제목": getattr(self, 'title', ''),
+                                        "인덱스": self.selected_index,
+                                        "텍스트": getattr(current_item, 'text', '')
+                                    })
+                            except Exception:
+                                pass
+                            if MENU_DEBUG:
+                                try:
+                                    print(f"[MENU_DEBUG] return selected_index={self.selected_index}", flush=True)
+                                except Exception:
+                                    pass
+                            return self.selected_index
+                        
+                elif action == MenuAction.CANCEL:
+                    if MENU_DEBUG:
+                        try:
+                            print(f"[MENU_DEBUG] return CANCEL(None)", flush=True)
+                        except Exception:
+                            pass
+                    # 시스템 로그: 취소
+                    try:
+                        if _menu_log_system:
+                            _menu_log_system("메뉴취소", "사용자가 메뉴를 취소함", {
+                                "제목": getattr(self, 'title', ''),
+                            })
+                    except Exception:
+                        pass
+                    return None  # Q 키로 취소할 때 None 반환
+        finally:
+            # 전역 메뉴 락 안전 해제 (예외/빠른 반환 포함)
+            try:
+                if _lock_acquired:
+                    _ACTIVE_MENU = False
+            except Exception:
+                pass
+    # 함수 종료 시 전역 메뉴 락 해제
+        
                 
     def show_item_info(self):
         """선택된 아이템의 상세 정보 표시"""
@@ -838,10 +1129,12 @@ class CursorMenu:
 # 편의 함수들
 def create_simple_menu(title: str, options: List[str], descriptions: List[str] = None,
                       audio_manager=None, keyboard=None, clear_screen: bool = True, 
-                      extra_content: str = "") -> CursorMenu:
+                      extra_content: str = "", cancellable: bool = True,
+                      ignore_initial_enter_ms: float = 0.2) -> CursorMenu:
     """간단한 메뉴 생성"""
     menu = CursorMenu(title, options, descriptions, audio_manager, keyboard, 
-                     clear_screen=clear_screen, extra_content=extra_content)
+                     cancellable=cancellable, clear_screen=clear_screen, extra_content=extra_content,
+                     ignore_initial_enter_ms=ignore_initial_enter_ms)
     return menu
 
 def create_character_selection_menu(characters: List[Any], audio_manager=None, keyboard=None) -> CursorMenu:

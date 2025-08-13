@@ -11,22 +11,26 @@ import threading
 import time
 from typing import Dict, List, Any, Optional
 from game.real_player_multiplayer import RealPlayerMultiplayerServer, NetworkPlayer, NetworkGameState, PlayerConnectionState
+
+# 필요한 모듈들을 안전하게 임포트
 try:
-    from game.party_manager import PartyManager
     from game.character import Character, CharacterClass
     from game.brave_combat import BraveCombatSystem
     from game.world import World
-    from game.ai_game_mode_manager import AIGameModeManager
+    GAME_MODULES_AVAILABLE = True
 except ImportError:
-    # 간단한 더미 클래스들로 대체
+    GAME_MODULES_AVAILABLE = False
     print("⚠️ 일부 게임 모듈을 찾을 수 없어 더미 클래스를 사용합니다")
-    
-    class PartyManager:
-        def __init__(self): 
-            self.members = []
-        def add_member(self, member): 
-            self.members.append(member)
-    
+
+# PartyManager 더미 클래스 (없는 경우)
+class PartyManager:
+    def __init__(self): 
+        self.members = []
+    def add_member(self, member): 
+        self.members.append(member)
+
+# 게임 모듈이 없는 경우 더미 클래스들 정의
+if not GAME_MODULES_AVAILABLE:
     class Character:
         def __init__(self, name, character_class, level=1):
             self.name = name
@@ -37,18 +41,18 @@ except ImportError:
             self.current_mp = 50
             self.max_mp = 50
             self.exp = 0
-    
+
     class CharacterClass:
         WARRIOR = "전사"
         ARCHMAGE = "아크메이지"
         ARCHER = "궁수"
         ROGUE = "도적"
-    
+
     class BraveCombatSystem:
         def __init__(self, party_manager, ai_game_mode_manager):
             self.party_manager = party_manager
             self.ai_manager = ai_game_mode_manager
-    
+
     class World:
         def __init__(self):
             self.width = 20
@@ -85,10 +89,10 @@ except ImportError:
         
         def get_current_tile_info(self): 
             return {"type": "일반", "description": "평범한 던전 바닥"}
-    
-    class AIGameModeManager:
-        def __init__(self): 
-            pass
+
+class AIGameModeManager:
+    def __init__(self): 
+        pass
 
 class DawnOfStellarMultiplayerServer(RealPlayerMultiplayerServer):
     """Dawn of Stellar 게임과 통합된 멀티플레이어 서버"""

@@ -92,40 +92,60 @@ class AI27JobCharacterCreator:
         print("🤖 27개 직업 AI 캐릭터 생성기 초기화 완료")
     
     def _init_name_pools(self) -> Dict[str, List[str]]:
-        """직업별 이름 풀 초기화"""
+        """성별별 캐릭터 이름 풀 초기화 (300개 이상)"""
         return {
-            # 전투 직업군
-            "warrior": ["아르투스", "레오니드", "발키리", "브룬힐드", "시그프리드"],
-            "archmage": ["메를린", "갈라드리엘", "간달프", "헤르메스", "아르카나"],
-            "archer": ["레골라스", "로빈후드", "아르테미스", "카트니스", "호크아이"],
-            "rogue": ["아사신", "쉐도우", "실버", "나이트메어", "팬텀"],
-            "paladin": ["세라핌", "가브리엘", "미카엘", "우리엘", "라파엘"],
-            "dark_knight": ["아르토리아스", "다크니스", "레이븐", "오르페우스", "데모고르곤"],
-            "monk": ["젠마스터", "부다", "샤오린", "달라이", "카르마"],
-            "bard": ["오르페우스", "아폴론", "리라", "하모니", "멜로디"],
+            # 남성 이름 (150개)
+            "male": [
+                "아리우스", "발렌타인", "가브리엘", "라파엘", "카이저", "레오나르드", "세바스찬", "알렉산더",
+                "막시무스", "아드리안", "루카스", "니콜라스", "도미닉", "빈센트", "에밀리오", "마르코",
+                "클라우디우스", "오거스트", "바실리우스", "이그니스", "펠릭스", "라이언", "에릭",
+                "마틴", "엘리아스", "다미안", "율리안", "카를로스", "디에고", "파블로", "프란시스",
+                "로드리고", "안토니오", "페드로", "미구엘", "호세", "루이스", "페르난도", "애드워드",
+                "라몬", "호르헤", "카를로스", "마누엘", "프랑크", "올리버", "해리", "잭", "윌리엄",
+                "제임스", "찰스", "로버트", "마이클", "데이비드", "리처드", "조셉", "토머스", "크리스토퍼",
+                "매트", "앤소니", "마크", "도널드", "스티븐", "폴", "앤드류", "조슈아", "케네스", "케빈",
+                "브라이언", "조지", "에드워드", "로널드", "티모시", "제이슨", "제프리", "라이언", "제이콥",
+                "게리", "니콜라스", "에릭", "조나단", "스티븐", "래리", "저스틴", "스콧", "브랜든", "벤자민",
+                "사무엘", "그레고리", "알렉산더", "패트릭", "잭", "데니스", "제리", "타일러", "애런","헤인",
+                "호세", "헨리", "더글러스", "네이선", "피터", "잭슨", "노아", "이단", "루카스", "메이슨",
+                "로건", "제이콥", "윌리엄", "엘리야", "웨인", "칼렙", "라이언", "니콜라스", "조던","플라튼",
+                "로버트", "그레이슨", "헌터", "에이든", "카메론", "코너", "산티아고", "칼렙", "네이선",
+                "이사이야", "찰리", "이반", "오웬", "루크", "딜런", "잭슨", "가빈", "데이비드", "콜튼",
+                "앤드류", "맥스", "라이언", "브레이든", "토머스", "카터", "다니엘", "마이클", "아담",
+                "엘라이", "벤자민", "핀", "코딘", "트리스탄", "로넌", "블레이크", "브로디", "데클란",
+                "숀", "리암", "루카", "제임슨", "카일", "브랜든", "알렉스", "자이든", "자비에르","테오",
+                "도미닉", "데미트리","에이스", "니키타", "블라디미르", "알렉세이", "이반", "안톤", "올렉",
+                "세르겐", "빅터", "로만", "파벨", "녹티스", "아르템", "콘스탄틴", "발렌틴", "드미트리","티더","클라우드","프롬프토","그림니르","시스","랜슬롯","벤티","카이","솔","제노","슈르크","네스"
+            ],
             
-            # 마법 직업군  
-            "necromancer": ["리치킹", "모르데카이", "네크로스", "레이스", "소울리버"],
-            "dragon_knight": ["드래곤로드", "와이번", "바하무트", "파이어브레스", "스카이림"],
-            "sword_saint": ["무사시", "켄세이", "소드마스터", "블레이드", "검신"],
-            "elementalist": ["엘레멘탈", "스톰", "블리자드", "인페르노", "어스퀘이크"],
-            "time_mage": ["크로노스", "타임워프", "프로피셔", "오라클", "포시어"],
-            "alchemist": ["니콜라스", "파라셀수스", "호문클루스", "엘릭서", "트랜스뮤터"],
-            "dimension_mage": ["디멘션", "포털", "보이드워커", "리프트", "네더"],
-            "magic_swordsman": ["스펠소드", "마검사", "엔챈터", "배틀메이지", "워스펠"],
-            "engineer": ["스팀펑크", "기어헤드", "테슬라", "사이보그", "메카닉"],
-            "shaman": ["토템", "스피릿", "와이즈맨", "드림워커", "소울가이드"],
-            
-            # 특수 직업군
-            "assassin": ["이지오", "파이버", "해시신", "그림리퍼", "실런트"],
-            "pirate": ["잭스패로우", "블랙비어드", "붉은수염", "바다늑대", "크라켄"],
-            "samurai": ["무사시", "요시츠네", "하치로", "사카모토", "코지로"],
-            "druid": ["래디언트", "네이처", "그린맨", "숲지기", "생명수"],
-            "philosopher": ["소크라테스", "플라톤", "아리스토텔레스", "데카르트", "니체"],
-            "gladiator": ["스파르타쿠스", "막시무스", "루셀", "챔피언", "아레나킹"],
-            "knight": ["랜슬롯", "가웨인", "퍼시발", "갈라하드", "트리스탄"],
-            "priest": ["베네딕트", "프란시스", "요한", "마리아", "가브리엘라"],
-            "berserker": ["바바리안", "광전사", "레이지", "버서커", "와일드맨"]
+            # 여성 이름 (150개)
+            "female": [
+                "아리아", "셀레스트","유나", "이사벨라", "발레리아", "세라피나", "아드리아나", "밀리아", "비비안", "클라라","비라","유엘",
+                "에밀리아", "루시아", "소피아", "올리비아", "나탈리아", "카밀라", "레오니", "미리암",
+                "로사", "에스텔라", "바이올렛", "샬롯", "베아트리체", "카타리나", "레베카", "엘레나",
+                "마리아", "안나", "루나", "시에라", "니나", "에바", "릴리안", "로렌", "그레이스",
+                "에밀리", "한나", "엠마", "매디슨", "애슐리", "사라", "브리트니", "사만다", "제시카",
+                "아만다", "스테파니", "니콜", "멜리사", "데보라", "레이첼", "캐서린", "엘리자베스", "해더",
+                "티파니", "에이미", "줄리", "조이스", "빅토리아", "켈리", "크리스티나", "조안", "이블린",
+                "린다", "바바라", "엘렌", "캐럴", "산드라", "도나", "루스", "샤론", "미셸", "로라",
+                "에밀리", "칼라", "레베카", "스테파니", "캐롤라인", "엘리", "제나", "브룩", "케이트",
+                "사바나", "제시카", "테일러", "킴벌리", "데이지", "하이디", "가브리엘라", "니키",
+                "로린", "셸리", "레슬리", "에리카", "카일린", "애나", "코트니", "루비", "이바",
+                "메간", "알렉시스", "소피아", "클로에", "이사벨", "에이바", "밀라", "아리아나",
+                "라일라", "미아", "엠마", "아드리아나", "알리", "라일리", "캐밀라", "클레어", "빅토리아",
+                "엘리아나", "나오미", "엘레나", "네이탈리", "헤일리", "브루클린", "로렌", "앨리슨",
+                "가브리엘라", "세라", "자스민", "마야", "사만다", "페넬로페", "오를리", "발레리아",
+                "바이올렛", "스카를릿", "애나스타샤", "베로니카", "테레사", "앤젤라", "카르멘", "몰리",
+                "셸리", "레이첼", "니콜", "웬디", "리사", "킴벌리", "도나", "아니타", "리비",
+                "알리시아", "알렉산드라", "키아라", "조아나", "마리사", "카렌", "스테이시", "다이애나",
+                "로즈", "이솔데", "기네비어", "모르가나", "세라피나", "아르테미스", "아테나", "헤라",
+                "아프로디테", "헤스티아", "데메테르", "펠레", "프레이야", "이두나", "브룬힐데", "발키리",
+                "키르케", "카산드라", "안드로메다", "페넬로페", "헬렌", "클레오파트라", "이시스", "네페르티티",
+                "세라핌", "우리엘", "가브리엘라", "미카엘라", "라파엘라", "아리엘", "젤다", "세레나",
+                "팬도라", "포에베", "셀레네", "헤카테", "님프", "오로라", "루나", "스텔라", "노바",
+                "베가", "안드로메다", "카시오페아", "라이라", "알타이르", "벨라트릭스", "리겔", "시리우스","플레임",
+                "프로키온", "아크투루스", "스피카", "알데바란", "카펠라", "폴룩스", "레굴루스", "안타레스", "오즈","코린","엔비","아이린","플루토"
+            ]
         }
     
     def _init_personality_mappings(self) -> Dict[str, List[str]]:
@@ -151,6 +171,26 @@ class AI27JobCharacterCreator:
             "특수직": ["독특한", "창의적", "자유로운", "특별한"]
         }
     
+    def _detect_gender_from_name(self, name: str) -> str:
+        """이름으로부터 성별 감지"""
+        if name in self.name_pools["male"]:
+            return "male"
+        elif name in self.name_pools["female"]:
+            return "female"
+        else:
+            # 알 수 없는 이름이면 랜덤하게
+            return random.choice(["male", "female"])
+    
+    def _generate_name_by_gender(self, preferred_gender: str = None) -> tuple[str, str]:
+        """성별별 이름 생성"""
+        if preferred_gender and preferred_gender in self.name_pools:
+            gender = preferred_gender
+        else:
+            gender = random.choice(["male", "female"])
+        
+        name = random.choice(self.name_pools[gender])
+        return name, gender
+    
     def create_character_from_job(self, job_id: str, custom_name: str = None) -> Dict[str, Any]:
         """직업 기반 AI 캐릭터 생성"""
         if not JOB_SYSTEM_AVAILABLE:
@@ -161,12 +201,12 @@ class AI27JobCharacterCreator:
             print(f"❌ 직업 '{job_id}'를 찾을 수 없습니다.")
             return {}
         
-        # 이름 생성
+        # 이름과 성별 생성
         if custom_name:
             name = custom_name
+            gender = self._detect_gender_from_name(name)
         else:
-            name_pool = self.name_pools.get(job_id, ["Unknown"])
-            name = random.choice(name_pool)
+            name, gender = self._generate_name_by_gender()
         
         # 성격 생성
         personality = self._generate_personality(job_profile)
@@ -183,6 +223,9 @@ class AI27JobCharacterCreator:
         # 대화 패턴 생성
         dialogue_patterns = self._generate_dialogue_patterns(job_profile)
         
+        # 자기소개 대사 생성
+        introduction_dialogue = self._generate_introduction_dialogue(name, gender, job_profile, "플레이어")
+        
         # 스토리 동기 생성
         story_motivation = self._generate_story_motivation(job_profile)
         
@@ -192,6 +235,7 @@ class AI27JobCharacterCreator:
         # AI 캐릭터 데이터 구성
         character_data = {
             "name": name,
+            "gender": gender,
             "job_id": job_id,
             "job_name": job_profile.name,
             "personality": {
@@ -207,6 +251,7 @@ class AI27JobCharacterCreator:
             },
             "social": {
                 "dialogue_patterns": dialogue_patterns,
+                "introduction_dialogue": introduction_dialogue,
                 "cooperation_preference": job_profile.cooperation_preference,
                 "default_relationships": relationships
             },
@@ -265,6 +310,31 @@ class AI27JobCharacterCreator:
             emotions.extend(role_emotions[job_profile.tactical_role])
         
         return emotions[:4]
+    
+    def _detect_gender_from_name(self, name: str) -> str:
+        """이름으로부터 성별 감지"""
+        if name in self.name_pools["male"]:
+            return "male"
+        elif name in self.name_pools["female"]:
+            return "female"
+        else:
+            # 이름이 풀에 없는 경우 랜덤 선택
+            return random.choice(["male", "female"])
+    
+    def _generate_name_by_gender(self, gender: str = None) -> tuple:
+        """성별에 따른 이름 생성"""
+        if gender is None:
+            gender = random.choice(["male", "female"])
+        
+        if gender in self.name_pools:
+            name = random.choice(self.name_pools[gender])
+        else:
+            # 기본값으로 모든 이름에서 선택
+            all_names = self.name_pools["male"] + self.name_pools["female"]
+            name = random.choice(all_names)
+            gender = self._detect_gender_from_name(name)
+        
+        return name, gender
     
     def _generate_cooperation_style(self, job_profile: JobProfile) -> str:
         """협력 스타일 생성"""
@@ -331,6 +401,100 @@ class AI27JobCharacterCreator:
             patterns.extend(job_patterns[job_profile.job_id])
         
         return patterns[:4]
+    
+    def _generate_introduction_dialogue(self, name: str, gender: str, job_profile: JobProfile, player_name: str = "핀") -> str:
+        """성별과 직업에 따른 자기소개 대사 생성"""
+        
+        # 성별별 기본 어투
+        male_endings = ["다", "네", "지", "요"]
+        female_endings = ["요", "어요", "에요", "네요"]
+        
+        # 직업별 특성을 반영한 대사 템플릿
+        job_templates = {
+            # 전투 직업군
+            "warrior": {
+                "male": [
+                    f"{player_name}아, 강철 같은 의지로 이곳에 서준 것이 고맙다. 함께 싸워나가자.",
+                    f"{player_name}, 전장에서 너와 함께할 수 있어 든든하다.",
+                    f"용감한 {player_name}이군. 우리의 검이 정의를 관철할 것이다."
+                ],
+                "female": [
+                    f"{player_name}, 당신과 함께라면 어떤 시련도 이겨낼 수 있을 것 같아요.",
+                    f"안녕하세요, {player_name}. 저도 전투에서 도움이 되도록 하겠어요.",
+                    f"{player_name}님, 함께 승리를 쟁취해보아요!"
+                ]
+            },
+            "knight": {
+                "male": [
+                    f"{player_name}아, 강철 같은 의지로 이곳에 서준 것이 고맙다. 함께 정의를 지켜나가자.",
+                    f"기사 {name}이다. {player_name}, 너의 용기를 보니 마음이 든든하구나.",
+                    f"{player_name}, 함께 명예로운 길을 걸어가자."
+                ],
+                "female": [
+                    f"기사 {name}입니다. {player_name}님, 함께 정의를 실현해나가요.",
+                    f"{player_name}님, 당신의 용기에 감명받았어요. 함께 싸우겠습니다.",
+                    f"안녕하세요 {player_name}. 저와 함께 악을 물리쳐요!"
+                ]
+            },
+            "assassin": {
+                "male": [
+                    f"{player_name}, 죽음의 길을 함께 걸어갈 동료구나. 기대되네.",
+                    f"그림자 속에서 {player_name}을 지켜보고 있었다. 흥미로운 녀석이군.",
+                    f"{player_name}... 너도 어둠의 길을 아는 자인가?"
+                ],
+                "female": [
+                    f"{player_name}, 당신도 그림자의 길을 걷는 분이군요. 함께해요.",
+                    f"안녕하세요 {player_name}. 저는 조용히 뒤에서 지원하겠어요.",
+                    f"{player_name}님, 제 기술이 도움이 될 거예요."
+                ]
+            },
+            "monk": {
+                "male": [
+                    f"{player_name}이라니... 흥미로운 이름이구나. 싸우는 법 좀 배웠나?",
+                    f"수행자 {name}이다. {player_name}, 너의 정신력을 시험해보고 싶군.",
+                    f"{player_name}, 내면의 힘을 키우는 것이 중요하다네."
+                ],
+                "female": [
+                    f"안녕하세요 {player_name}. 저는 평화로운 해결을 선호해요.",
+                    f"{player_name}님, 함께 수행의 길을 걸어가요.",
+                    f"명상과 무술, 둘 다 중요하답니다. {player_name}님도 그렇게 생각하시나요?"
+                ]
+            },
+            "archmage": {
+                "male": [
+                    f"마법사 {name}이다. {player_name}, 마법의 신비를 함께 탐구해보지 않겠나?",
+                    f"{player_name}, 너에게서 특별한 마력을 느낀다.",
+                    f"흥미롭군, {player_name}. 함께라면 더 강력한 마법을 쓸 수 있을 것 같다."
+                ],
+                "female": [
+                    f"안녕하세요 {player_name}. 마법으로 도움을 드릴게요.",
+                    f"{player_name}님, 함께 마법의 세계를 탐험해보아요.",
+                    f"저의 마법이 {player_name}님께 도움이 되길 바라요."
+                ]
+            }
+        }
+        
+        # 기본 템플릿 (직업별 템플릿이 없는 경우)
+        default_templates = {
+            "male": [
+                f"{player_name}, 함께 모험을 떠나자.",
+                f"만나서 반갑다, {player_name}. 잘 부탁한다.",
+                f"{player_name}이군. 흥미로운 여행이 될 것 같다."
+            ],
+            "female": [
+                f"안녕하세요 {player_name}. 잘 부탁드려요.",
+                f"{player_name}님, 함께 모험을 떠나요!",
+                f"만나서 반가워요, {player_name}님."
+            ]
+        }
+        
+        # 직업에 맞는 템플릿 선택
+        if job_profile.job_id in job_templates:
+            templates = job_templates[job_profile.job_id][gender]
+        else:
+            templates = default_templates[gender]
+        
+        return random.choice(templates)
     
     def _generate_story_motivation(self, job_profile: JobProfile) -> str:
         """스토리 동기 생성"""

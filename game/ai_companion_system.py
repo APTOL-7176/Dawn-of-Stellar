@@ -1,11 +1,21 @@
 """
 AI 파티원(용병) 시스템
 플레이어가 직접 조작하지 않는 AI 동료들
+
+2025년 8월 14일 - 통합 언어모델 연동 추가
 """
 import random
 import time
 from typing import List, Dict, Optional, Tuple
 from enum import Enum
+
+# 통합 언어모델 매니저 임포트
+try:
+    from game.unified_llm_manager import get_unified_llm_manager, LLMType
+    LLM_AVAILABLE = True
+except ImportError:
+    print("⚠️ 통합 언어모델 매니저를 찾을 수 없습니다. 기본 AI만 사용합니다.")
+    LLM_AVAILABLE = False
 
 class AIPersonality(Enum):
     """AI 성격 타입"""
@@ -26,7 +36,7 @@ class AIRequest(Enum):
     SUGGEST_RETREAT = "retreat"             # 후퇴 제안
 
 class AICompanion:
-    """AI 동료 클래스"""
+    """AI 동료 클래스 - 통합 언어모델 지원"""
     
     def __init__(self, character, personality: AIPersonality = AIPersonality.BALANCED):
         self.character = character
@@ -46,6 +56,148 @@ class AICompanion:
         # 협동 공격 데이터
         self.coordinated_attack_ready = False
         self.preferred_combo_partner = None
+        
+        # 언어모델 연동
+        self.llm_enabled = LLM_AVAILABLE
+        self.llm_manager = get_unified_llm_manager() if LLM_AVAILABLE else None
+        self.conversation_context = ""
+        self.last_response_time = 0
+        
+        # 캐릭터 개성 설정
+        self._setup_character_personality()
+        
+        if self.llm_enabled:
+            print(f"🤖 {self.character.name}: 언어모델 AI 동료로 활성화!")
+    
+    def _setup_character_personality(self):
+        """캐릭터 개성 설정"""
+        # 성격별 대화 특성
+        personality_traits = {
+            AIPersonality.AGGRESSIVE: "용맹하고 직설적이며 전투를 좋아하는",
+            AIPersonality.DEFENSIVE: "신중하고 동료를 보호하려는 마음이 강한",
+            AIPersonality.BALANCED: "균형 잡히고 합리적이며 상황에 맞게 행동하는",
+            AIPersonality.SUPPORTIVE: "친절하고 협력적이며 다른 사람을 돕기 좋아하는",
+            AIPersonality.TACTICAL: "전략적이고 분석적이며 계획을 세우기 좋아하는"
+        }
+        
+        # 직업별 특성
+        class_traits = {
+            '전사': "근접 전투의 전문가이며 방패와 검을 사용하는",
+            '아크메이지': "강력한 마법을 구사하는 지혜로운 마법사",
+            '궁수': "정확한 원거리 공격을 하는 침착한 사수",
+            '도적': "은밀하고 빠른 움직임을 하는 그림자 전문가",
+            '성기사': "신성한 힘으로 동료를 보호하는 성스러운 기사",
+            '암흑기사': "어둠의 힘을 다루는 강력한 전사",
+            '몽크': "맨손 격투와 기(氣)를 다루는 수행자",
+            '바드': "음악으로 동료를 격려하는 예술가 전사"
+        }
+        
+        character_class = getattr(self.character, 'character_class', '전사')
+        self.personality_description = personality_traits.get(self.personality, "친근한")
+        self.class_description = class_traits.get(character_class, "모험가")
+    
+    def get_natural_response(self, trigger_event: str, situation: str = "전투") -> str:
+        """자연스러운 언어모델 응답 생성"""
+        if not self.llm_enabled or not self.llm_manager:
+            return self._get_fallback_response(trigger_event, situation)
+        
+        try:
+            # 현재 시간 체크 (너무 자주 말하지 않도록)
+            current_time = time.time()
+            if current_time - self.last_response_time < 10:  # 10초 쿨다운
+                return ""
+            
+            # 캐릭터 정보 구성
+            character_name = getattr(self.character, 'name', 'AI동료')
+            character_class = getattr(self.character, 'character_class', '전사')
+            
+            # HP/MP 상태 정보
+            hp_ratio = self.character.current_hp / self.character.max_hp
+            mp_ratio = self.character.current_mp / self.character.max_mp if self.character.max_mp > 0 else 1.0
+            
+            # 상황 정보 추가
+            status_info = f"(HP: {hp_ratio*100:.0f}%, MP: {mp_ratio*100:.0f}%)"
+            
+            # 응답 생성
+            response = self.llm_manager.generate_response(
+                user_message=f"{trigger_event} {status_info}",
+                character_name=character_name,
+                character_class=character_class,
+                personality=f"{self.personality_description} {self.class_description}",
+                situation=situation
+            )
+            
+            self.last_response_time = current_time
+            return response
+            
+        except Exception as e:
+            print(f"⚠️ {self.character.name} 언어모델 응답 실패: {e}")
+            return self._get_fallback_response(trigger_event, situation)
+    
+    def _get_fallback_response(self, trigger_event: str, situation: str) -> str:
+        """폴백 응답 (언어모델 사용 불가 시)"""
+        
+        # 기본 응답 템플릿
+        responses_by_personality = {
+            AIPersonality.AGGRESSIVE: [
+                "좋아! 싸워보자!", "적을 박살내버리겠어!", "전투다!"
+            ],
+            AIPersonality.DEFENSIVE: [
+                "조심하자.", "안전하게 가자.", "동료들을 지켜야 해."
+            ],
+            AIPersonality.BALANCED: [
+                "상황을 파악해보자.", "현명하게 행동하자.", "함께 할 수 있어."
+            ],
+            AIPersonality.SUPPORTIVE: [
+                "도와줄게!", "함께 이겨내자!", "괜찮을 거야."
+            ],
+            AIPersonality.TACTICAL: [
+                "전략을 세워보자.", "이렇게 해보는 건 어때?", "분석해보니..."
+            ]
+        }
+        
+        responses = responses_by_personality.get(self.personality, ["좋아!"])
+        return random.choice(responses)
+    
+    def react_to_combat_event(self, event_type: str, details: Dict = None) -> str:
+        """전투 이벤트에 대한 반응"""
+        
+        event_descriptions = {
+            "battle_start": "전투가 시작되었습니다!",
+            "enemy_defeated": "적을 쓰러뜨렸습니다!",
+            "ally_critical": "동료가 위험합니다!",
+            "critical_hit": "크리티컬 히트!",
+            "skill_used": "특수 기술을 사용했습니다!",
+            "level_up": "레벨이 올랐습니다!",
+            "victory": "승리했습니다!",
+            "near_death": "체력이 위험합니다!"
+        }
+        
+        description = event_descriptions.get(event_type, event_type)
+        return self.get_natural_response(description, "전투 중")
+    
+    def chat_with_player(self, player_message: str) -> str:
+        """플레이어와의 직접 대화"""
+        if not self.llm_enabled:
+            return "죄송해요, 지금은 간단한 대화만 할 수 있어요."
+        
+        try:
+            character_name = getattr(self.character, 'name', 'AI동료')
+            character_class = getattr(self.character, 'character_class', '전사')
+            
+            response = self.llm_manager.generate_response(
+                user_message=player_message,
+                character_name=character_name,
+                character_class=character_class,
+                personality=f"{self.personality_description} {self.class_description}",
+                situation="평상시 대화"
+            )
+            
+            return response
+            
+        except Exception as e:
+            print(f"⚠️ {self.character.name} 대화 실패: {e}")
+            return "음... 뭔가 문제가 있는 것 같아요. 나중에 다시 이야기해요!"
         
     def _get_personality_weights(self) -> Dict[str, float]:
         """성격에 따른 행동 가중치 설정"""

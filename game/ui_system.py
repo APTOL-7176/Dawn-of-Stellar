@@ -8,43 +8,6 @@ import os
 from typing import Tuple, List, Dict, Optional
 from enum import Enum
 
-
-# 안전한 색상 상수 정의
-COLORS = {
-    'RESET': '\033[0m',
-    'BOLD': '\033[1m',
-    'DIM': '\033[2m', 
-    'UNDERLINE': '\033[4m',
-    'BLACK': '\033[30m',
-    'RED': '\033[31m',
-    'GREEN': '\033[32m',
-    'YELLOW': '\033[33m',
-    'BLUE': '\033[34m',
-    'MAGENTA': '\033[35m',
-    'CYAN': '\033[36m',
-    'WHITE': '\033[37m',
-    'BRIGHT_BLACK': '\033[90m',
-    'BRIGHT_RED': '\033[91m',
-    'BRIGHT_GREEN': '\033[92m',
-    'BRIGHT_YELLOW': '\033[93m',
-    'BRIGHT_BLUE': '\033[94m',
-    'BRIGHT_MAGENTA': '\033[95m',
-    'BRIGHT_CYAN': '\033[96m',
-    'BRIGHT_WHITE': '\033[97m',
-    'BG_BLACK': '\033[40m',
-    'BG_RED': '\033[41m',
-    'BG_GREEN': '\033[42m',
-    'BG_YELLOW': '\033[43m',
-    'BG_BLUE': '\033[44m',
-    'BG_MAGENTA': '\033[45m',
-    'BG_CYAN': '\033[46m',
-    'BG_WHITE': '\033[47m'
-}
-
-def get_color(color_name):
-    """안전한 색상 코드 반환"""
-    return COLORS.get(color_name, '')
-
 # 폰트 매니저 import
 try:
     from .font_manager import get_font_manager, apply_game_font
@@ -181,14 +144,14 @@ class UIManager:
                 curses.start_color()
                 curses.use_default_colors()
                 
-                curses.init_pair(UIget_color('WHITE'), curses.COLOR_WHITE, -1)
-                curses.init_pair(UIget_color('RED'), curses.COLOR_RED, -1)
-                curses.init_pair(UIget_color('GREEN'), curses.COLOR_GREEN, -1)
-            curses.init_pair(UIget_color('BLUE'), curses.COLOR_BLUE, -1)
-            curses.init_pair(UIget_color('YELLOW'), curses.COLOR_YELLOW, -1)
-            curses.init_pair(UIget_color('MAGENTA'), curses.COLOR_MAGENTA, -1)
-            curses.init_pair(UIget_color('CYAN'), curses.COLOR_CYAN, -1)
-            curses.init_pair(UIget_color('BLACK'), curses.COLOR_BLACK, -1)
+                curses.init_pair(UIColor.WHITE.value, curses.COLOR_WHITE, -1)
+                curses.init_pair(UIColor.RED.value, curses.COLOR_RED, -1)
+                curses.init_pair(UIColor.GREEN.value, curses.COLOR_GREEN, -1)
+            curses.init_pair(UIColor.BLUE.value, curses.COLOR_BLUE, -1)
+            curses.init_pair(UIColor.YELLOW.value, curses.COLOR_YELLOW, -1)
+            curses.init_pair(UIColor.MAGENTA.value, curses.COLOR_MAGENTA, -1)
+            curses.init_pair(UIColor.CYAN.value, curses.COLOR_CYAN, -1)
+            curses.init_pair(UIColor.BLACK.value, curses.COLOR_BLACK, -1)
             
             self.colors_initialized = True
         

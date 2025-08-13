@@ -1,17 +1,17 @@
 # Dawn Of Stellar - Version Information
 
-__version__ = "4.2.0"
+__version__ = "5.0.0"
 __title__ = "Dawn Of Stellar - 별빛의 여명"
-__description__ = "차세대 ASCII 기반 전략 로그라이크 RPG - 한국어 입력 지원 + 멀티플레이어 완성"
+__description__ = "완전체 로그라이크 RPG - 스타팅 장비 개선 + Flutter 모바일 + 종합 로깅"
 __author__ = "APTOL-7176"
 __author_email__ = "iamckck49@gmail.com"
 __license__ = "MIT"
 __url__ = "https://github.com/APTOL-7176/Dawn-of-Stellar"
 
 # Release Information
-RELEASE_DATE = "2025-08-11"
-MAJOR_VERSION = 4
-MINOR_VERSION = 2
+RELEASE_DATE = "2025-08-13"
+MAJOR_VERSION = 5
+MINOR_VERSION = 0
 PATCH_VERSION = 0
 
 # Game Information
@@ -21,7 +21,7 @@ GAME_VERSION_DISPLAY = f"v{__version__}"
 
 # Build Information
 BUILD_TYPE = "Release"
-PYTHON_MIN_VERSION = "3.8"
+PYTHON_MIN_VERSION = "3.10"
 PYTHON_RECOMMENDED = "3.11"
 
 def get_version_info():
@@ -36,6 +36,36 @@ def get_version_info():
         "python_min": PYTHON_MIN_VERSION,
         "python_recommended": PYTHON_RECOMMENDED
     }
+
+# v5.0.0 메이저 업데이트 내역 (2025-08-13)
+VERSION_NOTES_500 = [
+    "🎮 완전체 게임 시스템 완성 - 스타팅 장비 4명 균등 분배",
+    "⚔️ 28개 직업별 맞춤 장비 시스템 - 부위 겹침 방지",
+    "⚡ B키 직접 저장 기능 - 맵에서 바로 저장 가능",
+    "🌿 통합 필드 메뉴 - F키로 채집, 요리, 스킬, 상점, 저장 접근",
+    "🛒 상점 정보 대폭 강화 - 가격, 재고, 희귀도, 스탯, 내구도 표시",
+    "📜 파티 히스토리 시스템 복구 - 저장된 파티 불러오기 기능",
+    "📱 Flutter 모바일 클라이언트 완성 - 터미널 스타일 UI",
+    "🗂️ 종합 로깅 시스템 - 7종류 한국어 로그 파일 세션별 관리",
+    "🔧 장비 슬롯 자동 감지 시스템 - 아이템명 기반 타입 분류",
+    "🎯 공정한 아이템 분배 - 첫 번째 파티원 독점 문제 해결",
+    "📊 실시간 문제 진단 - 이동, 전투, AI 문제 로그 추적",
+    "💫 완성도 극대화 - 모든 시스템 안정화 및 최적화"
+]
+
+# v4.3.0 업데이트 내역 (2025-01-27)
+VERSION_NOTES_430 = [
+    "⚔️ 통합 장비 시스템 완전 구현 - 모든 장비 타입 통합 관리",
+    "🌟 그림자 시스템 특수 효과 추가 - 원소가 아닌 특수 능력으로 분류",
+    "🔧 SHADOW_DAMAGE 오류 해결 - 그림자 이동, 강화, 메아리 효과 구현",
+    "📦 창고 시스템 완전 제거 - 게임 밸런스 개선",
+    "🎯 장비 강화 시스템 개선 - 최대 +15 강화, 성공률 조정",
+    "💎 장비 저주 시스템 - 2% 확률로 저주 옵션 추가",
+    "🛠️ Easy Character Creator 모듈 오류 수정",
+    "📊 비전 속성 제거 - 게임 내 존재하지 않는 속성 정리",
+    "🎮 커서 메뉴 시스템 전면 적용",
+    "🚀 코드 최적화 및 안정성 향상"
+]
 
 # v3.1.1 업데이트 내역 (2025-08-10)
 VERSION_NOTES_311 = [
@@ -75,7 +105,11 @@ def print_version_info():
     print(f"Author: {__author__}")
     print(f"License: {__license__}")
     
-    if __version__ == "3.1.1":
+    if __version__ == "4.3.0":
+        print(f"\n📋 v{__version__} 업데이트 내역:")
+        for note in VERSION_NOTES_430:
+            print(f"   {note}")
+    elif __version__ == "3.1.1":
         print(f"\n📋 v{__version__} 업데이트 내역:")
         for note in VERSION_NOTES_311:
             print(f"   {note}")
