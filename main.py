@@ -1778,7 +1778,7 @@ class DawnOfStellarGame:
                     
                     exploration_info = {
                         "creation_method": creation_methods.get(result, "알 수 없음"),
-                        "game_version": "2.0",
+                        "game_version": "4.3.0",
                         "created_at": "character_creation"
                     }
                     

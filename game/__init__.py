@@ -2,7 +2,7 @@
 게임 패키지 초기화 파일
 """
 
-__version__ = "1.0.0"
+__version__ = "4.3.0"
 __author__ = "Roguelike Game Developer"
 
 # 주요 모듈 import

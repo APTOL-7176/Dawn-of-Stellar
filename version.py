@@ -1,17 +1,17 @@
 # Dawn Of Stellar - Version Information
 
-__version__ = "5.0.0"
+__version__ = "4.3.0"
 __title__ = "Dawn Of Stellar - 별빛의 여명"
-__description__ = "완전체 로그라이크 RPG - 스타팅 장비 개선 + Flutter 모바일 + 종합 로깅"
+__description__ = "완전체 로그라이크 RPG - 밸런스 시스템 통합 + 스토리 BGM 수정"
 __author__ = "APTOL-7176"
 __author_email__ = "iamckck49@gmail.com"
 __license__ = "MIT"
 __url__ = "https://github.com/APTOL-7176/Dawn-of-Stellar"
 
 # Release Information
-RELEASE_DATE = "2025-08-13"
-MAJOR_VERSION = 5
-MINOR_VERSION = 0
+RELEASE_DATE = "2025-08-14"
+MAJOR_VERSION = 4
+MINOR_VERSION = 3
 PATCH_VERSION = 0
 
 # Game Information
@@ -53,17 +53,17 @@ VERSION_NOTES_500 = [
     "💫 완성도 극대화 - 모든 시스템 안정화 및 최적화"
 ]
 
-# v4.3.0 업데이트 내역 (2025-01-27)
+# v4.3.0 업데이트 내역 (2025-08-14)
 VERSION_NOTES_430 = [
-    "⚔️ 통합 장비 시스템 완전 구현 - 모든 장비 타입 통합 관리",
-    "🌟 그림자 시스템 특수 효과 추가 - 원소가 아닌 특수 능력으로 분류",
-    "🔧 SHADOW_DAMAGE 오류 해결 - 그림자 이동, 강화, 메아리 효과 구현",
-    "📦 창고 시스템 완전 제거 - 게임 밸런스 개선",
-    "🎯 장비 강화 시스템 개선 - 최대 +15 강화, 성공률 조정",
-    "💎 장비 저주 시스템 - 2% 확률로 저주 옵션 추가",
-    "🛠️ Easy Character Creator 모듈 오류 수정",
-    "📊 비전 속성 제거 - 게임 내 존재하지 않는 속성 정리",
-    "🎮 커서 메뉴 시스템 전면 적용",
+    "🎯 완전한 밸런스 시스템 v3.0 통합 - final_integrated_balance_system.py",
+    "� 스토리 시스템 BGM import 경로 수정 - game.audio -> game.audio_system",
+    "🔧 메뉴 시스템 인덱스 정렬 문제 해결",
+    "� 오디오 폴더 구조 자동 생성",
+    "� 모든 게임 모드에서 통일된 밸런스 적용",
+    "� AI 게임 모드 검증 시스템 강화",
+    "� 난이도별 스토리 시스템 완성 (평온/보통/도전/악몽/지옥)",
+    "🎭 28개 직업별 고유 스토리 및 특성 시스템",
+    "🔒 .gitignore 업데이트로 디버그 파일 제외",
     "🚀 코드 최적화 및 안정성 향상"
 ]
 

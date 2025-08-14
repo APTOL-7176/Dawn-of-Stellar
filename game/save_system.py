@@ -213,7 +213,7 @@ class SaveManager:
     def _create_save_data(self, game_state: Dict[str, Any]) -> Dict[str, Any]:
         """저장 데이터 생성"""
         save_data = {
-            "version": "2.2.0",  # 새로운 스킬 시스템 반영
+            "version": "4.3.0",  # 밸런스 시스템 통합 버전
             "timestamp": datetime.now().isoformat(),
             "checksum": "",
             "game_state": game_state,
@@ -449,7 +449,7 @@ class SaveManager:
                             char_data["steps_taken"] = 0
             
             # 버전 업데이트
-            save_data["version"] = "2.2.0"
+            save_data["version"] = "4.3.0"
             save_data["skill_system_version"] = "new_skill_system"
             save_data["organic_effects_enabled"] = True
             
@@ -1179,7 +1179,7 @@ class GameStateSerializer:
                 print(f"⚠️ 난이도 정보 가져오기 오류: {e}")
             
             return {
-                'version': '2.2.0',  # 새로운 스킬 시스템 반영
+                'version': '4.3.0',  # 밸런스 시스템 통합 버전
                 'current_level': game.world.current_level,
                 'difficulty': difficulty_info,  # 난이도 정보 추가
                 'score': getattr(game, 'score', 0),
