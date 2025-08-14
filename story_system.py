@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Dawn of Stellar - 스토리 시스템
 시공교란 컨셉의 오프닝 스토리와 게임 내러티브
@@ -13,11 +13,11 @@ from dataclasses import dataclass
 
 # 오디오 시스템 import
 try:
-    from game.audio_system import get_audio_manager
+    from game.audio_system import get_unified_audio_system
     AUDIO_AVAILABLE = True
 except ImportError:
     AUDIO_AVAILABLE = False
-    def get_audio_manager(): return None
+    def get_unified_audio_system(): return None
 
 # 키보드 입력 시스템 import
 try:
@@ -66,7 +66,7 @@ class StorySystem:
         # 오디오 시스템 초기화
         if AUDIO_AVAILABLE:
             try:
-                self.audio_manager = get_audio_manager()
+                self.audio_manager = get_unified_audio_system()
             except Exception as e:
                 print(f"⚠️ 스토리 오디오 시스템 초기화 실패: {e}")
                 self.audio_manager = None
@@ -571,14 +571,14 @@ class StorySystem:
                 # Bombing Mission Opening BGM 재생 (02번 오프닝 사용)
                 if bgm_type == "BOMBING_MISSION":
                     # BGMType enum 사용 - 스토리용 오프닝 (새로 만든 전용 타입 사용)
-                    from game.audio_system import BGMType
+                    from game.audio_system import BGMType  # game.audio -> game.audio_system으로 수정
                     self.audio_manager.play_bgm(BGMType.MAIN_MENU_OPENING)
                     # BGM 재생 조용히
                 elif bgm_type == "BOSS":
-                    from game.audio_system import BGMType
+                    from game.audio_system import BGMType  # game.audio -> game.audio_system으로 수정
                     self.audio_manager.play_bgm(BGMType.BOSS)
                 elif bgm_type == "VICTORY":
-                    from game.audio_system import BGMType
+                    from game.audio_system import BGMType  # game.audio -> game.audio_system으로 수정
                     self.audio_manager.play_bgm(BGMType.VICTORY)
             except Exception as e:
                 print(f"⚠️ BGM 재생 실패: {e}")
@@ -2361,7 +2361,7 @@ class StorySystem:
             
             # MENU BGM으로 전환 (BOMBING_MISSION 대신)
             try:
-                from game.audio_system import BGMType
+                from game.audio_system import BGMType  # game.audio -> game.audio_system으로 수정
                 if hasattr(self.audio_manager, 'play_bgm'):
                     self.audio_manager.play_bgm(BGMType.MENU, loop=True)
                 print("🎶 메인 메뉴 BGM이 재생됩니다.")

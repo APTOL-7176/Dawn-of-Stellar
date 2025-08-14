@@ -7,7 +7,7 @@
 from typing import List, Dict, Any, Optional, Tuple
 import random
 import math
-from .character import Character
+from game.character import Character
 
 # 색상 정의
 RESET = '\033[0m'

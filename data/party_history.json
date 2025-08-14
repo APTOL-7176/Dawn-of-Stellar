@@ -1,0 +1,302 @@
+[
+  {
+    "created_date": "2025-08-14T05:33:39.802004",
+    "creation_method": "균형잡힌 파티 생성",
+    "party_composition": [
+      {
+        "name": "프란시스",
+        "job": "용기사",
+        "gender": "남성",
+        "traits": []
+      },
+      {
+        "name": "릴리안",
+        "job": "아크메이지",
+        "gender": "남성",
+        "traits": []
+      },
+      {
+        "name": "알데바란",
+        "job": "기계공학자",
+        "gender": "남성",
+        "traits": []
+      },
+      {
+        "name": "크리스토퍼",
+        "job": "바드",
+        "gender": "남성",
+        "traits": []
+      }
+    ]
+  },
+  {
+    "created_date": "2025-08-14T05:39:27.015872",
+    "creation_method": "균형잡힌 파티 생성",
+    "party_composition": [
+      {
+        "name": "라일리",
+        "job": "사무라이",
+        "gender": "남성",
+        "traits": []
+      },
+      {
+        "name": "이단",
+        "job": "검성",
+        "gender": "남성",
+        "traits": []
+      },
+      {
+        "name": "패트릭",
+        "job": "암살자",
+        "gender": "남성",
+        "traits": []
+      },
+      {
+        "name": "제시카",
+        "job": "궁수",
+        "gender": "남성",
+        "traits": []
+      }
+    ]
+  },
+  {
+    "created_date": "2025-08-14T05:43:47.917337",
+    "creation_method": "자동 캐릭터 생성",
+    "party_composition": [
+      {
+        "name": "니콜라스",
+        "job": "광전사",
+        "gender": "남성",
+        "traits": []
+      },
+      {
+        "name": "발레리아",
+        "job": "용기사",
+        "gender": "남성",
+        "traits": []
+      },
+      {
+        "name": "아드리아나",
+        "job": "아크메이지",
+        "gender": "남성",
+        "traits": []
+      },
+      {
+        "name": "클라라",
+        "job": "검투사",
+        "gender": "남성",
+        "traits": []
+      }
+    ]
+  },
+  {
+    "created_date": "2025-08-14T06:04:35.950949",
+    "creation_method": "균형잡힌 파티 생성",
+    "party_composition": [
+      {
+        "name": "잭슨",
+        "job": "궁수",
+        "gender": "남성",
+        "traits": []
+      },
+      {
+        "name": "케네스",
+        "job": "검성",
+        "gender": "남성",
+        "traits": []
+      },
+      {
+        "name": "레오나르드",
+        "job": "몽크",
+        "gender": "남성",
+        "traits": []
+      },
+      {
+        "name": "에릭",
+        "job": "드루이드",
+        "gender": "남성",
+        "traits": []
+      }
+    ]
+  },
+  {
+    "created_date": "2025-08-14T06:24:27.747984",
+    "creation_method": "균형잡힌 파티 생성",
+    "party_composition": [
+      {
+        "name": "래리",
+        "job": "연금술사",
+        "gender": "남성",
+        "traits": []
+      },
+      {
+        "name": "레이첼",
+        "job": "철학자",
+        "gender": "남성",
+        "traits": []
+      },
+      {
+        "name": "피터",
+        "job": "무당",
+        "gender": "남성",
+        "traits": []
+      },
+      {
+        "name": "윌리엄",
+        "job": "바드",
+        "gender": "남성",
+        "traits": []
+      }
+    ]
+  },
+  {
+    "created_date": "2025-08-14T06:27:50.935038",
+    "creation_method": "랜덤 파티 생성",
+    "party_composition": [
+      {
+        "name": "네페르티티",
+        "job": "성기사",
+        "gender": "female",
+        "traits": []
+      },
+      {
+        "name": "루카스",
+        "job": "전사",
+        "gender": "male",
+        "traits": []
+      },
+      {
+        "name": "콜튼",
+        "job": "기사",
+        "gender": "male",
+        "traits": []
+      },
+      {
+        "name": "패트릭",
+        "job": "기계공학자",
+        "gender": "male",
+        "traits": []
+      }
+    ]
+  },
+  {
+    "created_date": "2025-08-14T06:35:50.968157",
+    "creation_method": "균형잡힌 파티 생성",
+    "party_composition": [
+      {
+        "name": "테일러",
+        "job": "몽크",
+        "gender": "남성",
+        "traits": []
+      },
+      {
+        "name": "애슐리",
+        "job": "궁수",
+        "gender": "남성",
+        "traits": []
+      },
+      {
+        "name": "올리버",
+        "job": "마검사",
+        "gender": "남성",
+        "traits": []
+      },
+      {
+        "name": "케이트",
+        "job": "무당",
+        "gender": "남성",
+        "traits": []
+      }
+    ]
+  },
+  {
+    "created_date": "2025-08-14T07:03:10.757162",
+    "creation_method": "균형잡힌 파티 생성",
+    "party_composition": [
+      {
+        "name": "루크",
+        "job": "암흑기사",
+        "gender": "남성",
+        "traits": []
+      },
+      {
+        "name": "데클란",
+        "job": "기사",
+        "gender": "남성",
+        "traits": []
+      },
+      {
+        "name": "가브리엘라",
+        "job": "검성",
+        "gender": "남성",
+        "traits": []
+      },
+      {
+        "name": "스테이시",
+        "job": "바드",
+        "gender": "남성",
+        "traits": []
+      }
+    ]
+  },
+  {
+    "created_date": "2025-08-14T07:05:04.602395",
+    "creation_method": "랜덤 파티 생성",
+    "party_composition": [
+      {
+        "name": "녹티스",
+        "job": "성기사",
+        "gender": "male",
+        "traits": []
+      },
+      {
+        "name": "데미트리",
+        "job": "바드",
+        "gender": "male",
+        "traits": []
+      },
+      {
+        "name": "트리스탄",
+        "job": "도적",
+        "gender": "male",
+        "traits": []
+      },
+      {
+        "name": "에릭",
+        "job": "정령술사",
+        "gender": "male",
+        "traits": []
+      }
+    ]
+  },
+  {
+    "created_date": "2025-08-14T07:53:35.882648",
+    "creation_method": "랜덤 파티 생성",
+    "party_composition": [
+      {
+        "name": "도나",
+        "job": "신관",
+        "gender": "남성",
+        "traits": []
+      },
+      {
+        "name": "멜리사",
+        "job": "드루이드",
+        "gender": "남성",
+        "traits": []
+      },
+      {
+        "name": "에릭",
+        "job": "해적",
+        "gender": "남성",
+        "traits": []
+      },
+      {
+        "name": "세라",
+        "job": "네크로맨서",
+        "gender": "남성",
+        "traits": []
+      }
+    ]
+  }
+]

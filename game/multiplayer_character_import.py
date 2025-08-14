@@ -7,12 +7,12 @@ import json
 import os
 from typing import List, Dict, Optional, Any, Tuple
 from datetime import datetime
-from .character import Character
-from .character_presets import CharacterPresets
-from .save_system import SaveSystem
-from .items import Item, ItemDatabase
-from .cursor_menu_system import CursorMenu
-from .color_text import GREEN, YELLOW, RED, CYAN, WHITE, RESET
+from game.character import Character
+from game.character_presets import CharacterPresets
+from game.save_system import SaveSystem
+from game.items import Item, ItemDatabase
+from game.cursor_menu_system import CursorMenu
+from game.color_text import GREEN, YELLOW, RED, CYAN, WHITE, RESET
 
 
 class MultiplayerCharacterImport:

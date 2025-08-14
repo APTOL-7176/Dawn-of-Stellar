@@ -16,7 +16,7 @@ from dataclasses import dataclass
 import time
 import logging
 
-from .error_logger import log_debug, log_error, log_system
+from game.error_logger import log_debug, log_error, log_system
 
 class PlayerRole(Enum):
     """플레이어 역할 정의"""

@@ -26,7 +26,7 @@ import uuid
 from pathlib import Path
 import logging
 
-from .color_text import bright_cyan, bright_yellow, bright_green, bright_red, cyan, yellow, red, green, white, bright_magenta
+from game.color_text import bright_cyan, bright_yellow, bright_green, bright_red, cyan, yellow, red, green, white, bright_magenta
 
 # 게임 버전 정보
 GAME_VERSION = "4.1.1"

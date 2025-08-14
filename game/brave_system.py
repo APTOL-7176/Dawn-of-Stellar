@@ -160,7 +160,7 @@ class BraveManager:
             return 0
             
         # 밸런스 시스템 사용
-        from .balance import GameBalance
+        from game.balance import GameBalance
         
         # 캐릭터 속성명 매핑
         if hasattr(attacker, 'get_effective_stat'):
@@ -217,7 +217,7 @@ class BraveManager:
             return 0, 0
             
         # 밸런스 시스템 사용
-        from .balance import GameBalance
+        from game.balance import GameBalance
         
         brave_points = getattr(attacker, 'brave_points', self.base_brave)
         is_break = getattr(target, 'is_broken', False)

@@ -4,8 +4,8 @@
 """
 
 from typing import List, Dict, Optional, Tuple
-from .character import Character
-from .new_skill_system import StatusType
+from game.character import Character
+from game.new_skill_system import StatusType
 
 class ShadowSystem:
     """그림자 시스템 관리자"""
@@ -65,8 +65,8 @@ class ShadowSystem:
     
     def _set_shadow_count(self, character: Character, count: int):
         """그림자 개수 설정 (내부 메서드)"""
-        from .new_skill_system import StatusType
-        from .status_effects import StatusEffect
+        from game.new_skill_system import StatusType
+        from game.status_effects import StatusEffect
         
         if not hasattr(character, 'status_effects'):
             character.status_effects = []

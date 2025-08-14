@@ -1024,28 +1024,28 @@ class UnifiedEquipmentGenerator:
                 "category": WeaponCategory.SWORD,
                 "rarity": EquipmentRarity.COMMON,
                 "base_stats": {"attack": 15},
-                "classes": []  # 직업 제한 없음
+                "classes": ["전사", "성기사", "암흑기사", "기사", "사무라이", "검성", "마검사"]
             },
             "마법 지팡이": {
                 "type": EquipmentType.WEAPON,
                 "category": WeaponCategory.STAFF,
                 "rarity": EquipmentRarity.COMMON,
                 "base_stats": {"attack": 10, "magic_attack": 20},
-                "classes": []
+                "classes": ["아크메이지", "정령술사", "시간술사", "차원술사", "연금술사", "철학자", "무당"]
             },
             "활": {
                 "type": EquipmentType.WEAPON,
                 "category": WeaponCategory.BOW,
                 "rarity": EquipmentRarity.COMMON,
                 "base_stats": {"attack": 14},
-                "classes": []
+                "classes": ["궁수"]
             },
             "단검": {
                 "type": EquipmentType.WEAPON,
                 "category": WeaponCategory.DAGGER,
                 "rarity": EquipmentRarity.COMMON,
                 "base_stats": {"attack": 12},
-                "classes": []
+                "classes": ["도적", "암살자"]
             },
             
             # 추가 기본 무기들 (50종)
@@ -3405,6 +3405,9 @@ class EquipmentManager:
 
 # 전역 장비 생성기
 unified_equipment_generator = UnifiedEquipmentGenerator()
+
+# 호환성을 위한 별칭 - auto_party_builder.py에서 사용하는 이름
+unified_equipment_system = unified_equipment_generator
 
 # ===== 장비 효과 적용 시스템 =====
 

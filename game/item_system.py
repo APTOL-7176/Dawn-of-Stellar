@@ -9,7 +9,7 @@ from enum import Enum
 import random
 
 # 올바른 모듈에서 import
-from .new_skill_system import StatusType, ElementType, get_status_icon
+from game.new_skill_system import StatusType, ElementType, get_status_icon
 
 # StatusEffect 클래스 정의
 class StatusEffect:

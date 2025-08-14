@@ -6,7 +6,7 @@
 from typing import List, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .character import Character
+    from game.character import Character
 
 def select_player_characters_with_cursor_menu(party_members: List['Character'], count: int) -> List['Character']:
     """커서 메뉴를 사용한 플레이어 캐릭터 선택"""
@@ -47,7 +47,7 @@ def select_player_characters_with_cursor_menu(party_members: List['Character'], 
         
         # 커서 메뉴로 캐릭터 선택
         try:
-            from .cursor_menu_system import CursorMenu
+            from game.cursor_menu_system import CursorMenu
             
             menu = CursorMenu(
                 title=f"캐릭터 선택 ({i+1}/{count})",

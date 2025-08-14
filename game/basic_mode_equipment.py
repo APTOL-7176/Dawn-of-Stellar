@@ -4,7 +4,7 @@
 """
 
 from typing import List, Dict
-from .ai_game_mode import basic_equipment_manager, auto_equip_for_basic_mode, get_equipment_recommendations_for_basic_mode
+from game.ai_game_mode import basic_equipment_manager, auto_equip_for_basic_mode, get_equipment_recommendations_for_basic_mode
 
 class BasicModeEquipmentUI:
     """기본 게임모드용 장비 관리 UI"""
@@ -213,7 +213,7 @@ class BasicModeEquipmentUI:
                 return
             
             # equipment_helpers의 optimize_all_equipment 사용
-            from .equipment_helpers import optimize_all_equipment
+            from game.equipment_helpers import optimize_all_equipment
             results = optimize_all_equipment(party, inventory_items, show_results=True)
             
             print("\n🎉 파티 전체 장비 최적화가 완료되었습니다!")
@@ -222,7 +222,7 @@ class BasicModeEquipmentUI:
             print(f"❌ 최적화 중 오류 발생: {e}")
             # 대체 방법: 개별 자동 장착
             try:
-                from .equipment_helpers import auto_equip_party
+                from game.equipment_helpers import auto_equip_party
                 auto_equip_party(party, inventory_items, show_results=True)
             except:
                 print("❌ 대체 최적화도 실패했습니다.")

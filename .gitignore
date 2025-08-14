@@ -523,6 +523,45 @@ chat_history/
 conversation_logs/
 
 # ===================================================================
+# 2025-08-14 추가: 디버그 및 개발 도구들
+# ===================================================================
+
+# History 파일들
+.history/
+
+# 디버그 도구들
+*_debugger.py
+*_analyzer.py
+*_checker.py
+*_verifier.py
+*_hunter.py
+*_fix_tool.py
+*_selector.py
+comprehensive_*.py
+professional_*.py
+realistic_*.py
+issue_*.py
+
+# 버그 리포트들
+bug_report_*.txt
+bug_analysis_report_*.json
+debug_session_*.log
+
+# 임시 수정 도구들
+auto_fix_system.py
+mass_fix_tool.py
+next_target_selector.py
+apply_complete_balance.py
+
+# 임시 백업들
+safe_fix_summary_*.json
+emergency_exit_backups/
+
+# 이슈 트래킹 파일들 (임시)
+ISSUE_TRACKING_*.md
+*_STATUS_*.md
+
+# ===================================================================
 # 프로젝트 정리 - 아카이브 폴더 (로컬 백업용)
 # ===================================================================
 archive/

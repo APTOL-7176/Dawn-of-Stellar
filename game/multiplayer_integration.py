@@ -11,10 +11,10 @@ import time
 from typing import Dict, List, Optional, Any, Tuple
 from enum import Enum
 
-from .multiplayer_session import MultiplayerGameSession, get_multiplayer_session, SessionState
-from .multiplayer_combat import MultiplayerBraveCombatSystem
-from .error_logger import log_debug, log_system, log_player
-from .color_text import bright_cyan, bright_yellow, bright_green, bright_red, cyan, yellow, red, green, white
+from game.multiplayer_session import MultiplayerGameSession, get_multiplayer_session, SessionState
+from game.multiplayer_combat import MultiplayerBraveCombatSystem
+from game.error_logger import log_debug, log_system, log_player
+from game.color_text import bright_cyan, bright_yellow, bright_green, bright_red, cyan, yellow, red, green, white
 
 class MultiplayerMode(Enum):
     """멀티플레이어 모드"""

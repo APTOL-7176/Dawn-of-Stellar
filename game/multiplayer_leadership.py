@@ -8,9 +8,9 @@ import time
 from typing import Dict, List, Optional, Any, Tuple
 from enum import Enum
 from dataclasses import dataclass
-from .color_text import GREEN, YELLOW, RED, CYAN, WHITE, RESET
-from .cursor_menu_system import CursorMenu
-from .error_logger import log_system, log_player
+from game.color_text import GREEN, YELLOW, RED, CYAN, WHITE, RESET
+from game.cursor_menu_system import CursorMenu
+from game.error_logger import log_system, log_player
 
 
 class LeadershipStatus(Enum):

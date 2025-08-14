@@ -3968,28 +3968,30 @@ def _poison_stack(caster, target, skill_data):
         return False
 
 def _corrosive_poison(caster, target, skill_data):
-    """부식성 독 효과 - 도적 공격력 기반"""
+    """부식성 독 효과 - 도적 공격력 기반 강화 버전"""
     try:
         if not target:
             return False
         
-        # 도적 공격력 기반 독 강도 계산 - 안전한 기본값 설정
+        # 🔥 도적 공격력 기반 독 강도 계산 - 대폭 강화!
         caster_attack = safe_get_attack_stat(caster, 'physical_attack', 100)
         
-        # 공격력의 25%를 독 강도로 사용 (최소 50, 최대 99999)
-        poison_intensity = max(50, min(99999, int(caster_attack * 0.25)))
+        # 🎯 공격력의 60%를 독 강도로 사용 (25% → 60%로 대폭 증가)
+        # 최소 100, 최대 99999로 범위 확대
+        poison_intensity = max(100, min(99999, int(caster_attack * 0.6)))
         
         if hasattr(target, 'add_status'):
-            # 방어력 감소와 함께 강력한 독 누적
-            target.add_status(StatusType.POISON, duration=8, power=poison_intensity)
-            target.add_status(StatusType.REDUCE_DEF, duration=5, power=0.7)
-            print(f"☠️ {target.name}에게 부식성 맹독이 스며들었습니다! (독성: {poison_intensity})")
+            # 방어력 감소와 함께 강력한 독 누적 (지속시간 증가)
+            target.add_status(StatusType.POISON, duration=5, power=poison_intensity)  # 8턴 → 10턴
+            target.add_status(StatusType.REDUCE_DEF, duration=4, power=0.3)  # 5턴 → 8턴, 70% → 80%
+            print(f"☠️💀 {target.name}에게 극독성 부식독이 스며들었습니다! (독성: {poison_intensity})")
             
-            # 독 피해량이 방어력 감소에 비례하여 증가
+            # 🔥 독 피해량이 방어력 감소에 비례하여 대폭 증가
             if hasattr(target, 'temp_effects'):
-                target.temp_effects["poison_amplify"] = target.temp_effects.get("poison_amplify", 0) + 0.3
+                target.temp_effects["poison_amplify"] = target.temp_effects.get("poison_amplify", 0) + 0.5  # 0.3 → 0.5
+                target.temp_effects["corrosive_stacks"] = target.temp_effects.get("corrosive_stacks", 0) + 1
         else:
-            print(f"☠️ 부식성 맹독이 {target.name}의 방어력을 녹여냅니다!")
+            print(f"☠️💀 극독성 부식독이 {target.name}의 방어력을 완전히 녹여냅니다!")
         return True
     except Exception as e:
         print(f"부식성 독 효과 적용 중 오류: {e}")
@@ -8065,16 +8067,34 @@ def _inner_ki_enhancement(caster, target=None, skill_data=None):
         return False
 
 def _poison_needle(caster, target, skill_data):
-    """독침 - 독 피해와 지속 독 효과"""
+    """독침 - 강화된 독 피해와 지속 독 효과"""
     try:
         if target and skill_data:
-            poison_damage = skill_data.get('power', 80)
-            target.take_damage(poison_damage, "독침 피해")
+            # 🔥 도적 공격력 기반 독침 데미지 계산
+            caster_attack = safe_get_attack_stat(caster, 'physical_attack', 80)
+            
+            # 기본 피해 + 공격력의 120% (대폭 강화)
+            base_damage = skill_data.get('power', 80)
+            poison_damage = int(base_damage + (caster_attack * 1.2))
+            target.take_damage(poison_damage, "강화 독침 피해")
+            
+            # 🎯 공격력 기반 독 강도 계산 (40% → 55%로 증가)
+            poison_intensity = max(50, int(caster_attack * 0.55))
             
             if hasattr(target, 'status_manager'):
-                target.status_manager.add_status('맹독', 5, 30)  # 5턴간 강력한 독
+                # 더 강력하고 오래 지속되는 독
+                target.status_manager.add_status('맹독', 8, poison_intensity)  # 5턴 → 8턴, 강도 대폭 증가
+                
+                # 🔥 추가 효과: 독 중첩 시 추가 피해
+                if hasattr(target, 'temp_effects'):
+                    target.temp_effects["poison_needle_stacks"] = target.temp_effects.get("poison_needle_stacks", 0) + 1
+                    stack_bonus = target.temp_effects["poison_needle_stacks"] * 0.2  # 스택당 20% 보너스
+                    if stack_bonus > 0:
+                        bonus_damage = int(poison_damage * stack_bonus)
+                        target.take_damage(bonus_damage, "독침 중첩 보너스")
+                        print(f"🧪💀 독침 중첩 보너스! +{bonus_damage} 피해 (스택: {target.temp_effects['poison_needle_stacks']})")
             
-            print(f"{caster.name}의 독침이 {target.name}을 중독시켰습니다!")
+            print(f"🧪☠️ {caster.name}의 강화 독침이 {target.name}을 맹독시켰습니다! (독성: {poison_intensity})")
         return True
     except Exception as e:
         print(f"독침 효과 적용 중 오류: {e}")
@@ -10192,7 +10212,7 @@ def _time_warp(caster, target=None, skill_data=None):
         # 전장의 모든 적과 아군에게 시간 왜곡 효과 적용
         if hasattr(caster, 'status_manager'):
             # 시전자는 시간 왜곡의 주인이므로 이득 효과
-            from .character import StatusEffect
+            from game.character import StatusEffect
             time_effect = StatusEffect("시간_왜곡", StatusType.TIME_DISTORTION, 5, 1.0)
             caster.status_manager.add_status(time_effect)
             print(f"⏰ {caster.name}은(는) 시간 왜곡의 중심에서 시공간을 조작합니다!")

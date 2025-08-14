@@ -10,7 +10,7 @@ from enum import Enum
 
 # 폰트 매니저 import
 try:
-    from .font_manager import get_font_manager, apply_game_font
+    from game.font_manager import get_font_manager, apply_game_font
     FONT_MANAGER_AVAILABLE = True
 except ImportError:
     FONT_MANAGER_AVAILABLE = False

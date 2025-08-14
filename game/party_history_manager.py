@@ -8,7 +8,7 @@ import os
 import time
 from datetime import datetime
 from typing import List, Dict, Optional, Any
-from .character import Character
+from game.character import Character
 
 class PartyHistoryManager:
     """최근 탐험한 파티들을 관리하는 시스템"""

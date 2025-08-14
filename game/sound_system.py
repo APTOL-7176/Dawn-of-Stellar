@@ -15,7 +15,7 @@ except ImportError:
     # pygame 없음 메시지 제거
 
 try:
-    from .chiptune_sfx import get_chiptune_sfx, play_chiptune_sound
+    from game.chiptune_sfx import get_chiptune_sfx, play_chiptune_sound
     CHIPTUNE_AVAILABLE = True
 except ImportError:
     CHIPTUNE_AVAILABLE = False

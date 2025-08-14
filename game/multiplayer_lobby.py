@@ -11,10 +11,10 @@ import time
 from typing import List, Dict, Optional, Any
 from enum import Enum
 
-from .multiplayer_session import MultiplayerGameSession, get_multiplayer_session, SessionState
-from .multiplayer_network import get_network_manager, PlayerRole
-from .error_logger import log_debug, log_system
-from .color_text import bright_cyan, bright_yellow, bright_green, bright_red, cyan, yellow, red, green, white
+from game.multiplayer_session import MultiplayerGameSession, get_multiplayer_session, SessionState
+from game.multiplayer_network import get_network_manager, PlayerRole
+from game.error_logger import log_debug, log_system
+from game.color_text import bright_cyan, bright_yellow, bright_green, bright_red, cyan, yellow, red, green, white
 
 class LobbyState(Enum):
     """로비 상태"""
@@ -224,7 +224,7 @@ class MultiplayerLobbyManager:
         print()
         
         try:
-            from .multiplayer_test import run_phase1_tests
+            from game.multiplayer_test import run_phase1_tests
             
             print("테스트 시작...")
             results = await run_phase1_tests()
@@ -307,7 +307,8 @@ class MultiplayerLobbyManager:
         
         if name_input:
             self.host_settings['session_name'] = name_input
-            print(f"{bright_green(f'세션 이름이 \"{name_input}\"으로 변경되었습니다.')}")
+            success_msg = f'세션 이름이 "{name_input}"으로 변경되었습니다.'
+            print(f"{bright_green(success_msg)}")
         
         time.sleep(1)
     
@@ -530,7 +531,7 @@ class MultiplayerLobbyManager:
         
         try:
             # 멀티플레이어 통합 시스템 초기화
-            from .multiplayer_integration import MultiplayerGameIntegration, MultiplayerMode
+            from game.multiplayer_integration import MultiplayerGameIntegration, MultiplayerMode
             
             print("멀티플레이어 통합 시스템을 초기화하고 있습니다...")
             

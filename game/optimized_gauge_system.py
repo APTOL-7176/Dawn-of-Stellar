@@ -4,7 +4,7 @@
 중복 표시 방지 시스템 포함
 """
 
-from .color_text import Color  # color_text.Color로 통일
+from game.color_text import Color  # color_text.Color로 통일
 import time
 
 
@@ -191,7 +191,7 @@ class OptimizedGaugeSystem:
         stance_display = ""
         if job == "전사" or "전사" in job:
             try:
-                from .warrior_system import get_warrior_system
+                from game.warrior_system import get_warrior_system
                 warrior_system = get_warrior_system()
                 stance_icon = warrior_system.get_stance_icon(character)
                 stance_display = f" {stance_icon}"

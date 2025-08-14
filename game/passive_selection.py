@@ -4,7 +4,7 @@
 """
 
 from typing import List, Dict, Any
-from .character import Character, CharacterClassManager
+from game.character import Character, CharacterClassManager
 
 # 색상 정의
 RESET = '\033[0m'
@@ -197,7 +197,7 @@ class PassiveSelectionSystem:
         """커서 메뉴로 선택 확인"""
         try:
             # CursorMenu import 시도
-            from .cursor_menu_system import CursorMenu
+            from game.cursor_menu_system import CursorMenu
             
             print(f"\n{CYAN}{'='*50}{RESET}")
             print(f"{YELLOW}이 선택으로 확정하시겠습니까?{RESET}")
@@ -312,7 +312,7 @@ class PassiveSelectionSystem:
     def load_passive_selections(self, party: List[Character], filename: str = "passive_selections.json"):
         """저장된 패시브 선택 사항 로드"""
         import json
-        from .character import CharacterTrait
+        from game.character import CharacterTrait
         
         try:
             with open(filename, 'r', encoding='utf-8') as f:

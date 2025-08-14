@@ -5,7 +5,7 @@
 """
 
 from typing import List, Dict, Optional, Any
-from .character import Character, PartyManager
+from game.character import Character, PartyManager
 
 class FieldSkillSelector:
     """필드 스킬 사용자 선택기"""
@@ -223,7 +223,7 @@ class FieldSkillSelector:
         skill_info = self.field_skills[skill_id]
         
         try:
-            from .cursor_menu_system import create_simple_menu
+            from game.cursor_menu_system import create_simple_menu
             
             # 커서 메뉴로 사용자 선택
             options = []
@@ -679,7 +679,7 @@ class FieldSkillSelector:
     
     def _execute_purify(self, user: Character, party: PartyManager) -> Dict[str, Any]:
         """정화 스킬"""
-        from .status_effects import StatusEffectType
+        from game.status_effects import StatusEffectType
         
         # 디버프 효과 타입들 정의
         debuff_types = {
@@ -795,7 +795,7 @@ class FieldSkillSelector:
                     tile.is_locked = False
                     if hasattr(tile, 'type'):
                         # 잠긴 문을 일반 문으로 변경
-                        from .world import TileType
+                        from game.world import TileType
                         if tile.type == TileType.LOCKED_DOOR:
                             tile.type = TileType.DOOR
                     
@@ -834,7 +834,7 @@ class FieldSkillSelector:
                     
                     # 비밀 문 탐지
                     if (hasattr(tile, 'type') and hasattr(tile, 'secret_revealed')):
-                        from .world import TileType
+                        from game.world import TileType
                         if tile.type == TileType.SECRET_DOOR and not tile.secret_revealed:
                             tile.secret_revealed = True
                             distance = abs(dx) + abs(dy)
@@ -868,7 +868,7 @@ class FieldSkillSelector:
                     
                     # 함정 탐지
                     if (hasattr(tile, 'type') and hasattr(tile, 'trap_detected')):
-                        from .world import TileType
+                        from game.world import TileType
                         if tile.type == TileType.TRAP and not tile.trap_detected:
                             tile.trap_detected = True
                             distance = abs(dx) + abs(dy)
@@ -891,7 +891,7 @@ class FieldSkillSelector:
             
             tile = world.tiles[y][x]
             if (hasattr(tile, 'type') and hasattr(tile, 'trap_detected')):
-                from .world import TileType
+                from game.world import TileType
                 if tile.type == TileType.TRAP and tile.trap_detected:
                     # 성공률 계산
                     success_rate = 0.85 + (getattr(user, 'agility', 10) / 150)
@@ -929,7 +929,7 @@ class FieldSkillSelector:
             
             tile = world.tiles[y][x]
             if hasattr(tile, 'type'):
-                from .world import TileType
+                from game.world import TileType
                 if tile.type == TileType.ALTAR:
                     # 제단 축복 효과
                     blessed_members = []
@@ -985,7 +985,7 @@ class FieldSkillSelector:
             
             tile = world.tiles[y][x]
             if hasattr(tile, 'type'):
-                from .world import TileType
+                from game.world import TileType
                 if tile.type == TileType.LEVER:
                     # 레버 조작 효과
                     if not hasattr(tile, 'is_activated') or not tile.is_activated:
@@ -1023,7 +1023,7 @@ class FieldSkillSelector:
             
             tile = world.tiles[y][x]
             if hasattr(tile, 'type'):
-                from .world import TileType
+                from game.world import TileType
                 if tile.type == TileType.BOOKSHELF:
                     # 지식 습득 효과
                     intelligence_bonus = getattr(user, 'intelligence', 15)
@@ -1061,7 +1061,7 @@ class FieldSkillSelector:
             
             tile = world.tiles[y][x]
             if hasattr(tile, 'type'):
-                from .world import TileType
+                from game.world import TileType
                 if tile.type == TileType.FORGE:
                     # 대장간 강화 효과
                     engineering_skill = getattr(user, 'intelligence', 15) + getattr(user, 'agility', 10)
@@ -1100,7 +1100,7 @@ class FieldSkillSelector:
             
             tile = world.tiles[y][x]
             if hasattr(tile, 'type'):
-                from .world import TileType
+                from game.world import TileType
                 if tile.type == TileType.GARDEN:
                     # 정원에서 자연의 축복
                     nature_power = getattr(user, 'magic_attack', 15)
@@ -1160,7 +1160,7 @@ class FieldSkillSelector:
             
             tile = world.tiles[y][x]
             if hasattr(tile, 'type'):
-                from .world import TileType
+                from game.world import TileType
                 if tile.type == TileType.CRYSTAL:
                     # 마법 수정에서 마력 충전
                     elemental_power = getattr(user, 'magic_attack', 20)
@@ -1222,6 +1222,6 @@ def get_field_skill_selector():
     """필드 스킬 선택기 인스턴스 반환"""
     global _field_skill_selector
     if _field_skill_selector is None:
-        from .ffvii_sound_system import get_ffvii_sound_system
+        from game.ffvii_sound_system import get_ffvii_sound_system
         _field_skill_selector = FieldSkillSelector(get_ffvii_sound_system())
     return _field_skill_selector

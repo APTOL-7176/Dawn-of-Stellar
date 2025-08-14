@@ -4,9 +4,9 @@
 """
 
 from typing import List, Dict, Any, Optional
-from .character import Character, PartyManager
-from .balance_system import FieldSkillBalance, get_field_skill_targets
-from .field_cooking import get_field_cooking_interface
+from game.character import Character, PartyManager
+from game.balance_system import FieldSkillBalance, get_field_skill_targets
+from game.field_cooking import get_field_cooking_interface
 
 # 색상 정의
 RESET = '\033[0m'
@@ -135,7 +135,7 @@ class FieldSkillSystem:
     def select_caster_and_use_skill(self, party: PartyManager) -> bool:
         """시전자 선택하고 스킬 사용 - 커서 시스템"""
         try:
-            from .cursor_menu_system import create_simple_menu
+            from game.cursor_menu_system import create_simple_menu
             
             # 파티 멤버들이 사용할 수 있는 스킬 수집
             available_skills = {}
@@ -241,7 +241,7 @@ class FieldSkillSystem:
             return False
         
         try:
-            from .cursor_menu_system import create_simple_menu
+            from game.cursor_menu_system import create_simple_menu
             
             # 시전자 옵션 구성
             caster_options = []

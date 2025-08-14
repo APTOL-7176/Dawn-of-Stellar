@@ -9,7 +9,7 @@ import re
 import sys
 import time
 from typing import List, Optional
-from .color_text import Color  # color_text.Color로 통일
+from game.color_text import Color  # color_text.Color로 통일
 
 
 # 안전한 색상 상수 정의

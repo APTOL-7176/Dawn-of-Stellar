@@ -23,9 +23,9 @@ from enum import Enum
 from collections import defaultdict, deque
 import uuid
 
-from .color_text import bright_cyan, bright_yellow, bright_green, bright_red, cyan, yellow, red, green, white, bright_magenta
-from .robat_gameplay_system import RobatGamePlayer, RobatGameplaySystem
-from .job_specialized_ai import JobSpecializedAI, JobClass, RobatPersonality
+from game.color_text import bright_cyan, bright_yellow, bright_green, bright_red, cyan, yellow, red, green, white, bright_magenta
+from game.robat_gameplay_system import RobatGamePlayer, RobatGameplaySystem
+from game.job_specialized_ai import JobSpecializedAI, JobClass, RobatPersonality
 
 # 버전 정보
 GAME_VERSION = "4.1.1"
@@ -387,7 +387,7 @@ class RobatMultiplayerSession:
     async def add_robat_player(self, job_class: JobClass, player_name: str, 
                               intelligence_level = None) -> str:
         """로-바트 플레이어 추가"""
-        from .job_specialized_ai import AIIntelligenceLevel
+        from game.job_specialized_ai import AIIntelligenceLevel
         
         if intelligence_level is None:
             intelligence_level = AIIntelligenceLevel.GENIUS

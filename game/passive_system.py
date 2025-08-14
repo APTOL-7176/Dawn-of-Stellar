@@ -329,7 +329,7 @@ def show_passive_selection_menu(player_stats: Dict) -> PassiveSystem:
         return passive_system
     
     try:
-        from .cursor_menu_system import create_simple_menu
+        from game.cursor_menu_system import create_simple_menu
         
         print("\n" + "="*80)
         print("🎯 패시브 선택 - 2개를 선택하세요")

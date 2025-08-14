@@ -5,9 +5,9 @@
 
 import random
 from typing import List, Dict, Any, Optional
-from .character import Character, CharacterClassManager
-from .input_utils import KeyboardInput
-from . import enhanced_items
+from game.character import Character, CharacterClassManager, CharacterTrait  # CharacterTrait 추가
+from game.input_utils import KeyboardInput
+from game import enhanced_items
 from config import game_config
 
 # 색상 정의
@@ -431,7 +431,7 @@ class AutoPartyBuilder:
     def create_question_based_party(self, party_size: int = 4) -> List[Character]:
         """질문 기반 파티 추천 시스템 - 커서 메뉴 버전"""
         try:
-            from .cursor_menu_system import CursorMenu
+            from game.cursor_menu_system import CursorMenu
             
             print(f"\n{CYAN}🎯 질문 기반 파티 추천 시스템{RESET}")
             print(f"{WHITE}8가지 질문에 답하시면 맞춤형 파티를 추천해드립니다!{RESET}")
@@ -605,8 +605,12 @@ class AutoPartyBuilder:
         for i, class_name in enumerate(selected_classes):
             character = self._create_character(class_name, i + 1)
             
-            # 질문 기반 특성 선택
-            self._auto_select_traits_by_tags(character, user_tags, trait_scores)
+            # 사용자가 직접 특성 선택 (AI 추천 기반 힌트 제공)
+            self._ai_assisted_select_passives(character, user_tags)
+            
+            # 시작 장비 제공
+            self._provide_starting_equipment(character)
+            
             party_members.append(character)
         
         # 파티 분석
@@ -1091,7 +1095,7 @@ class AutoPartyBuilder:
         print(f"  최대값: {BLUE}{mechanic['max']}{RESET}")
         print(f"  설명: {WHITE}{mechanic['description']}{RESET}")
 
-    def create_balanced_party(self, user_selected: List[str] = None, party_size: int = 4, auto_select_traits: bool = True) -> List[Character]:
+    def create_balanced_party(self, user_selected: List[str] = None, party_size: int = 4, auto_select_traits: bool = False) -> List[Character]:
         """밸런스 잡힌 파티 생성 (개선된 다양성 알고리즘)"""
         if user_selected is None:
             user_selected = []
@@ -1139,9 +1143,21 @@ class AutoPartyBuilder:
         
         for i, class_name in enumerate(party_classes):
             character = self._create_character(class_name, i + 1)
-            # 특성 자동 선택 (옵션)
+            
+            # 이름 커스터마이징 (auto_select_traits가 False인 경우)
+            if not auto_select_traits:
+                self._allow_name_customization(character)
+            
+            # 특성 선택 처리
             if auto_select_traits:
                 self._auto_select_passives(character)
+            else:
+                # 사용자가 직접 특성 선택
+                self._manual_select_passives(character)
+                
+            # 시작 장비 제공
+            self._provide_starting_equipment(character)
+            
             party_members.append(character)
         
         # 파티 분석 및 시너지 확인
@@ -1738,8 +1754,8 @@ class AutoPartyBuilder:
     def select_party_passive_effects(self):
         """파티 전체 패시브 효과 선택 - main.py와 동일한 시스템"""
         try:
-            from .cursor_menu_system import CursorMenu
-            from .color_text import bright_cyan, bright_yellow, yellow, green, red, bright_white, cyan, white
+            from game.cursor_menu_system import CursorMenu
+            from game.color_text import bright_cyan, bright_yellow, yellow, green, red, bright_white, cyan, white
             
             # 🌟 완전 리메이크된 창의적 패시브 시스템 (1-10 코스트, 최대 3개 제한)
             all_passive_effects = [
@@ -2284,7 +2300,7 @@ class AutoPartyBuilder:
     def _update_difficulty_scaling(self, party: List[Character]):
         """파티에 맞춰 적 난이도 스케일링 업데이트"""
         try:
-            from .dynamic_enemy_scaling import update_difficulty_for_party, show_current_difficulty
+            from game.dynamic_enemy_scaling import update_difficulty_for_party, show_current_difficulty
             
             # 파티 분석 업데이트
             update_difficulty_for_party(party)
@@ -2400,7 +2416,7 @@ class AutoPartyBuilder:
                 char_info = unique_characters[index]
                 try:
                     # 저장된 데이터에서 캐릭터 복원
-                    from .save_system import GameStateSerializer
+                    from game.save_system import GameStateSerializer
                     character = GameStateSerializer.deserialize_character(char_info['original_data'])
                     if character:
                         party.append(character)
@@ -2449,7 +2465,7 @@ class AutoPartyBuilder:
                     elif hasattr(character.inventory, 'add_item'):
                         # Inventory 객체인 경우 - 직접 추가 (fallback)
                         try:
-                            from .items import Item, ItemType, ItemRarity
+                            from game.items import Item, ItemType, ItemRarity
                             inventory_item = Item(item['name'], ItemType.EQUIPMENT, ItemRarity.COMMON, 
                                                 item.get('description', '장비 아이템'))
                             character.inventory.add_item(inventory_item)
@@ -2477,7 +2493,7 @@ class AutoPartyBuilder:
                     elif hasattr(character.inventory, 'add_item'):
                         # Inventory 객체인 경우 - 직접 추가 (fallback)
                         try:
-                            from .items import Item, ItemType, ItemRarity
+                            from game.items import Item, ItemType, ItemRarity
                             inventory_item = Item(item['name'], ItemType.CONSUMABLE, ItemRarity.COMMON, 
                                                 item.get('description', '소비 아이템'))
                             character.inventory.add_item(inventory_item)
@@ -2605,6 +2621,528 @@ class AutoPartyBuilder:
         
         # 기본값은 무기로 처리
         return "무기"
+    
+    def _manual_select_passives(self, character: Character):
+        """사용자가 직접 특성 선택 - 커서 메뉴 방식"""
+        print(f"\n{CYAN}=== {character.name}({character.character_class})의 특성 선택 ==={RESET}")
+        
+        # 특성 시스템이 있는지 확인
+        try:
+            from game.character import CharacterClassManager
+            from game.cursor_menu_system import CursorMenu
+            
+            available_traits = CharacterClassManager.get_class_traits(character.character_class)
+            
+            if not available_traits:
+                print(f"{YELLOW}사용 가능한 특성이 없습니다.{RESET}")
+                return
+            
+            # 커서 메뉴용 옵션 구성
+            options = []
+            for trait in available_traits:
+                options.append({
+                    'text': trait.name,
+                    'detail': trait.description
+                })
+            
+            # 건너뛰기 옵션 추가
+            options.append({
+                'text': '특성 없이 계속',
+                'detail': '특성을 선택하지 않고 진행합니다'
+            })
+            
+            # 커서 메뉴 표시
+            menu = CursorMenu(
+                title=f"{character.name}의 특성 선택",
+                options=options,
+                descriptions=[opt['detail'] for opt in options],
+                screen_width=100,
+                screen_height=30
+            )
+            
+            choice = menu.display()
+            
+            if choice < len(available_traits):
+                selected_trait = available_traits[choice]
+                character.traits = [selected_trait]
+                print(f"\n{GREEN}✅ '{selected_trait.name}' 특성이 선택되었습니다!{RESET}")
+            else:
+                print(f"\n{CYAN}특성 선택을 건너뛰었습니다.{RESET}")
+                    
+        except Exception as e:
+            print(f"{YELLOW}특성 시스템을 로드할 수 없습니다: {e}{RESET}")
+            print(f"{CYAN}특성 없이 계속 진행합니다.{RESET}")
+    
+    def _provide_starting_equipment(self, character: Character):
+        """캐릭터에게 시작 장비 제공"""
+        try:
+            # 시작 아이템 생성 (랜덤 2개 장비 + 1-3개 소모품)
+            starting_items = self._generate_starting_items_for_class(character.character_class)
+            
+            if starting_items:
+                print(f"\n{GREEN}✅ {character.name}에게 시작 장비를 제공합니다:{RESET}")
+                
+                # 인벤토리 초기화 (없는 경우)
+                if not hasattr(character, 'inventory') or character.inventory is None:
+                    from game.items import Inventory
+                    character.inventory = Inventory()
+                
+                # 장비 아이템 추가 및 자동 장착
+                equipment_for_auto_equip = []
+                for item in starting_items.get("equipment", []):
+                    # Item 객체로 변환하여 인벤토리에 추가
+                    from game.items import Item, ItemType, ItemRarity
+                    
+                    # 아이템 타입 결정
+                    item_type_str = item.get('type', '장비')
+                    if item_type_str == '무기':
+                        item_type = ItemType.WEAPON
+                    elif item_type_str == '방어구':
+                        item_type = ItemType.ARMOR
+                    elif item_type_str == '장신구':
+                        item_type = ItemType.ACCESSORY
+                    else:
+                        item_type = ItemType.WEAPON  # 기본값
+                    
+                    item_obj = Item(
+                        name=item.get('name', '알 수 없는 장비'),
+                        item_type=item_type,
+                        rarity=ItemRarity.COMMON,
+                        description=f"{character.character_class} 전용 시작 장비",
+                        weight=1.0,
+                        value=10
+                    )
+                    
+                    # 아이템 스탯 설정
+                    if item.get('attack'):
+                        item_obj.stats['공격력'] = item['attack']
+                    if item.get('defense'):
+                        item_obj.stats['방어력'] = item['defense']
+                    
+                    if character.inventory.add_item(item_obj):
+                        print(f"  📦 {item.get('name', '알 수 없는 장비')} 획득!")
+                        equipment_for_auto_equip.append(item)
+                    else:
+                        print(f"  ❌ {item.get('name', '알 수 없는 장비')} 추가 실패 (인벤토리 가득참)")
+                
+                # 소모품 추가
+                for item in starting_items.get("consumables", []):
+                    from game.items import Item, ItemType, ItemRarity
+                    item_obj = Item(
+                        name=item.get('name', '알 수 없는 소모품'),
+                        item_type=ItemType.CONSUMABLE,
+                        rarity=ItemRarity.COMMON,
+                        description=f"유용한 소모품",
+                        weight=0.1,
+                        value=5
+                    )
+                    
+                    if character.inventory.add_item(item_obj):
+                        print(f"  🧪 {item.get('name', '알 수 없는 소모품')} 획득!")
+                    else:
+                        print(f"  ❌ {item.get('name', '알 수 없는 소모품')} 추가 실패 (인벤토리 가득함)")
+                
+                # 자동 장착 시도
+                if equipment_for_auto_equip:
+                    self._auto_equip_starting_items(character, equipment_for_auto_equip)
+                
+            else:
+                print(f"{YELLOW}⚠️ {character.character_class}에 대한 시작 장비가 없습니다.{RESET}")
+                
+        except Exception as e:
+            print(f"{YELLOW}⚠️ 시작 장비 제공 중 오류: {e}{RESET}")
+            import traceback
+            traceback.print_exc()
+    
+    def _generate_starting_items_for_class(self, character_class: str) -> Dict[str, List[Dict]]:
+        """직업별 시작 아이템 생성 (2개 장비 + 1-3개 소모품)"""
+        import random
+        
+        # 직업별 장비 카테고리 매핑
+        class_equipment_map = {
+            # 전투 직업군
+            "전사": {"weapon": ["검", "도끼", "망치"], "armor": ["판금갑옷", "사슬갑옷"], "accessory": ["전사의 반지"]},
+            "아크메이지": {"weapon": ["지팡이", "완드"], "armor": ["마법사 로브"], "accessory": ["마력의 목걸이"]},
+            "궁수": {"weapon": ["활", "석궁"], "armor": ["가죽갑옷"], "accessory": ["정확성의 반지"]},
+            "도적": {"weapon": ["단검", "단검"], "armor": ["경량갑옷"], "accessory": ["민첩의 반지"]},
+            "성기사": {"weapon": ["성검", "성스러운 창"], "armor": ["성기사 갑옷"], "accessory": ["성스러운 목걸이"]},
+            "암흑기사": {"weapon": ["암흑검", "저주받은 도끼"], "armor": ["암흑갑옷"], "accessory": ["어둠의 반지"]},
+            "몽크": {"weapon": ["권투글러브", "철제 건틀릿"], "armor": ["수도복"], "accessory": ["집중의 팔찌"]},
+            "바드": {"weapon": ["하프", "류트"], "armor": ["음유시인 옷"], "accessory": ["음악의 반지"]},
+            
+            # 마법 직업군
+            "네크로맨서": {"weapon": ["해골 지팡이", "부패의 완드"], "armor": ["네크로맨서 로브"], "accessory": ["언데드의 목걸이"]},
+            "용기사": {"weapon": ["용검", "드래곤 창"], "armor": ["용비늘 갑옷"], "accessory": ["용의 심장"]},
+            "검성": {"weapon": ["영검", "기검"], "armor": ["검성 도복"], "accessory": ["검기의 반지"]},
+            "정령술사": {"weapon": ["정령 지팡이", "원소 완드"], "armor": ["정령술사 로브"], "accessory": ["원소의 목걸이"]},
+            "시간술사": {"weapon": ["시공 지팡이", "시간의 완드"], "armor": ["시간술사 로브"], "accessory": ["시간의 반지"]},
+            "연금술사": {"weapon": ["연금술 지팡이", "실험 도구"], "armor": ["연금술사 코트"], "accessory": ["연금의 반지"]},
+            "차원술사": {"weapon": ["차원 지팡이", "공간 완드"], "armor": ["차원술사 로브"], "accessory": ["차원의 목걸이"]},
+            "마검사": {"weapon": ["마검", "마도검"], "armor": ["마검사 갑옷"], "accessory": ["마력의 반지"]},
+            "기계공학자": {"weapon": ["기계 권총", "레이저 건"], "armor": ["기계 갑옷"], "accessory": ["기계의 팔찌"]},
+            "무당": {"weapon": ["영혼 지팡이", "제례용 칼"], "armor": ["무당 의복"], "accessory": ["영혼의 목걸이"]},
+            
+            # 특수 직업군
+            "암살자": {"weapon": ["암살 단검", "독 칼"], "armor": ["암살자 의복"], "accessory": ["그림자의 반지"]},
+            "해적": {"weapon": ["해적 도", "곡도"], "armor": ["해적 코트"], "accessory": ["해적의 목걸이"]},
+            "사무라이": {"weapon": ["카타나", "와키자시"], "armor": ["사무라이 갑옷"], "accessory": ["명예의 반지"]},
+            "드루이드": {"weapon": ["자연 지팡이", "나무 창"], "armor": ["드루이드 로브"], "accessory": ["자연의 목걸이"]},
+            "철학자": {"weapon": ["지혜의 지팡이", "논리의 완드"], "armor": ["철학자 로브"], "accessory": ["지혜의 반지"]},
+            "검투사": {"weapon": ["글라디우스", "트라이던트"], "armor": ["검투사 갑옷"], "accessory": ["투기의 반지"]},
+            "기사": {"weapon": ["기사 창", "롱소드"], "armor": ["기사 갑옷"], "accessory": ["기사의 반지"]},
+            "신관": {"weapon": ["성스러운 메이스", "축복의 지팡이"], "armor": ["신관 로브"], "accessory": ["신성의 목걸이"]},
+            "광전사": {"weapon": ["광전사 도끼", "파괴의 망치"], "armor": ["광전사 갑옷"], "accessory": ["광기의 반지"]}
+        }
+        
+        # 공통 소모품
+        consumables = [
+            {"name": "체력 포션", "type": "소모품", "effect": "HP 회복", "value": 50},
+            {"name": "마나 포션", "type": "소모품", "effect": "MP 회복", "value": 30},
+            {"name": "해독제", "type": "소모품", "effect": "독 치료", "value": 1},
+            {"name": "상처 연고", "type": "소모품", "effect": "상처 치료", "value": 25},
+            {"name": "힘의 물약", "type": "소모품", "effect": "공격력 증가", "value": 10}
+        ]
+        
+        # 직업에 맞는 장비 선택
+        equipment_data = class_equipment_map.get(character_class, class_equipment_map["전사"])
+        starting_equipment = []
+        
+        # 무기 1개 랜덤 선택
+        if equipment_data.get("weapon"):
+            weapon_name = random.choice(equipment_data["weapon"])
+            starting_equipment.append({
+                "name": weapon_name,
+                "type": "무기",
+                "attack": random.randint(8, 15),
+                "durability": 100,
+                "class_specific": character_class
+            })
+        
+        # 방어구 1개 랜덤 선택
+        if equipment_data.get("armor"):
+            armor_name = random.choice(equipment_data["armor"])
+            starting_equipment.append({
+                "name": armor_name,
+                "type": "방어구", 
+                "defense": random.randint(5, 12),
+                "durability": 100,
+                "class_specific": character_class
+            })
+        
+        # 소모품 1-3개 랜덤 선택
+        starting_consumables = random.sample(consumables, random.randint(1, 3))
+        
+        return {
+            "equipment": starting_equipment,
+            "consumables": starting_consumables
+        }
+    
+    def _ai_assisted_select_passives(self, character: Character, user_tags: List[str]):
+        """AI 힌트와 함께 특성 선택"""
+        print(f"\n{CYAN}=== {character.name}({character.character_class})의 특성 선택 (AI 추천) ==={RESET}")
+        
+        try:
+            from game.character import CharacterClassManager
+            available_traits = CharacterClassManager.get_class_traits(character.character_class)
+            
+            if not available_traits:
+                print(f"{YELLOW}사용 가능한 특성이 없습니다.{RESET}")
+                return
+            
+            # AI 추천 점수 계산
+            trait_scores = {}
+            for trait in available_traits:
+                score = self._calculate_trait_ai_score(trait, user_tags)
+                trait_scores[trait.name] = score
+            
+            # 점수 순으로 정렬
+            sorted_traits = sorted(available_traits, key=lambda t: trait_scores[t.name], reverse=True)
+            
+            print(f"{GREEN}AI 추천 특성 (추천도 순):{RESET}")
+            for i, trait in enumerate(sorted_traits):
+                score = trait_scores[trait.name]
+                stars = "★" * min(5, max(1, int(score / 20)))
+                print(f"  [{i+1}] {trait.name}: {trait.description}")
+                print(f"      {YELLOW}AI 추천도: {stars} ({score:.0f}점){RESET}")
+            
+            print(f"\n{YELLOW}특성을 선택하세요 (1-{len(sorted_traits)}, 0=AI 자동 선택):{RESET}")
+            
+            while True:
+                try:
+                    choice = input("특성 번호: ").strip()
+                    if choice == "0" or choice == "":
+                        # AI 자동 선택 (가장 높은 점수)
+                        selected_trait = sorted_traits[0]
+                        character.traits = [selected_trait]
+                        print(f"{GREEN}🤖 AI가 '{selected_trait.name}'을(를) 자동 선택했습니다!{RESET}")
+                        break
+                    
+                    trait_index = int(choice) - 1
+                    if 0 <= trait_index < len(sorted_traits):
+                        selected_trait = sorted_traits[trait_index]
+                        character.traits = [selected_trait]
+                        print(f"{GREEN}✅ '{selected_trait.name}' 특성이 선택되었습니다!{RESET}")
+                        break
+                    else:
+                        print(f"{RED}잘못된 번호입니다. 1-{len(sorted_traits)} 사이의 숫자를 입력하세요.{RESET}")
+                        
+                except ValueError:
+                    print(f"{RED}숫자를 입력하세요.{RESET}")
+                except KeyboardInterrupt:
+                    print(f"\n{YELLOW}특성 선택을 취소했습니다.{RESET}")
+                    break
+                    
+        except Exception as e:
+            print(f"{YELLOW}특성 시스템을 로드할 수 없습니다: {e}{RESET}")
+            print(f"{CYAN}특성 없이 계속 진행합니다.{RESET}")
+    
+    def _calculate_trait_ai_score(self, trait: 'CharacterTrait', user_tags: List[str]) -> float:
+        """특성에 대한 AI 추천 점수 계산"""
+        score = 50.0  # 기본 점수
+        
+        # 사용자 태그에 따른 점수 조정
+        trait_name_lower = trait.name.lower()
+        trait_desc_lower = trait.description.lower()
+        
+        for tag in user_tags:
+            tag_lower = tag.lower()
+            
+            # 태그와 특성 이름/설명 매칭
+            if tag_lower in trait_name_lower or tag_lower in trait_desc_lower:
+                score += 30
+            
+            # 특정 태그에 따른 추가 점수
+            if tag == "공격적" and ("공격" in trait_desc_lower or "피해" in trait_desc_lower):
+                score += 25
+            elif tag == "방어적" and ("방어" in trait_desc_lower or "보호" in trait_desc_lower):
+                score += 25
+            elif tag == "전략적" and ("스택" in trait_desc_lower or "효과" in trait_desc_lower):
+                score += 20
+            elif tag == "협력적" and ("아군" in trait_desc_lower or "파티" in trait_desc_lower):
+                score += 20
+        
+        # 특성 타입에 따른 기본 점수
+        if hasattr(trait, 'effect_type'):
+            if trait.effect_type == "passive":
+                score += 10  # 패시브는 항상 유용
+            elif trait.effect_type == "trigger":
+                score += 15  # 트리거는 더 강력
+        
+        return min(100, max(0, score))
+    
+    def _allow_name_customization(self, character: Character):
+        """캐릭터 이름 커스터마이징 - 이름 풀에서 선택"""
+        print(f"\n{CYAN}=== 캐릭터 이름 설정 ==={RESET}")
+        print(f"현재 이름: {GREEN}{character.name}{RESET} ({character.character_class})")
+        
+        try:
+            from game.unified_name_pools import NAME_POOLS, get_random_name, detect_gender_from_name
+            from game.cursor_menu_system import CursorMenu
+            import random
+            
+            # 현재 이름으로 성별 감지
+            current_gender = detect_gender_from_name(character.name)
+            
+            # 같은 성별 이름들만 15개 선택
+            same_gender_names = random.sample(NAME_POOLS["western"][current_gender], min(15, len(NAME_POOLS["western"][current_gender])))
+            
+            # 커서 메뉴 옵션 구성
+            options = []
+            
+            # 현재 이름 유지 옵션
+            options.append({
+                'text': f'현재 이름 유지: {character.name}',
+                'detail': f'{character.character_class}에게 어울리는 현재 이름을 그대로 사용합니다'
+            })
+            
+            # 같은 성별 이름들
+            for name in same_gender_names:
+                if name != character.name:  # 현재 이름과 다른 것만
+                    options.append({
+                        'text': f'{name}',
+                        'detail': f'{character.character_class}에게 어울리는 {current_gender} 이름입니다'
+                    })
+            
+            # 랜덤 리롤 옵션
+            options.append({
+                'text': '🎲 다른 이름들 보기',
+                'detail': '새로운 랜덤 이름 목록을 다시 생성합니다'
+            })
+            
+            # 직접 입력 옵션
+            options.append({
+                'text': '✏️ 직접 입력',
+                'detail': '원하는 이름을 직접 입력합니다'
+            })
+            
+            while True:
+                # 커서 메뉴 표시
+                menu = CursorMenu(
+                    title=f"{character.name}의 이름 선택",
+                    options=options,
+                    descriptions=[opt['detail'] for opt in options],
+                    screen_width=100,
+                    screen_height=25
+                )
+                
+                choice = menu.display()
+                
+                if choice == 0:  # 현재 이름 유지
+                    print(f"{CYAN}기존 이름 '{character.name}'을 유지합니다.{RESET}")
+                    break
+                elif choice == len(options) - 2:  # 리롤
+                    # 새로운 이름 목록 생성
+                    same_gender_names = random.sample(NAME_POOLS["western"][current_gender], min(15, len(NAME_POOLS["western"][current_gender])))
+                    
+                    # 옵션 다시 구성 (첫 번째와 마지막 두 개는 고정)
+                    options = options[:1] + options[-2:]  # 첫 번째, 리롤, 직접입력만 유지
+                    
+                    # 새 이름들 추가
+                    new_options = []
+                    for name in same_gender_names:
+                        if name != character.name:
+                            new_options.append({
+                                'text': f'{name}',
+                                'detail': f'{character.character_class}에게 어울리는 {current_gender} 이름입니다'
+                            })
+                    
+                    # 새 옵션들을 중간에 삽입
+                    options = options[:1] + new_options + options[1:]
+                    print(f"{GREEN}🎲 새로운 이름 목록을 생성했습니다!{RESET}")
+                    continue
+                    
+                elif choice == len(options) - 1:  # 직접 입력
+                    print(f"{YELLOW}새로운 이름을 입력하세요:{RESET}")
+                    new_name = input("새 이름: ").strip()
+                    if new_name and new_name != character.name:
+                        character.name = new_name
+                        print(f"{GREEN}✅ 이름이 '{new_name}'으로 변경되었습니다!{RESET}")
+                        break
+                    else:
+                        print(f"{YELLOW}올바른 이름을 입력하지 않았습니다.{RESET}")
+                        continue
+                        
+                else:  # 이름 선택
+                    selected_option = options[choice]
+                    # 이름 추출
+                    new_name = selected_option['text']
+                    if new_name != character.name:
+                        character.name = new_name
+                        print(f"{GREEN}✅ 이름이 '{new_name}'으로 변경되었습니다!{RESET}")
+                    else:
+                        print(f"{CYAN}기존 이름을 유지합니다.{RESET}")
+                    break
+            
+        except KeyboardInterrupt:
+            print(f"\n{CYAN}이름 변경을 취소했습니다.{RESET}")
+        except Exception as e:
+            print(f"{YELLOW}이름 선택 중 오류 발생: {e}{RESET}")
+            print(f"{CYAN}기존 이름을 유지합니다.{RESET}")
+    
+    def create_random_party(self, party_size: int = 4) -> List[Character]:
+        """완전 랜덤 파티 생성"""
+        print(f"\n{CYAN}=== 랜덤 파티 생성 시작 ==={RESET}")
+        
+        # 사용된 이름 초기화
+        self._used_names = set()
+        
+        # 랜덤으로 직업 선택
+        import random
+        selected_classes = random.sample(self.ALL_CLASSES, min(party_size, len(self.ALL_CLASSES)))
+        
+        print(f"{GREEN}랜덤 선택된 직업들: {', '.join(selected_classes)}{RESET}")
+        
+        party_members = []
+        
+        for i, class_name in enumerate(selected_classes):
+            character = self._create_character(class_name, i + 1)
+            
+            # 랜덤으로 특성 선택 (50% 확률)
+            if random.choice([True, False]):
+                self._auto_select_passives(character)
+            
+            # 시작 장비 제공
+            self._provide_starting_equipment(character)
+            
+            party_members.append(character)
+        
+        print(f"{GREEN}✅ 랜덤 파티 생성 완료!{RESET}")
+        return party_members
+    
+    def _manual_select_passives_with_ai_hints(self, character: Character, user_tags: List[str], trait_scores: Dict[str, int]):
+        """AI 힌트와 함께 사용자가 직접 특성 선택 - 커서 메뉴 방식"""
+        print(f"\n{CYAN}=== {character.name}({character.character_class})의 특성 선택 ==={RESET}")
+        
+        try:
+            from game.trait_system import get_trait_system
+            from game.cursor_menu_system import CursorMenu
+            trait_system = get_trait_system()
+            available_traits = trait_system.get_available_traits(character.character_class)
+            
+            if not available_traits:
+                print(f"{YELLOW}사용 가능한 특성이 없습니다.{RESET}")
+                return
+            
+            # AI 추천 특성 계산
+            recommended_traits = []
+            for trait in available_traits:
+                trait_name = trait.get('name', '')
+                if trait_name in trait_scores:
+                    recommended_traits.append((trait, trait_scores[trait_name]))
+            
+            # 점수 순으로 정렬
+            recommended_traits.sort(key=lambda x: x[1], reverse=True)
+            recommended_trait_names = [t[0].get('name', '') for t in recommended_traits[:3]]
+            
+            # 커서 메뉴용 옵션 구성
+            options = []
+            descriptions = []
+            
+            for trait in available_traits:
+                trait_name = trait.get('name', '')
+                trait_desc = trait.get('description', '')
+                
+                # AI 추천 특성인지 확인
+                if trait_name in recommended_trait_names:
+                    display_name = f"🤖⭐ {trait_name}"
+                    description = f"[AI 추천] {trait_desc}"
+                else:
+                    display_name = trait_name
+                    description = trait_desc
+                
+                options.append({'text': display_name, 'detail': description})
+                descriptions.append(description)
+            
+            # 건너뛰기 옵션 추가
+            options.append({'text': '특성 없이 계속', 'detail': '특성을 선택하지 않고 진행합니다'})
+            descriptions.append('특성을 선택하지 않고 진행합니다')
+            
+            # 커서 메뉴 표시
+            menu = CursorMenu(
+                title=f"{character.name}의 특성 선택 (🤖 = AI 추천)",
+                options=options,
+                descriptions=descriptions,
+                screen_width=100,
+                screen_height=30
+            )
+            
+            choice = menu.display()
+            
+            if choice < len(available_traits):
+                selected_trait = available_traits[choice]
+                character.traits = [selected_trait]
+                
+                trait_name = selected_trait.get('name', '')
+                if trait_name in recommended_trait_names:
+                    print(f"\n{GREEN}✅ AI 추천 특성 '{trait_name}'을 선택했습니다! 🤖⭐{RESET}")
+                else:
+                    print(f"\n{GREEN}✅ '{trait_name}' 특성이 선택되었습니다!{RESET}")
+            else:
+                print(f"\n{CYAN}특성 선택을 건너뛰었습니다.{RESET}")
+                    
+        except Exception as e:
+            print(f"{YELLOW}특성 시스템을 로드할 수 없습니다: {e}{RESET}")
+            print(f"{CYAN}특성 없이 계속 진행합니다.{RESET}")
 
 # 전역 자동 파티 빌더 인스턴스
 auto_party_builder = AutoPartyBuilder()

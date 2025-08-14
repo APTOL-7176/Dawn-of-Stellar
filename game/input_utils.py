@@ -33,7 +33,7 @@ class KeyboardInput:
         # 오디오 매니저 자동 설정
         if not sound_manager:
             try:
-                from .audio_system import get_audio_manager
+                from game.audio_system import get_audio_manager
                 self.sound_manager = get_audio_manager()
             except ImportError:
                 self.sound_manager = None

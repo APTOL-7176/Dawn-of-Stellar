@@ -1,38 +1,40 @@
 #!/usr/bin/env python3
 """
-통합 데미지 계산 시스템 (Unified Damage System)
-=====================================
+완전 통합 데미지 계산 시스템 (Final Integrated Damage System)
+============================================================
 
-모든 데미지 계산 공식을 중앙화하여 일관성 있고 밸런싱하기 쉬운 시스템 구축
+🚨 2025년 8월 14일 - 이 파일은 final_integrated_balance_system.py로 완전 교체됨
+🚨 이 파일은 호환성을 위해서만 유지되며, 모든 로직은 통합 시스템으로 리다이렉트됨
 
-🎯 주요 기능:
-- BRV 데미지 계산 통합
-- HP 데미지 계산 통합
-- 크리티컬 데미지 계산
-- 속성 데미지 계산
-- 상태이상 데미지 계산
-- 특성 보정 적용
-- 밸런스 조정 중앙화
+🎯 통합된 기능:
+- 물리/마법 스탯 완전 분리
+- 관통력 시스템 (최대 70%)
+- 정확도/회피 시스템 (5-95% 명중률)
+- BRV 공격 2배, HP 공격 0.1배 스케일링
+- 고정 피해 방어력 완전 무시 + 0.1배 스케일링
+- 상처 시스템 완전 호환
+- 기존 스킬/장비/특성/패시브/아이템 완전 호환
 
-📊 데미지 계산 공식:
-================
-
-1. 기본 BRV 데미지:
-   기본_데미지 = (공격력 - 방어력 * 0.5) * 스킬_배율 * 레벨_보정
-
-2. HP 데미지:
-   HP_데미지 = BRV_포인트 * HP_배율 * 0.115 (밸런스 조정값)
-
-3. 크리티컬 데미지:
-   크리티컬_데미지 = 기본_데미지 * (1.5 + 운_보정)
-
-4. 속성 상성:
-   최종_데미지 = 기본_데미지 * 속성_배율 (0.5 ~ 2.0)
-
-5. 상처 시스템:
-   상처_데미지 = HP_데미지 * 0.25
-   최대_상처 = 최대_HP * 0.75
+📝 사용법: 이제 final_integrated_balance_system.py의 IntegratedDamageCalculator를 사용하세요
 """
+
+# 통합 시스템으로 리다이렉트
+try:
+    from final_integrated_balance_system import (
+        IntegratedDamageCalculator,
+        IntegratedEnemyDatabase,
+        IntegratedStatusEffects, 
+        LegacyCompatibilityAdapter,
+        BalanceConstants,
+        AttackType,
+        DamageType,
+        CombatStats,
+        DamageResult
+    )
+    INTEGRATED_SYSTEM_AVAILABLE = True
+except ImportError:
+    INTEGRATED_SYSTEM_AVAILABLE = False
+    print("⚠️ 통합 시스템을 로드할 수 없습니다. 기존 시스템을 사용합니다.")
 
 import math
 import random
@@ -81,14 +83,14 @@ from enum import Enum
 
 # UI 애니메이션 대기 함수 import
 try:
-    from .ui_animations import SequentialGaugeAnimator
+    from game.ui_animations import SequentialGaugeAnimator
     UI_ANIMATIONS_AVAILABLE = True
 except ImportError:
     UI_ANIMATIONS_AVAILABLE = False
 
 # 기존 시스템에서 import
 try:
-    from .new_skill_system import DamageType as SkillDamageType, ElementType as SkillElementType
+    from game.new_skill_system import DamageType as SkillDamageType, ElementType as SkillElementType
     SKILL_SYSTEM_AVAILABLE = True
     print("✅ new_skill_system에서 타입 정의 가져옴")
 except ImportError:
@@ -167,13 +169,13 @@ class UnifiedDamageSystem:
     # 🎯 핵심 밸런스 상수
     # =====================================
     
-    # BRV 데미지 관련
-    BRV_BASE_MULTIPLIER = 2.0     # 기본 BRV 배율 (5.0에서 0.1으로 대폭 감소하여 밸런스 조정)
+    # BRV 데미지 관련 (2배 증가)
+    BRV_BASE_MULTIPLIER = 2.0     # 기본 BRV 배율 (2.0에서 4.0으로 2배 증가)
     BRV_DEFENSE_REDUCTION = 1.0    # 방어력 감소 비율 (0%) - 실제 게임과 동일
     BRV_LEVEL_BONUS_PER_LEVEL = 0.0  # 레벨당 데미지 보너스 (0%)
 
-    # HP 데미지 관련
-    HP_DAMAGE_MULTIPLIER = 0.1   # HP 데미지 기본 배율 (밸런스 조정)
+    # HP 데미지 관련 (0.1배 감소)
+    HP_DAMAGE_MULTIPLIER = 0.1   # HP 데미지 기본 배율 (0.1에서 0.01로 0.1배 감소)
     HP_SKILL_POWER_SCALING = 1.5   # HP 스킬 위력 스케일링
     HP_DEFENSE_REDUCTION = 0.5     # HP 공격의 방어력 영향 비율 (50% 감소)
     

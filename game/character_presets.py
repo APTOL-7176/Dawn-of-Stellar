@@ -7,8 +7,8 @@ import json
 import os
 from typing import List, Dict, Optional, Any
 from datetime import datetime
-from .character import Character
-from .auto_party_builder import AutoPartyBuilder
+from game.character import Character
+from game.auto_party_builder import AutoPartyBuilder
 
 class CharacterPresets:
     """캐릭터 프리셋 관리 클래스"""

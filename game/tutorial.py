@@ -4,8 +4,8 @@
 
 import time
 from typing import Dict, List, Optional
-from .ascii_effects import combat_animator, play_ascii_sound
-from .settings import game_settings
+from game.ascii_effects import combat_animator, play_ascii_sound
+from game.settings import game_settings
 
 
 class Tutorial:
@@ -499,7 +499,7 @@ class TutorialManager:
         
         # 키 입력 대기 추가
         try:
-            from .input_utils import wait_for_any_key
+            from game.input_utils import wait_for_any_key
             wait_for_any_key("\n계속하려면 아무 키나 누르세요...")
         except ImportError:
             input("\n계속하려면 Enter를 누르세요...")
@@ -577,7 +577,7 @@ class TutorialManager:
         
         # 키 입력 대기 추가
         try:
-            from .input_utils import wait_for_any_key
+            from game.input_utils import wait_for_any_key
             wait_for_any_key("\n계속하려면 아무 키나 누르세요...")
         except ImportError:
             input("\n계속하려면 Enter를 누르세요...")
@@ -612,7 +612,7 @@ class TutorialManager:
         
         # 키 입력 대기 추가
         try:
-            from .input_utils import wait_for_any_key
+            from game.input_utils import wait_for_any_key
             wait_for_any_key("\n계속하려면 아무 키나 누르세요...")
         except ImportError:
             input("\n계속하려면 Enter를 누르세요...")
@@ -681,7 +681,7 @@ class TutorialManager:
         
         # 키 입력 대기
         try:
-            from .input_utils import wait_for_any_key
+            from game.input_utils import wait_for_any_key
             wait_for_any_key("\n계속하려면 아무 키나 누르세요...")
         except ImportError:
             input("\n계속하려면 Enter를 누르세요...")
@@ -689,9 +689,9 @@ class TutorialManager:
     def show_tutorial_menu(self):
         """튜토리얼 메뉴 - 커서 네비게이션"""
         try:
-            from .cursor_menu_system import CursorMenu
-            from .input_utils import KeyboardInput
-            from .color_text import bright_cyan, bright_yellow, bright_green
+            from game.cursor_menu_system import CursorMenu
+            from game.input_utils import KeyboardInput
+            from game.color_text import bright_cyan, bright_yellow, bright_green
             
             keyboard = KeyboardInput()
             

@@ -2072,7 +2072,7 @@ def get_cooking_system():
 def show_recipe_collection():
     """해금된 레시피 컬렉션 확인 - 커서 방식"""
     try:
-        from .cursor_menu_system import create_simple_menu, MenuItem
+        from game.cursor_menu_system import create_simple_menu, MenuItem
         
         print("\n" + "="*80)
         print("🍳 레시피 컬렉션 - 발견한 레시피들")
@@ -2081,7 +2081,7 @@ def show_recipe_collection():
         if not cooking_system.discovered_recipes:
             print("\n아직 발견한 레시피가 없습니다.")
             print("요리를 시도해보세요!")
-            from .input_utils import KeyboardInput
+            from game.input_utils import KeyboardInput
             KeyboardInput().wait_for_key("아무 키나 눌러 계속...")
             return
         

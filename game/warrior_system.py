@@ -17,8 +17,8 @@ from dataclasses import dataclass
 
 # 기존 시스템에서 import
 try:
-    from .new_skill_system import StatusType
-    from .character import StatusEffect
+    from game.new_skill_system import StatusType
+    from game.character import StatusEffect
 except ImportError:
     # 테스트 환경에서는 더미 클래스 사용
     class StatusType:

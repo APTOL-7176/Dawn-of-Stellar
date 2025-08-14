@@ -12,14 +12,14 @@ from enum import Enum
 import time
 import copy
 
-from .brave_combat import BraveCombatSystem
-from .character import Character
-from .multiplayer_session import MultiplayerGameSession, get_multiplayer_session
-from .multiplayer_protocol import (
+from game.brave_combat import BraveCombatSystem
+from game.character import Character
+from game.multiplayer_session import MultiplayerGameSession, get_multiplayer_session
+from game.multiplayer_protocol import (
     GameMessage, GameMessageType, GameStateProtocol, GameStateConverter,
     CharacterState, CombatState
 )
-from .error_logger import log_debug, log_error, log_combat
+from game.error_logger import log_debug, log_error, log_combat
 
 class MultiplayerCombatPhase(Enum):
     """멀티플레이어 전투 단계"""

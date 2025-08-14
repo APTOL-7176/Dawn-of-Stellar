@@ -10,7 +10,7 @@ import threading
 import time
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
-from .chiptune_sfx import get_chiptune_sfx, play_chiptune_sound
+from game.chiptune_sfx import get_chiptune_sfx, play_chiptune_sound
 
 
 class AudioCategory(Enum):

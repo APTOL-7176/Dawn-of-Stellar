@@ -8,8 +8,8 @@ import time
 from typing import List, Dict, Optional, Tuple
 from enum import Enum
 
-from .ai_companion_system import AICompanion, AIPersonality, AIRequest, ai_mercenary_manager
-from .character import Character
+from game.ai_companion_system import AICompanion, AIPersonality, AIRequest, ai_mercenary_manager
+from game.character import Character
 
 def setup_ai_combat_mode(combat_system):
     """전투 시스템에 클래식 모드 설정"""
@@ -576,7 +576,7 @@ class AIGameModeManager:
         
         # 플레이어가 조작할 캐릭터 선택
         # 개선된 캐릭터 선택 시스템 사용
-        from .ai_character_selector import select_player_characters_with_cursor_menu
+        from game.ai_character_selector import select_player_characters_with_cursor_menu
         self.player_controlled_characters = select_player_characters_with_cursor_menu(party_members, controlled_count)
         
         # 나머지는 AI 동료로 설정
@@ -807,8 +807,8 @@ class AIGameModeManager:
         
         # 고급 AI 시스템 사용
         try:
-            from .smart_ai import SmartEnemyAI, AIPersonality
-            from .enemy_system import EnemyType
+            from game.smart_ai import SmartEnemyAI, AIPersonality
+            from game.enemy_system import EnemyType
             
             # 적의 성격 결정 (캐릭터 클래스나 타입에 따라)
             character_class = getattr(character, 'character_class', '전사')
@@ -862,7 +862,7 @@ class AIGameModeManager:
     
     def _determine_enemy_personality(self, character_class: str):
         """적의 성격 결정 - 실제 적 종류 기반"""
-        from .smart_ai import AIPersonality
+        from game.smart_ai import AIPersonality
         
         # 실제 적 종류에 따른 성격 매핑
         personality_map = {
@@ -1041,7 +1041,7 @@ class AIGameModeManager:
         elif action_chance < 0.9:
             # 스킬 사용 시도
             try:
-                from .new_skill_system import SkillDatabase
+                from game.new_skill_system import SkillDatabase
                 skill_db = SkillDatabase()
                 character_class = getattr(character, 'character_class', '전사')
                 skills = skill_db.get_skills(character_class)
@@ -1114,7 +1114,7 @@ class AIGameModeManager:
     
     def _select_and_use_skill(self, character: Character, party: List[Character], enemies: List[Character]):
         """스킬 선택 및 사용"""
-        from .new_skill_system import get_class_skills
+        from game.new_skill_system import get_class_skills
         character_class = getattr(character, 'character_class', '전사')
         skills = get_class_skills(character_class)
         
@@ -1171,7 +1171,7 @@ class AIGameModeManager:
         for item_name, quantity in character.inventory.get_items_list():
             if quantity > 0:
                 # 소모품인지 확인
-                from .items import ItemDatabase, ItemType
+                from game.items import ItemDatabase, ItemType
                 item_db = ItemDatabase()
                 item = item_db.get_item(item_name)
                 if item and item.item_type == ItemType.CONSUMABLE:
@@ -1559,7 +1559,7 @@ class AIGameModeManager:
         time.sleep(1.5)  # 대사 읽을 시간 제공
         
         # 협동 공격 애니메이션
-        from .ui_animations import show_coordination_attack_animation
+        from game.ui_animations import show_coordination_attack_animation
         show_coordination_attack_animation(character.name, partner.character.name)
         
         # 협동 공격 상태 해제
@@ -4054,7 +4054,7 @@ class BasicEquipmentManager:
         try:
             # ItemDatabase 가져오기 시도
             try:
-                from .items import ItemDatabase, ItemType
+                from game.items import ItemDatabase, ItemType
                 item_db = ItemDatabase()
             except ImportError:
                 print("❌ ItemDatabase를 불러올 수 없어 기본 장착 시스템을 사용합니다.")
@@ -4396,7 +4396,7 @@ class BasicEquipmentManager:
         recommendations = []
         
         try:
-            from .items import ItemDatabase
+            from game.items import ItemDatabase
             item_db = ItemDatabase()
             
             # 각 슬롯별 추천 아이템
@@ -4632,7 +4632,7 @@ def respond_to_ai_request(request):
     def _select_and_use_skill(self, character: Character, party: List[Character], enemies: List[Character]):
         """스킬 선택 및 사용 - 실제 스킬 시스템 통합"""
         try:
-            from .new_skill_system import get_class_skills
+            from game.new_skill_system import get_class_skills
             
             # 캐릭터의 직업별 스킬 가져오기
             character_class = getattr(character, 'character_class', '전사')
@@ -4739,7 +4739,7 @@ def respond_to_ai_request(request):
     def _select_and_use_item(self, character: Character, party: List[Character]):
         """아이템 선택 및 사용 - 실제 아이템 시스템 통합"""
         try:
-            from .items import ItemDatabase, ItemType
+            from game.items import ItemDatabase, ItemType
             item_db = ItemDatabase()
             
             # 캐릭터 인벤토리에서 사용 가능한 아이템 확인
@@ -4868,7 +4868,7 @@ def respond_to_ai_request(request):
     def _manage_equipment(self, character: Character, party: List[Character]):
         """장비 관리 시스템"""
         try:
-            from .equipment_system import get_equipment_manager
+            from game.equipment_system import get_equipment_manager
             equipment_manager = get_equipment_manager()
             
             print(f"\n🎒 {character.name}의 장비 관리")
@@ -4923,7 +4923,7 @@ def respond_to_ai_request(request):
     def _use_cooking_system(self, character: Character, party: List[Character]):
         """요리 시스템 사용"""
         try:
-            from .cooking_system import get_cooking_manager
+            from game.cooking_system import get_cooking_manager
             cooking_manager = get_cooking_manager()
             
             print(f"\n🍳 {character.name}의 요리 시스템")
@@ -4975,7 +4975,7 @@ def respond_to_ai_request(request):
     def _use_field_skill(self, character: Character, party: List[Character], enemies: List[Character]):
         """필드스킬 시스템 사용"""
         try:
-            from .field_skill_system import get_field_skill_manager
+            from game.field_skill_system import get_field_skill_manager
             field_skill_manager = get_field_skill_manager()
             
             print(f"\n🌟 {character.name}의 필드스킬")
@@ -5026,7 +5026,7 @@ def respond_to_ai_request(request):
     def _save_game_during_battle(self, character: Character, party: List[Character]):
         """전투 중 저장"""
         try:
-            from .save_system import get_save_manager
+            from game.save_system import get_save_manager
             save_manager = get_save_manager()
             
             print(f"\n💾 전투 중 저장")
@@ -5062,7 +5062,7 @@ def respond_to_ai_request(request):
     def _equip_unequip_items(self, character: Character):
         """장비 착용/해제 - 대폭 개선된 시스템"""
         try:
-            from .items import ItemDatabase, ItemType
+            from game.items import ItemDatabase, ItemType
             item_db = ItemDatabase()
             
             print(f"\n🎒 {character.name}의 장비 관리")

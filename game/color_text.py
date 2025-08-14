@@ -29,23 +29,27 @@ if os.name == 'nt':
         new_mode = mode.value | ENABLE_VIRTUAL_TERMINAL_PROCESSING
         kernel32.SetConsoleMode(handle, new_mode)
         
-        # PowerShell 환경 감지 및 강제 색상 활성화
-        if 'PSModulePath' in os.environ:
-            os.environ['FORCE_COLOR'] = '1'
+        # PowerShell, CMD, Windows Terminal 모두 강제 색상 활성화
+        os.environ['FORCE_COLOR'] = '1'
+        os.environ['COLORTERM'] = 'truecolor'
+        
+        print("🎨 ANSI 색상 지원 활성화됨")
             
     except Exception as e:
         # 폴백: 색상 비활성화
+        print(f"⚠️ 색상 활성화 실패: {e}")
         os.environ['NO_COLOR'] = '1'
-    
-    # Windows Terminal, ConEmu, PowerShell 감지
-    if any(env in os.environ for env in ['WT_SESSION', 'ConEmuANSI', 'PSModulePath']):
-        os.environ['FORCE_COLOR'] = '1'
 
-# 파워셸 환경에서 색상 문제 해결을 위한 전역 플래그
+# 파워셸 환경에서도 색상 강제 활성화
 POWERSHELL_DETECTED = 'PSModulePath' in os.environ
-# Windows Terminal에서는 PowerShell도 색상 지원 (WT_SESSION 체크)
 WINDOWS_TERMINAL = 'WT_SESSION' in os.environ
-COLOR_DISABLED = os.environ.get('NO_COLOR') == '1' or (POWERSHELL_DETECTED and not WINDOWS_TERMINAL)
+# 모든 Windows 환경에서 색상 활성화 시도
+COLOR_DISABLED = os.environ.get('NO_COLOR') == '1'
+
+# PowerShell에서도 색상 사용하도록 수정
+if POWERSHELL_DETECTED:
+    os.environ['FORCE_COLOR'] = '1'
+    COLOR_DISABLED = False
 
 
 class Color(Enum):

@@ -6,7 +6,7 @@ import random
 from typing import List, Dict, Optional, Tuple
 from enum import Enum
 
-from .character import Character
+from game.character import Character
 
 class ItemSharingPermission(Enum):
     """아이템 공유 권한"""
@@ -195,7 +195,7 @@ class PartyItemSharingSystem:
             return False
         
         try:
-            from .cursor_menu_system import create_simple_menu
+            from game.cursor_menu_system import create_simple_menu
             
             print(f"\n💬 AI 동료들의 아이템 사용 요청 ({len(self.pending_requests)}개):")
             print("="*60)

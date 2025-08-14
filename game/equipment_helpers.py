@@ -4,8 +4,8 @@
 """
 
 from typing import List, Dict, Optional
-from .ai_game_mode import basic_equipment_manager, auto_equip_for_basic_mode
-from .basic_mode_equipment import show_basic_mode_equipment_menu
+from game.ai_game_mode import basic_equipment_manager, auto_equip_for_basic_mode
+from game.basic_mode_equipment import show_basic_mode_equipment_menu
 
 def quick_auto_equip(character, inventory_items: List = None, show_results: bool = True) -> bool:
     """빠른 자동 장착 (메뉴 없이 바로 실행)"""

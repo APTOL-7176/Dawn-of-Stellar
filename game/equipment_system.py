@@ -14,7 +14,7 @@ from enum import Enum
 
 # balance_system import 오류 처리
 try:
-    from .balance_system import (
+    from game.balance_system import (
         EquipmentType, WeaponCategory, ArmorCategory, AccessoryCategory,
         ElementType, get_equipment_stats
     )

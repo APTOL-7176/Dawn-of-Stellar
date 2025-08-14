@@ -218,7 +218,7 @@ class CombatCalculator:
         # 원소 상성 적용 (있다면)
         if attack_element and defend_element:
             try:
-                from .elemental_system import calculate_elemental_damage
+                from game.elemental_system import calculate_elemental_damage
                 damage = calculate_elemental_damage(damage, attack_element, defend_element)
             except ImportError:
                 pass

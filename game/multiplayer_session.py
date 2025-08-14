@@ -13,14 +13,14 @@ import time
 import uuid
 import json
 
-from .multiplayer_network import P2PNetworkManager, get_network_manager, PlayerRole, MessageType
-from .multiplayer_protocol import (
+from game.multiplayer_network import P2PNetworkManager, get_network_manager, PlayerRole, MessageType
+from game.multiplayer_protocol import (
     GameMessage, GameMessageType, GameStateProtocol, GameStateConverter,
     MessageValidator, MessageQueue, get_message_queue,
     PlayerPosition, CharacterState, CombatState
 )
-from .character import Character
-from .error_logger import log_debug, log_error, log_system
+from game.character import Character
+from game.error_logger import log_debug, log_error, log_system
 
 class SessionState(Enum):
     """세션 상태"""

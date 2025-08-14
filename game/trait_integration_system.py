@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .trait_combat_integration import TraitCombatIntegrator as _Impl
+from game.trait_combat_integration import TraitCombatIntegrator as _Impl
 
 
 def get_trait_processor() -> _Impl:

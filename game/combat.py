@@ -5,8 +5,8 @@ ATB 전투 시스템 (Brave 시스템 통합)
 from typing import List, Optional, Tuple, Dict, Any
 import random
 import time
-from .character import Character
-from .brave_combat import BraveCombatSystem
+from game.character import Character
+from game.brave_combat import BraveCombatSystem
 
 
 class ItemEffectProcessor:
@@ -438,7 +438,7 @@ class CombatManager:
     
     def _select_enemy_skill_from_system(self, enemy: Character, target: Character) -> CombatAction:
         """적이 새로운 스킬 시스템에서 스킬 선택"""
-        from .new_skill_system import NewSkillSystem, SkillType
+        from game.new_skill_system import NewSkillSystem, SkillType
         
         skill_system = NewSkillSystem()
         
@@ -600,7 +600,7 @@ class CombatManager:
                 
     def select_skill(self, character: Character) -> Optional[CombatAction]:
         """스킬 선택 (새로운 스킬 시스템 연동)"""
-        from .new_skill_system import NewSkillSystem
+        from game.new_skill_system import NewSkillSystem
         
         skill_system = NewSkillSystem()
         character_skills = skill_system.get_skills_by_class(character.character_class)
@@ -648,7 +648,7 @@ class CombatManager:
     
     def create_skill_action(self, character: Character, skill: dict) -> Optional[CombatAction]:
         """스킬 데이터로부터 전투 액션 생성"""
-        from .new_skill_system import SkillType, TargetType, DamageType
+        from game.new_skill_system import SkillType, TargetType, DamageType
         
         skill_type = skill.get("type")
         target_type = skill.get("target")
@@ -681,7 +681,7 @@ class CombatManager:
     def play_skill_sfx(self, skill: dict):
         """스킬 SFX 재생 (FFVII 효과음 사용)"""
         try:
-            from .audio import get_unified_audio_system
+            from game.audio import get_unified_audio_system
             
             audio_system = get_unified_audio_system()
             skill_name = skill.get("name", "")
@@ -797,7 +797,7 @@ class CombatManager:
     
     def execute_new_skill(self, actor: Character, action: CombatAction):
         """새로운 스킬 시스템 스킬 실행"""
-        from .new_skill_system import SkillType, TargetType, DamageType, PenetrationType
+        from game.new_skill_system import SkillType, TargetType, DamageType, PenetrationType
         
         skill = action.skill_data
         skill_name = skill["name"]
@@ -841,7 +841,7 @@ class CombatManager:
             self.log(f"  → {actor.name}의 공격이 빗나갔습니다!")
             # 빗나감 효과음
             try:
-                from .audio import get_unified_audio_system
+                from game.audio import get_unified_audio_system
                 get_unified_audio_system().play_sfx("miss")  # 4 - Missed Hit
             except:
                 pass
@@ -854,7 +854,7 @@ class CombatManager:
         brv_power = skill.get("brv_power", 100)
         
         # 데미지 타입 가져오기
-        from .new_skill_system import DamageType
+        from game.new_skill_system import DamageType
         damage_type = skill.get("damage_type", DamageType.PHYSICAL)
         
         # 데미지 계산 (BRV 공격은 일반적으로 낮은 피해)
@@ -867,7 +867,7 @@ class CombatManager:
         if is_critical:
             self.log(f"  → {actor.name}의 크리티컬! {target.name}에게 {actual_damage} {damage_type_str} 데미지!")
             try:
-                from .audio import get_unified_audio_system
+                from game.audio import get_unified_audio_system
                 get_unified_audio_system().play_sfx("critical_hit")  # 26 - Cloud Critical Sword Hit
             except:
                 pass
@@ -896,7 +896,7 @@ class CombatManager:
         actual_damage = target.take_damage(base_damage)
         
         # 데미지 타입 가져오기
-        from .new_skill_system import DamageType
+        from game.new_skill_system import DamageType
         damage_type = skill.get("damage_type", DamageType.PHYSICAL)
         damage_type_str = self.get_damage_type_string(damage_type)
         self.log(f"  → {target.name}에게 {actual_damage} {damage_type_str} 데미지!")
@@ -921,7 +921,7 @@ class CombatManager:
         brv_actual = target.take_damage(brv_damage)
         
         # 데미지 타입 가져오기
-        from .new_skill_system import DamageType
+        from game.new_skill_system import DamageType
         damage_type = skill.get("damage_type", DamageType.PHYSICAL)
         damage_type_str = self.get_damage_type_string(damage_type)
         self.log(f"  → {target.name}에게 {brv_actual} {damage_type_str} 데미지! (BRV)")
@@ -1080,7 +1080,7 @@ class CombatManager:
     
     def calculate_skill_damage(self, attacker: Character, target: Character, skill: dict, power_multiplier: float) -> int:
         """스킬 데미지 계산 (관통 시스템 포함)"""
-        from .new_skill_system import DamageType, PenetrationType, new_skill_system
+        from game.new_skill_system import DamageType, PenetrationType, new_skill_system
         
         # 스킬 시스템에서 전역 배수 적용
         global_multiplier = new_skill_system.skill_power_multiplier  # 1.5배
@@ -1325,7 +1325,7 @@ class CombatManager:
     
     def get_damage_type_string(self, damage_type) -> str:
         """데미지 타입을 문자열로 변환"""
-        from .new_skill_system import DamageType
+        from game.new_skill_system import DamageType
         
         if damage_type == DamageType.PHYSICAL:
             return "물리"
@@ -1338,7 +1338,7 @@ class CombatManager:
     
     def apply_skill_status_effects(self, caster: Character, target: Character, skill: dict):
         """스킬의 상태이상 효과 적용"""
-        from .new_skill_system import StatusType, get_status_icon
+        from game.new_skill_system import StatusType, get_status_icon
         
         status_effects = skill.get("status_effects", [])
         
@@ -1373,7 +1373,7 @@ class CombatManager:
     
     def _apply_status_effect_to_character(self, character: Character, status_type, duration: int, intensity: int = 1):
         """캐릭터에게 상태효과 적용"""
-        from .new_skill_system import StatusType
+        from game.new_skill_system import StatusType
         
         # 캐릭터의 상태효과 시스템이 없다면 임시 딕셔너리 생성
         if not hasattr(character, 'status_effects'):
@@ -1388,7 +1388,7 @@ class CombatManager:
     
     def process_status_effects(self, character: Character):
         """캐릭터의 상태효과 처리 (턴 시작/종료 시 호출)"""
-        from .new_skill_system import StatusType, get_status_icon
+        from game.new_skill_system import StatusType, get_status_icon
         
         if not hasattr(character, 'status_effects'):
             return
@@ -1416,7 +1416,7 @@ class CombatManager:
     
     def _apply_status_effect_tick(self, character: Character, status_type, intensity: int):
         """상태효과의 턴별 효과 적용"""
-        from .new_skill_system import StatusType
+        from game.new_skill_system import StatusType
         
         # 지속 피해 상태효과들
         damage_effects = {
@@ -1447,7 +1447,7 @@ class CombatManager:
     
     def get_character_status_display(self, character: Character) -> str:
         """캐릭터의 상태효과를 문자열로 표시"""
-        from .new_skill_system import get_status_icon
+        from game.new_skill_system import get_status_icon
         
         if not hasattr(character, 'status_effects') or not character.status_effects:
             return ""
@@ -1498,7 +1498,7 @@ class CombatManager:
             
     def _apply_skill_status_effects(self, attacker: Character, target: Character, skill_name: str):
         """스킬에 따른 상태이상 적용"""
-        from .new_skill_system import StatusType, get_status_icon
+        from game.new_skill_system import StatusType, get_status_icon
         
         # 스킬별 상태이상 효과 정의
         skill_effects = {
@@ -1535,7 +1535,7 @@ class CombatManager:
             self.log(f"  → {attacker.name}의 공격이 빗나갔습니다!")
             # 빗나감 효과음
             try:
-                from .audio import get_unified_audio_system
+                from game.audio import get_unified_audio_system
                 get_unified_audio_system().play_sfx("miss")  # 4 - Missed Hit
             except:
                 pass
@@ -1561,7 +1561,7 @@ class CombatManager:
             
             # 크리티컬 효과음
             try:
-                from .audio import get_unified_audio_system
+                from game.audio import get_unified_audio_system
                 get_unified_audio_system().play_sfx("critical_hit")  # 26 - Cloud Critical Sword Hit
             except:
                 pass
@@ -1573,7 +1573,7 @@ class CombatManager:
             
             # 일반 공격 효과음
             try:
-                from .audio import get_unified_audio_system
+                from game.audio import get_unified_audio_system
                 get_unified_audio_system().play_sfx("sword_hit")  # 17 - Cloud's Sword Hit
             except:
                 pass
@@ -1597,7 +1597,7 @@ class CombatManager:
             
             # 적 사망 효과음
             try:
-                from .audio import get_unified_audio_system
+                from game.audio import get_unified_audio_system
                 get_unified_audio_system().play_sfx("victory")  # 승리 사운드
             except:
                 pass
@@ -1664,7 +1664,7 @@ class CombatManager:
                 if leveled_up:
                     # 레벨업 효과음 및 시각 효과
                     try:
-                        from .ascii_effects import play_ascii_sound
+                        from game.ascii_effects import play_ascii_sound
                         play_ascii_sound("level_up")
                     except:
                         pass

@@ -131,7 +131,7 @@ class GameSettings:
     def show_settings_menu(self):
         """설정 메뉴 표시 - 커서 방식"""
         try:
-            from .cursor_menu_system import create_simple_menu
+            from game.cursor_menu_system import create_simple_menu
             
             while True:
                 # 현재 설정 상태로 옵션 텍스트 생성
@@ -216,7 +216,7 @@ class GameSettings:
     def _change_screen_width(self):
         """화면 너비 변경"""
         try:
-            from .input_utils import KeyboardInput
+            from game.input_utils import KeyboardInput
             keyboard = KeyboardInput()
             
             print("새 화면 너비 (80-200): ", end='', flush=True)
@@ -247,7 +247,7 @@ class GameSettings:
     def _change_map_size(self):
         """맵 크기 변경"""
         try:
-            from .input_utils import KeyboardInput
+            from game.input_utils import KeyboardInput
             keyboard = KeyboardInput()
             
             print("맵 너비 (60-120): ", end='', flush=True)
@@ -292,7 +292,7 @@ class GameSettings:
     
     def _change_difficulty(self):
         """난이도 변경"""
-        from .cursor_menu_system import create_simple_menu
+        from game.cursor_menu_system import create_simple_menu
         
         try:
             # config.py에서 난이도 설정 가져오기
@@ -357,7 +357,7 @@ class GameSettings:
     
     def _reset_tutorials(self):
         """튜토리얼 초기화"""
-        from .cursor_menu_system import create_yes_no_menu
+        from game.cursor_menu_system import create_yes_no_menu
         
         confirm_menu = create_yes_no_menu("튜토리얼을 초기화하시겠습니까?")
         confirm_result = confirm_menu.run()
@@ -370,7 +370,7 @@ class GameSettings:
     def _show_atb_settings(self):
         """ATB 시스템 설정"""
         try:
-            from .cursor_menu_system import create_simple_menu
+            from game.cursor_menu_system import create_simple_menu
             
             while True:
                 # 현재 ATB 설정 상태로 옵션 텍스트 생성
@@ -457,7 +457,7 @@ class GameSettings:
     def _change_atb_fps(self):
         """ATB 애니메이션 FPS 변경"""
         try:
-            from .cursor_menu_system import create_simple_menu
+            from game.cursor_menu_system import create_simple_menu
             
             fps_options = ["10 FPS", "15 FPS", "20 FPS (기본)", "30 FPS", "60 FPS", "❌ 취소"]
             fps_descriptions = [
@@ -500,7 +500,7 @@ class GameSettings:
     def _change_atb_speed(self):
         """ATB 업데이트 속도 변경"""
         try:
-            from .cursor_menu_system import create_simple_menu
+            from game.cursor_menu_system import create_simple_menu
             
             speed_options = [
                 "0.5x (매우 느림)", "0.75x (느림)", "1.0x (기본)", 
@@ -543,7 +543,7 @@ class GameSettings:
     def _reset_atb_settings(self):
         """ATB 설정 초기화"""
         try:
-            from .cursor_menu_system import create_yes_no_menu
+            from game.cursor_menu_system import create_yes_no_menu
             
             confirm_menu = create_yes_no_menu("ATB 설정을 초기화하시겠습니까?")
             confirm_result = confirm_menu.run()
@@ -573,7 +573,7 @@ class GameSettings:
     def _show_audio_settings(self):
         """오디오 설정"""
         try:
-            from .cursor_menu_system import create_simple_menu
+            from game.cursor_menu_system import create_simple_menu
             
             while True:
                 # 현재 오디오 설정 상태로 옵션 텍스트 생성
@@ -636,7 +636,7 @@ class GameSettings:
     def _change_volume(self):
         """볼륨 변경"""
         try:
-            from .input_utils import KeyboardInput
+            from game.input_utils import KeyboardInput
             keyboard = KeyboardInput()
             
             print("새 볼륨 (0-100): ", end='', flush=True)
@@ -670,7 +670,7 @@ class GameSettings:
     def _wait_for_key(self):
         """키 입력 대기"""
         try:
-            from .input_utils import KeyboardInput
+            from game.input_utils import KeyboardInput
             keyboard = KeyboardInput()
             keyboard.wait_for_key("아무 키나 눌러 계속...")
         except Exception:
@@ -780,7 +780,7 @@ class GameSettings:
     def _show_atb_settings(self):
         """ATB 시스템 설정 메뉴"""
         try:
-            from .cursor_menu_system import create_simple_menu
+            from game.cursor_menu_system import create_simple_menu
             
             while True:
                 atb_settings = self.get_section("atb")
@@ -836,7 +836,7 @@ class GameSettings:
     def _change_atb_fps(self):
         """ATB FPS 설정 변경"""
         try:
-            from .cursor_menu_system import create_simple_menu
+            from game.cursor_menu_system import create_simple_menu
             
             fps_options = ["10 FPS (매우 느림)", "15 FPS (느림)", "20 FPS (기본)", "30 FPS (빠름)", "60 FPS (매우 빠름)"]
             fps_values = [10, 15, 20, 30, 60]
@@ -869,7 +869,7 @@ class GameSettings:
     def _change_atb_speed(self):
         """ATB 속도 설정 변경"""
         try:
-            from .cursor_menu_system import create_simple_menu
+            from game.cursor_menu_system import create_simple_menu
             
             speed_options = ["0.5x (매우 느림)", "0.75x (느림)", "1.0x (기본)", "1.25x (조금 빠름)", "1.5x (빠름)", "2.0x (매우 빠름)", "3.0x (초고속)"]
             speed_values = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0]

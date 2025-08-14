@@ -18,7 +18,7 @@ class GameBalance:
     def get_brave_damage_multiplier():
         """BRV 데미지 배율 가져오기 - UnifiedDamageSystem에서 관리"""
         try:
-            from .unified_damage_system import UnifiedDamageSystem
+            from game.unified_damage_system import UnifiedDamageSystem
             return UnifiedDamageSystem.BRV_DAMAGE_BASE_MULTIPLIER
         except ImportError:
             return 0.1  # 폴백값
@@ -27,7 +27,7 @@ class GameBalance:
     def get_hp_damage_multiplier():
         """HP 데미지 배율 가져오기 - UnifiedDamageSystem에서 관리"""
         try:
-            from .unified_damage_system import UnifiedDamageSystem
+            from game.unified_damage_system import UnifiedDamageSystem
             return UnifiedDamageSystem.HP_DAMAGE_MULTIPLIER
         except ImportError:
             return 0.15  # 폴백값
@@ -36,7 +36,7 @@ class GameBalance:
     def get_break_damage_bonus():
         """Break 데미지 보너스 가져오기 - UnifiedDamageSystem에서 관리"""
         try:
-            from .unified_damage_system import UnifiedDamageSystem
+            from game.unified_damage_system import UnifiedDamageSystem
             return UnifiedDamageSystem.BREAK_DAMAGE_BONUS
         except ImportError:
             return 1.5  # 폴백값
@@ -336,7 +336,7 @@ class GameBalance:
     def get_enemy_brave_stats(enemy_name: str, level: int = 1) -> Dict:
         """적의 이름과 레벨에 따른 Brave 스탯 계산"""
         try:
-            from .enemy_system import EnemyType
+            from game.enemy_system import EnemyType
             
             level = max(1, min(level, 20))  # 적 레벨 제한 1-20
             
@@ -386,7 +386,7 @@ class GameBalance:
             
             # enemy_system.py의 Brave 데이터 사용
             try:
-                from .enemy_system import ENEMY_BRAVE_STATS
+                from game.enemy_system import ENEMY_BRAVE_STATS
                 if enemy_type in ENEMY_BRAVE_STATS:
                     base_stats = ENEMY_BRAVE_STATS[enemy_type]
                 else:
@@ -438,7 +438,7 @@ class GameBalance:
         """밸런스 조정된 Brave 데미지 계산 - UnifiedDamageSystem으로 리다이렉트"""
         try:
             # ⚡ 통합 데미지 시스템 사용 (중복 제거)
-            from .unified_damage_system import UnifiedDamageSystem
+            from game.unified_damage_system import UnifiedDamageSystem
             damage_system = UnifiedDamageSystem()
             
             # BRV 데미지 계산 결과 가져오기
@@ -465,7 +465,7 @@ class GameBalance:
         """밸런스 조정된 HP 데미지 계산 - UnifiedDamageSystem으로 리다이렉트"""
         try:
             # ⚡ 통합 데미지 시스템 사용 (중복 제거)
-            from .unified_damage_system import UnifiedDamageSystem
+            from game.unified_damage_system import UnifiedDamageSystem
             damage_system = UnifiedDamageSystem()
             
             # 스킬 객체 생성 (없으면 기본값)

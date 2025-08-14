@@ -5,8 +5,8 @@
 
 import traceback
 from typing import Any, Dict, List, Tuple, Optional
-from .character import Character
-from .items import Item, ItemType, ItemRarity
+from game.character import Character
+from game.items import Item, ItemType, ItemRarity
 
 
 class ValidationError(Exception):

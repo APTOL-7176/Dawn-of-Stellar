@@ -830,7 +830,7 @@ class RandomEncounterManager:
     def _handle_special_encounter_choice(self, encounter_result: Dict[str, Any], party: List, floor: int) -> Dict[str, Any]:
         """특별한 인카운트에 대한 선택지 제공"""
         try:
-            from .cursor_menu_system import create_simple_menu
+            from game.cursor_menu_system import create_simple_menu
             
             # 인카운트 정보 표시
             encounter_type = encounter_result.get("type", "신비한 조우")

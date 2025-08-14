@@ -17,14 +17,14 @@ from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 from collections import defaultdict
 
-from .job_specialized_ai import JobSpecializedAI, JobClass, RobatPersonality
-from .color_text import bright_cyan, bright_yellow, bright_green, bright_red, cyan, yellow, red, green, white, bright_magenta
+from game.job_specialized_ai import JobSpecializedAI, JobClass, RobatPersonality
+from game.color_text import bright_cyan, bright_yellow, bright_green, bright_red, cyan, yellow, red, green, white, bright_magenta
 
 # 실제 게임 시스템 import (가능한 것들)
 try:
-    from .character import Character
-    from .world import World
-    from .brave_combat import BraveCombatSystem
+    from game.character import Character
+    from game.world import World
+    from game.brave_combat import BraveCombatSystem
     GAME_SYSTEMS_AVAILABLE = True
 except ImportError:
     # 게임 시스템이 없는 경우 Mock 클래스 사용
@@ -532,7 +532,7 @@ class RobatGameplaySystem:
         
         for job_class in job_classes:
             # 직업별 AI 생성
-            from .job_specialized_ai import JobSpecializedAI, AIIntelligenceLevel
+            from game.job_specialized_ai import JobSpecializedAI, AIIntelligenceLevel
             
             job_ai = JobSpecializedAI(
                 f"robat_{job_class.value}",

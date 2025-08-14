@@ -3,7 +3,7 @@
 BattlegroundTrainingCenter를 TrainingRoom으로 import 가능하게 하는 브릿지
 """
 
-from .battleground_training import BattlegroundTrainingCenter
+from game.battleground_training import BattlegroundTrainingCenter
 
 # 호환성을 위한 별칭
 TrainingRoom = BattlegroundTrainingCenter

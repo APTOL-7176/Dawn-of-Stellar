@@ -3,9 +3,9 @@
 """
 
 from typing import List, Optional
-from .character import Character, PartyManager
-from .items import ItemDatabase, ItemType
-from .input_utils import KeyboardInput
+from game.character import Character, PartyManager
+from game.items import ItemDatabase, ItemType
+from game.input_utils import KeyboardInput
 
 # 색상 정의
 RESET = '\033[0m'
@@ -37,7 +37,7 @@ class FieldItemSystem:
             return False
         
         try:
-            from .cursor_menu_system import create_simple_menu
+            from game.cursor_menu_system import create_simple_menu
             
             # 파티원 목록을 커서 메뉴로 생성
             options = []
@@ -105,7 +105,7 @@ class FieldItemSystem:
             return False
         
         try:
-            from .cursor_menu_system import create_simple_menu
+            from game.cursor_menu_system import create_simple_menu
             
             # 아이템 목록을 커서 메뉴로 생성
             options = []

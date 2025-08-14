@@ -6,7 +6,7 @@
 
 from typing import Dict, List, Any
 try:
-    from .status_effects import ElementType, StatusEffectType
+    from game.status_effects import ElementType, StatusEffectType
 except ImportError:
     # 직접 실행할 때의 fallback
     import sys

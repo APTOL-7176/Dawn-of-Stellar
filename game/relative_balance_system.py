@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Any, TYPE_CHECKING
 import math
 
 if TYPE_CHECKING:
-    from .character import Character
+    from game.character import Character
 
 class RelativeBalanceSystem:
     """상대적 밸런스 시스템"""

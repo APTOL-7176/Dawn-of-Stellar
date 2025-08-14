@@ -12,10 +12,10 @@ from typing import Dict, List, Optional, Tuple, Any
 from enum import Enum
 
 try:
-    from .cursor_menu_system import CursorMenu
-    from .color_text import *
-    from .random_encounters import EncounterType, RandomEncounter
-    from .character import Character
+    from game.cursor_menu_system import CursorMenu
+    from game.color_text import *
+    from game.random_encounters import EncounterType, RandomEncounter
+    from game.character import Character
 except ImportError:
     # 폴백 처리
     pass
@@ -417,7 +417,7 @@ class EnhancedEncounterManager:
                                floor: int) -> Dict[str, Any]:
         """커서 기반 조우 인터페이스 실행"""
         try:
-            from .cursor_menu_system import CursorMenu
+            from game.cursor_menu_system import CursorMenu
             
             # 상황 설명
             print(f"\n{bright_cyan('='*60)}")

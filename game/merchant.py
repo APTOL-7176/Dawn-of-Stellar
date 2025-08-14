@@ -5,9 +5,9 @@
 
 import random
 from typing import List, Optional, Dict, Tuple
-from .items import Item, ItemDatabase, ItemType, ItemRarity
-from .ui_formatters import format_item_brief
-from .character import Character
+from game.items import Item, ItemDatabase, ItemType, ItemRarity
+from game.ui_formatters import format_item_brief
+from game.character import Character
 
 
 class ShopItem:
@@ -130,7 +130,7 @@ class Merchant:
                 self.shop_items.append(shop_item)
             else:
                 # 아이템이 DB에 없으면 기본 아이템 생성
-                from .items import Item, ItemType, ItemRarity
+                from game.items import Item, ItemType, ItemRarity
                 
                 if item_name == "치료 포션":
                     basic_item = Item("치료 포션", ItemType.CONSUMABLE, ItemRarity.COMMON, 
@@ -311,8 +311,8 @@ class Merchant:
     def show_shop_menu(self, party_manager=None):
         """상점 메뉴 표시 - 커서 시스템"""
         try:
-            from .cursor_menu_system import create_simple_menu
-            from .color_text import bright_cyan, bright_white, bright_yellow, bright_green
+            from game.cursor_menu_system import create_simple_menu
+            from game.color_text import bright_cyan, bright_white, bright_yellow, bright_green
             
             while True:
                 print(f"\n{bright_cyan('='*60)}")
@@ -372,8 +372,8 @@ class Merchant:
     def _show_buy_menu(self, party_manager=None):
         """구매 메뉴"""
         try:
-            from .cursor_menu_system import create_simple_menu
-            from .color_text import bright_cyan, bright_white, bright_yellow, bright_green, bright_red
+            from game.cursor_menu_system import create_simple_menu
+            from game.color_text import bright_cyan, bright_white, bright_yellow, bright_green, bright_red
             
             if not self.shop_items:
                 print(f"{bright_red('판매할 아이템이 없습니다.')}")
@@ -425,8 +425,8 @@ class Merchant:
     def _show_sell_menu(self, party_manager=None):
         """판매 메뉴"""
         try:
-            from .cursor_menu_system import create_simple_menu
-            from .color_text import bright_cyan, bright_white, bright_yellow, bright_green, bright_red
+            from game.cursor_menu_system import create_simple_menu
+            from game.color_text import bright_cyan, bright_white, bright_yellow, bright_green, bright_red
             
             if not party_manager:
                 print(f"{bright_red('파티 정보가 없어 판매할 수 없습니다.')}")
@@ -443,7 +443,7 @@ class Merchant:
                     
                     # 딕트 구조 (아이템명: 개수)인 경우
                     if isinstance(inventory_items, dict):
-                        from .items import ItemDatabase
+                        from game.items import ItemDatabase
                         db = ItemDatabase()
                         
                         for item_name, quantity in inventory_items.items():
@@ -503,7 +503,7 @@ class Merchant:
     
     def _show_shop_items(self):
         """상점 아이템 목록 표시 (상세 정보 포함)"""
-        from .color_text import bright_cyan, bright_white, bright_yellow, bright_green, bright_red, cyan, green
+        from game.color_text import bright_cyan, bright_white, bright_yellow, bright_green, bright_red, cyan, green
         
         print(f"\n{bright_cyan('='*60)}")
         print(f"{bright_white(f'📋 {self.name}의 상품 목록')}")
@@ -576,9 +576,9 @@ class Merchant:
     def _show_enhancement_menu(self, party_manager=None):
         """장비 강화 메뉴"""
         try:
-            from .cursor_menu_system import create_simple_menu
-            from .color_text import bright_cyan, bright_white, bright_yellow, bright_green, bright_red
-            from .unified_equipment_system import UnifiedEquipmentGenerator
+            from game.cursor_menu_system import create_simple_menu
+            from game.color_text import bright_cyan, bright_white, bright_yellow, bright_green, bright_red
+            from game.unified_equipment_system import UnifiedEquipmentGenerator
             
             if not party_manager:
                 print(f"{bright_red('파티 정보가 없어 강화할 수 없습니다.')}") 
@@ -637,9 +637,9 @@ class Merchant:
     def _show_reroll_menu(self, party_manager=None):
         """추가 옵션 리롤 메뉴"""
         try:
-            from .cursor_menu_system import create_simple_menu
-            from .color_text import bright_cyan, bright_white, bright_yellow, bright_green, bright_red
-            from .unified_equipment_system import UnifiedEquipmentGenerator
+            from game.cursor_menu_system import create_simple_menu
+            from game.color_text import bright_cyan, bright_white, bright_yellow, bright_green, bright_red
+            from game.unified_equipment_system import UnifiedEquipmentGenerator
             
             if not party_manager:
                 print(f"{bright_red('파티 정보가 없어 리롤할 수 없습니다.')}") 
@@ -726,7 +726,7 @@ class Merchant:
     def _enhance_equipment(self, party_manager, owner, item, cost):
         """장비 강화 실행"""
         try:
-            from .unified_equipment_system import UnifiedEquipmentGenerator
+            from game.unified_equipment_system import UnifiedEquipmentGenerator
             
             # 골드 차감
             party_manager.spend_gold(cost)
@@ -760,7 +760,7 @@ class Merchant:
     def _reroll_additional_options(self, party_manager, owner, item, cost):
         """추가 옵션 리롤 실행"""
         try:
-            from .unified_equipment_system import UnifiedEquipmentGenerator
+            from game.unified_equipment_system import UnifiedEquipmentGenerator
             
             # 골드 차감
             party_manager.spend_gold(cost)

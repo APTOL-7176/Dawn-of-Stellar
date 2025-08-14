@@ -4,8 +4,8 @@ Dawn Of Stellar 입문자를 위한 단계별 안내
 """
 
 from typing import Dict, List, Optional
-from .cursor_menu_system import CursorMenu
-from .ascii_effects import play_ascii_sound
+from game.cursor_menu_system import CursorMenu
+from game.ascii_effects import play_ascii_sound
 
 
 class BeginnerGuide:

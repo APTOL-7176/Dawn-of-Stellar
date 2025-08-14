@@ -22,7 +22,7 @@ from enum import Enum
 from dataclasses import dataclass, field
 from collections import defaultdict, deque
 
-from .color_text import bright_cyan, bright_yellow, bright_green, bright_red, cyan, yellow, red, green, white
+from game.color_text import bright_cyan, bright_yellow, bright_green, bright_red, cyan, yellow, red, green, white
 
 
 class AIIntelligenceLevel(Enum):

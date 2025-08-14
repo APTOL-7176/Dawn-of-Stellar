@@ -19,7 +19,7 @@ class FieldCookingInterface:
     def show_cooking_menu(self):
         """요리 메뉴 표시 - 커서 방식"""
         try:
-            from .cursor_menu_system import create_simple_menu
+            from game.cursor_menu_system import create_simple_menu
             
             while True:
                 print(f"\n{CYAN}{'='*80}{RESET}")
@@ -176,7 +176,7 @@ class FieldCookingInterface:
     def _show_gathering_menu(self):
         """채집 장소 메뉴 - 커서 방식"""
         try:
-            from .cursor_menu_system import create_simple_menu
+            from game.cursor_menu_system import create_simple_menu
             
             print(f"\n{CYAN}{'='*80}{RESET}")
             print(f"{WHITE}{BOLD}🌍 채집 장소 선택{RESET}")
@@ -190,7 +190,7 @@ class FieldCookingInterface:
                 cooldown_remaining = status['cooldown_remaining_steps']
                 if cooldown_remaining > 0:
                     print(f"{RED}⏰ 채집 쿨다운: {cooldown_remaining}걸음 더 이동 필요{RESET}")
-                    from .input_utils import KeyboardInput
+                    from game.input_utils import KeyboardInput
                     KeyboardInput().wait_for_key("아무 키나 눌러 계속...")
                     return
                 else:

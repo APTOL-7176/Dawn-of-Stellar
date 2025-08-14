@@ -5,8 +5,8 @@
 import random
 from typing import List, Tuple, Dict
 from enum import Enum
-from .items import ItemDatabase, Item, DropRateManager
-from .color_text import *
+from game.items import ItemDatabase, Item, DropRateManager
+from game.color_text import *
 
 
 class TileType(Enum):
@@ -113,12 +113,18 @@ class Tile:
                 return char, "white"
             
     def is_walkable(self) -> bool:
-        """이동 가능한지 확인"""
+        """이동 가능한지 확인 (상호작용 가능한 타일들 포함)"""
         # 기본적으로 이동 가능한 타일들
         walkable_types = [
             TileType.FLOOR, TileType.STAIRS_UP, TileType.STAIRS_DOWN,
             TileType.ITEM, TileType.TREASURE, TileType.FOUNTAIN,
-            TileType.GARDEN, TileType.BOSS, TileType.TRAP  # 함정도 이동 가능 (밟으면 발동)
+            TileType.GARDEN, TileType.BOSS, TileType.TRAP,  # 함정도 이동 가능 (밟으면 발동)
+            # 🔧 상호작용 가능한 타일들 추가 (몸으로 부딪혀서 활성화)
+            TileType.ALTAR, TileType.LEVER, TileType.BOOKSHELF, TileType.FORGE,
+            TileType.CRYSTAL, TileType.CHEST, TileType.CURSED_CHEST,
+            # 위험한 타일들도 이동 가능 (경고 후 상호작용)
+            TileType.CURSED_ALTAR, TileType.POISON_CLOUD, TileType.DARK_PORTAL,
+            TileType.UNSTABLE_FLOOR
         ]
         
         # 문은 잠겨있지 않으면 이동 가능
@@ -162,9 +168,9 @@ class GameWorld:
                 if hasattr(game_config, 'get_map_dimensions'):
                     width, height = game_config.get_map_dimensions()
                 else:
-                    width, height = 35, 35  # 기본값
+                    width, height = 50, 50  # 기본값 (큰 월드)
             except (ImportError, AttributeError):
-                width, height = 35, 35  # 기본값 (정사각형)
+                width, height = 50, 50  # 기본값 (정사각형)
         
         self.width = width
         self.height = height
@@ -179,6 +185,15 @@ class GameWorld:
         self.items_positions: List[Tuple[int, int]] = []
         self.floor_items: Dict[Tuple[int, int], Item] = {}  # 위치별 아이템 매핑
         self.floor_enemies: Dict[Tuple[int, int], Dict] = {}  # 위치별 적 정보 매핑 (레벨 등)
+        
+        # 🔥 통합 적 시스템 초기화
+        try:
+            from game.integrated_enemy_system import integrated_enemy_manager
+            self.integrated_enemy_manager = integrated_enemy_manager
+            print("✅ 통합 적 시스템 로드 완료")
+        except Exception as e:
+            print(f"⚠️ 통합 적 시스템 로드 실패: {e}")
+            self.integrated_enemy_manager = None
         
         # 새로운 필드 스킬 요소들
         self.special_tiles: Dict[Tuple[int, int], Dict] = {}  # 특수 타일 정보
@@ -407,27 +422,40 @@ class GameWorld:
                     (x, y) not in self.enemies_positions and
                     distance_from_player > safe_radius):  # 안전 반지름 확인
                     
-                    # 현재 층수 기반 적 레벨 계산 (더 직관적으로)
-                    base_level = max(1, (self.current_level + 1)) 
-                    enemy_level = base_level + random.randint(-1, 1)  # ±1 변동
-                    enemy_level = max(1, min(enemy_level, 100))  # 레벨 1-100 제한 (더 낮게)
+                    # 🔥 통합 적 시스템으로 적 생성 및 배치
+                    success = self.add_enemy((x, y))
+                    if success:
+                        # 적 생성 로깅
+                        enemy_data = self.floor_enemies.get((x, y), {})
+                        from game.error_logger import log_enemy
+                        log_enemy("적생성", f"통합 적 생성: {enemy_data.get('display_name', '적')} @ ({x}, {y})", {
+                            "위치": (x, y),
+                            "이름": enemy_data.get('display_name', '적'),
+                            "타입": enemy_data.get('enemy_type', 'unknown'),
+                            "레벨": enemy_data.get('level', 1),
+                            "행동패턴": enemy_data.get('behavior', 'none'),
+                            "HP": enemy_data.get('current_hp', 0),
+                            "공격력": enemy_data.get('attack', 0),
+                            "스킬수": len(enemy_data.get('skills', [])),
+                            "특수능력": len(enemy_data.get('special_abilities', [])),
+                            "접두사": enemy_data.get('prefix'),
+                            "AI활성화": enemy_data.get('ai_enabled', False)
+                        })
+                        break
+                    else:
+                        from game.error_logger import log_error
+                        log_error("적생성", f"적 배치 실패 @ ({x}, {y})", {"위치": (x, y)})
+                        # 기본 적 정보 가져오기
+                        enemy_data = self.floor_enemies.get((x, y), {})
+                        enemy_type = enemy_data.get('enemy_type', '적')
+                        enemy_level = enemy_data.get('level', self.current_level)
+                        log_enemy("적생성", f"기본 적 생성: {enemy_type} Lv.{enemy_level} @ ({x}, {y})", {
+                            "위치": (x, y),
+                            "타입": enemy_type,
+                            "레벨": enemy_level
+                        })
                     
-                    self.enemies_positions.append((x, y))
-                    self.floor_enemies[(x, y)] = {
-                        'level': enemy_level,
-                        'type': random.choice(['고블린', '오크', '스켈레톤', '다크엘프', '트롤'])
-                    }
                     self.tiles[y][x].has_enemy = True
-                    
-                    # 적 생성 로깅
-                    from .error_logger import log_enemy
-                    enemy_type = self.floor_enemies[(x, y)]['type']
-                    # 적 생성 로그 기록
-                    log_enemy("적생성", f"적 생성: {enemy_type} Lv.{enemy_level} @ ({x}, {y})", {
-                        "위치": (x, y),
-                        "타입": enemy_type,
-                        "레벨": enemy_level
-                    })
                     break
                     
                 attempts += 1
@@ -438,7 +466,7 @@ class GameWorld:
         
         # 적 배치 완료 후 총계 로깅 (완전체 시스템)
         final_enemy_count = len(self.enemies_positions)
-        from .error_logger import get_comprehensive_logger, log_world_generation
+        from game.error_logger import get_comprehensive_logger, log_world_generation
         logger = get_comprehensive_logger()
         
         # 월드 생성 정보 로그
@@ -483,7 +511,7 @@ class GameWorld:
                         (x, y) not in self.items_positions):
                         
                         # 현재 레벨에 맞는 랜덤 아이템 생성 (스테이지 기반)
-                        from .items import ItemDatabase
+                        from game.items import ItemDatabase
                         item = ItemDatabase.get_random_item_by_stage(self.current_level)
                         if item:  # 아이템이 드롭되었을 때만 배치
                             self.items_positions.append((x, y))
@@ -518,7 +546,7 @@ class GameWorld:
                         (x, y) not in self.items_positions and
                         distance_from_player >= safe_radius):  # 스폰 지점에서 충분히 멀리
                         
-                        from .items import ItemDatabase
+                        from game.items import ItemDatabase
                         # 보물상자는 더 좋은 아이템 (스테이지+2 수준)
                         item = ItemDatabase.get_random_item_by_stage(self.current_level + 2)
                         if not item:  # 혹시라도 아이템이 없으면 기본 아이템
@@ -788,7 +816,7 @@ class GameWorld:
     def can_move(self, dx: int, dy: int) -> bool:
         """이동 가능한지 확인 - 개선된 오류 처리"""
         try:
-            from .error_logger import log_player
+            from game.error_logger import log_player
             
             new_x = self.player_pos[0] + dx
             new_y = self.player_pos[1] + dy
@@ -838,7 +866,7 @@ class GameWorld:
             return is_walkable
             
         except Exception as e:
-            from .error_logger import log_error
+            from game.error_logger import log_error
             log_error("이동판정", f"can_move 오류: {e}", {
                 "현재위치": self.player_pos,
                 "이동량": (dx, dy),
@@ -850,7 +878,7 @@ class GameWorld:
     def move_player(self, dx: int, dy: int):
         """플레이어 이동 - 개선된 아이템 처리"""
         try:
-            from .error_logger import log_player
+            from game.error_logger import log_player
             
             new_x = self.player_pos[0] + dx
             new_y = self.player_pos[1] + dy
@@ -985,7 +1013,7 @@ class GameWorld:
             # 🎯 랜덤 인카운트 체크 (층별 걸음수 전달)
             if hasattr(self, 'encounter_manager'):
                 try:
-                    from .random_encounters import get_encounter_manager
+                    from game.random_encounters import get_encounter_manager
                     encounter_result = get_encounter_manager().check_encounter(
                         [], self.current_level, self.current_floor_steps
                     )
@@ -1020,6 +1048,61 @@ class GameWorld:
                     
                     return {"type": "item", "item": item}  # 아이템 반환
             
+            # 🔧 상호작용 가능한 타일에 이동했을 때 자동 상호작용 시도
+            current_tile = self.tiles[new_y][new_x]
+            interactive_tiles = [
+                TileType.ALTAR, TileType.LEVER, TileType.BOOKSHELF, TileType.FORGE,
+                TileType.CRYSTAL, TileType.CHEST, TileType.CURSED_CHEST,
+                TileType.CURSED_ALTAR, TileType.POISON_CLOUD, TileType.DARK_PORTAL,
+                TileType.UNSTABLE_FLOOR, TileType.FOUNTAIN, TileType.TRAP
+            ]
+            
+            if current_tile.type in interactive_tiles:
+                tile_names = {
+                    TileType.ALTAR: "신성한 제단",
+                    TileType.LEVER: "고대 레버", 
+                    TileType.BOOKSHELF: "마법 서고",
+                    TileType.FORGE: "마법 대장간",
+                    TileType.CRYSTAL: "마법 수정",
+                    TileType.CHEST: "보물상자",
+                    TileType.CURSED_CHEST: "저주받은 상자",
+                    TileType.CURSED_ALTAR: "저주받은 제단",
+                    TileType.POISON_CLOUD: "독성 구름",
+                    TileType.DARK_PORTAL: "어둠의 포털",
+                    TileType.UNSTABLE_FLOOR: "불안정한 바닥",
+                    TileType.FOUNTAIN: "치유의 샘",
+                    TileType.TRAP: "함정"
+                }
+                
+                tile_name = tile_names.get(current_tile.type, "특수 객체")
+                print(f"🔮 {tile_name}에 도달했습니다!")
+                
+                # 자동으로 밟아서 작동하는 타일들 (FOUNTAIN, TRAP)
+                auto_activate_tiles = [TileType.FOUNTAIN, TileType.TRAP]
+                
+                if current_tile.type in auto_activate_tiles:
+                    print(f"⚡ {tile_name}이(가) 자동으로 활성화됩니다...")
+                    interaction_result = self.interact_with_tile((new_x, new_y))
+                    
+                    if interaction_result.get('success'):
+                        print(f"✨ {interaction_result.get('message', '자동 상호작용 성공!')}")
+                        log_player("자동상호작용", f"{tile_name} 자동 활성화: ({new_x}, {new_y})", {
+                            "플레이어위치": self.player_pos,
+                            "타일타입": current_tile.type.name,
+                            "상호작용결과": interaction_result.get('message', '성공')
+                        })
+                        return {"type": "tile_interaction", "result": interaction_result, "position": (new_x, new_y), "tile_type": current_tile.type}
+                    else:
+                        print(f"❌ {interaction_result.get('message', '자동 상호작용 실패')}")
+                else:
+                    # 수동 상호작용이 필요한 타일들
+                    print(f"💡 Enter키를 눌러 {tile_name}와(과) 상호작용할 수 있습니다.")
+                    log_player("상호작용가능", f"{tile_name} 상호작용 가능: ({new_x}, {new_y})", {
+                        "플레이어위치": self.player_pos,
+                        "타일타입": current_tile.type.name,
+                        "상호작용타입": "수동"
+                    })
+                
             # 계단 체크 (다음 층으로 이동)
             if self.tiles[new_y][new_x].type == TileType.STAIRS_DOWN:
                 print("🪜 계단 발견! 다음 층으로 이동합니다.")
@@ -1115,7 +1198,7 @@ class GameWorld:
                         self.tiles[y][x].visible = True
                         self.tiles[y][x].explored = True
                         
-    def get_map_display(self, display_width: int = 30, display_height: int = 20) -> List[str]:
+    def get_map_display(self, display_width: int = 30, display_height: int = 14) -> List[str]:
         """화면에 표시할 맵 반환 (크기 증가, 시야 시스템 적용)"""
         player_x, player_y = self.player_pos
         
@@ -1177,7 +1260,7 @@ class GameWorld:
             
         return display_lines
     
-    def get_colored_map_display(self, display_width: int = 30, display_height: int = 20) -> List[str]:
+    def get_colored_map_display(self, display_width: int = 30, display_height: int = 14) -> List[str]:
         """색상이 적용된 맵 표시 반환 (시야 시스템 적용)"""
         player_x, player_y = self.player_pos
         
@@ -1255,7 +1338,7 @@ class GameWorld:
                         char = bright_yellow("@", True)  # 플레이어 (밝은 노랑)
                     elif (x, y) in self.enemies_positions:
                         # 적 표시 디버깅
-                        from .error_logger import log_enemy
+                        from game.error_logger import log_enemy
                         log_enemy("적표시", f"적 위치에 E 표시", {
                             "적위치": (x, y),
                             "플레이어위치": (player_x, player_y),
@@ -1375,14 +1458,74 @@ class GameWorld:
             x, y = pos
             self.tiles[y][x].has_enemy = False
             
-    def add_enemy(self, pos: Tuple[int, int]):
-        """적 추가"""
+    def add_enemy(self, pos: Tuple[int, int], enemy_data: Dict = None):
+        """적 추가 - 통합 적 시스템 지원"""
         x, y = pos
         if self.is_valid_pos(x, y) and self.tiles[y][x].is_walkable():
             self.enemies_positions.append(pos)
             self.tiles[y][x].has_enemy = True
+            
+            # 🔥 통합 적 시스템으로 적 데이터 생성
+            if enemy_data is None and self.integrated_enemy_manager:
+                try:
+                    enemy_data = self.integrated_enemy_manager.generate_integrated_enemy(self.current_floor)
+                    print(f"✅ 통합 적 생성: {enemy_data.get('display_name', '적')} (타입: {enemy_data.get('enemy_type', 'unknown')})")
+                except Exception as e:
+                    print(f"⚠️ 통합 적 생성 실패: {e}")
+                    enemy_data = self._create_fallback_enemy()
+            elif enemy_data is None:
+                enemy_data = self._create_fallback_enemy()
+            
+            # 적 데이터 저장
+            self.floor_enemies[pos] = enemy_data
             return True
         return False
+    
+    def _create_fallback_enemy(self) -> Dict:
+        """통합 시스템 실패 시 기본 적 생성"""
+        simple_enemies = ["늑대", "거미", "스켈레톤", "곰", "좀비"]
+        name = random.choice(simple_enemies)
+        
+        # 기본 스탯 (층수 기반 스케일링)
+        base_stats = {
+            "늑대": (45, 18, 8, 15),
+            "거미": (30, 15, 5, 20),
+            "스켈레톤": (35, 20, 12, 10),
+            "곰": (80, 25, 15, 8),
+            "좀비": (60, 16, 6, 6)
+        }
+        
+        base_hp, base_attack, base_defense, base_speed = base_stats.get(name, (40, 15, 8, 12))
+        
+        # 층수 기반 스케일링 (간단한 공식)
+        scale = 1.0 + (self.current_floor - 1) * 0.3
+        
+        return {
+            "name": name,
+            "display_name": name,
+            "type": "beast",
+            "behavior": "fallback",
+            "level": max(1, self.current_floor),
+            "max_hp": int(base_hp * scale),
+            "current_hp": int(base_hp * scale),
+            "attack": int(base_attack * scale),
+            "defense": int(base_defense * scale),
+            "speed": int(base_speed * scale),
+            "max_mp": 20,
+            "current_mp": 20,
+            "ai_aggression": 0.5,
+            "ai_intelligence": 0.3,
+            "special_abilities": [],
+            "skills": ["기본공격"],
+            "passives": [],
+            "prefix": None,
+            "experience_reward": int(max(5, self.current_floor * 2)),
+            "gold_reward": int(max(2, self.current_floor * 1)),
+            "enemy_type": "fallback",
+            "ai_enabled": False,
+            "status_effects": {},
+            "last_skill_use": {}
+        }
         
     def get_random_floor_position(self) -> Tuple[int, int]:
         """랜덤한 바닥 위치 반환"""
@@ -1417,9 +1560,9 @@ class GameWorld:
     def move_enemies(self):
         """적들의 AI 이동 처리"""
         # 로깅 시스템 사용
-        from .error_logger import log_enemy
+        from game.error_logger import log_enemy
         
-        # 강제 디버그 출력 (로깅 문제 우회)
+        # 강제 디버그 출력 (이동 문제 해결용)
         print(f"🔍 [DEBUG] move_enemies 호출됨 - 적 수: {len(getattr(self, 'enemies_positions', []))}")
         
         if not self.enemies_positions:
@@ -1571,27 +1714,81 @@ class GameWorld:
             "이동비율": f"{moved_count}/{len(new_positions)}"
         })
         
-        # 강제 디버그 출력 (실제 위치 변화 확인)
-        print(f"🔍 [DEBUG] 이동 완료 - 이동한 적: {moved_count}개")
-        print(f"🔍 [DEBUG] 이전 위치: {list(self.enemies_positions)}")
+        # 강제 디버그 출력 (실제 위치 변화 확인) - 비활성화
+        # print(f"🔍 [DEBUG] 이동 완료 - 이동한 적: {moved_count}개")
+        # print(f"🔍 [DEBUG] 이전 위치: {list(self.enemies_positions)}")
         
         self.enemies_positions = new_positions
         # 즉시 화면 갱신으로 적 위치 동기화
         if moved_count > 0:
             self.update_display()
         
-        print(f"🔍 [DEBUG] 새 위치: {list(self.enemies_positions)}")
+        # print(f"🔍 [DEBUG] 새 위치: {list(self.enemies_positions)}")
         
         # 적이 이동했으면 화면 갱신 필요함을 반환
         enemies_moved = moved_count > 0
         
-        print(f"🔍 [DEBUG] 화면 갱신 필요: {enemies_moved}")
+        # print(f"🔍 [DEBUG] 화면 갱신 필요: {enemies_moved}")
         
         return enemies_moved  # 적이 이동했으면 True, 안했으면 False
     
     def _calculate_intelligent_move(self, enemy_x: int, enemy_y: int, player_x: int, player_y: int, enemy_type: str) -> Tuple[int, int]:
-        """🧠 지능적 적 이동 계산 - 집단 지성 및 전술적 판단"""
-        from .error_logger import log_enemy
+        """🧠 고급 지능형 적 이동 계산 - 새로운 AI 시스템 사용"""
+        try:
+            from game.advanced_field_enemy_ai import get_intelligent_enemy_move
+            from game.error_logger import log_enemy
+            
+            # 적 데이터 가져오기
+            enemy_data = self.floor_enemies.get((enemy_x, enemy_y), {})
+            
+            # 기본 적 데이터가 없으면 생성
+            if not enemy_data or "behavior" not in enemy_data:
+                from game.advanced_field_enemy_ai import advanced_field_ai
+                enemy_data = advanced_field_ai.generate_enemy(self.current_floor)
+                enemy_data.update({
+                    "spawn_x": enemy_x,
+                    "spawn_y": enemy_y
+                })
+                self.floor_enemies[(enemy_x, enemy_y)] = enemy_data
+                
+                log_enemy("적AI", f"새로운 고급 적 데이터 생성", {
+                    "위치": (enemy_x, enemy_y),
+                    "적이름": enemy_data.get("display_name", "알수없음"),
+                    "행동패턴": enemy_data.get("behavior", "기본"),
+                    "층수": self.current_floor
+                })
+            
+            # 아군 위치 수집 (같은 타입의 다른 적들)
+            ally_positions = []
+            enemy_type_match = enemy_data.get("type", "기본")
+            for pos, data in self.floor_enemies.items():
+                if pos != (enemy_x, enemy_y) and data.get("type") == enemy_type_match:
+                    ally_positions.append(pos)
+            
+            # 고급 AI로 이동 계산
+            new_pos = get_intelligent_enemy_move(
+                enemy_data, (enemy_x, enemy_y), (player_x, player_y), ally_positions, self
+            )
+            
+            log_enemy("적AI", f"고급 AI 이동 계산 완료", {
+                "적위치": (enemy_x, enemy_y),
+                "새위치": new_pos,
+                "행동패턴": enemy_data.get("behavior", "기본"),
+                "지능수치": enemy_data.get("ai_intelligence", 1.0),
+                "공격성": enemy_data.get("ai_aggression", 1.0)
+            })
+            
+            return new_pos
+            
+        except Exception as e:
+            from game.error_logger import log_error
+            log_error("적AI", f"고급 AI 실패, 기존 AI 사용", {"오류": str(e)})
+            # 폴백: 기존 단순 AI
+            return self._calculate_simple_move(enemy_x, enemy_y, player_x, player_y)
+    
+    def _calculate_simple_move(self, enemy_x: int, enemy_y: int, player_x: int, player_y: int):
+        """기존 단순 이동 계산 (폴백용)"""
+        from game.error_logger import log_enemy
         
         # 가능한 모든 이동 방향 (8방향)
         all_directions = [
@@ -1701,7 +1898,7 @@ class GameWorld:
     
     def _can_move_to(self, x: int, y: int, current_enemy_pos: Tuple[int, int] = None) -> bool:
         """해당 위치로 이동 가능한지 확인 - 현재 적 위치 제외"""
-        from .error_logger import log_enemy
+        from game.error_logger import log_enemy
         
         # 경계 체크
         if not self.is_valid_pos(x, y):
@@ -1972,7 +2169,7 @@ class GameWorld:
         
         # 필드스킬 시스템 활용
         try:
-            from .field_skill_selector import get_field_skill_selector
+            from game.field_skill_selector import get_field_skill_selector
             field_skill_selector = get_field_skill_selector()
             
             # 직접적으로 스킬 이름 사용
@@ -2583,7 +2780,7 @@ class GameWorld:
             pos = (x, y)
             
             # Item 객체 재생성
-            from .items import ItemDatabase, ItemType, ItemRarity
+            from game.items import ItemDatabase, ItemType, ItemRarity
             item_type = None
             for type_enum in ItemType:
                 if type_enum.value == item_data['type']:
@@ -2597,7 +2794,7 @@ class GameWorld:
                     break
             
             if item_type and item_rarity:
-                from .items import Item
+                from game.items import Item
                 item = Item(item_data['name'], item_type, item_rarity, item_data['stats'])
                 self.floor_items[pos] = item
         
@@ -2797,3 +2994,46 @@ class GameWorld:
         # 실제 화면 갱신은 메인 게임 루프에서 담당하므로
         # 여기서는 플래그만 설정하거나 간단한 처리만 함
         pass
+    
+    def handle_interaction(self):
+        """Enter 키 상호작용 처리"""
+        # 플레이어 주변 상호작용 가능한 타일 찾기
+        x, y = self.player_pos
+        interactions = []
+        
+        # 주변 8방향 + 현재 위치 확인
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < self.width and 0 <= ny < self.height:
+                    tile = self.grid[ny][nx]
+                    if tile.type != TileType.FLOOR and tile.type != TileType.WALL:
+                        interactions.append((nx, ny, tile))
+        
+        if interactions:
+            # 상호작용 가능한 타일들 표시
+            print("상호작용 가능한 객체들:")
+            for i, (nx, ny, tile) in enumerate(interactions, 1):
+                print(f"{i}. {tile.type.value} (위치: {nx}, {ny})")
+            
+            try:
+                choice = int(input("선택하세요 (0=취소): "))
+                if 1 <= choice <= len(interactions):
+                    nx, ny, tile = interactions[choice - 1]
+                    return self.interact_with_tile((nx, ny))
+            except ValueError:
+                pass
+                
+        return {'success': False, 'message': '상호작용 가능한 객체가 없습니다.'}
+    
+    def check_interaction(self, pos):
+        """특정 위치의 상호작용 가능성 확인"""
+        x, y = pos
+        if 0 <= x < self.width and 0 <= y < self.height:
+            tile = self.grid[y][x]
+            return tile.type != TileType.FLOOR and tile.type != TileType.WALL
+        return False
+
+
+# 호환성을 위한 별칭
+World = GameWorld

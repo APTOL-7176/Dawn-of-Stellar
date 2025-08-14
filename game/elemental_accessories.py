@@ -9,7 +9,7 @@ import random
 from typing import Dict, List, Optional, Any
 from enum import Enum
 from equipment_system import ItemTier, AccessoryCategory
-from .balance_system import ElementType
+from game.balance_system import ElementType
 
 class ElementalAccessory:
     """속성 변경 장신구"""

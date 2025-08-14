@@ -6,7 +6,7 @@
 import json
 import os
 from typing import Dict, List
-from .color_text import bright_cyan, bright_yellow, bright_green, bright_red, bright_white
+from game.color_text import bright_cyan, bright_yellow, bright_green, bright_red, bright_white
 
 
 class MetaProgression:
@@ -403,7 +403,7 @@ class MetaProgression:
     def show_character_unlock_shop(self):
         """캐릭터 해금 상점 표시 - 커서 기반"""
         try:
-            from .cursor_menu_system import CursorMenu
+            from game.cursor_menu_system import CursorMenu
             CURSOR_AVAILABLE = True
         except ImportError:
             CURSOR_AVAILABLE = False
@@ -1054,7 +1054,7 @@ class MetaProgression:
     def show_trait_unlock_shop(self):
         """특성 해금 상점 표시 - 커서 기반"""
         try:
-            from .cursor_menu_system import CursorMenu
+            from game.cursor_menu_system import CursorMenu
             CURSOR_AVAILABLE = True
         except ImportError:
             CURSOR_AVAILABLE = False
@@ -1534,7 +1534,7 @@ class MetaProgression:
         
         # 별조각을 별의 정수로 교환할지 물어보기
         try:
-            from .cursor_menu_system import CursorMenu
+            from game.cursor_menu_system import CursorMenu
             
             exchange_options = [
                 "별의 정수로 교환하고 영구 강화 메뉴 열기",
@@ -1584,7 +1584,7 @@ class MetaProgression:
                             
                             # 영구 강화 시스템에 별조각 추가
                             try:
-                                from .permanent_progression import PermanentProgressionSystem
+                                from game.permanent_progression import PermanentProgressionSystem
                                 perm_system = PermanentProgressionSystem()
                                 perm_system.load_from_file()
                                 perm_system.gain_star_fragments(exchange_count)
@@ -1625,7 +1625,7 @@ class MetaProgression:
                             
                             # 영구 강화 시스템에 추가
                             try:
-                                from .permanent_progression import PermanentProgressionSystem
+                                from game.permanent_progression import PermanentProgressionSystem
                                 perm_system = PermanentProgressionSystem()
                                 perm_system.load_from_file()
                                 perm_system.gain_star_fragments(exchange_count)
@@ -1652,7 +1652,7 @@ class MetaProgression:
     def show_achievements_menu(self):
         """업적 보기 메뉴 - 커서 기반"""
         try:
-            from .cursor_menu_system import CursorMenu
+            from game.cursor_menu_system import CursorMenu
             CURSOR_AVAILABLE = True
         except ImportError:
             CURSOR_AVAILABLE = False
@@ -2012,7 +2012,7 @@ class MetaProgression:
     def show_class_mastery_overview(self):
         """직업 숙련도 개요 표시 - 커서 기반"""
         try:
-            from .cursor_menu_system import CursorMenu
+            from game.cursor_menu_system import CursorMenu
             CURSOR_AVAILABLE = True
         except ImportError:
             CURSOR_AVAILABLE = False
@@ -2179,7 +2179,7 @@ class MetaProgression:
     def show_detailed_statistics(self):
         """상세 통계 표시 - 커서 기반"""
         try:
-            from .cursor_menu_system import CursorMenu
+            from game.cursor_menu_system import CursorMenu
             CURSOR_AVAILABLE = True
         except ImportError:
             CURSOR_AVAILABLE = False
@@ -2410,7 +2410,7 @@ class MetaProgression:
         """해금 진행상황 표시"""
         print("\n=== 캐릭터 해금 진행상황 ===")
         try:
-            from .character_database import CharacterDatabase
+            from game.character_database import CharacterDatabase
             all_characters = CharacterDatabase.get_all_characters()
         except ImportError:
             print("캐릭터 데이터베이스를 불러올 수 없습니다.")
@@ -2537,8 +2537,8 @@ class MetaProgression:
     
     def show_warehouse_menu(self):
         """창고 메뉴 표시"""
-        from .warehouse_system import get_warehouse
-        from .cursor_menu_system import CursorMenu
+        from game.warehouse_system import get_warehouse
+        from game.cursor_menu_system import CursorMenu
         
         warehouse = get_warehouse()
         
@@ -2588,7 +2588,7 @@ class MetaProgression:
             self.data["warehouse_upgrade_level"] = current_level + 1
             
             # 창고 최대 무게 증가
-            from .warehouse_system import get_warehouse
+            from game.warehouse_system import get_warehouse
             warehouse = get_warehouse()
             warehouse.max_weight += 50
             
@@ -2672,7 +2672,7 @@ class MetaProgression:
         print("="*50)
         
         salvaged_items = []
-        from .cursor_menu_system import CursorMenu
+        from game.cursor_menu_system import CursorMenu
         
         for i in range(max_salvage):
             if not available_items:
@@ -2706,7 +2706,7 @@ class MetaProgression:
             
             # 창고에 자동 저장 (창고가 해금된 경우)
             if self.data.get("warehouse_unlocked", False):
-                from .warehouse_system import get_warehouse, WarehouseTab
+                from game.warehouse_system import get_warehouse, WarehouseTab
                 warehouse = get_warehouse()
                 
                 for item in salvaged_items:

@@ -47,7 +47,7 @@ def get_color(color_name):
 
 # StatusType을 new_skill_system에서 import
 try:
-    from .new_skill_system import StatusType
+    from game.new_skill_system import StatusType
 except ImportError:
     # fallback: 기본 StatusType 정의
     class StatusType(Enum):

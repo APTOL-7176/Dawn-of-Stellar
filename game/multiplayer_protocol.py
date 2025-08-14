@@ -12,8 +12,8 @@ from dataclasses import dataclass, asdict
 from typing import Dict, List, Optional, Any, Union
 import json
 import time
-from .character import Character
-from .error_logger import log_debug
+from game.character import Character
+from game.error_logger import log_debug
 
 class GameMessageType(Enum):
     """게임 메시지 타입 - 게임 로직 전용"""

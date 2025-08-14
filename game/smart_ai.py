@@ -229,7 +229,7 @@ class AllyAI:
     
     def _calculate_assassin_priority(self, character, enemy, situation: Dict) -> float:
         """암살자 아군의 그림자 시스템 우선순위 계산"""
-        from .shadow_system import get_shadow_system
+        from game.shadow_system import get_shadow_system
         
         shadow_system = get_shadow_system()
         shadow_count = shadow_system.get_shadow_count(character)
@@ -501,7 +501,7 @@ class SmartEnemyAI:
         
         try:
             # 실제 게임의 스킬 시스템 사용
-            from .new_skill_system import SkillDatabase
+            from game.new_skill_system import SkillDatabase
             skill_db = SkillDatabase()
             character_class = getattr(character, 'character_class', '전사')
             available_skills = skill_db.get_skills(character_class)
@@ -1549,7 +1549,7 @@ def create_party_ai() -> PartyAI:
 
     def _analyze_shadow_state(self, character, situation: Dict) -> Dict:
         """그림자 상태 분석 (암살자 클래스 전용)"""
-        from .shadow_system import ShadowSystem
+        from game.shadow_system import ShadowSystem
         
         # 암살자가 아닌 경우 빈 딕셔너리 반환
         if character.character_class != "암살자":

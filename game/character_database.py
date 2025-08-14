@@ -14,7 +14,7 @@ class CharacterDatabase:
         """28개 직업에 맞는 기본 캐릭터 반환"""
         try:
             # auto_party_builder에서 실제 캐릭터 데이터 가져오기
-            from .auto_party_builder import AutoPartyBuilder
+            from game.auto_party_builder import AutoPartyBuilder
             
             builder = AutoPartyBuilder()
             
@@ -166,7 +166,7 @@ class CharacterDatabase:
     def get_balanced_party_from_list(unlocked_names: List[str]) -> List[str]:
         """해금된 캐릭터 목록에서 균형잡힌 파티 구성"""
         try:
-            from .auto_party_builder import AutoPartyBuilder
+            from game.auto_party_builder import AutoPartyBuilder
             builder = AutoPartyBuilder()
             return builder.get_balanced_party_from_list(unlocked_names)
         except Exception as e:
@@ -179,7 +179,7 @@ class CharacterDatabase:
         """캐릭터 데이터에서 Character 객체 생성"""
         # Character 클래스 동적 임포트로 순환참조 방지
         try:
-            from .character import Character
+            from game.character import Character
             return Character(
                 name=char_data["name"],
                 character_class=char_data["class"],

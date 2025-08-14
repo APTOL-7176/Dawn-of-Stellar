@@ -10,9 +10,9 @@ import time
 import random
 from datetime import datetime
 from typing import List, Dict, Optional, Tuple
-from .character import Character
-from .cursor_menu_system import create_simple_menu
-from .color_text import *
+from game.character import Character
+from game.cursor_menu_system import create_simple_menu
+from game.color_text import *
 from copy import deepcopy
 
 def clear_screen():
@@ -209,7 +209,7 @@ class BattlegroundTrainingCenter:
         print()
         
         try:
-            from .save_system import SaveSystem
+            from game.save_system import SaveSystem
             save_system = SaveSystem()
             
             # 세이브 파일 목록 (개선된 list_saves 사용)

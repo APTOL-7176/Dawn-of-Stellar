@@ -89,6 +89,6 @@ def get_delayed_bgm_player():
     """지연 BGM 플레이어 인스턴스 반환"""
     global _delayed_bgm_player
     if _delayed_bgm_player is None:
-        from .ffvii_sound_system import get_ffvii_sound_system
+        from game.ffvii_sound_system import get_ffvii_sound_system
         _delayed_bgm_player = DelayedBGMPlayer(get_ffvii_sound_system())
     return _delayed_bgm_player

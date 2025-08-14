@@ -1567,7 +1567,7 @@ class AIChatSystem:
         # 캐릭터 프리셋 시스템 연동 시도
         if use_presets:
             try:
-                from .character_presets import CharacterPresets
+                from game.character_presets import CharacterPresets
                 presets = CharacterPresets()
                 preset_characters = presets.get_all_character_presets()
                 

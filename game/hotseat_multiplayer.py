@@ -14,8 +14,8 @@ import time
 from typing import Dict, List, Optional, Tuple
 from enum import Enum
 
-from .error_logger import log_system, log_player
-from .color_text import bright_cyan, bright_yellow, bright_green, bright_red, cyan, yellow, red, green, white, bright_white
+from game.error_logger import log_system, log_player
+from game.color_text import bright_cyan, bright_yellow, bright_green, bright_red, cyan, yellow, red, green, white, bright_white
 
 class HotSeatPhase(Enum):
     """핫시트 게임 단계"""

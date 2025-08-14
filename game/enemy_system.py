@@ -7,9 +7,9 @@
 from typing import Dict, List, Optional, Tuple
 from enum import Enum
 import random
-from .character import Character
+from game.character import Character
 try:
-    from .new_skill_system import StatusType, StatusEffect
+    from game.new_skill_system import StatusType, StatusEffect
 except ImportError:
     # StatusType과 StatusEffect를 간단히 정의 (fallback)
     class StatusType:
@@ -1152,7 +1152,7 @@ class Enemy(Character):
         """적 스킬 위력에 배수 적용"""
         try:
             # NewSkillSystem에서 적 스킬 배수 가져오기
-            from .new_skill_system import skill_system
+            from game.new_skill_system import skill_system
             return base_power * skill_system.enemy_skill_power_multiplier
         except ImportError:
             # 폴백: 1.3배 고정 배수

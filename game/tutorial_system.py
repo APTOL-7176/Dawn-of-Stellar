@@ -738,7 +738,7 @@ def get_tutorial_manager() -> TutorialManager:
 def show_tutorial_selection_menu():
     """튜토리얼 선택 메뉴 표시 - 커서 방식"""
     try:
-        from .cursor_menu_system import create_simple_menu
+        from game.cursor_menu_system import create_simple_menu
         
         progress = tutorial_manager.get_tutorial_progress()
         
@@ -850,7 +850,7 @@ def _show_tutorial_selection_menu_fallback():
 def handle_tutorial_settings():
     """튜토리얼 설정 메뉴 - 커서 방식"""
     try:
-        from .cursor_menu_system import create_simple_menu
+        from game.cursor_menu_system import create_simple_menu
         
         while True:
             prefs = tutorial_manager.user_preferences
@@ -905,7 +905,7 @@ def handle_tutorial_settings():
                 else:
                     print("⚠️ 튜토리얼 시스템이 비활성화되었습니다.")
             elif result == 6:  # 모든 진행도 초기화
-                from .cursor_menu_system import create_yes_no_menu
+                from game.cursor_menu_system import create_yes_no_menu
                 confirm_menu = create_yes_no_menu("정말로 모든 튜토리얼 진행도를 초기화하시겠습니까?")
                 confirm_result = confirm_menu.run()
                 

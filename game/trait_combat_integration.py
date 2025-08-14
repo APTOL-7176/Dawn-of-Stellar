@@ -5,7 +5,7 @@ character.py의 temp_* 속성들을 실제 전투에서 활용하도록 구현
 
 import random
 from typing import Dict, Any, List, Optional
-from .character import Character, CharacterTrait, CharacterClassManager
+from game.character import Character, CharacterTrait, CharacterClassManager
 
 class TraitCombatIntegrator:
     """특성 효과를 전투 시스템에 연동하는 클래스"""

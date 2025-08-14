@@ -4,7 +4,7 @@
 
 from typing import List, Optional, Dict, Any, TYPE_CHECKING
 import random
-from .new_skill_system import StatusType, get_status_icon
+from game.new_skill_system import StatusType, get_status_icon
 from game.color_text import bright_cyan, bright_yellow, yellow, green, red, bright_white, cyan, white, magenta, blue
 
 # 전역 전투 상태 변수
@@ -417,8 +417,8 @@ class StatusManager:
     def get_active_effects(self) -> List[str]:
         """활성 상태이상 목록"""
         return [effect.status_type.value for effect in self.status_effects]
-from .items import Inventory, Item, ItemDatabase
-from .brave_system import BraveMixin, BraveSkillDatabase
+from game.items import Inventory, Item, ItemDatabase
+from game.brave_system import BraveMixin, BraveSkillDatabase
 from config import game_config
 
 # 색상 정의
@@ -446,7 +446,7 @@ def bright_white(text): return f"\033[97m{text}{RESET}"
 
 # TYPE_CHECKING을 사용하여 순환 import 방지
 if TYPE_CHECKING:
-    from .smart_ai import SmartEnemyAI
+    from game.smart_ai import SmartEnemyAI
 
 
 class CharacterTrait:
@@ -2274,7 +2274,7 @@ class Character(BraveMixin):
         
         # 추가 Brave 스탯들 - GameBalance 시스템 사용
         # GameBalance에서 직업별 BRV 값 가져오기
-        from .balance import GameBalance
+        from game.balance import GameBalance
         try:
             brave_stats = GameBalance.get_character_brave_stats(character_class, level=1)
             self.int_brv = brave_stats["int_brv"]
@@ -2529,7 +2529,7 @@ class Character(BraveMixin):
         if (hasattr(self, '_animation_enabled') and self._animation_enabled and 
             is_combat_active() and old_value != self._current_hp):
             try:
-                from .ui_animations import animate_hp_change
+                from game.ui_animations import animate_hp_change
                 animate_hp_change(self, old_value, self._current_hp)
             except ImportError:
                 pass  # 애니메이션 모듈이 없으면 무시
@@ -2563,7 +2563,7 @@ class Character(BraveMixin):
         if (hasattr(self, '_animation_enabled') and self._animation_enabled and 
             is_combat_active() and old_value != self._current_mp):
             try:
-                from .ui_animations import animate_mp_change
+                from game.ui_animations import animate_mp_change
                 animate_mp_change(self, old_value, self._current_mp)
             except ImportError:
                 pass  # 애니메이션 모듈이 없으면 무시
@@ -2587,7 +2587,7 @@ class Character(BraveMixin):
         if (hasattr(self, '_animation_enabled') and self._animation_enabled and 
             is_combat_active() and old_value != self._brave_points):
             try:
-                from .ui_animations import animate_brv_change
+                from game.ui_animations import animate_brv_change
                 animate_brv_change(self, old_value, self._brave_points)
             except ImportError:
                 pass  # 애니메이션 모듈이 없으면 무시
@@ -3577,7 +3577,7 @@ class Character(BraveMixin):
     def set_brave_stats_from_data(self, char_data: dict):
         """캐릭터 데이터에서 Brave 스탯 설정 (안전한 예외처리 포함)"""
         try:
-            from .balance import GameBalance
+            from game.balance import GameBalance
             
             # 데이터베이스에 명시된 값이 있으면 검증 후 사용
             if 'int_brv' in char_data and 'max_brv' in char_data:
@@ -4161,7 +4161,7 @@ class Character(BraveMixin):
     def update_brave_on_level_up(self):
         """레벨업 시 Brave 능력치 업데이트"""
         try:
-            from .balance import GameBalance
+            from game.balance import GameBalance
             
             # 이전 값 저장 (디버그용)
             old_int_brv = self.int_brv
@@ -4572,7 +4572,7 @@ class Character(BraveMixin):
                 
                 # 장비 효과 로깅
                 if hp_bonus > 0 or mp_bonus > 0:
-                    from .error_logger import log_debug
+                    from game.error_logger import log_debug
                     log_debug("장비효과", f"장비 보너스 적용", {
                         "캐릭터": self.name,
                         "장비명": item.name,
@@ -4593,7 +4593,7 @@ class Character(BraveMixin):
             self.current_mp = self.max_mp
             
         # 장비 변경 로깅
-        from .error_logger import log_debug
+        from game.error_logger import log_debug
         log_debug("장비변경", f"장비 효과 재계산 완료", {
             "캐릭터": self.name,
             "최대HP": self.max_hp,
@@ -4624,7 +4624,7 @@ class Character(BraveMixin):
             self.atb_speed = self.get_total_speed()
         
         # 로깅
-        from .error_logger import log_debug
+        from game.error_logger import log_debug
         log_debug("스탯계산", f"총 스탯 재계산 완료", {
             "캐릭터": self.name,
             "직업": self.character_class,
@@ -5779,7 +5779,7 @@ class PartyManager:
             
             # 인벤토리 복원
             if 'inventory' in data:
-                from .items import Inventory
+                from game.items import Inventory
                 if isinstance(data['inventory'], dict):
                     # 새로운 Inventory 인스턴스 생성 후 데이터 복원
                     character.inventory = Inventory()
@@ -5788,12 +5788,12 @@ class PartyManager:
                 elif hasattr(data['inventory'], 'items'):
                     character.inventory = data['inventory']
                 else:
-                    from .items import Inventory
+                    from game.items import Inventory
                     character.inventory = Inventory()
             
             # 장비 복원
             if 'equipped_weapon' in data and data['equipped_weapon']:
-                from .items import ItemDatabase
+                from game.items import ItemDatabase
                 item_db = ItemDatabase()
                 weapon_data = data['equipped_weapon']
                 if isinstance(weapon_data, dict):
@@ -5803,7 +5803,7 @@ class PartyManager:
                         character.equipped_weapon = weapon_item
                         
             if 'equipped_armor' in data and data['equipped_armor']:
-                from .items import ItemDatabase
+                from game.items import ItemDatabase
                 item_db = ItemDatabase()
                 armor_data = data['equipped_armor']
                 if isinstance(armor_data, dict):

@@ -6,8 +6,8 @@
 
 import random
 from typing import Dict, List, Tuple, Optional
-from .items import Item, ItemDatabase, ItemRarity, DropRateManager
-from .character import Character
+from game.items import Item, ItemDatabase, ItemRarity, DropRateManager
+from game.character import Character
 
 
 class EnemyDropSystem:

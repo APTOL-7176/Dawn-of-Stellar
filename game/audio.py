@@ -4,535 +4,554 @@ import random
 import time
 from typing import Optional, Dict, List
 from pathlib import Path
+from enum import Enum
+
+class BGMType(Enum):
+    """BGM 타입 정의 - FFVII 완전 매핑"""
+    MENU = "menu"
+    MAIN_MENU_OPENING = "main_menu_opening"
+    DIFFICULTY_SELECT = "difficulty_select"
+    FLOOR_1_3 = "floor_1_3"
+    FLOOR_4_6 = "floor_4_6"
+    FLOOR_7_9 = "floor_7_9"
+    FLOOR_10_12 = "floor_10_12"
+    FLOOR_13_15 = "floor_13_15"
+    FLOOR_16_18 = "floor_16_18"
+    FLOOR_19_21 = "floor_19_21"
+    FLOOR_22_24 = "floor_22_24"
+    FLOOR_25_27 = "floor_25_27"
+    FLOOR_28_30 = "floor_28_30"
+    FLOOR_31_33 = "floor_31_33"
+    FLOOR_34_36 = "floor_34_36"
+    FLOOR_37_39 = "floor_37_39"
+    FLOOR_40_42 = "floor_40_42"
+    FLOOR_43_45 = "floor_43_45"
+    FLOOR_46_48 = "floor_46_48"
+    FLOOR_49_51 = "floor_49_51"
+    FLOOR_52_PLUS = "floor_52_plus"
+    BATTLE = "battle"
+    BOSS = "boss"
+    SHOP = "shop"
+    AERITH_THEME = "aerith_theme"
+    VICTORY = "victory"
+    GAME_OVER = "game_over"
+    SPECIAL_EVENT = "special_event"
+
+class SFXType(Enum):
+    """효과음 타입 정의 - FFVII 완전 매핑"""
+    # UI 효과음
+    MENU_SELECT = "menu_select"
+    MENU_CONFIRM = "menu_confirm"
+    MENU_CANCEL = "menu_cancel"
+    MENU_ERROR = "menu_error"
+    ITEM_GET = "item_get"
+    ITEM_USE = "item_use"
+    ITEM_PICKUP = "item_pickup"
+    LEVEL_UP = "level_up"
+    SKILL_LEARN = "skill_learn"
+    SAVE_GAME = "save_game"
+    SAVE_READY = "save_ready"
+    EQUIP = "equip"
+    UNEQUIP = "unequip"
+    
+    # 소모품 효과음
+    POTION = "potion"
+    HI_POTION = "hi_potion"
+    X_POTION = "x_potion"
+    ELIXIR = "elixir"
+    PHOENIX_DOWN = "phoenix_down"
+    
+    # 전투 효과음
+    SWORD_HIT = "sword_hit"
+    CRITICAL_HIT = "critical_hit"
+    MAGIC_CAST = "magic_cast"
+    MAGIC_HIT = "magic_hit"
+    ARROW_SHOT = "arrow_shot"
+    GUN_SHOT = "gun_shot"
+    EXPLOSION = "explosion"
+    MISS = "miss"
+    BLOCK = "block"
+    DODGE = "dodge"
+    
+    # 상태 효과음
+    HEAL = "heal"
+    POISON = "poison"
+    BURN = "burn"
+    FREEZE = "freeze"
+    SHOCK = "shock"
+    BUFF_ON = "buff_on"
+    DEBUFF_ON = "debuff_on"
+    BUFF_OFF = "buff_off"
+    DEBUFF_OFF = "debuff_off"
+    
+    # 환경 효과음
+    FOOTSTEP = "footstep"
+    DOOR_OPEN = "door_open"
+    DOOR_CLOSE = "door_close"
+    TREASURE_OPEN = "treasure_open"
+    TRAP_ACTIVATE = "trap_activate"
+    STAIRS_UP = "stairs_up"
+    STAIRS_DOWN = "stairs_down"
+    BATTLE_SWIRL = "battle_swirl"
+    
+    # 특수 효과음
+    SUMMON = "summon"
+    TELEPORT = "teleport"
+    TRANSFORMATION = "transformation"
+    ULTIMATE = "ultimate"
+    DEATH = "death"
+    REVIVE = "revive"
 
 class UnifiedAudioSystem:
-    """통합 오디오 시스템 - BGM과 효과음 통합 관리"""
+    """통합 오디오 시스템 - FFVII 완전 매핑 + 랜덤 재생"""
     
     def __init__(self, debug_mode: bool = False):
         self.initialized = False
         self.debug_mode = debug_mode
         self.current_bgm = None
         self.bgm_volume = 0.6
-        self.sfx_volume = 0.8  # 원래대로 복구
+        self.sfx_volume = 0.8
         self.master_volume = 0.7
         
         # 사운드 저장소
         self.bgm_tracks = {}
         self.sfx_sounds = {}
-        self.sounds = {}  # 통합 사운드 딕셔너리
         
-        # 경로 설정 - 새로운 game/audio 구조 사용
-        self.base_path = Path("game/audio")
-        self.bgm_path = self.base_path / "bgm"
-        self.sfx_path = self.base_path / "sfx"
+        # 경로 설정
+        self.base_path = Path(os.path.dirname(os.path.abspath(__file__))).parent
+        self.bgm_path = self.base_path / "audio" / "bgm"
+        self.sfx_path = self.base_path / "audio" / "sfx"
         
-        # pygame mixer 초기화 시도
+        # 매핑 초기화
+        self._initialize_bgm_mapping()
+        self._initialize_sfx_mapping()
+        
+        # 초기화 시도
+        self._initialize_pygame()
+    
+    def _initialize_pygame(self):
+        """Pygame 초기화"""
         try:
-            pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=1024)
-            pygame.mixer.init()
-            pygame.mixer.set_num_channels(16)  # 여러 사운드 동시 재생
+            if not pygame.get_init():
+                pygame.init()
+            
+            if not pygame.mixer.get_init():
+                pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=2048)
+            
             self.initialized = True
             if self.debug_mode:
-                print("🎵 통합 오디오 시스템 초기화 완료!")
+                print("🎵 UnifiedAudioSystem 초기화 성공")
+                
         except Exception as e:
             if self.debug_mode:
-                print(f"⚠️ 오디오 시스템 초기화 실패: {e}")
+                print(f"❌ 오디오 초기화 실패: {e}")
             self.initialized = False
-        
-        # 사운드 시스템 초기화
-        self._initialize_sound_mappings()
-        self._create_audio_directories()
-    
-    def _create_audio_directories(self):
-        """오디오 디렉토리 생성"""
-        try:
-            os.makedirs(self.bgm_path, exist_ok=True)
-            os.makedirs(self.sfx_path, exist_ok=True)
-            if self.debug_mode:
-                print("📁 오디오 디렉토리 확인 완료")
-        except Exception as e:
-            if self.debug_mode:
-                print(f"⚠️ 디렉토리 생성 실패: {e}")
-    
-    def _initialize_sound_mappings(self):
-        """사운드 매핑 초기화"""
-        # FFVII BGM 매핑 (게임 상황별)
-        self.bgm_mapping = {
-            # 메인 테마들
-            'title': '01-The Prelude.mp3',
-            'main_theme': '25-Main Theme of Final Fantasy VII.mp3',
-            'menu_theme': '01-The Prelude.mp3',
-            'prelude': '01-The Prelude.mp3',
-            
-            # 캐릭터/평화로운 테마
-            'character_select': '06-Tifa\'s Theme.mp3',
-            'tifa_theme': '06-Tifa\'s Theme.mp3',
-            'peaceful': '26-Ahead on Our Way.mp3',
-            'safe_area': '13-Flowers Blooming in the Church.mp3',
-            
-            # 던전 테마들 (층별)
-            'dungeon': '04-Mako Reactor.mp3',
-            'dungeon_theme': '04-Mako Reactor.mp3',
-            'dungeon_deep': '09-Lurking in the Darkness.mp3',
-            'mysterious': '33-Chasing the Black-Caped Man.mp3',
-            'cave': '46-Cosmo Canyon.mp3',
-            
-            # 전투 테마들
-            'battle': '11-Fighting.mp3',
-            'boss_battle': '21-Still More Fighting.mp3',
-            'boss_theme': '21-Still More Fighting.mp3',
-            'final_boss': '38-J-E-N-O-V-A.mp3',
-            'epic_battle': '87-One-Winged Angel.mp3',
-            
-            # 이벤트 테마들
-            'victory': '12-Fanfare.mp3',
-            'success': '59-A Great Success.mp3',
-            'game_over': '39-Continue.mp3',
-            'tension': '05-Anxious Heart.mp3',
-            'urgent': '08-Hurry!.mp3',
-            
-            # 기존 호환성을 위한 매핑
-            'bombing_mission': '03-Bombing Mission.mp3',
-            'mako_reactor': '04-Mako Reactor.mp3',
-        }
-        
-        # FFVII SFX 매핑 (정확한 파일명 기반)
-        self.sfx_mapping = {
-            # UI 사운드
-            'menu_select': '000.wav',      # 커서 이동
-            'menu_confirm': '001.wav',     # 세이브 완료/확인
-            'menu_cancel': '003.wav',      # 취소
-            'menu_error': '002.wav',       # 잘못된 선택
-            
-            # 전투 사운드 - 물리 공격
-            'sword_hit': '017.wav',        # 클라우드 검 타격
-            'critical_hit': '026.wav',     # 클라우드 크리티컬
-            'gun_hit': '014.wav',          # 바렛 총 타격
-            'gun_critical': '045.wav',     # 바렛 크리티컬
-            'staff_hit': '049.wav',        # 에어리스 스태프
-            'staff_critical': '022.wav',   # 에어리스 크리티컬
-            'punch_hit': '027.wav',        # 티파 펀치
-            'punch_critical': '289.wav',   # 티파 크리티컬
-            'miss': '004.wav',             # 공격 빗나감
-            
-            # 마법 사운드
-            'magic_cast': '012.wav',       # 마법 시전 준비
-            'fire': '008.wav',             # 파이어
-            'fire2': '009.wav',            # 파이어2
-            'fire3': '141.wav',            # 파이어3
-            'ice': '023.wav',              # 아이스
-            'ice3': '028.wav',             # 아이스3
-            'thunder': '010.wav',          # 볼트
-            'thunder2': '011.wav',         # 볼트2
-            'thunder3': '069.wav',         # 볼트3
-            'heal': '005.wav',             # 케알
-            'heal2': '007.wav',            # 케알2
-            'heal3': '068.wav',            # 케알3
-            'ultima': '307.wav',           # 알테마
-            
-            # 상태 마법
-            'haste': '082.wav',            # 헤이스트
-            'slow': '064.wav',             # 슬로우
-            'protect': '093.wav',          # 프로텍트
-            'shell': '066.wav',            # 쉘
-            'barrier': '067.wav',          # 배리어
-            'reflect': '071.wav',          # 리플렉트
-            'sleep': '072.wav',            # 슬립
-            'poison': '062.wav',           # 바이오
-            'silence': '083.wav',          # 사일런스
-            'stop': '086.wav',             # 스톱
-            'berserk': '065.wav',          # 버서크
-            
-            # 아이템 사운드
-            'item_use': '020.wav',         # 아이템 사용
-            'potion': '005.wav',           # 포션
-            'hi_potion': '006.wav',        # 하이포션
-            'x_potion': '007.wav',         # 엑스포션
-            'elixir': '068.wav',           # 엘릭서
-            'phoenix_down': '379.wav',     # 피닉스테일
-            'item_pickup': '357.wav',      # 아이템 획득
-            'treasure_open': '253.wav',    # 보물상자
-            'equip': '444.wav',            # 장비 장착
-            
-            # 전투 상황
-            'battle_start': '042.wav',     # 전투 시작 소용돌이
-            'victory': '012.wav',          # 승리 팡파레
-            'escape': '025.wav',           # 전투 도망
-            'enemy_death': '021.wav',      # 적 사망
-            'boss_death': '445.wav',       # 보스 사망
-            'level_up': '381.wav',         # 레벨업/4번째 리미트 습득
-            
-            # 리미트 브레이크
-            'limit_break': '035.wav',      # 리미트 브레이크 발동
-            'blade_beam': '368.wav',       # 클라우드 블레이드빔
-            'big_shot': '039.wav',         # 바렛 빅샷
-            'healing_wind': '033.wav',     # 에어리스 치유의바람
-            'somersault': '290.wav',       # 티파 공중제비
-            
-            # 환경 사운드
-            'door_open': '121.wav',        # 문 열기
-            'door_close': '052.wav',       # 문 닫기
-            'elevator': '041.wav',         # 엘리베이터
-            'save_point': '356.wav',       # 세이브 포인트
-            'save_complete': '206.wav',    # 세이브 완료
-            'footsteps': '027.wav',        # 발소리
-            'jumping': '054.wav',          # 점프
-            'landing': '055.wav',          # 착지
-            
-            # 시스템 사운드
-            'coin': '170.wav',             # 길/돈
-            'buy_item': '261.wav',         # 아이템 구매
-            'points_earned': '485.wav',    # 포인트/GP 획득
-            'winning_prize': '250.wav',    # 특별한 보상 획득
-            'applause': '438.wav',         # 박수
-            'materia_glow': '190.wav',     # 마테리아 빛남/소환
-            
-            # 특수 효과
-            'summon': '190.wav',           # 소환수 등장
-            'vanish': '040.wav',           # 소환을 위한 파티 사라짐
-            'transform': '266.wav',        # 변신/기계 반응
-            'teleport': '054.wav',         # 순간이동/점프
-            'chocobo_happy': '273.wav',    # 초코보 기쁨
-            'chocobo_sad': '272.wav',      # 초코보 슬픔
-            'moogle': '244.wav',           # 모글리 "쿠포"
-            
-            # 경고/알림
-            'alert': '059.wav',            # 경고음
-            'computer_beep': '058.wav',    # 컴퓨터 신호음
-            'switch_on': '050.wav',        # 스위치 켜기
-            'monitor': '173.wav',          # 모니터 작동
-            'announcement': '447.wav',     # 안내방송
-            
-            # 추가 호환성
-            'menu_move': '000.wav',        # 메뉴 이동 (별칭)
-            'confirm': '001.wav',          # 확인 (별칭)
-            'cancel': '003.wav',           # 취소 (별칭)
-            'error': '002.wav',            # 에러 (별칭)
+
+    def _initialize_bgm_mapping(self):
+        """FFVII BGM 매핑 초기화"""
+        self.bgm_files = {
+            BGMType.MENU: [
+                "01-The Prelude.mp3",           # FF7 프렐루드 (보조)
+                "25-Main Theme of Final Fantasy VII.mp3",     # FF7 메인 테마 (우선)
+            ],
+            BGMType.MAIN_MENU_OPENING: [
+                "02-Opening ~ Bombing Mission.mp3"     # 오프닝 전용 BGM
+            ],
+            BGMType.DIFFICULTY_SELECT: [
+                "15-Underneath the Rotting Pizza.mp3",  # 썩은 피자 아래서 (선택의 긴장감)
+                "19-Don of the Slums.mp3",              # 돈 코를레오네 (중후한 선택)
+                "23-Tifa's Theme.mp3"                   # 티파의 테마 (부드러운 선택)
+            ],
+            BGMType.FLOOR_1_3: [
+                "03-Bombing Mission.mp3",   # 필드용 폭파 임무 (03번 사용)
+                "15-Underneath the Rotting Pizza.mp3",  # 썩은 피자 아래서
+                "04-Mako Reactor.mp3"       # 마코로 1호기 (1층에 적합)
+            ],
+            BGMType.FLOOR_4_6: [
+                "26-Ahead on Our Way.mp3",      # 그 길에서
+                "27-Good Night, Until Tomorrow!.mp3",   # 그 앞길에서
+                "19-Don of the Slums.mp3"       # 돈 코를레오네
+            ],
+            BGMType.FLOOR_7_9: [
+                "40-Costa del Sol.mp3",     # 코스타 델 솔
+                "44-Cait Sith's Theme.mp3", # 케이트 시스의 테마
+                "13-Flowers Blooming in the Church.mp3"    # 꽃이 피는 교회
+            ],
+            BGMType.FLOOR_10_12: [
+                "22-Red XIII's Theme.mp3",  # 레드 XIII의 테마
+                "53-Cid's Theme.mp3",       # 시드의 테마
+                "62-Interrupted by Fireworks.mp3"  # 불꽃에 가로막혀서
+            ],
+            BGMType.FLOOR_13_15: [
+                "46-Cosmo Canyon.mp3",      # 코스모 캐년
+                "65-Aeris' Theme.mp3",      # 에어리스의 테마
+                "60-Tango of Tears.mp3"     # 눈물의 탱고
+            ],
+            BGMType.FLOOR_16_18: [
+                "78-Sending a Dream into the Universe.mp3",     # 약속의 땅
+                "72-The Highwind Takes to the Skies.mp3",       # 하이윈드
+                "75-Off the Edge of Despair.mp3"                # 절망의 끝에서
+            ],
+            BGMType.FLOOR_19_21: [
+                "10-Shinra Corporation.mp3",    # 신라 컴퍼니
+                "39-Continue.mp3",               # 컨티뉴
+                "68-Reunion.mp3"                 # 재회
+            ],
+            BGMType.FLOOR_22_24: [
+                "05-Anxious Heart.mp3",         # 불안한 마음
+                "24-Holding My Thoughts in My Heart.mp3",  # 마음에 품은 생각
+                "28-On That Day, 5 Years Ago.mp3"     # 그날, 5년 전
+            ],
+            BGMType.FLOOR_25_27: [
+                "33-Chasing the Black-Caped Man.mp3",  # 검은 망토의 사나이를 쫓아서
+                "41-Mark of the Traitor.mp3",          # 배반자의 표식
+                "37-Trail of Blood.mp3"                # 피의 흔적
+            ],
+            BGMType.FLOOR_28_30: [
+                "52-The Nightmare's Beginning.mp3",    # 악몽의 시작
+                "64-You Can Hear the Cry of the Planet.mp3",  # 별의 울음소리가 들려
+                "67-The Great Northern Cave.mp3"       # 대공동
+            ],
+            BGMType.FLOOR_31_33: [
+                "07-Barret's Theme.mp3",            # 바렛의 테마
+                "14-Turks' Theme.mp3",              # 터크스의 테마
+                "06-Tifa's Theme.mp3"               # 티파의 테마
+            ],
+            BGMType.FLOOR_34_36: [
+                "16-Oppressed People.mp3",          # 억압받는 사람들
+                "17-Honeybee Manor.mp3",            # 벌집 저택
+                "18-Who Are You.mp3"                # 너는 누구냐
+            ],
+            BGMType.FLOOR_37_39: [
+                "20-Infiltrating Shinra Tower.mp3", # 신라 빌딩 침입
+                "29-Farm Boy.mp3",                  # 농장 소년
+                "34-Fortress of the Condor.mp3"     # 콘돌 요새
+            ],
+            BGMType.FLOOR_40_42: [
+                "35-Rufus' Welcoming Ceremony.mp3", # 루퍼스 환영식
+                "42-Mining Town.mp3",               # 광산 마을
+                "43-Gold Saucer.mp3"                # 골드 소서
+            ],
+            BGMType.FLOOR_43_45: [
+                "45-Sandy Badlands.mp3",            # 모래 황무지
+                "47-Life Stream.mp3",               # 라이프 스트림
+                "48-Great Warrior.mp3"              # 위대한 전사
+            ],
+            BGMType.FLOOR_46_48: [
+                "49-Descendant of Shinobi.mp3",     # 시노비의 후예
+                "50-Those Chosen By the Planet.mp3", # 별에게 선택받은 자
+                "55-Wutai.mp3"                      # 우타이
+            ],
+            BGMType.FLOOR_49_51: [
+                "63-Forested Temple.mp3",           # 숲의 신전
+                "66-Buried in the Snow.mp3",        # 눈에 묻힌
+                "69-Who Am I.mp3"                   # 나는 누구인가
+            ],
+            BGMType.FLOOR_52_PLUS: [
+                "88-World Crisis.mp3",              # 세계의 위기 (최종층)
+                "84-Judgement Day.mp3",             # 심판의 날 (최종층)
+                "79-The Countdown Begins.mp3"       # 카운트다운 시작 (최종층)
+            ],
+            BGMType.BATTLE: [
+                "11-Fighting.mp3",                  # 전투! (일반 전투)
+                "21-Still More Fighting.mp3",       # 더욱 전투를! (일반 전투)
+                "85-Jenova Absolute.mp3",           # 제노바 앱솔루트 (일반 전투)
+            ],
+            BGMType.BOSS: [
+                "38-J-E-N-O-V-A.mp3",              # 제노바 (보스급)
+                "86-The Birth of God.mp3",          # 신의 탄생 (보스급)
+                "23-Crazy Motorcycle Chase.mp3",    # 크레이지 모터사이클
+                "70-Full-Scale Attack.mp3",         # 전면 공격
+                "71-Weapon Raid.mp3",               # 웨폰 습격
+                "82-Attacking Weapon!.mp3",         # 웨폰을 공격하라!
+                "87-One-Winged Angel.mp3"           # 외날개 천사 (최종보스 전용)
+            ],
+            BGMType.SHOP: [
+                "44-Cait Sith's Theme.mp3",          # 상인
+                "40-Costa del Sol.mp3",              # 코스타 델 솔
+                "19-Don of the Slums.mp3",            # 월 마켓
+            ],
+            BGMType.AERITH_THEME: [
+                "47-Life Stream.mp3",                      # 라이프 스트림 (잔잔함)
+                "65-Aeris Theme.mp3"                       # 에어리스 테마
+            ],
+            BGMType.VICTORY: [
+                "12-Fanfare.mp3",                    # 승리의 팡파르 (우선 재생)
+                "12-Fanfare.mp3",                    # 팡파레 확률 증가
+                "12-Fanfare.mp3",                    # 팡파레 확률 더 증가
+                "72-The Highwind Takes to the Skies.mp3"           # 하이윈드 (보조)
+            ],
+            BGMType.GAME_OVER: [
+                "39-Continue.mp3",                   # 게임 오버
+                "75-Off the Edge of Despair.mp3"    # 슬픈 테마
+            ],
+            BGMType.SPECIAL_EVENT: [
+                "02-Opening ~ Bombing Mission.mp3",       # 오프닝/스토리용 (02번 오프닝)
+                "13-Flowers Blooming in the Church.mp3",  # 꽃이 피는 교회
+                "62-Interrupted by Fireworks.mp3",        # 불꽃에 가로막혀서
+                "60-Tango of Tears.mp3"                   # 데이트 테마
+            ]
         }
     
-    def load_bgm(self, bgm_name: str) -> bool:
-        """BGM 파일 로드"""
-        if bgm_name in self.bgm_tracks:
-            return True
-        
-        if bgm_name not in self.bgm_mapping:
-            if self.debug_mode:
-                print(f"⚠️ BGM 매핑을 찾을 수 없음: {bgm_name}")
-            return False
-        
-        filename = self.bgm_mapping[bgm_name]
-        file_path = self.bgm_path / filename
-        
-        if file_path.exists():
-            try:
-                # pygame.mixer.music은 로드만 하고 실제 Sound 객체는 저장하지 않음
-                self.bgm_tracks[bgm_name] = str(file_path)
-                if self.debug_mode:
-                    print(f"✅ BGM 로드: {bgm_name} -> {filename}")
-                return True
-            except Exception as e:
-                if self.debug_mode:
-                    print(f"⚠️ BGM 로드 실패: {bgm_name} - {e}")
-                return False
-        else:
-            if self.debug_mode:
-                print(f"⚠️ BGM 파일 없음: {file_path}")
-            return False
-    
-    def load_sfx(self, sfx_name: str) -> bool:
-        """SFX 파일 로드"""
-        if sfx_name in self.sfx_sounds:
-            return True
-        
-        if sfx_name not in self.sfx_mapping:
-            if self.debug_mode:
-                print(f"⚠️ SFX 매핑을 찾을 수 없음: {sfx_name}")
-            return False
-        
-        filename = self.sfx_mapping[sfx_name]
-        file_path = self.sfx_path / filename
-        
-        if file_path.exists():
-            try:
-                sound = pygame.mixer.Sound(str(file_path))
-                sound.set_volume(self.sfx_volume * self.master_volume)
-                self.sfx_sounds[sfx_name] = sound
-                if self.debug_mode:
-                    print(f"✅ SFX 로드: {sfx_name} -> {filename}")
-                return True
-            except Exception as e:
-                if self.debug_mode:
-                    print(f"⚠️ SFX 로드 실패: {sfx_name} - {e}")
-                return False
-        else:
-            if self.debug_mode:
-                print(f"⚠️ SFX 파일 없음: {file_path}")
-            return False
-    
-    def play_bgm(self, bgm_name: str, loop: bool = True, fade_in: float = 1.0, force_restart: bool = False):
-        """BGM 재생 - 끊김 방지 개선"""
-        if not self.initialized:
-            if self.debug_mode:
-                print(f"🔇 오디오 시스템 비활성화됨 - BGM: {bgm_name}")
-            return False
-        
-        # 같은 BGM이 이미 재생 중이고 실제로 재생되고 있으면 그냥 둠
-        if (not force_restart and 
-            self.current_bgm == bgm_name and 
-            pygame.mixer.music.get_busy()):
-            if self.debug_mode:
-                print(f"🎵 이미 재생 중 (끊김 방지): {bgm_name}")
-            return True
-        
-        # 같은 BGM이지만 재생이 중단된 경우 빠르게 재시작
-        if (self.current_bgm == bgm_name and 
-            not pygame.mixer.music.get_busy()):
-            if self.debug_mode:
-                print(f"🔄 BGM 재시작 (연속성 보장): {bgm_name}")
-            fade_in = 0.3  # 더 빠른 재시작
-        
-        # BGM 로드
-        if not self.load_bgm(bgm_name):
-            return False
-        
-        try:
-            # 현재 BGM 중지 (같은 BGM 재시작이면 더 빠르게)
-            if pygame.mixer.music.get_busy():
-                fadeout_time = int(fade_in * 300) if self.current_bgm == bgm_name else int(fade_in * 500)
-                pygame.mixer.music.fadeout(fadeout_time)
-                time.sleep(fade_in * 0.3)  # 더 짧은 대기
+    def _initialize_sfx_mapping(self):
+        """FFVII SFX 매핑 초기화 - 랜덤 재생 지원"""
+        self.sfx_files = {
+            # UI 효과음 (FFVII 정확한 파일명)
+            SFXType.MENU_SELECT: ["000.wav"],      # 커서 이동
+            SFXType.MENU_CONFIRM: ["001.wav"],     # 세이브 완료/확인
+            SFXType.MENU_CANCEL: ["003.wav"],      # 취소
+            SFXType.MENU_ERROR: ["003.wav"],       # 에러도 취소음 사용 (더 적절함)
+            SFXType.ITEM_GET: ["357.wav"],         # 아이템 획득
+            SFXType.ITEM_USE: ["020.wav"],         # 아이템 사용
+            SFXType.ITEM_PICKUP: ["357.wav"],      # 아이템 픽업
+            SFXType.LEVEL_UP: ["381.wav"],         # 레벨업/4번째 리미트 습득
+            SFXType.SKILL_LEARN: ["381.wav"],      # 스킬 습득/새로운 발견
+            SFXType.SAVE_GAME: ["001.wav"],        # 저장 (확인음 사용)
+            SFXType.SAVE_READY: ["001.wav"],       # 로드 성공 (확인음 사용)
+            SFXType.EQUIP: ["444.wav"],            # 장비 장착
+            SFXType.UNEQUIP: ["444.wav"],          # 장비 해제
             
-            # 새 BGM 로드 및 재생
-            pygame.mixer.music.load(self.bgm_tracks[bgm_name])
-            pygame.mixer.music.set_volume(self.bgm_volume * self.master_volume)
+            # 소모품 효과음 (FFVII 정확한 파일명)
+            SFXType.POTION: ["005.wav"],           # 포션
+            SFXType.HI_POTION: ["006.wav"],        # 하이포션  
+            SFXType.X_POTION: ["007.wav"],         # 엑스포션
+            SFXType.ELIXIR: ["068.wav"],           # 엘릭서
+            SFXType.PHOENIX_DOWN: ["379.wav"],     # 피닉스테일
             
-            loops = -1 if loop else 0
-            pygame.mixer.music.play(loops, fade_ms=int(fade_in * 1000))
+            # 전투 효과음 (FFVII 정확한 파일명 + 랜덤 지원)
+            SFXType.SWORD_HIT: ["017.wav", "014.wav"],        # 클라우드 검 타격 (랜덤)
+            SFXType.CRITICAL_HIT: ["026.wav"],     # 클라우드 크리티컬
+            SFXType.MAGIC_CAST: ["012.wav"],       # 마법 시전 준비
+            SFXType.MAGIC_HIT: ["008.wav", "023.wav", "010.wav"],  # 파이어, 아이스, 볼트 (랜덤)
+            SFXType.ARROW_SHOT: ["017.wav", "014.wav", "019.wav"],  # 물리 공격 (랜덤)
+            SFXType.GUN_SHOT: ["014.wav", "017.wav"],         # 바렛 총 타격 (랜덤)
+            SFXType.EXPLOSION: ["019.wav", "008.wav"],        # 그레네이드 폭발 (랜덤)
+            SFXType.MISS: ["004.wav", "061.wav"],             # 공격 빗나감 (랜덤)
+            SFXType.BLOCK: ["061.wav"],            # 공격 회피
+            SFXType.DODGE: ["061.wav"],            # 회피
             
-            self.current_bgm = bgm_name
-            if self.debug_mode:
-                print(f"🎵 BGM 재생: {bgm_name}")
-            return True
+            # 상태 효과음 (FFVII 정확한 파일명)
+            SFXType.HEAL: ["005.wav"],             # 케알
+            SFXType.POISON: ["062.wav"],           # 바이오
+            SFXType.BURN: ["008.wav"],             # 파이어
+            SFXType.FREEZE: ["023.wav"],           # 아이스
+            SFXType.SHOCK: ["010.wav"],            # 볼트
+            SFXType.BUFF_ON: ["082.wav"],          # 헤이스트
+            SFXType.DEBUFF_ON: ["064.wav"],        # 슬로우
+            SFXType.BUFF_OFF: ["148.wav"],         # 상태이상 회복
+            SFXType.DEBUFF_OFF: ["148.wav"],       # 상태이상 회복
             
-        except Exception as e:
-            if self.debug_mode:
-                print(f"⚠️ BGM 재생 실패: {bgm_name} - {e}")
-            return False
+            # 환경 효과음 (FFVII 정확한 파일명)
+            SFXType.FOOTSTEP: ["027.wav"],         # 발소리
+            SFXType.DOOR_OPEN: ["121.wav"],        # 문 열기
+            SFXType.DOOR_CLOSE: ["052.wav"],       # 문 닫기
+            SFXType.TREASURE_OPEN: ["253.wav"],    # 보물상자
+            SFXType.TRAP_ACTIVATE: ["059.wav"],    # 경고음
+            SFXType.STAIRS_UP: ["054.wav"],        # 점프/이동
+            SFXType.STAIRS_DOWN: ["055.wav"],      # 착지
+            SFXType.BATTLE_SWIRL: ["042.wav"],     # 전투 시작 소용돌이
+            
+            # 특수 효과음 (FFVII 정확한 파일명)
+            SFXType.SUMMON: ["190.wav"],           # 마테리아 빛남/소환
+            SFXType.TELEPORT: ["054.wav"],         # 순간이동/점프
+            SFXType.TRANSFORMATION: ["266.wav"],   # 변신/기계 반응
+            SFXType.ULTIMATE: ["035.wav"],         # 리미트 브레이크
+            SFXType.DEATH: ["021.wav"],            # 적 사망
+            SFXType.REVIVE: ["379.wav"]            # 피닉스테일
+        }
     
-    def play_sfx(self, sfx_name: str, volume: float = 1.0, fallback: str = None):
-        """SFX 재생"""
-        if not self.initialized:
-            if self.debug_mode:
-                print(f"🔇 오디오 시스템 비활성화됨 - SFX: {sfx_name}")
-            return False
-        
-        # 요청된 사운드가 없으면 fallback 사용
-        if sfx_name not in self.sfx_sounds and fallback and fallback in self.sfx_mapping:
-            sfx_name = fallback
-        
-        # SFX 로드
-        if not self.load_sfx(sfx_name):
-            return False
-        
-        try:
-            sound = self.sfx_sounds[sfx_name]
-            sound.set_volume(volume * self.sfx_volume * self.master_volume)
-            sound.play()
-            if self.debug_mode:
-                print(f"🔊 SFX 재생: {sfx_name}")
-            return True
-        except Exception as e:
-            if self.debug_mode:
-                print(f"⚠️ SFX 재생 실패: {sfx_name} - {e}")
-            return False
-    
-    def get_bgm_for_floor(self, floor: int) -> str:
-        """층수에 맞는 FFVII BGM 트랙명 반환"""
-        # 최종 보스층 (20층 이상)
-        if floor >= 20:
-            if floor % 5 == 0:  # 20, 25, 30층... 진짜 보스층
-                return "final_boss"  # J-E-N-O-V-A
-            else:
-                return "epic_battle"  # One-Winged Angel
-        
-        # 보스층 체크 (5의 배수)
-        if floor % 5 == 0:
-            if floor >= 15:
-                return "boss_battle"  # Still More Fighting
-            else:
-                return "battle"   # Fighting
-        
-        # 일반층 - FFVII 스토리 진행에 맞춰 배치
-        if floor <= 4:
-            return "dungeon"         # Mako Reactor (1-4층)
-        elif floor <= 9:
-            return "dungeon_deep"    # Lurking in the Darkness (5-9층)
-        elif floor <= 14:
-            return "cave"            # Cosmo Canyon (10-14층)
-        elif floor <= 19:
-            return "mysterious"      # Chasing the Black-Caped Man (15-19층)
-        else:
-            return "dungeon"         # 기본 던전 테마
-    
-    def set_floor_bgm(self, floor: int):
-        """층수에 맞는 BGM 재생"""
-        bgm_name = self.get_bgm_for_floor(floor)
-        return self.play_bgm(bgm_name)
-    
-    def stop_bgm(self, fade_out: float = 1.0):
-        """BGM 정지"""
+    def play_bgm(self, bgm_type, loop: bool = True, force_restart: bool = False):
+        """BGM 재생 - 랜덤 선택 지원"""
         if not self.initialized:
             return
         
         try:
-            if pygame.mixer.music.get_busy():
-                if fade_out > 0:
-                    pygame.mixer.music.fadeout(int(fade_out * 1000))
+            # BGMType 변환
+            if isinstance(bgm_type, str):
+                # 문자열을 BGMType으로 변환 시도
+                for bt in BGMType:
+                    if bt.value == bgm_type or bt.name.lower() == bgm_type.lower():
+                        bgm_type = bt
+                        break
                 else:
-                    pygame.mixer.music.stop()
+                    if self.debug_mode:
+                        print(f"⚠️ 알 수 없는 BGM 타입: {bgm_type}")
+                    return
+            
+            if bgm_type not in self.bgm_files:
+                if self.debug_mode:
+                    print(f"⚠️ BGM 타입이 매핑되지 않음: {bgm_type}")
+                return
+            
+            # 랜덤 파일 선택
+            file_list = self.bgm_files[bgm_type]
+            selected_file = random.choice(file_list)
+            
+            # 현재 재생 중인 곡과 같으면 스킵 (force_restart가 False일 때)
+            if not force_restart and self.current_bgm == selected_file:
+                return
+            
+            # 파일 경로 확인
+            file_path = self.bgm_path / selected_file
+            if not file_path.exists():
+                if self.debug_mode:
+                    print(f"⚠️ BGM 파일이 없음: {file_path}")
+                return
+            
+            # BGM 재생
+            pygame.mixer.music.load(str(file_path))
+            pygame.mixer.music.set_volume(self.bgm_volume * self.master_volume)
+            pygame.mixer.music.play(-1 if loop else 1)
+            
+            self.current_bgm = selected_file
+            
+            if self.debug_mode:
+                print(f"🎵 BGM 재생: {selected_file} (타입: {bgm_type.name})")
+                
+        except Exception as e:
+            if self.debug_mode:
+                print(f"❌ BGM 재생 실패: {e}")
+    
+    def _play_bgm_internal(self, bgm_type, loop: bool = True, fade_in: int = 1000):
+        """내부 BGM 재생 로직 (호환성용)"""
+        self.play_bgm(bgm_type, loop=loop)
+    
+    def play_sfx(self, sfx_type, volume_override: Optional[float] = None):
+        """SFX 재생 - 랜덤 선택 지원"""
+        if not self.initialized:
+            return
+        
+        try:
+            # SFXType 변환
+            if isinstance(sfx_type, str):
+                # 문자열을 SFXType으로 변환 시도
+                for st in SFXType:
+                    if st.value == sfx_type or st.name.lower() == sfx_type.lower():
+                        sfx_type = st
+                        break
+                else:
+                    if self.debug_mode:
+                        print(f"⚠️ 알 수 없는 SFX 타입: {sfx_type}")
+                    return
+            
+            if sfx_type not in self.sfx_files:
+                if self.debug_mode:
+                    print(f"⚠️ SFX 타입이 매핑되지 않음: {sfx_type}")
+                return
+            
+            # 랜덤 파일 선택
+            file_list = self.sfx_files[sfx_type]
+            selected_file = random.choice(file_list)
+            
+            # 파일 경로 확인
+            file_path = self.sfx_path / selected_file
+            if not file_path.exists():
+                if self.debug_mode:
+                    print(f"⚠️ SFX 파일이 없음: {file_path}")
+                return
+            
+            # SFX 재생
+            sound = pygame.mixer.Sound(str(file_path))
+            volume = volume_override if volume_override is not None else (self.sfx_volume * self.master_volume)
+            sound.set_volume(volume)
+            sound.play()
+            
+            if self.debug_mode:
+                print(f"🔊 SFX 재생: {selected_file} (타입: {sfx_type.name})")
+                
+        except Exception as e:
+            if self.debug_mode:
+                print(f"❌ SFX 재생 실패: {e}")
+    
+    def stop_bgm(self):
+        """BGM 중지"""
+        if self.initialized:
+            pygame.mixer.music.stop()
             self.current_bgm = None
             if self.debug_mode:
-                print("🔇 BGM 정지")
-        except Exception as e:
-            if self.debug_mode:
-                print(f"⚠️ BGM 정지 실패: {e}")
-    
-    def pause_bgm(self):
-        """BGM 일시정지"""
-        if not self.initialized:
-            return
-        
-        try:
-            pygame.mixer.music.pause()
-            if self.debug_mode:
-                print("⏸️ BGM 일시정지")
-        except Exception as e:
-            if self.debug_mode:
-                print(f"⚠️ BGM 일시정지 실패: {e}")
-    
-    def resume_bgm(self):
-        """BGM 재개"""
-        if not self.initialized:
-            return
-        
-        try:
-            pygame.mixer.music.unpause()
-            if self.debug_mode:
-                print("▶️ BGM 재개")
-        except Exception as e:
-            if self.debug_mode:
-                print(f"⚠️ BGM 재개 실패: {e}")
-    
-    def set_master_volume(self, volume: float):
-        """마스터 볼륨 설정 (0.0 ~ 1.0)"""
-        self.master_volume = max(0.0, min(1.0, volume))
-        
-        # 현재 재생중인 BGM 볼륨 업데이트
-        if self.current_bgm and pygame.mixer.music.get_busy():
-            pygame.mixer.music.set_volume(self.bgm_volume * self.master_volume)
-        
-        # 로드된 SFX 볼륨 업데이트
-        for sound in self.sfx_sounds.values():
-            sound.set_volume(self.sfx_volume * self.master_volume)
-        
-        if self.debug_mode:
-            print(f"🔊 마스터 볼륨: {int(self.master_volume * 100)}%")
+                print("🛑 BGM 중지")
     
     def set_bgm_volume(self, volume: float):
         """BGM 볼륨 설정 (0.0 ~ 1.0)"""
         self.bgm_volume = max(0.0, min(1.0, volume))
-        if self.current_bgm and pygame.mixer.music.get_busy():
+        if self.initialized and pygame.mixer.music.get_busy():
             pygame.mixer.music.set_volume(self.bgm_volume * self.master_volume)
-        if self.debug_mode:
-            print(f"🎵 BGM 볼륨: {int(self.bgm_volume * 100)}%")
     
     def set_sfx_volume(self, volume: float):
         """SFX 볼륨 설정 (0.0 ~ 1.0)"""
         self.sfx_volume = max(0.0, min(1.0, volume))
-        # 로드된 모든 SFX 볼륨 업데이트
-        for sound in self.sfx_sounds.values():
-            sound.set_volume(self.sfx_volume * self.master_volume)
+    
+    def set_master_volume(self, volume: float):
+        """마스터 볼륨 설정 (0.0 ~ 1.0)"""
+        self.master_volume = max(0.0, min(1.0, volume))
+        if self.initialized and pygame.mixer.music.get_busy():
+            pygame.mixer.music.set_volume(self.bgm_volume * self.master_volume)
+    
+    def get_bgm_for_floor(self, floor: int) -> BGMType:
+        """층수에 따른 BGM 타입 반환"""
+        if floor <= 3:
+            return BGMType.FLOOR_1_3
+        elif floor <= 6:
+            return BGMType.FLOOR_4_6
+        elif floor <= 9:
+            return BGMType.FLOOR_7_9
+        elif floor <= 12:
+            return BGMType.FLOOR_10_12
+        elif floor <= 15:
+            return BGMType.FLOOR_13_15
+        elif floor <= 18:
+            return BGMType.FLOOR_16_18
+        elif floor <= 21:
+            return BGMType.FLOOR_19_21
+        elif floor <= 24:
+            return BGMType.FLOOR_22_24
+        elif floor <= 27:
+            return BGMType.FLOOR_25_27
+        elif floor <= 30:
+            return BGMType.FLOOR_28_30
+        elif floor <= 33:
+            return BGMType.FLOOR_31_33
+        elif floor <= 36:
+            return BGMType.FLOOR_34_36
+        elif floor <= 39:
+            return BGMType.FLOOR_37_39
+        elif floor <= 42:
+            return BGMType.FLOOR_40_42
+        elif floor <= 45:
+            return BGMType.FLOOR_43_45
+        elif floor <= 48:
+            return BGMType.FLOOR_46_48
+        elif floor <= 51:
+            return BGMType.FLOOR_49_51
+        else:
+            return BGMType.FLOOR_52_PLUS
+    
+    def set_floor_bgm(self, floor: int):
+        """층수에 따른 BGM 자동 설정"""
+        bgm_type = self.get_bgm_for_floor(floor)
+        self.play_bgm(bgm_type)
+        
         if self.debug_mode:
-            print(f"🔊 SFX 볼륨: {int(self.sfx_volume * 100)}%")
+            print(f"🏢 {floor}층 BGM 설정: {bgm_type.name}")
     
     def cleanup(self):
         """오디오 시스템 정리"""
-        try:
-            if self.initialized:
-                pygame.mixer.music.stop()
-                pygame.mixer.quit()
-                if self.debug_mode:
-                    print("🎵 오디오 시스템 종료")
-        except Exception as e:
+        if self.initialized:
+            pygame.mixer.music.stop()
+            pygame.mixer.quit()
+            self.initialized = False
             if self.debug_mode:
-                print(f"⚠️ 오디오 시스템 종료 실패: {e}")
-    
-    # 기존 AudioManager 호환성을 위한 메서드들
-    def load_bgm_tracks(self):
-        """호환성을 위한 메서드 - 실제로는 아무것도 하지 않음"""
-        if self.debug_mode:
-            print("🎵 BGM 트랙 정보 로드됨 (호환성 모드)")
-    
-    def play_bgm_for_floor(self, floor: int):
-        """호환성을 위한 메서드"""
-        return self.set_floor_bgm(floor)
-    
-    def play_sound_effect(self, effect_name: str):
-        """호환성을 위한 메서드"""
-        return self.play_sfx(effect_name)
-    
-    def play_special_bgm(self, situation: str):
-        """특수 상황용 BGM 재생"""
-        situation_mapping = {
-            "shop": "peaceful",
-            "rest": "safe_area", 
-            "mystery": "mysterious",
-            "ending": "victory"
-        }
-        
-        bgm_name = situation_mapping.get(situation, "peaceful")
-        return self.play_bgm(bgm_name)
-    
-    def is_bgm_playing(self) -> bool:
-        """BGM 재생 상태 확인"""
-        if not self.initialized:
-            return False
-        try:
-            return pygame.mixer.music.get_busy()
-        except:
-            return False
-    
-    def ensure_bgm_continuity(self, bgm_name: str):
-        """BGM 연속성 보장 - 창 전환 시 호출"""
-        if (self.current_bgm == bgm_name and 
-            not self.is_bgm_playing()):
-            # 같은 BGM이지만 재생이 중단된 경우 빠르게 재시작
-            if self.debug_mode:
-                print(f"🔄 BGM 연속성 복구: {bgm_name}")
-            self.play_bgm(bgm_name, fade_in=0.2)
-    
-    def soft_transition_bgm(self, bgm_name: str, **kwargs):
-        """부드러운 BGM 전환 - 끊김 최소화"""
-        if self.current_bgm != bgm_name:
-            kwargs.setdefault('fade_in', 0.3)
-            self.play_bgm(bgm_name, **kwargs)
-        else:
-            self.ensure_bgm_continuity(bgm_name)
+                print("🧹 오디오 시스템 정리 완료")
 
-# 전역 통합 오디오 시스템 인스턴스
+# 전역 인스턴스
 _unified_audio_system = None
 
-def get_unified_audio_system(debug_mode: bool = False):
-    """통합 오디오 시스템 인스턴스 반환"""
+def get_unified_audio_system() -> UnifiedAudioSystem:
+    """통합 오디오 시스템 싱글톤 인스턴스 반환"""
     global _unified_audio_system
     if _unified_audio_system is None:
-        _unified_audio_system = UnifiedAudioSystem(debug_mode=debug_mode)
+        _unified_audio_system = UnifiedAudioSystem(debug_mode=False)
     return _unified_audio_system
-
-# 기존 호환성을 위한 별칭들
-def get_audio_system():
-    """기존 호환성을 위한 함수"""
-    return get_unified_audio_system()
 
 def get_audio_manager():
     """기존 호환성을 위한 함수"""
@@ -574,22 +593,25 @@ if __name__ == "__main__":
     
     # BGM 테스트
     print("\n📀 BGM 테스트:")
-    audio.play_bgm("title")
+    audio.play_bgm(BGMType.MENU)
     time.sleep(2)
-    audio.play_bgm("dungeon")
+    audio.play_bgm(BGMType.FLOOR_1_3)
     time.sleep(2)
     
     # SFX 테스트
     print("\n🔊 SFX 테스트:")
-    audio.play_sfx("menu_select")
+    audio.play_sfx(SFXType.MENU_SELECT)
     time.sleep(0.5)
-    audio.play_sfx("sword_hit")
+    audio.play_sfx(SFXType.SWORD_HIT)  # 랜덤으로 017.wav 또는 014.wav 재생
+    time.sleep(0.5)
+    audio.play_sfx(SFXType.MAGIC_HIT)  # 랜덤으로 008.wav, 023.wav, 010.wav 중 하나 재생
     time.sleep(0.5)
     
     # 층별 BGM 테스트
     print("\n🏢 층별 BGM 테스트:")
     for floor in [1, 5, 10, 15, 20]:
-        print(f"  {floor}층: {audio.get_bgm_for_floor(floor)}")
+        bgm_type = audio.get_bgm_for_floor(floor)
+        print(f"  {floor}층: {bgm_type.name}")
     
     audio.cleanup()
     print("✅ 테스트 완료!")

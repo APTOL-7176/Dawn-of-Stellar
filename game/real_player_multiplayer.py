@@ -737,6 +737,34 @@ async def demo_real_multiplayer():
     # 10초 후 서버 종료 (데모용)
     await asyncio.sleep(10)
     
+    def start_multiplayer_session(self):
+        """멀티플레이어 세션 시작 (메인 메뉴에서 호출)"""
+        print("🎮 멀티플레이어 세션 시작...")
+        try:
+            # 이벤트 루프 실행
+            asyncio.run(self._run_multiplayer_session())
+        except Exception as e:
+            print(f"❌ 멀티플레이어 세션 오류: {e}")
+    
+    async def _run_multiplayer_session(self):
+        """실제 멀티플레이어 세션 실행"""
+        print("🚀 멀티플레이어 서버 시작 중...")
+        await self.start_server()
+        
+        try:
+            print("⏳ 플레이어 접속 대기 중...")
+            print("   Ctrl+C로 종료할 수 있습니다.")
+            
+            # 서버 대기
+            await self.server.wait_closed()
+            
+        except KeyboardInterrupt:
+            print("\n🛑 사용자에 의해 중단됨")
+        except Exception as e:
+            print(f"❌ 서버 오류: {e}")
+        finally:
+            await self.stop_server()
+
     print("🛑 데모 종료. 서버를 중지합니다...")
     await server.stop_server()
 

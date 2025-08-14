@@ -12,12 +12,12 @@ from enum import Enum
 from dataclasses import dataclass
 
 # 우리가 만든 고급 시스템들 import
-from .ffvii_sound_system import get_ffvii_sound_system, AudioCategory
-from .meta_progression import MetaProgression
+from game.ffvii_sound_system import get_ffvii_sound_system, AudioCategory
+from game.meta_progression import MetaProgression
 
 # 선택적 시스템들 (없어도 동작)
 try:
-    from .adaptive_balance import AdaptiveBalanceSystem, DifficultyLevel
+    from game.adaptive_balance import AdaptiveBalanceSystem, DifficultyLevel
 except ImportError:
     print("adaptive_balance 모듈을 찾을 수 없습니다.")
     class AdaptiveBalanceSystem:
@@ -28,7 +28,7 @@ except ImportError:
         def update(self, dt): pass
 
 try:
-    from .smart_ai import SmartEnemyAI, PartyAI, AIPersonality
+    from game.smart_ai import SmartEnemyAI, PartyAI, AIPersonality
 except ImportError:
     print("smart_ai 모듈을 찾을 수 없습니다.")
     class SmartEnemyAI:
@@ -44,7 +44,7 @@ except ImportError:
         ADAPTIVE = "adaptive"
 
 try:
-    from .advanced_ui import AdvancedUI, AnimationType, ParticleType
+    from game.advanced_ui import AdvancedUI, AnimationType, ParticleType
 except ImportError:
     print("advanced_ui 모듈을 찾을 수 없습니다.")
     class AdvancedUI:

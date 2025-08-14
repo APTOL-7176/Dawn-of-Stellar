@@ -21,8 +21,8 @@ from dataclasses import dataclass, field
 from collections import defaultdict, deque
 from pathlib import Path
 
-from .color_text import bright_cyan, bright_yellow, bright_green, bright_red, cyan, yellow, red, green, white
-from .game_integrated_ai import GameIntegratedAI, AIIntelligenceLevel
+from game.color_text import bright_cyan, bright_yellow, bright_green, bright_red, cyan, yellow, red, green, white
+from game.game_integrated_ai import GameIntegratedAI, AIIntelligenceLevel
 
 # 임시 클래스들 (실제 멀티플레이어 시스템 대체)
 class SessionState:

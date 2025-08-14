@@ -460,7 +460,8 @@ class SaveManager:
     def save_game(self, game_state: Dict[str, Any], save_name: str = None) -> bool:
         """게임 저장"""
         try:
-            print(f"🔍 저장 시작 - save_name: {save_name}")
+            print(f"🔍 [DEBUG] 저장 시작 - save_name: {save_name}")
+            print(f"🔍 [DEBUG] 저장 매니저 초기화 상태: save_dir={self.save_dir}")
             
             if save_name is None:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -484,16 +485,27 @@ class SaveManager:
             game_state['save_name'] = save_name
             
             print(f"📝 파일 쓰기 시작...")
+            print(f"🔍 [DEBUG] 게임 상태 키: {list(game_state.keys())}")
+            
             with open(save_path, 'w', encoding='utf-8') as f:
                 try:
                     json.dump(game_state, f, indent=2, ensure_ascii=False, cls=GameStateEncoder)
+                    print(f"🔍 [DEBUG] JSON 직렬화 성공")
                 except TypeError as e:
                     # JSON 직렬화 실패 시 fallback
                     print(f"⚠️ JSON 직렬화 오류, fallback 사용: {e}")
                     json.dump(game_state, f, indent=2, ensure_ascii=False, default=str)
+                    print(f"🔍 [DEBUG] Fallback 직렬화 완료")
             
-            print(f"✅ 게임이 저장되었습니다: {save_name}")
-            return True
+            # 파일이 실제로 생성되었는지 확인
+            if os.path.exists(save_path):
+                file_size = os.path.getsize(save_path)
+                print(f"🔍 [DEBUG] 저장 파일 확인됨: {file_size} bytes")
+                print(f"✅ 게임이 저장되었습니다: {save_name}")
+                return True
+            else:
+                print(f"❌ 저장 파일이 생성되지 않았습니다!")
+                return False
             
         except PermissionError as e:
             print(f"❌ 권한 오류: {e}")
@@ -861,7 +873,7 @@ class GameStateSerializer:
         """딕셔너리에서 캐릭터 객체 생성"""
         # Character 클래스 동적 임포트
         try:
-            from .character import Character
+            from game.character import Character
             
             # 🔧 모든 스탯 중복 적용 방지: 클래스 보정을 건너뛰고 저장된 값 사용
             character = Character(
@@ -1007,7 +1019,7 @@ class GameStateSerializer:
         # 인벤토리 복원 (강화된 안전성)
         if 'inventory' in char_data and char_data['inventory']:
             try:
-                from .items import Inventory
+                from game.items import Inventory
                 inventory_data = char_data['inventory']
                 
                 # 새 인벤토리 객체 생성
@@ -1039,7 +1051,7 @@ class GameStateSerializer:
                 traceback.print_exc()
                 # 기본 인벤토리 생성
                 try:
-                    from .items import Inventory
+                    from game.items import Inventory
                     character.inventory = Inventory(max_size=15, max_weight=100.0)
                     character.inventory.items = {}
                     print(f"🔧 {character.name} 기본 인벤토리 생성")
@@ -1048,7 +1060,7 @@ class GameStateSerializer:
         else:
             # 인벤토리 데이터가 없는 경우 기본 인벤토리 생성
             try:
-                from .items import Inventory
+                from game.items import Inventory
                 character.inventory = Inventory(max_size=15, max_weight=100.0)
                 character.inventory.items = {}
                 print(f"🆕 {character.name} 새 인벤토리 생성 (저장 데이터 없음)")
@@ -1061,7 +1073,7 @@ class GameStateSerializer:
             if equipment_data is None:
                 return None
             try:
-                from .items import Item, ItemType, ItemRarity
+                from game.items import Item, ItemType, ItemRarity
                 # ItemType 변환
                 item_type_str = equipment_data.get('item_type', 'WEAPON')
                 if hasattr(ItemType, item_type_str):
@@ -1159,7 +1171,7 @@ class GameStateSerializer:
             # 게임 설정에서 난이도 정보 가져오기
             difficulty_info = "normal"  # 기본값
             try:
-                from .settings import GameSettings
+                from game.settings import GameSettings
                 settings = GameSettings()
                 difficulty_info = settings.get('gameplay', 'difficulty')
                 print(f"🎯 난이도 정보 저장: {difficulty_info}")
@@ -1226,7 +1238,7 @@ class GameStateSerializer:
 def show_save_menu(save_manager: SaveManager) -> Optional[str]:
     """저장 메뉴 표시 - 커서 방식"""
     try:
-        from .cursor_menu_system import create_simple_menu
+        from game.cursor_menu_system import create_simple_menu
         
         # 커서 메뉴 생성
         options = [
@@ -1246,17 +1258,27 @@ def show_save_menu(save_manager: SaveManager) -> Optional[str]:
         menu = create_simple_menu("💾 게임 저장", options, descriptions)
         result = menu.run()
         
-        if result == -1 or result == 3:  # 취소
+        print(f"🔍 [DEBUG] 커서 메뉴 결과: {result}")
+        print(f"🔍 [DEBUG] 커서 메뉴 타입: {type(result)}")
+        
+        # 메뉴 결과 처리 (None은 취소, 정수는 선택)
+        if result is None:  # Q키로 취소했거나 오류 발생
+            print("ℹ️ 저장을 취소했습니다.")
+            return "CANCEL"
+        elif result == 3:  # 취소 옵션 선택
+            print("ℹ️ 저장을 취소했습니다.")
             return "CANCEL"
         elif result == 0:  # 빠른 저장
             import datetime
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             return f"autosave_{timestamp}"
         elif result == 1:  # 이름 지정 저장
-            from .input_utils import KeyboardInput
+            from game.input_utils import KeyboardInput
             keyboard = KeyboardInput()
             print("\n저장 파일 이름을 입력하세요: ", end='', flush=True)
+            print(f"🔍 [DEBUG] 문자열 입력 대기 중...")
             save_name = keyboard.get_string_input()
+            print(f"🔍 [DEBUG] 입력된 파일명: '{save_name}'")
             if save_name:
                 return save_name
             else:
@@ -1266,7 +1288,7 @@ def show_save_menu(save_manager: SaveManager) -> Optional[str]:
             saves = save_manager.list_saves()
             if not saves:
                 print("\n기존 저장 파일이 없습니다.")
-                from .input_utils import KeyboardInput
+                from game.input_utils import KeyboardInput
                 KeyboardInput().wait_for_key("아무 키나 눌러 계속...")
                 return None
             
@@ -1296,7 +1318,7 @@ def show_save_menu(save_manager: SaveManager) -> Optional[str]:
 
 def _show_save_menu_fallback(save_manager: SaveManager) -> Optional[str]:
     """저장 메뉴 폴백 (기존 방식)"""
-    from .input_utils import KeyboardInput
+    from game.input_utils import KeyboardInput
     
     keyboard = KeyboardInput()
     
@@ -1368,12 +1390,12 @@ def show_load_menu(save_manager: SaveManager) -> Optional[str]:
     
     if not saves:
         print("\n저장된 게임이 없습니다.")
-        from .input_utils import KeyboardInput
+        from game.input_utils import KeyboardInput
         KeyboardInput().wait_for_key("아무 키나 눌러 계속...")
         return None
     
     try:
-        from .cursor_menu_system import create_simple_menu
+        from game.cursor_menu_system import create_simple_menu
         
         # 페이지당 항목 수 (화면에 맞게 조정)
         items_per_page = 10
@@ -1457,7 +1479,7 @@ def show_load_menu(save_manager: SaveManager) -> Optional[str]:
 
 def _show_load_menu_fallback(save_manager: SaveManager, saves: List) -> Optional[str]:
     """불러오기 메뉴 폴백 (기존 방식)"""
-    from .input_utils import KeyboardInput
+    from game.input_utils import KeyboardInput
     keyboard = KeyboardInput()
     
     print("\n" + "="*50)

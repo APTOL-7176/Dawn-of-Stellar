@@ -1,17 +1,17 @@
 from typing import List, Optional
-from .character import Character
-from .items import Item
-from .unified_name_pools import unified_name_pools
-from .enhanced_items import enhanced_items
-from .enhanced_party_presets import EnhancedPartyPresets
-from .auto_party_builder import AutoPartyBuilder
-from .party_history_manager import PartyHistoryManager
-from .cursor_menu_system import CursorMenu
-from .color_text import *
+from game.character import Character
+from game.items import Item
+from game.unified_name_pools import unified_name_pools
+from game.enhanced_items import enhanced_items
+from game.enhanced_party_presets import EnhancedPartyPresets
+from game.auto_party_builder import AutoPartyBuilder
+from game.party_history_manager import PartyHistoryManager
+from game.cursor_menu_system import CursorMenu
+from game.color_text import *
 
 # 커서 메뉴 시스템 사용 가능 여부 확인
 try:
-    from .cursor_menu_system import CursorMenu
+    from game.cursor_menu_system import CursorMenu
     CURSOR_MENU_AVAILABLE = True
 except ImportError:
     CURSOR_MENU_AVAILABLE = False
@@ -56,7 +56,7 @@ class EasyCharacterCreator:
             # 폴백: 기본 파티 직접 생성
             try:
                 print(f"{YELLOW}🔄 기본 파티로 대체합니다...{RESET}")
-                from .character import Character
+                from game.character import Character
                 
                 # 기본 4인 파티 생성 (전사, 아크메이지, 성기사, 바드)
                 default_party = []
@@ -223,7 +223,7 @@ class EasyCharacterCreator:
         try:
             # 화면 정리 (안전하게)
             try:
-                from .clear_screen_utils import clear_screen
+                from game.clear_screen_utils import clear_screen
                 clear_screen()
             except ImportError:
                 import os
@@ -298,7 +298,7 @@ class EasyCharacterCreator:
             print(f"\n{RED}❌ 파티 정보 표시 중 오류: {e}{RESET}")
             input(f"\n{CYAN}계속하려면 Enter를 누르세요...{RESET}")
     
-    def create_character_with_details(self, character_class: str, name: str = None, gender: str = None) -> Character:
+    def create_character_with_details(self, character_class: str, name: str = None, gender: str = None, level: int = 1) -> Character:
         """상세 정보를 포함한 캐릭터 생성"""
         try:
             # 이름이 제공되지 않으면 통합 이름 풀에서 생성
@@ -312,8 +312,8 @@ class EasyCharacterCreator:
             if not gender:
                 gender = unified_name_pools.detect_gender_from_name(name)
             
-            # 캐릭터 생성
-            character = self.auto_builder._create_character(character_class, 1)
+            # 캐릭터 생성 (level 매개변수 사용)
+            character = self.auto_builder._create_character(character_class, level)
             character.name = name
             
             # 성별 정보 저장
@@ -350,7 +350,7 @@ class EasyCharacterCreator:
                     character.inventory.add_item_by_name(item['name'])
                 elif hasattr(character.inventory, 'add_item'):
                     # Inventory 객체인 경우 - 직접 추가 (fallback)
-                    from .items import Item, ItemType, ItemRarity
+                    from game.items import Item, ItemType, ItemRarity
                     inventory_item = Item(item['name'], ItemType.WEAPON, ItemRarity.COMMON, 
                                         item.get('description', '장비 아이템'))
                     character.inventory.add_item(inventory_item)
@@ -366,7 +366,7 @@ class EasyCharacterCreator:
                     character.inventory.add_item_by_name(item['name'])
                 elif hasattr(character.inventory, 'add_item'):
                     # Inventory 객체인 경우 - 직접 추가 (fallback)
-                    from .items import Item, ItemType, ItemRarity
+                    from game.items import Item, ItemType, ItemRarity
                     inventory_item = Item(item['name'], ItemType.CONSUMABLE, ItemRarity.COMMON, 
                                         item.get('description', '소비 아이템'))
                     character.inventory.add_item(inventory_item)
@@ -377,7 +377,7 @@ class EasyCharacterCreator:
         except Exception as e:
             print(f"⚠️ 시작 아이템 지급 실패: {e}")
 
-    def create_balanced_party(self, auto_select_traits: bool = True) -> List[Character]:
+    def create_balanced_party(self, auto_select_traits: bool = False) -> List[Character]:
         """균형잡힌 파티 생성"""
         try:
             print(f"\n{YELLOW}⚖️ 균형잡힌 파티를 생성하는 중...{RESET}")
@@ -406,7 +406,7 @@ class EasyCharacterCreator:
             else:
                 # 폴백: 랜덤 직업 선택으로 균형잡힌 파티 생성
                 import random
-                from .character import Character
+                from game.character import Character
                 
                 available_classes = [
                     "전사", "아크메이지", "성기사", "바드", "도적", "기사", 
@@ -445,6 +445,19 @@ class EasyCharacterCreator:
                 return None
             
             print(f"{CYAN}📋 party_data 타입: {type(party_data)}{RESET}")
+            
+            # party_data가 리스트인 경우 딕셔너리로 변환 시도
+            if isinstance(party_data, list):
+                print(f"{YELLOW}⚠️ party_data가 list입니다. dict로 변환 시도...{RESET}")
+                if len(party_data) >= 4:  # 최소 4명의 파티원이 있어야 함
+                    # 리스트를 딕셔너리로 변환
+                    converted_data = {"members": party_data}
+                    party_data = converted_data
+                    print(f"{GREEN}✅ party_data를 dict로 변환했습니다.{RESET}")
+                else:
+                    print(f"{RED}❌ party_data 리스트에 충분한 데이터가 없습니다: {len(party_data)}개{RESET}")
+                    return None
+            
             print(f"{CYAN}📋 party_data 키: {list(party_data.keys()) if isinstance(party_data, dict) else 'dict가 아님'}{RESET}")
             
             # party_data가 딕셔너리가 아닌 경우 오류

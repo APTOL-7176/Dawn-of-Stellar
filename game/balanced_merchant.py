@@ -13,7 +13,7 @@ from enum import Enum
 
 # 아이템 시스템에서 소모품 데이터베이스 임포트
 try:
-    from .item_system import get_consumable_database, ItemRarity as ConsumableRarity, Consumable
+    from game.item_system import get_consumable_database, ItemRarity as ConsumableRarity, Consumable
 except ImportError:
     from item_system import get_consumable_database, ItemRarity as ConsumableRarity, Consumable
 

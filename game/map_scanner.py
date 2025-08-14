@@ -12,8 +12,8 @@ from dataclasses import dataclass
 
 # 게임 모듈들
 try:
-    from .world import TileType, World
-    from .error_logger import log_system
+    from game.world import TileType, World
+    from game.error_logger import log_system
 except ImportError:
     # 로깅이 없으면 더미 함수 사용
     def log_system(category, message, details=None):
@@ -32,9 +32,9 @@ except ImportError:
         DOOR = '='
         STAIRS_UP = '<'
         STAIRS_DOWN = '>'
-    from .character import Character
-    from .ai_chat_system import AICharacterProfile
-    from .error_logger import log_system, log_debug
+    from game.character import Character
+    from game.ai_chat_system import AICharacterProfile
+    from game.error_logger import log_system, log_debug
 except ImportError:
     # 개발 환경에서의 임포트
     TileType = None

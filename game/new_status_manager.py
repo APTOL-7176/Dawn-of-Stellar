@@ -4,7 +4,7 @@
 """
 
 from typing import List, Dict, Any, Optional
-from .new_skill_system import StatusType
+from game.new_skill_system import StatusType
 
 class StatusEffect:
     """상태이상 효과"""
