@@ -146,7 +146,7 @@ debug_*.py
 # ===================================================================
 # 문서 및 리포트 파일들 (개발 전용)
 # ===================================================================
-*_REPORT.md
+#*_REPORT.md
 *_GUIDE.md
 *_NOTES.md
 *_TODO.md
@@ -558,10 +558,161 @@ safe_fix_summary_*.json
 emergency_exit_backups/
 
 # 이슈 트래킹 파일들 (임시)
-ISSUE_TRACKING_*.md
+#ISSUE_TRACKING_*.md
 *_STATUS_*.md
 
 # ===================================================================
 # 프로젝트 정리 - 아카이브 폴더 (로컬 백업용)
 # ===================================================================
 archive/
+
+# ===================================================================
+# 오디오 파일들 - 게임에 필요하므로 포함
+# ===================================================================
+# (오디오 파일은 Git에 포함됩니다)
+
+# ===================================================================
+# Flutter 모바일 앱 관련 파일들
+# ===================================================================
+flutter_mobile/.dart_tool/
+flutter_mobile/.flutter-plugins
+flutter_mobile/.flutter-plugins-dependencies
+flutter_mobile/.metadata
+flutter_mobile/build/
+flutter_mobile/android/.gradle/
+flutter_mobile/android/build/
+flutter_mobile/android/app/build/
+flutter_mobile/android/local.properties
+flutter_mobile/android/app/src/main/java/io/flutter/plugins/
+flutter_mobile/ios/.symlinks/
+flutter_mobile/ios/Flutter/
+flutter_mobile/ios/Pods/
+flutter_mobile/ios/.generated/
+flutter_mobile/linux/flutter/ephemeral/
+flutter_mobile/linux/flutter/generated_plugin_registrant.cc
+flutter_mobile/linux/flutter/generated_plugin_registrant.h
+flutter_mobile/linux/flutter/generated_plugins.cmake
+flutter_mobile/macos/Flutter/
+flutter_mobile/windows/flutter/
+flutter_mobile/web/
+flutter_mobile/pubspec.lock
+flutter_mobile/.packages
+
+# ===================================================================
+# AI 캐릭터 데이터 (개인화된 데이터)
+# ===================================================================
+ai_character_data/memories/
+ai_character_data/personalities/
+*.db
+*.db-journal
+
+# ===================================================================
+# 게임 데이터 파일들
+# ===================================================================
+data/party_history.json
+
+# ===================================================================
+# BOM 백업 파일들
+# ===================================================================
+*.bom_backup_*
+
+# ===================================================================
+# 추가 개발/디버그 파일들 (게임 구동 불필요)
+# ===================================================================
+
+# Python 런처 백업 및 테스트
+python_launcher_new.py
+safe_exit_handler.py
+ui_preview_example.py
+
+# 디버그 및 체크 스크립트들
+debug_*.py
+check_*.py
+fix_*.py
+safe_*.py
+*_debugger.py
+*_checker.py
+*_hunter.py
+bom_analyzer.py
+import_analyzer.py
+game_status_check.py
+sync_wiki.py
+cleanup_*.py
+
+# AI 멀티플레이어 테스트 파일들
+game_ai_multiplayer.py
+simple_robat_chat.py
+korean_ollama_guide.py
+demo_personality_commentary.py
+
+# 개발용 문서들 (CLAUDE.md, README.md는 제외)
+*_GUIDE.md
+*_PLAN.md
+*_REPORT.md
+*_COMPLETE.md
+*_DOCUMENTATION.md
+*_DESIGN_DOCUMENT.md
+*_COMPLETION_*.md
+*_STATUS_*.md
+ISSUE_TRACKING_*.md
+ISSUE_RESOLUTION_*.md
+RELEASE_NOTES_*.md
+NEXT_RECOMMENDATIONS.md
+SAVE_SYSTEM_IMPROVEMENTS.md
+JOB_SYSTEM_IMPLEMENTATION_PLAN.md
+SYSTEM_UPDATE_REPORT_*.md
+mobile_port_plan.md
+fix_summary_*.md
+atb_fix_report_*.md
+enemy_debug_system_*.md
+README_설치가이드.md
+
+# 모바일 관련 문서
+MOBILE_*.md
+iOS_배포_가이드.md
+ELECTRON_APP_README.md
+
+# AI 시스템 관련 문서
+AI_DIALOGUE_*.md
+AI_MODE_GUIDE.py
+AI_DIALOGUE_GUIDE.py
+AI_MULTIPLAYER_*.md
+HYBRID_AI_MULTIPLAYER_*.md
+
+# 프로젝트 상태 문서
+COMPLETION_STATUS_*.md
+COMPLETE_JOB_SYSTEM_*.md
+
+# JSON 설정 파일들 (게임 구동 불필요)
+enhanced_skill_system_batch1.json
+organic_skill_system_*.json
+character_presets_ai.json
+character_presets.json
+gamepad_config.json
+
+# 검증 및 이슈 추적
+issue_verification_*.txt
+issue_verifier.py
+
+# 설치 관련 (setup.py는 배포용이므로 유지 가능)
+setup_portable.sh
+start_game_portable.sh
+
+# AI 영구 학습 데이터베이스
+ai_permanent_learning.db
+ai_interactions.db
+
+# 배치 파일 (필수 런처 제외)
+Ollama_서버_시작.bat
+
+# ===================================================================
+# .github/copilot-instructions.md 제외 (프로젝트별 개발 가이드)
+# ===================================================================
+.github/copilot-instructions.md
+
+# ===================================================================
+# 기타 보안/기여 가이드 (선택적)
+# ===================================================================
+SECURITY.md
+CONTRIBUTING.md
+CHANGELOG.md
